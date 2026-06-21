@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --surface: #fbf9f8;
+  --surface-dim: #dcd9d9;
+  --surface-bright: #fbf9f8;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f6f3f2;
+  --surface-container: #f0eded;
+  --surface-container-high: #eae8e7;
+  --surface-container-highest: #e4e2e1;
+  --on-surface: #1b1c1c;
+  --on-surface-variant: #514532;
+  --inverse-surface: #303030;
+  --inverse-on-surface: #f3f0f0;
+  --outline: #837560;
+  --outline-variant: #d5c4ab;
+  --surface-tint: #7c5800;
+  --primary: #7c5800;
+  --on-primary: #ffffff;
+  --primary-container: #ffb800;
+  --on-primary-container: #6b4c00;
+  --inverse-primary: #ffba20;
+  --secondary: #2559bd;
+  --on-secondary: #ffffff;
+  --secondary-container: #6c98ff;
+  --on-secondary-container: #002f76;
+  --tertiary: #5f5f59;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #c6c5be;
+  --on-tertiary-container: #51524c;
+  --background: #fbf9f8;
+  --on-background: #1b1c1c;
+  --surface-variant: #e4e2e1;
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  --shadow-card: 0 15px 35px -5px rgba(37, 89, 189, 0.12), 0 5px 15px -3px rgba(37, 89, 189, 0.05);
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-surface-tint: var(--surface-tint);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-inverse-primary: var(--inverse-primary);
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --color-neutral: var(--neutral);
+  --color-background: var(--background);
+  --color-foreground: var(--on-background);
+  --font-headline: var(--font-plus-jakarta-sans);
+  --font-body: var(--font-manrope);
+  --font-label: var(--font-manrope);
+  --font-sans: var(--font-manrope);
+  --radius-brand: var(--radius-lg);
+  --radius-card: var(--radius-xl);
+  --radius-pill: var(--radius-full);
+}
+
+body {
+  color: var(--on-background);
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+.font-headline {
+  font-family: var(--font-plus-jakarta-sans), Arial, Helvetica, sans-serif;
+}
+
+.font-label {
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+.rounded-brand {
+  border-radius: var(--radius-lg);
+}
+
+.rounded-card {
+  border-radius: var(--radius-xl);
+}
+
+.rounded-pill {
+  border-radius: var(--radius-full);
+}
