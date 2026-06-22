@@ -5,24 +5,24 @@ import { TeacherShell } from "@/components/teacher/teacher-shell";
 export default function TeacherProfilePage() {
   const teacherData = {
     personalInfo: {
-      fullName: "Sarah Elizabeth Jenkins",
-      dateOfBirth: "May 14, 1990",
-      email: "sarah.j@merryexplorers.edu",
+      fullName: "Iya Abeleda",
+      dateOfBirth: "May 1, 2002",
+      email: "iya.a@merryexplorers.edu",
       phone: "(555) 123-4567",
       homeAddress: "123 Maple Street, Apt 4B, Springfield, IL 62704",
     },
     workDetails: {
-      role: "Lead Educator",
+      role: "Lead Teacher",
       assignedRoom: "Sunshine Room (Toddlers)",
       employeeId: "ME-2021-042",
       scheduleType: "Full-Time (M-F)",
     },
     profileCard: {
-      firstName: "Sarah",
-      lastName: "Jenkins",
-      title: "Lead Educator - Toddlers",
+      firstName: "Iya",
+      lastName: "Abeleda",
+      title: "Lead Teacher - Toddlers",
       tags: ["Early Childhood Ed", "CPR Certified"],
-      joined: "Aug 2021",
+      joined: "Aug 2026",
       status: "Active",
     },
     emergencyContacts: [
@@ -40,261 +40,184 @@ export default function TeacherProfilePage() {
   };
 
   return (
-    <TeacherShell
-      title="My Profile"
-      description="View and update your personal and professional information."
-    >
-      <div className="flex gap-6 items-start">
-        {/* ── Left: Profile Card ── */}
-        <div
-          className="flex-shrink-0 w-[220px] bg-white rounded-2xl p-6 flex flex-col items-center text-center shadow-sm"
-          style={{ border: "1.5px solid #ffe9a0" }}
-        >
-          {/* Avatar */}
-          <div
-            className="w-24 h-24 rounded-full overflow-hidden mb-4"
-            style={{
-              border: "3px solid #ffd700",
-              background: "linear-gradient(135deg, #ffe9a0 0%, #ffd700 100%)",
-            }}
-          >
-            <div
-              className="w-full h-full flex items-center justify-center text-3xl font-bold text-[#002f76]"
-              style={{ background: "#f0e6c8" }}
-            >
-              SJ
+    <TeacherShell title="Teacher Profile">
+      <div className="gap-8 w-full">
+        {/* ── Top Row: Profile Card + Personal Info ── */}
+        <div className="flex gap-8 items-stretch w-full mb-6">
+          {/* Left Column: Profile Card */}
+          <div className="w-1/3 flex">
+            <div className="bg-white rounded-[2rem] shadow-lg border-2 border-brand-yellow overflow-hidden flex flex-col items-center pt-10 pb-8 px-6 relative w-full">
+              {/* Decorative top banner */}
+              <div className="absolute top-0 left-0 w-full h-24 bg-brand-sky/50" />
+
+              {/* Avatar */}
+              <div className="w-32 h-32 rounded-full border-4 border-white bg-surface-container-low shadow-md overflow-hidden relative z-10 mb-6">
+                <img
+                  alt="Teacher Profile Picture"
+                  className="w-full h-full object-cover"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCaYlFqj6EAFK8LQwd7mdya-CtY8v_KVPqBxmvy4UHfIE-w__pFGXRAE_KzWqPqEj3y97tXZvL3u1jxNGPzU5JrduNIOZcVSXHEaqpZTle63VIMUr0KGtNVOPwwURG0s93J6tgBopsG-5N0fURy0L8ue31EbigHvhp_NoInxxBvHvio8DJOvL_HaWsoOem4mn9XJvcbLhD2Zhs_gmSEM4reBws7VsfOeW5HVEIhWGzFjknJbtxWgHe9laadthUeLxrBR5rJjk96NqI"
+                />
+              </div>
+
+              {/* Name & Title */}
+              <h2 className="text-2xl font-black text-brand-navy text-center mb-1">
+                {teacherData.profileCard.firstName} {teacherData.profileCard.lastName}
+              </h2>
+              <p className="font-bold text-brand-blue text-sm text-center mb-4">
+                {teacherData.profileCard.title}
+              </p>
+
+              {/* Tags */}
+              <div className="flex flex-wrap justify-center gap-2 mb-8">
+                {teacherData.profileCard.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className={`font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider ${
+                      tag === "CPR Certified"
+                        ? "bg-brand-sky text-brand-blue"
+                        : "bg-brand-orange text-brand-navy"
+                    }`}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              {/* Joined & Status */}
+              <div className="w-full border-t border-brand-sky mt-auto pt-6 flex justify-around">
+                <div className="text-center">
+                  <p className="font-bold text-[10px] text-brand-blue uppercase tracking-wider mb-1">
+                    Joined
+                  </p>
+                  <p className="text-sm text-brand-navy font-bold">
+                    {teacherData.profileCard.joined}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold text-[10px] text-brand-blue uppercase tracking-wider mb-1">
+                    Status
+                  </p>
+                  <p className="text-sm text-brand-orange font-bold">
+                    {teacherData.profileCard.status}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Name */}
-          <h2 className="text-[17px] font-bold text-[#002f76] leading-tight">
-            {teacherData.profileCard.firstName}{" "}
-            {teacherData.profileCard.lastName}
-          </h2>
-          <p className="text-[12px] text-[#5a7184] mt-1 mb-4">
-            {teacherData.profileCard.title}
-          </p>
+          {/* Right Column: Personal Information */}
+          <div className="w-2/3 flex">
+            <section className="bg-white rounded-[2rem] border-2 border-brand-orange shadow-lg p-6 relative overflow-hidden w-full flex flex-col">
+              <h3 className="text-2xl font-black text-brand-navy mb-6 flex items-center gap-2">
+                <svg className="text-brand-orange w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                    </svg>
+                Personal Information
+              </h3>
 
-          {/* Tags */}
-          <div className="flex flex-wrap gap-1.5 justify-center mb-5">
-            {teacherData.profileCard.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                style={{
-                  background:
-                    tag === "CPR Certified" ? "#fff0c0" : "#ffb800",
-                  color: tag === "CPR Certified" ? "#b07800" : "#fff",
-                }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+              <div className="grid grid-cols-2 gap-5 flex-1">
+                {/* Full Name */}
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
+                    Full Name
+                  </label>
+                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                    {teacherData.personalInfo.fullName}
+                  </div>
+                </div>
 
-          {/* Divider */}
-          <div
-            className="w-full border-t mb-4"
-            style={{ borderColor: "#f0e6c0" }}
-          />
+                {/* Date of Birth */}
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
+                    Date of Birth
+                  </label>
+                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                    {teacherData.personalInfo.dateOfBirth}
+                  </div>
+                </div>
 
-          {/* Joined & Status */}
-          <div className="flex w-full justify-around text-center">
-            <div>
-              <p
-                className="text-[10px] font-bold uppercase tracking-widest mb-0.5"
-                style={{ color: "#a0aec0" }}
-              >
-                Joined
-              </p>
-              <p className="text-[13px] font-semibold text-[#002f76]">
-                {teacherData.profileCard.joined}
-              </p>
-            </div>
-            <div>
-              <p
-                className="text-[10px] font-bold uppercase tracking-widest mb-0.5"
-                style={{ color: "#a0aec0" }}
-              >
-                Status
-              </p>
-              <p
-                className="text-[13px] font-semibold"
-                style={{ color: "#2da05b" }}
-              >
-                {teacherData.profileCard.status}
-              </p>
-            </div>
+                {/* Email */}
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
+                    Email Address
+                  </label>
+                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                    {teacherData.personalInfo.email}
+                  </div>
+                </div>
+
+                {/* Phone */}
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
+                    Phone Number
+                  </label>
+                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                    {teacherData.personalInfo.phone}
+                  </div>
+                </div>
+
+                {/* Home Address – full width */}
+                <div className="col-span-2 flex flex-col gap-1">
+                  <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
+                    Home Address
+                  </label>
+                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                    {teacherData.personalInfo.homeAddress}
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
 
-        {/* ── Right: Info Panels ── */}
-        <div className="flex-1 flex flex-col gap-5">
-          {/* Personal Information */}
-          <section
-            className="bg-white rounded-2xl p-6 shadow-sm"
-            style={{ border: "1.5px solid #e8eef5" }}
-          >
-            {/* Section Header */}
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-xl">🧑</span>
-              <h2 className="text-[17px] font-bold text-[#002f76]">
-                Personal Information
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-              {/* Full Name */}
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
-                  Full Name
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
-                  {teacherData.personalInfo.fullName}
-                </div>
-              </div>
-
-              {/* Date of Birth */}
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
-                  Date of Birth
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
-                  {teacherData.personalInfo.dateOfBirth}
-                </div>
-              </div>
-
-              {/* Email */}
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
-                  Email Address
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
-                  {teacherData.personalInfo.email}
-                </div>
-              </div>
-
-              {/* Phone */}
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
-                  Phone Number
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
-                  {teacherData.personalInfo.phone}
-                </div>
-              </div>
-
-              {/* Home Address – full width */}
-              <div className="col-span-2">
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
-                  Home Address
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
-                  {teacherData.personalInfo.homeAddress}
-                </div>
-              </div>
-            </div>
-          </section>
-
+        {/* ── Bottom Row: Full Width Cards ── */}
+        <div className="flex flex-col gap-6 w-full">
           {/* Work Details */}
-          <section
-            className="bg-white rounded-2xl p-6 shadow-sm"
-            style={{ border: "1.5px solid #e8eef5" }}
-          >
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-xl">💼</span>
-              <h2 className="text-[17px] font-bold text-[#002f76]">
-                Work Details
-              </h2>
-            </div>
+          <section className="bg-white rounded-[2rem] border-2 border-brand-sky shadow-lg p-6 relative overflow-hidden w-full">
+            <h3 className="text-2xl font-black text-brand-navy mb-6 flex items-center gap-2">
+              <svg className="text-brand-blue w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.98 16.02 1 13.64 1h-3.28C7.98 1 6 2.98 6 4.64c0 .48.11.92.18 1.36H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM8.36 4.64C8.36 4.07 8.93 3.5 10.36 3.5h3.28c1.43 0 2 .57 2 1.14 0 .48-.11.92-.18 1.36H8.54c-.07-.44-.18-.88-.18-1.36zM20 19H4V8h16v11z"/>
+                  </svg>
+              Work Details
+            </h3>
 
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              {/* Role */}
+              <div className="flex flex-col gap-1">
+                <label className="font-bold text-[10px] text-brand-blue uppercase tracking-wider ml-1">
                   Role
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
+                </label>
+                <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
                   {teacherData.workDetails.role}
                 </div>
               </div>
 
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
+              {/* Assigned Room */}
+              <div className="flex flex-col gap-1">
+                <label className="font-bold text-[10px] text-brand-blue uppercase tracking-wider ml-1">
                   Assigned Room
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
+                </label>
+                <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
                   {teacherData.workDetails.assignedRoom}
                 </div>
               </div>
 
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
+              {/* Employee ID */}
+              <div className="flex flex-col gap-1">
+                <label className="font-bold text-[10px] text-brand-blue uppercase tracking-wider ml-1">
                   Employee ID
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
+                </label>
+                <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
                   {teacherData.workDetails.employeeId}
                 </div>
               </div>
 
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "#a0aec0" }}
-                >
+              {/* Schedule Type */}
+              <div className="flex flex-col gap-1">
+                <label className="font-bold text-[10px] text-brand-blue uppercase tracking-wider ml-1">
                   Schedule Type
-                </p>
-                <div
-                  className="rounded-lg px-3 py-2 text-[14px] font-semibold text-[#002f76]"
-                  style={{ background: "#f9fbfd", border: "1px solid #e8eef5" }}
-                >
+                </label>
+                <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
                   {teacherData.workDetails.scheduleType}
                 </div>
               </div>
@@ -302,66 +225,39 @@ export default function TeacherProfilePage() {
           </section>
 
           {/* Emergency Contacts */}
-          <section
-            className="bg-white rounded-2xl p-6 shadow-sm"
-            style={{ border: "1.5px solid #ffd7d7" }}
-          >
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-xl">🚑</span>
-              <h2 className="text-[17px] font-bold text-[#002f76]">
-                Emergency Contacts
-              </h2>
-            </div>
+          <section className="bg-white rounded-[2rem] border-2 border-brand-red shadow-lg p-6 relative overflow-hidden w-full">
+            <h3 className="text-2xl font-black text-brand-navy mb-6 flex items-center gap-2">
+              <svg className="text-brand-red w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 3c.55 0 1 .45 1 1v2h2c.55 0 1 .45 1 1v2c0 .55-.45 1-1 1h-2v2c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1v-2H8c-.55 0-1-.45-1-1v-2c0-.55.45-1 1-1h2V7c0-.55.45-1 1-1h2z"/>
+                  </svg>
+              Emergency Contacts
+            </h3>
 
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {teacherData.emergencyContacts.map((contact) => (
                 <div
                   key={contact.name}
-                  className="flex items-center gap-4 rounded-xl px-4 py-3"
-                  style={{
-                    background: "#fff8f8",
-                    border: "1px solid #ffe4e4",
-                  }}
+                  className="flex items-center justify-between p-4 rounded-2xl bg-red-50/50 border border-brand-red/20 hover:bg-red-50 transition-colors"
                 >
-                  {/* Avatar icon */}
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: "#ffd7d7" }}
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle cx="12" cy="8" r="4" fill="#e05252" />
-                      <path
-                        d="M4 20c0-4 3.582-7 8-7s8 3 8 7"
-                        stroke="#e05252"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                  {/* Left: Icon + Name + Relationship */}
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-brand-red/10 flex items-center justify-center text-brand-red">
+                      <svg className="text-brand-red w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                        </svg>
+                    </div>
+                    <div>
+                      <div className="font-bold text-brand-navy text-sm">{contact.name}</div>
+                      <div className="text-[10px] text-brand-red font-black uppercase tracking-wider mt-0.5">
+                        {contact.relationship}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Name & Relationship */}
-                  <div className="flex-1">
-                    <p className="text-[14px] font-bold text-[#002f76] leading-tight">
-                      {contact.name}
-                    </p>
-                    <p
-                      className="text-[11px] font-bold uppercase tracking-widest"
-                      style={{ color: "#e05252" }}
-                    >
-                      {contact.relationship}
-                    </p>
-                  </div>
-
-                  {/* Phone */}
-                  <p className="text-[14px] font-semibold text-[#002f76]">
+                  {/* Right: Phone */}
+                  <div className="font-bold text-brand-navy text-sm bg-white px-3 py-1.5 rounded-lg border border-brand-red/10 shadow-sm">
                     {contact.phone}
-                  </p>
+                  </div>
                 </div>
               ))}
             </div>

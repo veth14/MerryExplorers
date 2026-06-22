@@ -40,6 +40,13 @@
   --radius-xl: 24px;
   --radius-full: 9999px;
   --shadow-card: 0 15px 35px -5px rgba(37, 89, 189, 0.12), 0 5px 15px -3px rgba(37, 89, 189, 0.05);
+  --brand-navy: #003399;
+  --brand-blue: #0066cc;
+  --brand-yellow: #ffcc00;
+  --brand-orange: #ffb800;
+  --brand-sky: #e6f4f8;
+  --brand-green: #339933;
+  --brand-red: #ff3300;
 }
 
 @theme inline {
@@ -82,6 +89,20 @@
   --radius-brand: var(--radius-lg);
   --radius-card: var(--radius-xl);
   --radius-pill: var(--radius-full);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-sky: var(--brand-sky);
+  --color-brand-green: var(--brand-green);
+  --color-brand-red: var(--brand-red);
+}
+
+.cloud-bg {
+  background-color: #f0f9ff;
+  background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 20%),
+                    radial-gradient(circle at 80% 20%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 25%),
+                    radial-gradient(circle at 50% 80%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 30%);
 }
 
 body {
