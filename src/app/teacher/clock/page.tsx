@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import type { BreakEntry, ActivityEntry } from "@/data/teacher-dashboard";
 
@@ -73,8 +74,23 @@ export default function ClockPage() {
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [isCameraCovered, setIsCameraCovered] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // The currently active stream (may be null if startCamera is in flight).
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // A set of EVERY stream this component has ever created via getUserMedia.
+  // We need this because React StrictMode (dev) mounts the component twice on
+  // first render: startCamera() can be called twice in quick succession, and
+  // whichever getUserMedia() resolves second overwrites streamRef.current —
+  // orphaning the first stream. An orphaned stream's tracks never get stopped,
+  // so the camera indicator stays lit forever (even after navigation).
+  // By tracking all of them, stopCamera can guarantee every track is stopped.
+  const allStreamsRef = useRef<Set<MediaStream>>(new Set());
+  // Monotonic token for the most recent startCamera() call. Each in-flight
+  // getUserMedia() captures its token at call time; after the await resolves,
+  // it only proceeds if its token is still the current one. stopCamera and a
+  // newer startCamera both bump the token, invalidating any older in-flight
+  // call so its stream gets stopped instead of leaked.
+  const startTokenRef = useRef(0);
 
   // Frozen / covered frame detection
   const lastFrameDataRef = useRef<Uint8ClampedArray | null>(null);
@@ -86,6 +102,10 @@ export default function ClockPage() {
   // ── Camera ───────────────────────────────────────────────────────────────
 
   const startCamera = useCallback(async () => {
+    // Assign this call a fresh token and capture it. Any earlier in-flight
+    // call is implicitly invalidated (its captured token no longer matches).
+    const myToken = ++startTokenRef.current;
+
     setCameraStatus("loading");
     lastFrameDataRef.current = null;
 
@@ -94,27 +114,14 @@ export default function ClockPage() {
       return;
     }
 
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
         audio: false,
       });
-
-      const track = stream.getVideoTracks()[0];
-      if (track) {
-        // "ended" fires on some hardware kill switches — keep as a safety net
-        track.addEventListener("ended", () => {
-          setCameraStatus("unavailable");
-        });
-        // "mute" fires on some OS/driver combos when HW switch is toggled
-        track.addEventListener("mute", () => {
-          setCameraStatus("unavailable");
-        });
-      }
-
-      streamRef.current = stream;
-      setCameraStatus("active");
     } catch (err) {
+      if (myToken !== startTokenRef.current) return; // superseded — ignore
       const error = err as DOMException;
       if (
         error.name === "NotAllowedError" ||
@@ -124,14 +131,52 @@ export default function ClockPage() {
       } else {
         setCameraStatus("unavailable");
       }
+      return;
     }
+
+    // Race guard: if a newer startCamera() or a stopCamera() ran while we
+    // were awaiting (either via StrictMode double-mount or user navigation),
+    // our token no longer matches — stop this stream immediately so it can't
+    // leak, and don't touch any refs/state.
+    if (myToken !== startTokenRef.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
+    const track = stream.getVideoTracks()[0];
+    if (track) {
+      // "ended" fires on some hardware kill switches — keep as a safety net
+      track.addEventListener("ended", () => {
+        setCameraStatus("unavailable");
+      });
+      // "mute" fires on some OS/driver combos when HW switch is toggled
+      track.addEventListener("mute", () => {
+        setCameraStatus("unavailable");
+      });
+    }
+
+    streamRef.current = stream;
+    allStreamsRef.current.add(stream);
+    setCameraStatus("active");
   }, []);
 
+  // Single source of truth for tearing down the camera. Both the manual
+  // "Turn Off Camera" button, the unmount cleanup, and the route-change
+  // effect all route through here so they can never drift out of sync.
   const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
+    // Invalidate any in-flight startCamera() so its resolved stream gets
+    // stopped by its own race guard rather than orphaned.
+    startTokenRef.current++;
+    // Stop EVERY stream this component ever created, not just the current
+    // one. This is the critical fix: under React StrictMode (dev), two
+    // getUserMedia() calls can race and the loser's stream gets orphaned in
+    // the OS — only iterating all known streams guarantees no track is left
+    // running, which is what keeps the camera indicator lit.
+    allStreamsRef.current.forEach((s) => {
+      s.getTracks().forEach((t) => t.stop());
+    });
+    allStreamsRef.current.clear();
+    streamRef.current = null;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -274,17 +319,28 @@ export default function ClockPage() {
     return () => clearInterval(id);
   }, [cameraStatus]);
 
-  // Initialize camera on mount, clean up on unmount
+  // Start/stop the camera based on whether this page is the active route.
+  //
+  // WHY route-driven (not just unmount): In Next.js 16 the App Router may
+  // keep the previous route's component tree alive (background activity /
+  // cached) rather than truly unmounting it on navigation. When that happens,
+  // this component's unmount cleanup does NOT fire — so relying on it leaves
+  // the webcam stream running with the camera indicator lit on every other
+  // page.
+  //
+  // usePathname() updates on every navigation regardless of whether React
+  // unmounts, hides, or caches us, so it's a reliable signal of which page is
+  // visible. We start the camera when pathname is /teacher/clock and stop it
+  // otherwise. The cleanup return also fires on genuine unmount as a backstop.
+  const pathname = usePathname();
   useEffect(() => {
-    startCamera();
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (pathname === "/teacher/clock") {
+      startCamera();
+      return () => stopCamera();
+    }
+    // Not on this route — make sure the camera is off.
+    stopCamera();
+  }, [pathname, startCamera, stopCamera]);
 
   // ── Live clock ───────────────────────────────────────────────────────────
 
