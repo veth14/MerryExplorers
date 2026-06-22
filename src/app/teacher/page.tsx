@@ -31,14 +31,9 @@ function ProfileIcon() {
 function AlertIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-      <path d="m11.3 5.3 8.3 8.3" />
-      <path d="m14 2 8 8" />
-      <path d="M17 11V7" />
-      <path d="M21 15v-4" />
-      <path d="M22 22 2 2" />
-      <path d="M8 8v4" />
-      <path d="m5 5 1.4 1.4" />
-      <path d="m8.6 15 11.3-11.3" />
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }
@@ -53,83 +48,160 @@ function InfoIcon() {
   );
 }
 
+function UsersIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function GroupIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function CoTeacherIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 export default function TeacherDashboardPage() {
   return (
-    <TeacherShell title="Good Morning, Sarah" description="Here's what's happening at Merry Explorers today.">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 w-full">
-        {/* Left Column */}
+    <TeacherShell
+      title="Good Morning, Sarah 👋"
+      description="Here's what's happening at Merry Explorers today."
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 w-full">
+
+        {/* ── Left Column ── */}
         <div className="flex flex-col gap-6">
+
           {/* Today's Shift Card */}
-          <div className="rounded-[1.25rem] bg-white border-2 border-[#ffb800] p-6 shadow-sm relative overflow-hidden">
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-2 bg-[#f0f4f9] px-3 py-1.5 rounded-full text-[11px] font-bold text-[#002f76]">
+          <div className="bg-white rounded-[2rem] border-2 border-brand-yellow shadow-lg p-6 relative overflow-hidden">
+            {/* Decorative blobs */}
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-brand-yellow/10 pointer-events-none" />
+            <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full bg-brand-sky/20 pointer-events-none" />
+
+            {/* Top row: shift type pill + status */}
+            <div className="flex justify-between items-center mb-6 relative z-10">
+              <div className="flex items-center gap-2 bg-brand-sky/30 text-brand-navy px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider">
                 <ClockIcon />
                 {currentShift.type}
               </div>
               <div className="text-right">
-                <div className="flex items-center gap-1.5 text-[12px] font-bold text-[#005cc8]">
-                  <span className="w-2 h-2 rounded-full bg-[#005cc8]" />
-                  {currentShift.status}
+                <div className="flex items-center gap-1.5 justify-end">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[12px] font-black text-green-600">{currentShift.status}</span>
                 </div>
-                <div className="text-[10px] font-semibold text-[#002f76]/60 mt-1">
-                  {currentShift.since}
+                <div className="text-[10px] font-bold text-brand-navy/50 mt-0.5">{currentShift.since}</div>
+              </div>
+            </div>
+
+            {/* Shift title + time */}
+            <div className="mb-6 relative z-10">
+              <h2 className="text-[32px] font-black text-brand-navy leading-tight">Today&apos;s Shift</h2>
+              <p className="text-[15px] font-bold text-brand-blue mt-1">{currentShift.timeRange}</p>
+            </div>
+
+            {/* Info tiles */}
+            <div className="grid grid-cols-3 gap-3 mb-6 relative z-10">
+              {/* Assigned Group */}
+              <div className="rounded-2xl bg-brand-yellow/10 border border-brand-yellow/30 p-4">
+                <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-brand-yellow mb-2">
+                  <GroupIcon />
+                  Assigned Group
                 </div>
+                <div className="text-[15px] font-black text-brand-navy">{currentShift.group}</div>
+              </div>
+
+              {/* Students */}
+              <div className="rounded-2xl bg-brand-sky/20 border border-brand-sky/30 p-4">
+                <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-brand-blue mb-2">
+                  <UsersIcon />
+                  Students
+                </div>
+                <div className="text-[15px] font-black text-brand-navy">{currentShift.students}</div>
+              </div>
+
+              {/* Co-Teacher */}
+              <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
+                <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-purple-400 mb-2">
+                  <CoTeacherIcon />
+                  Co-Teacher
+                </div>
+                <div className="text-[15px] font-black text-brand-navy">{currentShift.coTeacher}</div>
               </div>
             </div>
 
-            <div className="mb-8">
-              <h2 className="text-[28px] font-extrabold text-[#002f76] leading-tight">Today&apos;s Shift</h2>
-              <p className="text-[14px] font-bold text-[#005cc8] mt-1">{currentShift.timeRange}</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="bg-[#fcfdfd] rounded-xl p-4 border border-[#f0f4f9]">
-                <div className="text-[10px] font-black uppercase tracking-wider text-[#005cc8]/60 mb-1">ASSIGNED GROUP</div>
-                <div className="text-[16px] font-extrabold text-[#002f76]">{currentShift.group}</div>
-              </div>
-              <div className="bg-[#fcfdfd] rounded-xl p-4 border border-[#f0f4f9]">
-                <div className="text-[10px] font-black uppercase tracking-wider text-[#005cc8]/60 mb-1">STUDENTS</div>
-                <div className="text-[16px] font-extrabold text-[#002f76]">{currentShift.students}</div>
-              </div>
-              <div className="bg-[#fcfdfd] rounded-xl p-4 border border-[#f0f4f9]">
-                <div className="text-[10px] font-black uppercase tracking-wider text-[#005cc8]/60 mb-1">CO-TEACHER</div>
-                <div className="text-[16px] font-extrabold text-[#002f76]">{currentShift.coTeacher}</div>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <button className="flex-1 bg-white border border-[#e2e8f0] text-[#002f76] font-extrabold py-3.5 rounded-full hover:bg-[#f0f4f9] transition-colors shadow-sm">
+            {/* Action buttons */}
+            <div className="flex gap-3 relative z-10">
+              <button className="flex-1 bg-white border-2 border-slate-200 text-brand-navy font-black py-3.5 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all text-[14px]">
                 Take Break
               </button>
-              <button className="flex-1 bg-[#ffb800] text-[#002f76] font-extrabold py-3.5 rounded-full hover:bg-[#ffb800]/90 transition-colors shadow-sm">
+              <button className="flex-1 bg-brand-yellow text-brand-navy font-black py-3.5 rounded-2xl hover:brightness-95 transition-all text-[14px] shadow-md shadow-brand-yellow/30">
                 Clock Out
               </button>
             </div>
           </div>
 
-          {/* Announcements */}
-          <div className="rounded-[1.25rem] bg-white p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+          {/* Announcements Card */}
+          <div className="bg-white rounded-[2rem] border-2 border-brand-sky shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-[20px] font-extrabold text-[#002f76]">Announcements</h2>
-              <button className="text-[11px] font-black uppercase tracking-wider text-[#005cc8] hover:underline">
-                VIEW ALL
+              <div className="flex items-center gap-3">
+                <span className="block w-7 h-[3px] rounded-full bg-brand-yellow" />
+                <h2 className="text-[20px] font-black text-brand-navy">Announcements</h2>
+              </div>
+              <button className="text-[10px] font-black uppercase tracking-widest text-brand-blue hover:underline">
+                View All
               </button>
             </div>
 
-            <div className="space-y-4">
-              {teacherAnnouncements.map((announcement) => (
-                <div key={announcement.id} className="flex gap-4 relative pl-4">
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-full ${announcement.type === "alert" ? "bg-[#ffb800]" : "bg-[#005cc8]"}`} />
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${announcement.type === "alert" ? "bg-[#fff9e6] text-[#ffb800]" : "bg-[#e8f0fe] text-[#005cc8]"}`}>
-                    {announcement.type === "alert" ? <AlertIcon /> : <InfoIcon />}
+            <div className="flex flex-col gap-4">
+              {teacherAnnouncements.map((a) => (
+                <div
+                  key={a.id}
+                  className={`flex gap-4 p-4 rounded-2xl border relative overflow-hidden ${
+                    a.type === "alert"
+                      ? "bg-amber-50/60 border-brand-yellow/30"
+                      : "bg-blue-50/40 border-brand-sky/40"
+                  }`}
+                >
+                  {/* Left accent bar */}
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${
+                      a.type === "alert" ? "bg-brand-yellow" : "bg-brand-blue"
+                    }`}
+                  />
+                  {/* Icon */}
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                      a.type === "alert"
+                        ? "bg-brand-yellow/20 text-amber-600"
+                        : "bg-brand-sky/40 text-brand-blue"
+                    }`}
+                  >
+                    {a.type === "alert" ? <AlertIcon /> : <InfoIcon />}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-[14px] font-extrabold text-[#002f76]">{announcement.title}</h3>
-                      <span className="text-[11px] font-bold text-[#002f76]/50">{announcement.timeAgo}</span>
+                  {/* Text */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="text-[13px] font-black text-brand-navy">{a.title}</h3>
+                      <span className="text-[10px] font-bold text-brand-navy/40">{a.timeAgo}</span>
                     </div>
-                    <p className="text-[13px] font-medium text-[#002f76]/70 leading-relaxed">
-                      {announcement.content}
+                    <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed">
+                      {a.content}
                     </p>
                   </div>
                 </div>
@@ -138,24 +210,61 @@ export default function TeacherDashboardPage() {
           </div>
         </div>
 
-        {/* Right Column */}
-        <div className="flex flex-col gap-6">
-          <button className="rounded-[1.25rem] bg-white p-8 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-lg transition-all flex flex-col items-center justify-center text-center group">
-            <div className="w-14 h-14 rounded-full bg-[#e8f0fe] text-[#005cc8] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+        {/* ── Right Column ── */}
+        <div className="flex flex-col gap-4">
+          {/* Shift History Button Card */}
+          <a
+            href="/teacher/shift-history"
+            className="bg-white rounded-[2rem] border-2 border-brand-sky shadow-lg p-8 hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center justify-center text-center group"
+          >
+            <div className="w-16 h-16 rounded-full bg-brand-sky/30 text-brand-blue flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-brand-sky/50 transition-all">
               <HistoryIcon />
             </div>
-            <h3 className="text-[18px] font-extrabold text-[#002f76]">Shift History</h3>
-            <p className="text-[13px] font-medium text-[#002f76]/60 mt-1">View past timesheets</p>
-          </button>
+            <h3 className="text-[17px] font-black text-brand-navy">Shift History</h3>
+            <p className="text-[12px] font-bold text-brand-navy/50 mt-1">View past timesheets</p>
+          </a>
 
-          <button className="rounded-[1.25rem] bg-white p-8 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-lg transition-all flex flex-col items-center justify-center text-center group">
-            <div className="w-14 h-14 rounded-full bg-[#e8f0fe] text-[#005cc8] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          {/* My Profile Button Card */}
+          <a
+            href="/teacher/profile"
+            className="bg-white rounded-[2rem] border-2 border-brand-orange shadow-lg p-8 hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center justify-center text-center group"
+          >
+            <div className="w-16 h-16 rounded-full bg-orange-100 text-brand-orange flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-orange-200 transition-all">
               <ProfileIcon />
             </div>
-            <h3 className="text-[18px] font-extrabold text-[#002f76]">My Profile</h3>
-            <p className="text-[13px] font-medium text-[#002f76]/60 mt-1">Update details</p>
-          </button>
+            <h3 className="text-[17px] font-black text-brand-navy">My Profile</h3>
+            <p className="text-[12px] font-bold text-brand-navy/50 mt-1">Update your details</p>
+          </a>
+
+          {/* Quick Stats mini card */}
+          <div className="bg-white rounded-[2rem] border-2 border-purple-100 shadow-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="block w-5 h-[3px] rounded-full bg-brand-yellow" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
+                This Week
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-brand-yellow/10 rounded-2xl p-3 text-center">
+                <div className="text-[22px] font-black text-brand-navy">32h</div>
+                <div className="text-[9px] font-black uppercase tracking-wider text-amber-600 mt-0.5">Hours</div>
+              </div>
+              <div className="bg-brand-sky/20 rounded-2xl p-3 text-center">
+                <div className="text-[22px] font-black text-brand-navy">5/6</div>
+                <div className="text-[9px] font-black uppercase tracking-wider text-brand-blue mt-0.5">Shifts</div>
+              </div>
+              <div className="bg-green-50 rounded-2xl p-3 text-center">
+                <div className="text-[22px] font-black text-brand-navy">94%</div>
+                <div className="text-[9px] font-black uppercase tracking-wider text-green-600 mt-0.5">On Time</div>
+              </div>
+              <div className="bg-purple-50 rounded-2xl p-3 text-center">
+                <div className="text-[22px] font-black text-brand-navy">7:52</div>
+                <div className="text-[9px] font-black uppercase tracking-wider text-purple-500 mt-0.5">Avg In</div>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
     </TeacherShell>
   );
