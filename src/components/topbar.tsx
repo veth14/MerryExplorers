@@ -1,9 +1,43 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { notifications as initialNotifications, notificationMeta } from "@/data/notifications";
+
 type TopbarProps = {
   title: string;
   description: string;
 };
 
 export function Topbar({ title, description }: TopbarProps) {
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [items, setItems] = useState(initialNotifications);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = items.filter((n) => !n.read).length;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function toggleNotif() {
+    setNotifOpen((open) => !open);
+  }
+
+  function markAllRead() {
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+  }
+
+  function markRead(id: string) {
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }
+
   return (
     <header className="flex items-center justify-between gap-4 shrink-0">
       {/* Left: greeting */}
@@ -30,13 +64,108 @@ export function Topbar({ title, description }: TopbarProps) {
           />
         </label>
 
-        {/* Bell */}
-        <button className="relative flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-white shadow-sm border border-[#e2e8f0]/80 text-[#0050d5]">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-            <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
-          </svg>
-          <span className="absolute right-[9px] top-[9px] h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ba1a1a]" />
-        </button>
+        {/* Bell + Notification dropdown */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={toggleNotif}
+            aria-label="Notifications"
+            aria-expanded={notifOpen}
+            className="relative flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-white shadow-sm border border-[#e2e8f0]/80 text-[#0050d5] transition-all hover:bg-[#f0f4f9]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute right-[6px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-white bg-[#ba1a1a] px-1 text-[9px] font-black text-white">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Dropdown panel */}
+          <div
+            className={`absolute right-0 top-[calc(100%+10px)] z-50 w-[360px] origin-top-right rounded-2xl bg-white border-2 border-[#e2e8f0] shadow-xl transition-all duration-200 ${
+              notifOpen
+                ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e8f0]">
+              <div className="flex items-center gap-2">
+                <h3 className="font-headline text-[15px] font-black text-[#002f76]">Notifications</h3>
+                {unreadCount > 0 && (
+                  <span className="rounded-full bg-[#ba1a1a]/10 px-2 py-0.5 text-[10px] font-black text-[#ba1a1a]">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="text-[11px] font-bold text-[#0050d5] hover:underline transition-colors"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+
+            {/* List */}
+            <div className="max-h-[340px] overflow-y-auto">
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 px-5 py-10 text-center">
+                  <span className="material-symbols-outlined text-[#a0aec0]" style={{ fontSize: "32px" }}>
+                    notifications_off
+                  </span>
+                  <p className="text-[12px] font-bold text-[#a0aec0]">No notifications yet</p>
+                </div>
+              ) : (
+                items.map((n) => {
+                  const meta = notificationMeta[n.type];
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => markRead(n.id)}
+                      className={`flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-[#f0f4f9] ${
+                        !n.read ? "bg-[#f0f4f9]/60" : ""
+                      }`}
+                    >
+                      {/* Icon */}
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                        style={{ backgroundColor: meta.bg }}
+                      >
+                        <span
+                          className="material-symbols-outlined"
+                          style={{ fontSize: "18px", color: meta.color }}
+                        >
+                          {meta.icon}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[12px] font-black text-[#002f76] truncate">{n.title}</p>
+                          {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-[#ba1a1a]" />}
+                        </div>
+                        <p className="mt-0.5 text-[11px] font-semibold text-[#4a5568] leading-snug">{n.message}</p>
+                        <p className="mt-1 text-[10px] font-bold text-[#a0aec0]">{n.time}</p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-[#e2e8f0] px-5 py-3 text-center">
+              <button className="text-[11px] font-black text-[#0050d5] hover:underline transition-colors">
+                View all notifications
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Calendar */}
         <button className="flex items-center gap-1.5 h-[40px] rounded-full border border-[#e2e8f0]/80 bg-white px-4 shadow-sm">

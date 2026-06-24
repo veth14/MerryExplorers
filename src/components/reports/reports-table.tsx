@@ -1,95 +1,232 @@
 "use client";
 
+import { useState } from "react";
 import { detailedLogs } from "@/data/reports";
 
-function ListIcon() {
+const ROWS_PER_PAGE = 5;
+const ROW_HEIGHT = 56;
+
+function ChevronLeft() {
   return (
-    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ffb800] text-white shadow-sm shadow-[#ffb800]/20">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-        <line x1="8" y1="6" x2="21" y2="6" />
-        <line x1="8" y1="12" x2="21" y2="12" />
-        <line x1="8" y1="18" x2="21" y2="18" />
-        <line x1="3" y1="6" x2="3.01" y2="6" />
-        <line x1="3" y1="12" x2="3.01" y2="12" />
-        <line x1="3" y1="18" x2="3.01" y2="18" />
-      </svg>
-    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
   );
 }
 
 export function ReportsTable() {
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.ceil(detailedLogs.length / ROWS_PER_PAGE);
+  const start = (page - 1) * ROWS_PER_PAGE;
+  const visibleLogs = detailedLogs.slice(start, start + ROWS_PER_PAGE);
+
+  // Always pad to exactly ROWS_PER_PAGE so height never changes
+  const paddedLogs: (typeof detailedLogs[number] | null)[] = [
+    ...visibleLogs,
+    ...Array(ROWS_PER_PAGE - visibleLogs.length).fill(null),
+  ];
+
+  function goTo(p: number) {
+    if (p >= 1 && p <= totalPages) setPage(p);
+  }
+
+  const pageNumbers: (number | "...")[] = [];
+  if (totalPages <= 5) {
+    for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+  } else {
+    pageNumbers.push(1);
+    if (page > 3) pageNumbers.push("...");
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+      pageNumbers.push(i);
+    }
+    if (page < totalPages - 2) pageNumbers.push("...");
+    pageNumbers.push(totalPages);
+  }
+
   return (
-    <div id="detailed-logs-table" className="rounded-[1.25rem] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)] w-full overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 py-6 border-b border-[#f0f4f9]">
+    <div
+      id="detailed-logs-table"
+      className="rounded-[2rem] bg-white border-2 border-brand-blue shadow-lg w-full overflow-hidden"
+    >
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-8 py-6 border-b border-brand-sky">
         <div className="flex items-center gap-3">
-          <ListIcon />
-          <h2 className="text-[18px] font-black text-[#002f76]">Detailed Logs</h2>
+          <span
+            className="material-symbols-outlined text-brand-blue"
+            style={{ fontSize: "26px", fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
+          >
+            list_alt
+          </span>
+          <h2 className="font-headline text-[20px] font-black text-brand-navy">Detailed Logs</h2>
         </div>
-        <span className="text-[11px] font-bold text-[#005cc8]/50">
-          Showing 1-10 of 42 entries
+        <span className="text-[11px] font-bold text-brand-blue/60">
+          Showing {start + 1}–{Math.min(start + ROWS_PER_PAGE, detailedLogs.length)} of {detailedLogs.length} entries
         </span>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto w-full">
-        <table className="w-full text-left border-collapse">
+      {/* ── Table wrapper: thead outside scroll, fixed-height div for rows ── */}
+      <div className="w-full overflow-x-auto">
+
+        {/* Column headers — always visible, never scrolls away */}
+        <table className="w-full text-left border-collapse table-fixed">
+          <colgroup>
+            <col className="w-[16%]" />
+            <col className="w-[22%]" />
+            <col className="w-[16%]" />
+            <col className="w-[16%]" />
+            <col className="w-[16%]" />
+            <col className="w-[14%]" />
+          </colgroup>
           <thead>
-            <tr className="border-b border-[#f0f4f9]">
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#005cc8]/40 w-[15%]">Date</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#005cc8]/40 w-[20%]">Teacher Name</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#005cc8]/40 w-[15%]">Scheduled In</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#005cc8]/40 w-[15%]">Actual In</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#005cc8]/40 w-[20%]">Status</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#005cc8]/40 w-[15%]">Total Hours</th>
+            <tr className="border-b border-brand-sky">
+              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Date</th>
+              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Teacher Name</th>
+              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Scheduled In</th>
+              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Actual In</th>
+              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Status</th>
+              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Total Hours</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#f0f4f9]">
-            {detailedLogs.map((log) => (
-              <tr key={log.id} className="transition-all duration-200 hover:bg-[#f8fafc] group">
-                <td className="px-8 py-5 whitespace-nowrap">
-                  <span className="text-[13px] font-bold text-[#005cc8]">{log.date}</span>
-                </td>
-                <td className="px-8 py-5 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black text-white shadow-sm transition-transform duration-200 group-hover:scale-110"
-                      style={{ backgroundColor: log.color }}
-                    >
-                      {log.initials}
-                    </div>
-                    <span className="text-[13px] font-black text-[#002f76]">{log.teacherName}</span>
-                  </div>
-                </td>
-                <td className="px-8 py-5 whitespace-nowrap">
-                  <span className="text-[13px] font-bold text-[#005cc8]/60">{log.scheduledIn}</span>
-                </td>
-                <td className="px-8 py-5 whitespace-nowrap">
-                  <span className={`text-[13px] font-black ${log.status === "LATE" ? "text-[#ef4444]" : "text-[#005cc8]"}`}>
-                    {log.actualIn}
-                  </span>
-                </td>
-                <td className="px-8 py-5 whitespace-nowrap">
-                  <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black tracking-[0.1em] uppercase ${
-                    log.status === "ON TIME" 
-                      ? "bg-[#e6f4ea] text-[#2da05b]" 
-                      : "bg-[#fef2f2] text-[#ef4444]"
-                  }`}>
-                    <div className={`h-1.5 w-1.5 rounded-full ${log.status === "ON TIME" ? "bg-[#2da05b]" : "bg-[#ef4444]"}`} />
-                    {log.status}
-                  </div>
-                </td>
-                <td className="px-8 py-5 whitespace-nowrap">
-                  <span className="text-[13px] font-bold text-[#005cc8]">{log.totalHours}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
         </table>
+
+        {/* Body rows in a fixed-height container */}
+        <div style={{ height: `${ROW_HEIGHT * ROWS_PER_PAGE}px`, overflow: "hidden" }}>
+          <table className="w-full text-left border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[16%]" />
+              <col className="w-[22%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[14%]" />
+            </colgroup>
+            <tbody>
+              {paddedLogs.map((log, idx) =>
+                log ? (
+                  <tr
+                    key={log.id}
+                    className="border-b border-brand-sky/40 hover:bg-brand-sky/20 transition-colors group"
+                    style={{ height: `${ROW_HEIGHT}px` }}
+                  >
+                    <td className="px-8 whitespace-nowrap">
+                      <span className="text-[13px] font-bold text-brand-blue">{log.date}</span>
+                    </td>
+                    <td className="px-8 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white shadow-sm group-hover:scale-110 transition-transform"
+                          style={{ backgroundColor: log.color }}
+                        >
+                          {log.initials}
+                        </div>
+                        <span className="text-[13px] font-black text-brand-navy truncate">{log.teacherName}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 whitespace-nowrap">
+                      <span className="text-[13px] font-bold text-brand-navy/60">{log.scheduledIn}</span>
+                    </td>
+                    <td className="px-8 whitespace-nowrap">
+                      <span className={`text-[13px] font-black ${log.status === "LATE" ? "text-brand-red" : "text-brand-blue"}`}>
+                        {log.actualIn}
+                      </span>
+                    </td>
+                    <td className="px-8 whitespace-nowrap">
+                      <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black tracking-[0.1em] uppercase ${
+                        log.status === "ON TIME" ? "bg-brand-green/15 text-brand-green" : "bg-brand-red/10 text-brand-red"
+                      }`}>
+                        <div className={`h-1.5 w-1.5 rounded-full ${log.status === "ON TIME" ? "bg-brand-green" : "bg-brand-red"}`} />
+                        {log.status}
+                      </div>
+                    </td>
+                    <td className="px-8 whitespace-nowrap">
+                      <span className="text-[13px] font-bold text-brand-blue">{log.totalHours}</span>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr
+                    key={`empty-${idx}`}
+                    className="border-b border-brand-sky/10"
+                    style={{ height: `${ROW_HEIGHT}px` }}
+                  >
+                    <td colSpan={6} />
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-      
-      {/* Footer Padding */}
-      <div className="h-3 w-full bg-white"></div>
+
+      {/* ── Pagination Footer ── */}
+      <div className="flex items-center justify-between px-8 py-4 border-t border-brand-sky/40">
+        <p className="text-[11px] font-bold text-brand-navy/50">
+          Page {page} of {totalPages}
+        </p>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => goTo(page - 1)}
+            disabled={page === 1}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border-2 border-brand-sky text-brand-blue hover:bg-brand-sky/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronLeft />
+          </button>
+
+          {pageNumbers.map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-[12px] font-bold text-brand-navy/40">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => goTo(p as number)}
+                className={`w-8 h-8 flex items-center justify-center rounded-xl text-[12px] font-black transition-all ${
+                  page === p
+                    ? "bg-brand-blue text-white shadow-sm"
+                    : "border-2 border-brand-sky text-brand-navy hover:bg-brand-sky/30"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+
+          <button
+            onClick={() => goTo(page + 1)}
+            disabled={page === totalPages}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border-2 border-brand-sky text-brand-blue hover:bg-brand-sky/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronRight />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 text-[11px] font-bold text-brand-navy/50">
+          Go to
+          <input
+            type="number"
+            min={1}
+            max={totalPages}
+            defaultValue={page}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                const val = parseInt((e.target as HTMLInputElement).value);
+                goTo(val);
+              }
+            }}
+            className="w-12 h-8 rounded-xl border-2 border-brand-sky text-center text-[12px] font-black text-brand-navy outline-none focus:border-brand-blue transition-colors"
+          />
+        </div>
+      </div>
     </div>
   );
 }

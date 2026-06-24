@@ -13,7 +13,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
       <Sidebar />
 
       <main className="flex-1 px-6 py-5 h-screen overflow-y-auto w-full">
-        <div className="w-full h-full flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           <Topbar title={title} description={description} />
           {children}
         </div>
