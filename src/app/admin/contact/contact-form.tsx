@@ -137,7 +137,7 @@ export function ContactForm() {
             </p>
             
             <p className="mt-4 text-[12px] font-semibold text-[#9aa3b2]">
-              I'll get back to you within 1–2 business days.
+              I&apos;ll get back to you within 1–2 business days.
             </p>
 
             <button
@@ -155,13 +155,13 @@ export function ContactForm() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-8" noValidate>
             <p className="text-[14px] font-medium text-[#555555] leading-relaxed">
-              Found a bug or have a great idea? Tell me what's on your mind — I read every message personally.
+              Found a bug or have a great idea? Tell me what&apos;s on your mind — I read every message personally.
             </p>
 
             {/* Issue type selector with visual distinction */}
             <div>
               <label className="block text-[13px] font-bold text-[#1f2a44] mb-3 uppercase tracking-wider">
-                What's this about?
+                What&apos;s this about?
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {issueTypes.map((t) => (
