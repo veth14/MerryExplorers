@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { teacherNavItems } from "@/data/teacher-dashboard";
 
 function DashboardIcon({ active }: { active?: boolean }) {
@@ -62,6 +63,24 @@ function LogoutIcon() {
   );
 }
 
+function BugReportIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <path d="m8 2 1.88 1.88" />
+      <path d="M14.12 3.88 16 2" />
+      <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />
+      <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6Z" />
+      <path d="M12 20v-9" />
+      <path d="M6.53 9C4.6 8.8 3 7.1 3 5" />
+      <path d="M6 12H2" />
+      <path d="M3 15c2.1 0 3.9-1.4 4.5-3.3" />
+      <path d="M17.47 9c1.93-.2 3.53-1.9 3.53-4" />
+      <path d="M18 12h4" />
+      <path d="M21 15c-2.1 0-3.9-1.4-4.5-3.3" />
+    </svg>
+  );
+}
+
 const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   "Clock In/Out": ClockInOutIcon,
@@ -71,6 +90,24 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
 
 export function TeacherSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleLogout() {
+    setUserMenuOpen(false);
+    router.push("/login");
+  }
 
   return (
     <aside className="border-r border-[#e4e2e1]/50 bg-white hidden lg:block w-[250px] shrink-0 h-screen overflow-y-auto shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 relative">
@@ -114,16 +151,75 @@ export function TeacherSidebar() {
           </div>
         </nav>
 
-        {/* Footer */}
-        <div className="p-3 mb-2 space-y-1">
-          <Link href="#" className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-bold text-[#005cc8] hover:bg-[#005cc8]/10 transition-colors">
-            <span className="text-[#005cc8]"><SettingsIcon /></span>
-            <span>Settings</span>
-          </Link>
-          <Link href="/login" className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-bold text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors">
-            <span className="text-[#ef4444]"><LogoutIcon /></span>
-            <span>Logout</span>
-          </Link>
+        {/* Footer: clickable user with dropdown */}
+        <div className="p-3 mb-2">
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen((open) => !open)}
+              aria-label="Open user menu"
+              aria-expanded={userMenuOpen}
+              className={[
+                "flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 transition-colors",
+                userMenuOpen ? "bg-[#005cc8]/10" : "hover:bg-[#005cc8]/10",
+              ].join(" ")}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#ffb800] bg-[#1a1a1a] text-[10px] font-black text-white relative">
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-[#2da05b]"></span>
+                IA
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-[13px] font-bold text-[#005cc8] leading-tight">Iya Abeleda</p>
+                <p className="truncate text-[10px] font-semibold text-[#005cc8]/80">Lead Teacher</p>
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-4 w-4 shrink-0 text-[#005cc8] transition-transform duration-200 ${
+                  userMenuOpen ? "rotate-180" : ""
+                }`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {/* Dropdown */}
+            <div
+              className={`absolute bottom-full left-0 right-0 mb-2 z-50 overflow-hidden rounded-2xl bg-white border-2 border-[#e2e8f0] shadow-xl transition-all duration-200 origin-bottom ${
+                userMenuOpen
+                  ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                  : "opacity-0 scale-95 translate-y-1 pointer-events-none"
+              }`}
+            >
+              {/* Report a Bug */}
+              <Link
+                href="/teacher/contact"
+                onClick={() => setUserMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-[13px] font-bold text-[#005cc8] hover:bg-[#005cc8]/10 transition-colors"
+              >
+                <span className="text-[#005cc8]"><BugReportIcon /></span>
+                <span>Report a Bug</span>
+              </Link>
+              {/* Divider */}
+              <div className="h-[1px] w-full bg-[#e2e8f0]" />
+              {/* Logout */}
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 px-4 py-3 text-[13px] font-bold text-[#ba1a1a] hover:bg-[#ba1a1a]/10 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </aside>

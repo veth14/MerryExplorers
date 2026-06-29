@@ -1,42 +1,55 @@
 "use client";
 
+import { useState } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 
+const initialTeacherData = {
+  personalInfo: {
+    fullName: "Iya Abeleda",
+    dateOfBirth: "May 1, 2002",
+    email: "iya.a@merryexplorers.edu",
+    phone: "(555) 123-4567",
+    homeAddress: "123 Maple Street, Apt 4B, Springfield, IL 62704",
+  },
+  workDetails: {
+    role: "Lead Teacher",
+    assignedRoom: "Sunshine Room (Toddlers)",
+    employeeId: "ME-2021-042",
+    scheduleType: "Full-Time (M-F)",
+  },
+  profileCard: {
+    firstName: "Iya",
+    lastName: "Abeleda",
+    title: "Lead Teacher - Toddlers",
+    tags: ["Early Childhood Ed", "CPR Certified"],
+    joined: "Aug 2026",
+    status: "Active",
+  },
+  emergencyContacts: [
+    {
+      name: "David Jenkins",
+      relationship: "Spouse",
+      phone: "(555) 987-6543",
+    },
+    {
+      name: "Martha Jenkins",
+      relationship: "Mother",
+      phone: "(555) 456-7890",
+    },
+  ],
+};
+
 export default function TeacherProfilePage() {
-  const teacherData = {
-    personalInfo: {
-      fullName: "Iya Abeleda",
-      dateOfBirth: "May 1, 2002",
-      email: "iya.a@merryexplorers.edu",
-      phone: "(555) 123-4567",
-      homeAddress: "123 Maple Street, Apt 4B, Springfield, IL 62704",
-    },
-    workDetails: {
-      role: "Lead Teacher",
-      assignedRoom: "Sunshine Room (Toddlers)",
-      employeeId: "ME-2021-042",
-      scheduleType: "Full-Time (M-F)",
-    },
-    profileCard: {
-      firstName: "Iya",
-      lastName: "Abeleda",
-      title: "Lead Teacher - Toddlers",
-      tags: ["Early Childhood Ed", "CPR Certified"],
-      joined: "Aug 2026",
-      status: "Active",
-    },
-    emergencyContacts: [
-      {
-        name: "David Jenkins",
-        relationship: "Spouse",
-        phone: "(555) 987-6543",
-      },
-      {
-        name: "Martha Jenkins",
-        relationship: "Mother",
-        phone: "(555) 456-7890",
-      },
-    ],
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState(initialTeacherData);
+
+  const handleSave = () => {
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setFormData(initialTeacherData);
+    setIsEditing(false);
   };
 
   return (
@@ -61,15 +74,15 @@ export default function TeacherProfilePage() {
 
               {/* Name & Title */}
               <h2 className="text-2xl font-black text-brand-navy text-center mb-1">
-                {teacherData.profileCard.firstName} {teacherData.profileCard.lastName}
+                {formData.personalInfo.fullName}
               </h2>
               <p className="font-bold text-brand-blue text-sm text-center mb-4">
-                {teacherData.profileCard.title}
+                {formData.profileCard.title}
               </p>
 
               {/* Tags */}
               <div className="flex flex-wrap justify-center gap-2 mb-8">
-                {teacherData.profileCard.tags.map((tag) => (
+                {formData.profileCard.tags.map((tag) => (
                   <span
                     key={tag}
                     className={`font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider ${
@@ -90,7 +103,7 @@ export default function TeacherProfilePage() {
                     Joined
                   </p>
                   <p className="text-sm text-brand-navy font-bold">
-                    {teacherData.profileCard.joined}
+                    {formData.profileCard.joined}
                   </p>
                 </div>
                 <div className="text-center">
@@ -98,7 +111,7 @@ export default function TeacherProfilePage() {
                     Status
                   </p>
                   <p className="text-sm text-brand-orange font-bold">
-                    {teacherData.profileCard.status}
+                    {formData.profileCard.status}
                   </p>
                 </div>
               </div>
@@ -108,12 +121,37 @@ export default function TeacherProfilePage() {
           {/* Right Column: Personal Information */}
           <div className="w-2/3 flex">
             <section className="bg-white rounded-[2rem] border-2 border-brand-orange shadow-lg p-6 relative overflow-hidden w-full flex flex-col">
-              <h3 className="text-2xl font-black text-brand-navy mb-6 flex items-center gap-2">
-                <svg className="text-brand-orange w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                    </svg>
-                Personal Information
-              </h3>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-black text-brand-navy flex items-center gap-2">
+                  <svg className="text-brand-orange w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                  </svg>
+                  Personal Information
+                </h3>
+                {!isEditing ? (
+                  <button 
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 rounded-full bg-brand-orange text-brand-navy font-bold text-sm hover:brightness-95 transition-all shadow-sm"
+                  >
+                    Edit Info
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleCancel}
+                      className="px-4 py-2 rounded-full bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleSave}
+                      className="px-4 py-2 rounded-full bg-brand-blue text-white font-bold text-sm hover:brightness-110 transition-all shadow-sm"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-5 flex-1">
                 {/* Full Name */}
@@ -121,9 +159,21 @@ export default function TeacherProfilePage() {
                   <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
                     Full Name
                   </label>
-                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
-                    {teacherData.personalInfo.fullName}
-                  </div>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full"
+                      value={formData.personalInfo.fullName}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        personalInfo: { ...formData.personalInfo, fullName: e.target.value }
+                      })}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                      {formData.personalInfo.fullName}
+                    </div>
+                  )}
                 </div>
 
                 {/* Date of Birth */}
@@ -131,9 +181,21 @@ export default function TeacherProfilePage() {
                   <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
                     Date of Birth
                   </label>
-                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
-                    {teacherData.personalInfo.dateOfBirth}
-                  </div>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full"
+                      value={formData.personalInfo.dateOfBirth}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        personalInfo: { ...formData.personalInfo, dateOfBirth: e.target.value }
+                      })}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                      {formData.personalInfo.dateOfBirth}
+                    </div>
+                  )}
                 </div>
 
                 {/* Email */}
@@ -141,9 +203,21 @@ export default function TeacherProfilePage() {
                   <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
                     Email Address
                   </label>
-                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
-                    {teacherData.personalInfo.email}
-                  </div>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full"
+                      value={formData.personalInfo.email}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        personalInfo: { ...formData.personalInfo, email: e.target.value }
+                      })}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                      {formData.personalInfo.email}
+                    </div>
+                  )}
                 </div>
 
                 {/* Phone */}
@@ -151,9 +225,21 @@ export default function TeacherProfilePage() {
                   <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
                     Phone Number
                   </label>
-                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
-                    {teacherData.personalInfo.phone}
-                  </div>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full"
+                      value={formData.personalInfo.phone}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        personalInfo: { ...formData.personalInfo, phone: e.target.value }
+                      })}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                      {formData.personalInfo.phone}
+                    </div>
+                  )}
                 </div>
 
                 {/* Home Address – full width */}
@@ -161,9 +247,21 @@ export default function TeacherProfilePage() {
                   <label className="font-bold text-[10px] text-brand-orange uppercase tracking-wider ml-1">
                     Home Address
                   </label>
-                  <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
-                    {teacherData.personalInfo.homeAddress}
-                  </div>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full"
+                      value={formData.personalInfo.homeAddress}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        personalInfo: { ...formData.personalInfo, homeAddress: e.target.value }
+                      })}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
+                      {formData.personalInfo.homeAddress}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -188,7 +286,7 @@ export default function TeacherProfilePage() {
                   Role
                 </label>
                 <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
-                  {teacherData.workDetails.role}
+                  {formData.workDetails.role}
                 </div>
               </div>
 
@@ -198,7 +296,7 @@ export default function TeacherProfilePage() {
                   Assigned Room
                 </label>
                 <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
-                  {teacherData.workDetails.assignedRoom}
+                  {formData.workDetails.assignedRoom}
                 </div>
               </div>
 
@@ -208,7 +306,7 @@ export default function TeacherProfilePage() {
                   Employee ID
                 </label>
                 <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
-                  {teacherData.workDetails.employeeId}
+                  {formData.workDetails.employeeId}
                 </div>
               </div>
 
@@ -218,7 +316,7 @@ export default function TeacherProfilePage() {
                   Schedule Type
                 </label>
                 <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
-                  {teacherData.workDetails.scheduleType}
+                  {formData.workDetails.scheduleType}
                 </div>
               </div>
             </div>
@@ -234,29 +332,71 @@ export default function TeacherProfilePage() {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {teacherData.emergencyContacts.map((contact) => (
+              {formData.emergencyContacts.map((contact, index) => (
                 <div
-                  key={contact.name}
+                  key={index}
                   className="flex items-center justify-between p-4 rounded-2xl bg-red-50/50 border border-brand-red/20 hover:bg-red-50 transition-colors"
                 >
                   {/* Left: Icon + Name + Relationship */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-brand-red/10 flex items-center justify-center text-brand-red">
+                  <div className="flex items-center gap-4 w-full mr-4">
+                    <div className="w-10 h-10 shrink-0 rounded-full bg-brand-red/10 flex items-center justify-center text-brand-red">
                       <svg className="text-brand-red w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                        </svg>
+                      </svg>
                     </div>
-                    <div>
-                      <div className="font-bold text-brand-navy text-sm">{contact.name}</div>
-                      <div className="text-[10px] text-brand-red font-black uppercase tracking-wider mt-0.5">
-                        {contact.relationship}
-                      </div>
+                    <div className="w-full flex flex-col gap-1.5">
+                      {isEditing ? (
+                        <>
+                          <input
+                            type="text"
+                            className="font-bold text-brand-navy text-sm bg-white border border-brand-red/40 rounded-md px-3 py-1.5 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 w-full transition-all"
+                            value={contact.name}
+                            onChange={(e) => {
+                              const newContacts = [...formData.emergencyContacts];
+                              newContacts[index].name = e.target.value;
+                              setFormData({ ...formData, emergencyContacts: newContacts });
+                            }}
+                          />
+                          <input
+                            type="text"
+                            className="text-[10px] text-brand-red font-black uppercase tracking-wider bg-white border border-brand-red/40 rounded-md px-3 py-1 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 w-full transition-all"
+                            value={contact.relationship}
+                            onChange={(e) => {
+                              const newContacts = [...formData.emergencyContacts];
+                              newContacts[index].relationship = e.target.value;
+                              setFormData({ ...formData, emergencyContacts: newContacts });
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-bold text-brand-navy text-sm">{contact.name}</div>
+                          <div className="text-[10px] text-brand-red font-black uppercase tracking-wider mt-0.5">
+                            {contact.relationship}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* Right: Phone */}
-                  <div className="font-bold text-brand-navy text-sm bg-white px-3 py-1.5 rounded-lg border border-brand-red/10 shadow-sm">
-                    {contact.phone}
+                  <div className="shrink-0 flex items-center">
+                    {isEditing ? (
+                      <input
+                        type="tel"
+                        className="font-bold text-brand-navy text-sm bg-white px-4 py-2 rounded-full border border-brand-red/40 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 shadow-sm w-[130px] text-center transition-all"
+                        value={contact.phone}
+                        onChange={(e) => {
+                          const newContacts = [...formData.emergencyContacts];
+                          newContacts[index].phone = e.target.value;
+                          setFormData({ ...formData, emergencyContacts: newContacts });
+                        }}
+                      />
+                    ) : (
+                      <div className="font-bold text-brand-navy text-sm bg-white px-3 py-1.5 rounded-lg border border-brand-red/10 shadow-sm">
+                        {contact.phone}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
