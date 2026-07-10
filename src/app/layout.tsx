@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "Merry Explorers",
   description: "Merry Explorers admin dashboard",
   icons: {
-    icon: "/logo.ico",
+    icon: "/LOGO.ico",
   },
 };
 
