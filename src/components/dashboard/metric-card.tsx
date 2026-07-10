@@ -60,10 +60,10 @@ function ClockInsGraphic() {
       <circle cx="40" cy="32" r="3" fill="#002f76" />
       {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg, i) => {
         const rad = (deg * Math.PI) / 180;
-        const x1 = 40 + 18 * Math.cos(rad);
-        const y1 = 32 + 18 * Math.sin(rad);
-        const x2 = 40 + 22 * Math.cos(rad);
-        const y2 = 32 + 22 * Math.sin(rad);
+        const x1 = Number((40 + 18 * Math.cos(rad)).toFixed(3));
+        const y1 = Number((32 + 18 * Math.sin(rad)).toFixed(3));
+        const x2 = Number((40 + 22 * Math.cos(rad)).toFixed(3));
+        const y2 = Number((32 + 22 * Math.sin(rad)).toFixed(3));
         return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffb800" strokeWidth={i % 3 === 0 ? 2 : 1} />;
       })}
     </svg>

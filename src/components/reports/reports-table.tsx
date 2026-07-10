@@ -1,7 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { detailedLogs } from "@/data/reports";
+import type { LogStatus } from "@/data/reports";
+
+type LogEntry = {
+  id: string;
+  date: string;
+  teacherName: string;
+  initials: string;
+  scheduledIn: string;
+  actualIn: string;
+  status: LogStatus;
+  totalHours: string;
+  color: string;
+};
 
 const ROWS_PER_PAGE = 5;
 const ROW_HEIGHT = 56;
@@ -22,15 +34,15 @@ function ChevronRight() {
   );
 }
 
-export function ReportsTable() {
+export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
   const [page, setPage] = useState(1);
 
-  const totalPages = Math.ceil(detailedLogs.length / ROWS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(logs.length / ROWS_PER_PAGE));
   const start = (page - 1) * ROWS_PER_PAGE;
-  const visibleLogs = detailedLogs.slice(start, start + ROWS_PER_PAGE);
+  const visibleLogs = logs.slice(start, start + ROWS_PER_PAGE);
 
   // Always pad to exactly ROWS_PER_PAGE so height never changes
-  const paddedLogs: (typeof detailedLogs[number] | null)[] = [
+  const paddedLogs: (LogEntry | null)[] = [
     ...visibleLogs,
     ...Array(ROWS_PER_PAGE - visibleLogs.length).fill(null),
   ];
@@ -69,7 +81,7 @@ export function ReportsTable() {
           <h2 className="font-headline text-[20px] font-black text-brand-navy">Detailed Logs</h2>
         </div>
         <span className="text-[11px] font-bold text-brand-blue/60">
-          Showing {start + 1}–{Math.min(start + ROWS_PER_PAGE, detailedLogs.length)} of {detailedLogs.length} entries
+          Showing {logs.length === 0 ? 0 : start + 1}–{Math.min(start + ROWS_PER_PAGE, logs.length)} of {logs.length} entries
         </span>
       </div>
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { punctualityTrends } from "@/data/reports";
 
-export function ReportsChart() {
+type TrendItem = { week: string; value: number; color: string; clockIns: number; onTime: number };
+
+export function ReportsChart({ trends = [] }: { trends?: TrendItem[] }) {
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
-  const maxValue = Math.max(...punctualityTrends.map((t) => t.value), 100);
+  const maxValue = Math.max(...trends.map((t) => t.value), 100);
+  const isEmpty = trends.length === 0;
 
   return (
     <div
@@ -17,10 +19,7 @@ export function ReportsChart() {
         <div className="flex items-center gap-3">
           <span
             className="material-symbols-outlined text-brand-orange"
-            style={{
-              fontSize: "26px",
-              fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24",
-            }}
+            style={{ fontSize: "26px", fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
           >
             monitoring
           </span>
@@ -58,93 +57,103 @@ export function ReportsChart() {
         </div>
       </div>
 
-      {/* Chart Area: Y-axis + plot */}
-      <div className="flex w-full">
-        {/* Y-axis scale (0–100%) */}
-        <div className="flex flex-col justify-between h-[200px] pr-2 text-right">
-          {[100, 75, 50, 25, 0].map((tick) => (
-            <span key={tick} className="text-[10px] font-bold text-brand-blue/40 leading-none">
-              {tick}%
-            </span>
-          ))}
+      {/* Chart Area: empty state OR bars */}
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center h-[260px] text-brand-blue/40 gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 opacity-40">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          <p className="text-[13px] font-bold">No attendance data yet.</p>
+          <p className="text-[11px] font-medium opacity-70">Charts will populate once teachers start clocking in.</p>
         </div>
-
-        {/* Plot region */}
-        <div className="flex-1 h-[200px] relative">
-          {/* Grid lines aligned to the Y-axis ticks */}
-          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="w-full h-[1px] bg-brand-sky/40" />
+      ) : (
+        <div className="flex w-full">
+          {/* Y-axis scale (0–100%) */}
+          <div className="flex flex-col justify-between h-[200px] pr-2 text-right">
+            {[100, 75, 50, 25, 0].map((tick) => (
+              <span key={tick} className="text-[10px] font-bold text-brand-blue/40 leading-none">
+                {tick}%
+              </span>
             ))}
           </div>
 
-          {/* Bars */}
-          <div className="h-full w-full flex items-end justify-around relative">
-            {punctualityTrends.map((trend, index) => {
-              const isHighlighted = trend.color === "#ffb800";
-              const isHovered = hoveredBar === index;
+          {/* Plot region */}
+          <div className="flex-1 h-[200px] relative">
+            {/* Grid lines */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="w-full h-[1px] bg-brand-sky/40" />
+              ))}
+            </div>
 
-              return (
-                <div
-                  key={trend.week}
-                  className="flex flex-col items-center gap-2 h-full justify-end group relative z-10"
-                  onMouseEnter={() => setHoveredBar(index)}
-                  onMouseLeave={() => setHoveredBar(null)}
-                >
-                  {/* Bar wrapper: holds its height so the tooltip can anchor to the bar's top.
-                      The fill is a separate child so hover scale never distorts the tooltip. */}
+            {/* Bars */}
+            <div className="h-full w-full flex items-end justify-around relative">
+              {trends.map((trend, index) => {
+                const isHighlighted = trend.color === "#ffb800";
+                const isHovered = hoveredBar === index;
+
+                return (
                   <div
-                    className="relative w-12"
-                    style={{ height: `${(trend.value / maxValue) * 100}%` }}
+                    key={trend.week}
+                    className="flex flex-col items-center gap-2 h-full justify-end group relative z-10"
+                    onMouseEnter={() => setHoveredBar(index)}
+                    onMouseLeave={() => setHoveredBar(null)}
                   >
-                    {/* Tooltip — anchored to the bar's top, always rendered above it */}
                     <div
-                      className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 whitespace-nowrap bg-brand-navy text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-lg transition-all duration-200 pointer-events-none ${
-                        isHovered ? "opacity-100 -translate-y-1" : "opacity-0 translate-y-1"
-                      }`}
+                      className="relative w-12"
+                      style={{ height: `${(trend.value / maxValue) * 100}%` }}
                     >
-                      {trend.value}%
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-brand-navy" />
+                      {/* Tooltip */}
+                      <div
+                        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 whitespace-nowrap bg-brand-navy text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-lg transition-all duration-200 pointer-events-none ${
+                          isHovered ? "opacity-100 -translate-y-1" : "opacity-0 translate-y-1"
+                        }`}
+                      >
+                        {trend.value}%
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-brand-navy" />
+                      </div>
+
+                      {/* Bar fill */}
+                      <div
+                        className={`h-full w-full rounded-t-xl rounded-b-md transition-all duration-500 ease-out ${
+                          isHovered ? "opacity-90 scale-x-110" : ""
+                        }`}
+                        style={{
+                          backgroundColor: trend.color,
+                          boxShadow: isHighlighted
+                            ? "0 4px 15px rgba(255, 184, 0, 0.4)"
+                            : isHovered
+                              ? "0 4px 15px rgba(0, 102, 204, 0.25)"
+                              : "none",
+                        }}
+                      />
                     </div>
 
-                    {/* Bar fill */}
-                    <div
-                      className={`h-full w-full rounded-t-xl rounded-b-md transition-all duration-500 ease-out ${
-                        isHovered ? "opacity-90 scale-x-110" : ""
+                    {/* Week label */}
+                    <span
+                      className={`text-[10px] font-black uppercase tracking-wider transition-colors duration-200 ${
+                        isHighlighted
+                          ? "text-brand-orange bg-brand-orange/15 px-2.5 py-0.5 rounded-full"
+                          : "text-brand-blue/50"
                       }`}
-                      style={{
-                        backgroundColor: trend.color,
-                        boxShadow: isHighlighted
-                          ? "0 4px 15px rgba(255, 184, 0, 0.4)"
-                          : isHovered
-                            ? "0 4px 15px rgba(0, 102, 204, 0.25)"
-                            : "none",
-                      }}
-                    />
-                  </div>
+                    >
+                      {trend.week}
+                    </span>
 
-                  {/* Week label */}
-                  <span
-                    className={`text-[10px] font-black uppercase tracking-wider transition-colors duration-200 ${
-                      isHighlighted
-                        ? "text-brand-orange bg-brand-orange/15 px-2.5 py-0.5 rounded-full"
-                        : "text-brand-blue/50"
-                    }`}
-                  >
-                    {trend.week}
-                  </span>
-
-                  {/* Extra data: total clock-ins this week */}
-                  <div className="text-center leading-tight">
-                    <div className="text-[12px] font-black text-brand-navy">{trend.clockIns}</div>
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-brand-blue/40">clock-ins</div>
+                    {/* Clock-ins */}
+                    <div className="text-center leading-tight">
+                      <div className="text-[12px] font-black text-brand-navy">{trend.clockIns}</div>
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-brand-blue/40">clock-ins</div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

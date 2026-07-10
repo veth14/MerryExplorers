@@ -1,19 +1,78 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { teacherMetrics, teachers, FilterTab } from "@/data/teachers";
 import { TeacherMetricCard } from "@/components/teachers/teacher-metric-card";
 import { TeacherCard } from "@/components/teachers/teacher-card";
+import type { FilterTab, Teacher } from "@/data/teachers";
+
+type AccountDoc = {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  role: "teacher" | "lead_teacher";
+  status?: string;
+  classAssigned?: string;
+  avatarUrl?: string;
+};
+
+function mapAccountToTeacher(acc: AccountDoc): Teacher {
+  const initials = `${acc.firstName?.[0] ?? ""}${acc.lastName?.[0] ?? ""}`.toUpperCase();
+  const COLORS = ["#ffb347", "#4a90d9", "#9b9b9b", "#6c5ce7", "#e17055", "#00b894"];
+  const colorIndex = (acc.firstName?.charCodeAt(0) ?? 0) % COLORS.length;
+  return {
+    id: acc._id,
+    name: `${acc.firstName} ${acc.lastName}`,
+    initials,
+    role: acc.role === "lead_teacher" ? "Lead Teacher" : "Assistant Teacher",
+    status: (acc.status as "active" | "on-leave") || "active",
+    classAssigned: acc.classAssigned ?? null,
+    email: acc.email,
+    phone: acc.phone ?? "–",
+    avatarColor: COLORS[colorIndex],
+  };
+}
 
 export default function TeachersPage() {
+  const [accounts, setAccounts] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("All Staff");
 
-  const filteredTeachers = teachers.filter((t) => {
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch("/api/accounts");
+        const json = await res.json();
+        if (json.success) {
+          const mapped = json.data.map(mapAccountToTeacher);
+          setAccounts(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch teachers:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const filteredTeachers = accounts.filter((t) => {
     if (activeTab === "Lead Teachers") return t.role === "Lead Teacher";
     if (activeTab === "Assistants") return t.role === "Assistant Teacher";
-    return true; // All Staff
+    return true;
   });
+
+  const totalLeads = accounts.filter((t) => t.role === "Lead Teacher").length;
+  const totalActive = accounts.filter((t) => t.status === "active").length;
+  const totalOnLeave = accounts.filter((t) => t.status === "on-leave").length;
+
+  const teacherMetrics = [
+    { label: "Total Teachers", value: accounts.length.toString(), meta: "Registered accounts", type: "total" as const },
+    { label: "Active Today", value: totalActive.toString(), meta: `${totalLeads} lead teachers`, type: "active" as const },
+    { label: "On Leave", value: totalOnLeave.toString(), meta: "Currently on leave", type: "leave" as const },
+  ];
 
   return (
     <AppShell title="Teachers" description="Manage your staff, view schedules, and monitor attendance.">
@@ -62,11 +121,22 @@ export default function TeachersPage() {
       </div>
 
       {/* Teacher Grid */}
-      <section className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        {filteredTeachers.map((teacher) => (
-          <TeacherCard key={teacher.id} teacher={teacher} />
-        ))}
-      </section>
+      {loading ? (
+        <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">
+          Loading teachers…
+        </div>
+      ) : filteredTeachers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-48 text-[#9aa3b2] gap-2">
+          <p className="font-bold text-sm">No teachers found.</p>
+          <p className="text-xs">Add teacher accounts from the Accounts page.</p>
+        </div>
+      ) : (
+        <section className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {filteredTeachers.map((teacher) => (
+            <TeacherCard key={teacher.id} teacher={teacher} />
+          ))}
+        </section>
+      )}
     </AppShell>
   );
 }

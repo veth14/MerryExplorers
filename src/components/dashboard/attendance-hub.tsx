@@ -3,7 +3,8 @@ import Image from "next/image";
 type ActiveStatusItem = {
   name: string;
   time: string;
-  status: "ON TIME" | "LATE (5M)";
+  status: "ON TIME" | "LATE (5M)" | "COMPLETED";
+  avatar?: string;
 };
 
 type HistoryItem = {
@@ -17,7 +18,7 @@ type AttendanceHubProps = {
   history: readonly HistoryItem[];
 };
 
-function MemberAvatar({ name }: { name: string }) {
+function MemberAvatar({ name, avatar, isCompleted }: { name: string; avatar?: string; isCompleted: boolean }) {
   const initials = name
     .split(" ")
     .filter((w) => w.match(/^[A-Z]/))
@@ -26,13 +27,17 @@ function MemberAvatar({ name }: { name: string }) {
     .join("");
 
   return (
-    <div className="w-9 h-9 rounded-full border-[2px] border-[#2da05b] flex items-center justify-center overflow-hidden relative bg-white flex-shrink-0">
-      <div
-        className="w-full h-full flex items-center justify-center text-[13px] font-extrabold text-[#0050d5]"
-        style={{ background: "linear-gradient(135deg, #e8f4ff 0%, #d1e8ff 100%)" }}
-      >
-        {initials || "?"}
-      </div>
+    <div className={`w-9 h-9 rounded-full border-[2px] flex items-center justify-center overflow-hidden relative bg-white flex-shrink-0 ${isCompleted ? 'border-[#0050d5]' : 'border-[#2da05b]'}`}>
+      {avatar ? (
+        <Image src={avatar} alt={name} fill className="object-cover" />
+      ) : (
+        <div
+          className="w-full h-full flex items-center justify-center text-[13px] font-extrabold text-[#0050d5]"
+          style={{ background: "linear-gradient(135deg, #e8f4ff 0%, #d1e8ff 100%)" }}
+        >
+          {initials || "?"}
+        </div>
+      )}
     </div>
   );
 }
@@ -75,7 +80,7 @@ export function AttendanceHub({ activeStatus, history }: AttendanceHubProps) {
                     className="flex items-center justify-between gap-3 bg-[#f8faff] rounded-[10px] px-3 py-2.5"
                   >
                     <div className="flex items-center gap-2.5">
-                      <MemberAvatar name={item.name} />
+                      <MemberAvatar name={item.name} avatar={item.avatar} isCompleted={item.status === "COMPLETED"} />
                       <div>
                         <p className="text-[14px] font-bold text-[#002f76] leading-tight">{item.name}</p>
                         <p className="text-[11px] font-semibold text-[#0050d5]/60">{item.time}</p>
@@ -83,8 +88,10 @@ export function AttendanceHub({ activeStatus, history }: AttendanceHubProps) {
                     </div>
                     <span
                       className={`text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-1 rounded-full whitespace-nowrap ${
-                        isOnTime
+                        item.status === "ON TIME"
                           ? "bg-[#2da05b] text-white"
+                          : item.status === "COMPLETED"
+                          ? "bg-[#0050d5] text-white"
                           : "bg-[#ffb800] text-[#002f76]"
                       }`}
                     >

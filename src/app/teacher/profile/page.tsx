@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
+import { useAuth } from "@/lib/auth-context";
+import { auth } from "@/lib/firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
 
 const initialTeacherData = {
   personalInfo: {
@@ -24,6 +27,9 @@ const initialTeacherData = {
     tags: ["Early Childhood Ed", "CPR Certified"],
     joined: "Aug 2026",
     status: "Active",
+    avatarUrl: "",
+    avatarColor: "#ffb800",
+    initials: "IA",
   },
   emergencyContacts: [
     {
@@ -40,16 +46,94 @@ const initialTeacherData = {
 };
 
 export default function TeacherProfilePage() {
+  const { user, userProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(initialTeacherData);
+  const [saving, setSaving] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
-  const handleSave = () => {
-    setIsEditing(false);
+  useEffect(() => {
+    if (userProfile) {
+      setFormData({
+        personalInfo: {
+          fullName: userProfile.fullName || "",
+          dateOfBirth: userProfile.dateOfBirth || "",
+          email: userProfile.email || "",
+          phone: userProfile.phone || "",
+          homeAddress: userProfile.homeAddress || "",
+        },
+        workDetails: {
+          role: userProfile.role || "",
+          assignedRoom: userProfile.assignedRoom || "",
+          employeeId: userProfile.employeeId || "",
+          scheduleType: userProfile.scheduleType || "",
+        },
+        profileCard: {
+          firstName: userProfile.fullName?.split(" ")[0] || "",
+          lastName: userProfile.fullName?.split(" ").slice(1).join(" ") || "",
+          title: `${userProfile.role} - ${userProfile.assignedRoom}`,
+          tags: userProfile.tags || [],
+          joined: userProfile.joinDate || "",
+          status: userProfile.status || "Active",
+          avatarUrl: userProfile.avatarUrl || "",
+          avatarColor: userProfile.avatarColor || "#ffb800",
+          initials: userProfile.initials || "T",
+        },
+        emergencyContacts: userProfile.emergencyContacts || [],
+      });
+    }
+  }, [userProfile]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const payload = {
+        fullName: formData.personalInfo.fullName,
+        dateOfBirth: formData.personalInfo.dateOfBirth,
+        email: formData.personalInfo.email,
+        phone: formData.personalInfo.phone,
+        homeAddress: formData.personalInfo.homeAddress,
+        emergencyContacts: formData.emergencyContacts,
+      };
+      
+      const res = await fetch(`/api/accounts/${user.uid}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      
+      if (res.ok) {
+        setIsEditing(false);
+        // Force a page reload to refresh the context data globally, or wait for next login.
+        window.location.reload();
+      } else {
+        alert("Failed to save changes.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error saving profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    setFormData(initialTeacherData);
+    if (userProfile) {
+      // Just re-trigger useEffect by toggling editing state
+    }
     setIsEditing(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!user?.email) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setResetSent(true);
+      setTimeout(() => setResetSent(false), 5000);
+    } catch (e: any) {
+      alert("Error sending reset email: " + e.message);
+    }
   };
 
   return (
@@ -64,12 +148,19 @@ export default function TeacherProfilePage() {
               <div className="absolute top-0 left-0 w-full h-24 bg-brand-sky/50" />
 
               {/* Avatar */}
-              <div className="w-32 h-32 rounded-full border-4 border-white bg-surface-container-low shadow-md overflow-hidden relative z-10 mb-6">
-                <img
-                  alt="Teacher Profile Picture"
-                  className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCaYlFqj6EAFK8LQwd7mdya-CtY8v_KVPqBxmvy4UHfIE-w__pFGXRAE_KzWqPqEj3y97tXZvL3u1jxNGPzU5JrduNIOZcVSXHEaqpZTle63VIMUr0KGtNVOPwwURG0s93J6tgBopsG-5N0fURy0L8ue31EbigHvhp_NoInxxBvHvio8DJOvL_HaWsoOem4mn9XJvcbLhD2Zhs_gmSEM4reBws7VsfOeW5HVEIhWGzFjknJbtxWgHe9laadthUeLxrBR5rJjk96NqI"
-                />
+              <div 
+                className="w-32 h-32 rounded-full border-4 border-white bg-surface-container-low shadow-md overflow-hidden relative z-10 mb-6 flex items-center justify-center text-white text-5xl font-black"
+                style={{ backgroundColor: formData.profileCard.avatarColor }}
+              >
+                {formData.profileCard.avatarUrl ? (
+                  <img
+                    alt="Teacher Profile Picture"
+                    className="w-full h-full object-cover"
+                    src={formData.profileCard.avatarUrl}
+                  />
+                ) : (
+                  formData.profileCard.initials
+                )}
               </div>
 
               {/* Name & Title */}
@@ -139,14 +230,17 @@ export default function TeacherProfilePage() {
                   <div className="flex gap-2">
                     <button 
                       onClick={handleCancel}
-                      className="px-4 py-2 rounded-full bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition-colors"
+                      disabled={saving}
+                      className="px-4 py-2 rounded-full bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition-colors disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button 
                       onClick={handleSave}
-                      className="px-4 py-2 rounded-full bg-brand-blue text-white font-bold text-sm hover:brightness-110 transition-all shadow-sm"
+                      disabled={saving}
+                      className="px-4 py-2 rounded-full bg-brand-blue text-white font-bold text-sm hover:brightness-110 transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
                     >
+                      {saving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                       Save Changes
                     </button>
                   </div>
@@ -262,6 +356,23 @@ export default function TeacherProfilePage() {
                       {formData.personalInfo.homeAddress}
                     </div>
                   )}
+                </div>
+              </div>
+              
+              {/* Password Reset Section */}
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-[13px] font-black text-brand-navy">Password & Security</h4>
+                    <p className="text-[11px] font-bold text-brand-navy/50 mt-0.5">Need to change your password? We will email you a secure link.</p>
+                  </div>
+                  <button 
+                    onClick={handleResetPassword}
+                    disabled={resetSent}
+                    className="px-4 py-2 rounded-xl border border-[#d0d8e8] text-[12px] font-bold text-[#5a6e8c] hover:bg-[#f0f4f9] transition-all"
+                  >
+                    {resetSent ? "Email Sent ✓" : "Change Password"}
+                  </button>
                 </div>
               </div>
             </section>

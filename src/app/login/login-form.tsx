@@ -3,14 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Hardcoded demo credentials (no backend in this project).
-// Email:    admin@merryexplorers.edu
-// Password: explorers123
-const VALID_EMAIL = "admin@merryexplorers.edu";
-const VALID_PASSWORD = "explorers123";
-
-const TEACHER_EMAIL = "teacher@merryexplorers.edu";
-const TEACHER_PASSWORD = "explorers123";
+import { useAuth } from "@/lib/auth-context";
 
 function MailIcon() {
   return (
@@ -115,10 +108,11 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const { signIn } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
 
@@ -129,17 +123,14 @@ export function LoginForm() {
 
     setLoading(true);
 
-    // Simulate a network round-trip before validating credentials.
-    window.setTimeout(() => {
-      if (email.trim() === VALID_EMAIL && password === VALID_PASSWORD) {
-        router.push("/admin");
-      } else if (email.trim() === TEACHER_EMAIL && password === TEACHER_PASSWORD) {
-        router.push("/teacher");
-      } else {
-        setError("Invalid email or password.");
-        setLoading(false);
-      }
-    }, 600);
+    try {
+      await signIn(email.trim(), password);
+    } catch (err: any) {
+      console.error(err);
+      setError("Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

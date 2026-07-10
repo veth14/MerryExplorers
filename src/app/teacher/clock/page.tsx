@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
+import { useAuth } from "@/lib/auth-context";
+import { uploadAttendanceLog } from "@/lib/supabase";
 import type { BreakEntry, ActivityEntry } from "@/data/teacher-dashboard";
 
 // ── State types ──────────────────────────────────────────────────────────────
@@ -48,7 +50,7 @@ function totalBreakMs(breaks: BreakEntry[]): number {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ClockPage() {
-  const [now, setNow] = useState<Date>(() => new Date());
+  const [now, setNow] = useState<Date>(() => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })));
   const [state, setState] = useState<ClockState>("ready");
 
   // Session tracking
@@ -60,6 +62,102 @@ export default function ClockPage() {
 
   // Activity log
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
+
+  // MongoDB record ID for the current shift
+  const [attendanceId, setAttendanceId] = useState<string | null>(null);
+
+  // Auth
+  const { user, userProfile } = useAuth();
+
+  // Load existing session for today
+  useEffect(() => {
+    if (!user?.uid) return;
+    
+    async function fetchTodaySession() {
+      try {
+        const res = await fetch(`/api/attendance?date=today&uid=${user!.uid}`);
+        const json = await res.json();
+        
+        if (json.success && json.data.length > 0) {
+          const record = json.data[0];
+          setAttendanceId(String(record._id));
+          
+          const newActivities: ActivityEntry[] = [];
+          
+          if (record.clockInTime) {
+            const inDate = new Date(record.clockInTime);
+            clockInAt.current = inDate;
+            const t = formatTime(inDate);
+            newActivities.push({
+              id: `act-in-${inDate.getTime()}`,
+              time: `${t.time} ${t.ampm}`,
+              action: "clock-in",
+              label: "Clocked In",
+            });
+            setState("clocked-in");
+          }
+          
+          const parsedBreaks: BreakEntry[] = [];
+          for (const b of (record.breaks || [])) {
+            const bStart = new Date(b.start);
+            const bEnd = b.end ? new Date(b.end) : undefined;
+            parsedBreaks.push({ start: bStart, end: bEnd });
+            
+            const ts = formatTime(bStart);
+            newActivities.push({
+              id: `act-bs-${bStart.getTime()}`,
+              time: `${ts.time} ${ts.ampm}`,
+              action: "break-start",
+              label: "Started Break",
+            });
+            
+            if (bEnd) {
+              const te = formatTime(bEnd);
+              const breakSec = Math.floor((bEnd.getTime() - bStart.getTime()) / 1000);
+              newActivities.push({
+                id: `act-be-${bEnd.getTime()}`,
+                time: `${te.time} ${te.ampm}`,
+                action: "break-end",
+                label: "Ended Break",
+                duration: formatElapsed(breakSec),
+              });
+            } else {
+              currentBreakStart.current = bStart;
+              setState("on-break");
+            }
+          }
+          setBreaks(parsedBreaks);
+          
+          if (record.clockOutTime) {
+            const outDate = new Date(record.clockOutTime);
+            const to = formatTime(outDate);
+            newActivities.push({
+              id: `act-out-${outDate.getTime()}`,
+              time: `${to.time} ${to.ampm}`,
+              action: "clock-out",
+              label: "Clocked Out",
+            });
+            setState("ready");
+            clockInAt.current = null;
+          } else if (clockInAt.current) {
+            const workMs = Date.now() - clockInAt.current.getTime() - totalBreakMs(parsedBreaks);
+            setElapsed(Math.max(0, Math.floor(workMs / 1000)));
+          }
+          
+          // Sort activities by time
+          newActivities.sort((a, b) => {
+             const timeA = parseInt(a.id.split('-').pop() || "0");
+             const timeB = parseInt(b.id.split('-').pop() || "0");
+             return timeA - timeB;
+          });
+          setActivities(newActivities);
+        }
+      } catch (err) {
+        console.error("Failed to load today's session", err);
+      }
+    }
+    fetchTodaySession();
+  }, [user]);
 
   // Undo state
   const [undoInfo, setUndoInfo] = useState<{
@@ -345,7 +443,7 @@ export default function ClockPage() {
   // ── Live clock ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 1000);
+    const id = window.setInterval(() => setNow(new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }))), 1000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -376,7 +474,26 @@ export default function ClockPage() {
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
-  function handleClockIn() {
+  /** Grabs the current video frame and returns it as a JPEG Blob. */
+  async function captureSnapshot(): Promise<Blob | null> {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) return null;
+
+    // Render full-res snapshot (not the tiny 64×64 analysis canvas)
+    const snap = document.createElement("canvas");
+    snap.width = video.videoWidth;
+    snap.height = video.videoHeight;
+    const ctx = snap.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0);
+
+    return new Promise<Blob | null>((resolve) => {
+      snap.toBlob((blob) => resolve(blob), "image/jpeg", 0.88);
+    });
+  }
+
+  async function handleClockIn() {
     const d = new Date();
     clockInAt.current = d;
     accumulatedWorkMs.current = 0;
@@ -394,9 +511,46 @@ export default function ClockPage() {
       },
     ]);
     setState("clocked-in");
+
+    // Capture & upload face snapshot, then persist to MongoDB
+    try {
+      let clockInPhotoUrl: string | null = null;
+      const blob = await captureSnapshot();
+      if (blob && user?.uid) {
+        try {
+          clockInPhotoUrl = await uploadAttendanceLog(blob, user.uid, "clock-in");
+          console.log("Clock-in photo uploaded:", clockInPhotoUrl);
+        } catch (uploadErr) {
+          console.warn("Photo upload failed (continuing without photo):", uploadErr);
+        }
+      }
+
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacherUid: user?.uid ?? "unknown",
+          name: userProfile?.fullName ?? user?.email ?? "Teacher",
+          group: userProfile?.assignedRoom ?? "Unassigned",
+          clockInPhotoUrl,
+        }),
+      });
+      const json = await res.json();
+      console.log("Clock-in response:", json);
+      if (json.success && json.data?._id) {
+        setAttendanceId(String(json.data._id));
+        console.log("attendanceId set to:", json.data._id);
+      } else if (json.error === "Already clocked in today" && json.data?._id) {
+        // Resume existing session
+        setAttendanceId(String(json.data._id));
+        console.log("Resuming existing session:", json.data._id);
+      }
+    } catch (err) {
+      console.error("Failed to save clock-in:", err);
+    }
   }
 
-  function handleClockOut() {
+  async function handleClockOut() {
     const out = new Date();
     const workMs =
       out.getTime() - clockInAt.current!.getTime() - totalBreakMs(breaks);
@@ -439,6 +593,31 @@ export default function ClockPage() {
     clockInAt.current = null;
     accumulatedWorkMs.current = 0;
     setState("ready");
+
+    // Capture snapshot + persist clock-out to MongoDB
+    if (attendanceId) {
+      try {
+        let photoUrl: string | null = null;
+        const blob = await captureSnapshot();
+        if (blob && user?.uid) {
+          try {
+            photoUrl = await uploadAttendanceLog(blob, user.uid, "clock-out");
+            console.log("Clock-out photo uploaded:", photoUrl);
+          } catch (uploadErr) {
+            console.warn("Clock-out photo upload failed:", uploadErr);
+          }
+        }
+
+        await fetch("/api/attendance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: attendanceId, action: "clock-out", photoUrl }),
+        });
+        setAttendanceId(null);
+      } catch (err) {
+        console.error("Failed to save clock-out:", err);
+      }
+    }
   }
 
   function handleUndoClockOut() {
@@ -460,7 +639,7 @@ export default function ClockPage() {
     setState("clocked-in");
   }
 
-  function handleTakeBreak() {
+  async function handleTakeBreak() {
     const d = new Date();
     currentBreakStart.current = d;
 
@@ -480,9 +659,31 @@ export default function ClockPage() {
       },
     ]);
     setState("on-break");
+
+    // Capture snapshot + persist break-start to MongoDB
+    if (attendanceId) {
+      try {
+        let photoUrl: string | null = null;
+        const blob = await captureSnapshot();
+        if (blob && user?.uid) {
+          try {
+            photoUrl = await uploadAttendanceLog(blob, user.uid, "break-start");
+          } catch (uploadErr) {
+            console.warn("Break-start photo upload failed:", uploadErr);
+          }
+        }
+        await fetch("/api/attendance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: attendanceId, action: "start-break", photoUrl }),
+        });
+      } catch (err) {
+        console.error("Failed to save break start:", err);
+      }
+    }
   }
 
-  function handleEndBreak() {
+  async function handleEndBreak() {
     const d = new Date();
     const breakStart = currentBreakStart.current || new Date();
 
@@ -513,6 +714,19 @@ export default function ClockPage() {
     }
 
     setState("clocked-in");
+
+    // Persist to MongoDB
+    if (attendanceId) {
+      try {
+        await fetch("/api/attendance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: attendanceId, action: "end-break" }),
+        });
+      } catch (err) {
+        console.error("Failed to save break end:", err);
+      }
+    }
   }
 
   // ── Confirmation modal ───────────────────────────────────────────────────

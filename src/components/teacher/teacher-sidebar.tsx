@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import { teacherNavItems } from "@/data/teacher-dashboard";
 
 function DashboardIcon({ active }: { active?: boolean }) {
@@ -90,7 +91,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
 
 export function TeacherSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const { signOut, userProfile } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -104,9 +105,9 @@ export function TeacherSidebar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function handleLogout() {
+  async function handleLogout() {
     setUserMenuOpen(false);
-    router.push("/login");
+    await signOut();
   }
 
   return (
@@ -163,13 +164,17 @@ export function TeacherSidebar() {
                 userMenuOpen ? "bg-[#005cc8]/10" : "hover:bg-[#005cc8]/10",
               ].join(" ")}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#ffb800] bg-[#1a1a1a] text-[10px] font-black text-white relative">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#ffb800] bg-[#1a1a1a] text-[10px] font-black text-white relative overflow-hidden" style={{ backgroundColor: userProfile?.avatarColor }}>
+                {userProfile?.avatarUrl ? (
+                  <Image src={userProfile.avatarUrl} alt="Avatar" width={36} height={36} className="w-full h-full object-cover" />
+                ) : (
+                  userProfile?.initials || "T"
+                )}
                 <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-[#2da05b]"></span>
-                IA
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-[13px] font-bold text-[#005cc8] leading-tight">Iya Abeleda</p>
-                <p className="truncate text-[10px] font-semibold text-[#005cc8]/80">Lead Teacher</p>
+                <p className="truncate text-[13px] font-bold text-[#005cc8] leading-tight">{userProfile?.fullName || "Teacher"}</p>
+                <p className="truncate text-[10px] font-semibold text-[#005cc8]/80">{userProfile?.role || "Staff"}</p>
               </div>
               <svg
                 xmlns="http://www.w3.org/2000/svg"

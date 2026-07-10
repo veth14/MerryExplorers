@@ -61,7 +61,7 @@ export function SiteHeader() {
         <nav className="hidden items-center gap-0.5 lg:flex">
           {NAV_LINKS.map((link, i) => (
             <motion.a
-              key={link.href}
+              key={link.label}
               href={link.href}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -139,7 +139,7 @@ export function SiteHeader() {
               <div className="flex flex-col">
                 {NAV_LINKS.map((link) => (
                   <a
-                    key={link.href}
+                    key={link.label}
                     href={link.href}
                     onClick={() => setOpen(false)}
                     className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-[#334155] transition-colors hover:bg-[#0033A0]/5 hover:text-[#0033A0]"

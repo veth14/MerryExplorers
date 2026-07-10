@@ -1,5 +1,24 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
-import { currentShift, teacherAnnouncements } from "@/data/teacher-dashboard";
+import { useAuth } from "@/lib/auth-context";
+
+type Announcement = {
+  _id?: string;
+  title: string;
+  timeAgo: string;
+  content: string;
+  type: string;
+  createdAt?: string;
+};
+
+type ShiftRecord = {
+  _id: string;
+  status: string;
+  clockInTime: string;
+  group: string;
+};
 
 function ClockIcon() {
   return (
@@ -48,6 +67,15 @@ function InfoIcon() {
   );
 }
 
+function GroupIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
 function UsersIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -55,15 +83,6 @@ function UsersIcon() {
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function GroupIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   );
 }
@@ -77,10 +96,57 @@ function CoTeacherIcon() {
   );
 }
 
+function formatTime(isoString: string) {
+  return new Date(isoString).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function timeAgoFromDate(isoString: string) {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
+  if (hrs > 0) return `${hrs} hr${hrs > 1 ? "s" : ""} ago`;
+  if (mins > 0) return `${mins} min${mins > 1 ? "s" : ""} ago`;
+  return "Just now";
+}
+
 export default function TeacherDashboardPage() {
+  const { user, userProfile } = useAuth();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [todayShift, setTodayShift] = useState<ShiftRecord | null>(null);
+  const [loadingAnn, setLoadingAnn] = useState(true);
+  const [loadingShift, setLoadingShift] = useState(true);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    async function fetchAll() {
+      try {
+        const [annRes, shiftRes] = await Promise.all([
+          fetch("/api/announcements"),
+          fetch(`/api/attendance?date=today&uid=${user!.uid}`),
+        ]);
+        const [annJson, shiftJson] = await Promise.all([annRes.json(), shiftRes.json()]);
+        if (annJson.success) setAnnouncements(annJson.data);
+        if (shiftJson.success && shiftJson.data.length > 0) setTodayShift(shiftJson.data[0]);
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+      } finally {
+        setLoadingAnn(false);
+        setLoadingShift(false);
+      }
+    }
+    fetchAll();
+  }, [user]);
+
+  const firstName = userProfile?.fullName?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Teacher";
+  const isClocked = todayShift?.status === "In Progress";
+  const isClockedOut = todayShift?.status === "Completed";
+  const clockInTimeStr = todayShift?.clockInTime ? formatTime(todayShift.clockInTime) : null;
+
   return (
     <TeacherShell
-      title="Good Morning, Sarah 👋"
+      title={`Good Morning, ${firstName} 👋`}
       description="Here's what's happening at Merry Explorers today."
     >
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 w-full">
@@ -98,21 +164,37 @@ export default function TeacherDashboardPage() {
             <div className="flex justify-between items-center mb-6 relative z-10">
               <div className="flex items-center gap-2 bg-brand-sky/30 text-brand-navy px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider">
                 <ClockIcon />
-                {currentShift.type}
+                Morning Shift
               </div>
               <div className="text-right">
-                <div className="flex items-center gap-1.5 justify-end">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-[12px] font-black text-green-600">{currentShift.status}</span>
-                </div>
-                <div className="text-[10px] font-bold text-brand-navy/50 mt-0.5">{currentShift.since}</div>
+                {loadingShift ? (
+                  <span className="text-[12px] font-bold text-brand-navy/40">Loading…</span>
+                ) : isClocked ? (
+                  <>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-[12px] font-black text-green-600">Clocked In</span>
+                    </div>
+                    <div className="text-[10px] font-bold text-brand-navy/50 mt-0.5">Since {clockInTimeStr}</div>
+                  </>
+                ) : isClockedOut ? (
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="text-[12px] font-black text-blue-600">Shift Complete</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span className="w-2 h-2 rounded-full bg-gray-300" />
+                    <span className="text-[12px] font-black text-brand-navy/50">Not Started</span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Shift title + time */}
             <div className="mb-6 relative z-10">
               <h2 className="text-[32px] font-black text-brand-navy leading-tight">Today&apos;s Shift</h2>
-              <p className="text-[15px] font-bold text-brand-blue mt-1">{currentShift.timeRange}</p>
+              <p className="text-[15px] font-bold text-brand-blue mt-1">08:00 AM - 01:00 PM</p>
             </div>
 
             {/* Info tiles */}
@@ -123,7 +205,7 @@ export default function TeacherDashboardPage() {
                   <GroupIcon />
                   Assigned Group
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">{currentShift.group}</div>
+                <div className="text-[15px] font-black text-brand-navy">{todayShift?.group ?? "–"}</div>
               </div>
 
               {/* Students */}
@@ -132,7 +214,7 @@ export default function TeacherDashboardPage() {
                   <UsersIcon />
                   Students
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">{currentShift.students}</div>
+                <div className="text-[15px] font-black text-brand-navy">–</div>
               </div>
 
               {/* Co-Teacher */}
@@ -141,18 +223,18 @@ export default function TeacherDashboardPage() {
                   <CoTeacherIcon />
                   Co-Teacher
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">{currentShift.coTeacher}</div>
+                <div className="text-[15px] font-black text-brand-navy">–</div>
               </div>
             </div>
 
             {/* Action buttons */}
             <div className="flex gap-3 relative z-10">
-              <button className="flex-1 bg-white border-2 border-slate-200 text-brand-navy font-black py-3.5 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all text-[14px]">
-                Take Break
-              </button>
-              <button className="flex-1 bg-brand-yellow text-brand-navy font-black py-3.5 rounded-2xl hover:brightness-95 transition-all text-[14px] shadow-md shadow-brand-yellow/30">
-                Clock Out
-              </button>
+              <a
+                href="/teacher/clock"
+                className="flex-1 text-center bg-brand-yellow text-brand-navy font-black py-3.5 rounded-2xl hover:brightness-95 transition-all text-[14px] shadow-md shadow-brand-yellow/30"
+              >
+                {isClocked ? "Manage Shift" : "Clock In"}
+              </a>
             </div>
           </div>
 
@@ -169,43 +251,51 @@ export default function TeacherDashboardPage() {
             </div>
 
             <div className="flex flex-col gap-4">
-              {teacherAnnouncements.map((a) => (
-                <div
-                  key={a.id}
-                  className={`flex gap-4 p-4 rounded-2xl border relative overflow-hidden ${
-                    a.type === "alert"
-                      ? "bg-amber-50/60 border-brand-yellow/30"
-                      : "bg-blue-50/40 border-brand-sky/40"
-                  }`}
-                >
-                  {/* Left accent bar */}
+              {loadingAnn ? (
+                <p className="text-[13px] text-brand-navy/40 font-bold">Loading announcements…</p>
+              ) : announcements.length === 0 ? (
+                <p className="text-[13px] text-brand-navy/40 font-bold">No announcements right now.</p>
+              ) : (
+                announcements.slice(0, 3).map((a, i) => (
                   <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${
-                      a.type === "alert" ? "bg-brand-yellow" : "bg-brand-blue"
-                    }`}
-                  />
-                  {/* Icon */}
-                  <div
-                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                    key={a._id ?? i}
+                    className={`flex gap-4 p-4 rounded-2xl border relative overflow-hidden ${
                       a.type === "alert"
-                        ? "bg-brand-yellow/20 text-amber-600"
-                        : "bg-brand-sky/40 text-brand-blue"
+                        ? "bg-amber-50/60 border-brand-yellow/30"
+                        : "bg-blue-50/40 border-brand-sky/40"
                     }`}
                   >
-                    {a.type === "alert" ? <AlertIcon /> : <InfoIcon />}
-                  </div>
-                  {/* Text */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="text-[13px] font-black text-brand-navy">{a.title}</h3>
-                      <span className="text-[10px] font-bold text-brand-navy/40">{a.timeAgo}</span>
+                    {/* Left accent bar */}
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${
+                        a.type === "alert" ? "bg-brand-yellow" : "bg-brand-blue"
+                      }`}
+                    />
+                    {/* Icon */}
+                    <div
+                      className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                        a.type === "alert"
+                          ? "bg-brand-yellow/20 text-amber-600"
+                          : "bg-brand-sky/40 text-brand-blue"
+                      }`}
+                    >
+                      {a.type === "alert" ? <AlertIcon /> : <InfoIcon />}
                     </div>
-                    <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed">
-                      {a.content}
-                    </p>
+                    {/* Text */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h3 className="text-[13px] font-black text-brand-navy">{a.title}</h3>
+                        <span className="text-[10px] font-bold text-brand-navy/40">
+                          {a.createdAt ? timeAgoFromDate(a.createdAt) : a.timeAgo}
+                        </span>
+                      </div>
+                      <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed">
+                        {a.content}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -214,7 +304,7 @@ export default function TeacherDashboardPage() {
         <div className="flex flex-col gap-4">
           {/* Shift History Button Card */}
           <a
-            href="/teacher/shift-history"
+            href="/teacher/history"
             className="bg-white rounded-[2rem] border-2 border-brand-sky shadow-lg p-8 hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center justify-center text-center group"
           >
             <div className="w-16 h-16 rounded-full bg-brand-sky/30 text-brand-blue flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-brand-sky/50 transition-all">
@@ -236,7 +326,7 @@ export default function TeacherDashboardPage() {
             <p className="text-[12px] font-bold text-brand-navy/50 mt-1">Update your details</p>
           </a>
 
-          {/* Quick Stats mini card */}
+          {/* Quick Stats mini card — loaded from history if available */}
           <div className="bg-white rounded-[2rem] border-2 border-purple-100 shadow-lg p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="block w-5 h-[3px] rounded-full bg-brand-yellow" />
@@ -246,19 +336,19 @@ export default function TeacherDashboardPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-brand-yellow/10 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">32h</div>
+                <div className="text-[22px] font-black text-brand-navy">–</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-amber-600 mt-0.5">Hours</div>
               </div>
               <div className="bg-brand-sky/20 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">5/6</div>
+                <div className="text-[22px] font-black text-brand-navy">–</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-brand-blue mt-0.5">Shifts</div>
               </div>
               <div className="bg-green-50 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">94%</div>
+                <div className="text-[22px] font-black text-brand-navy">–</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-green-600 mt-0.5">On Time</div>
               </div>
               <div className="bg-purple-50 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">7:52</div>
+                <div className="text-[22px] font-black text-brand-navy">–</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-purple-500 mt-0.5">Avg In</div>
               </div>
             </div>

@@ -3,7 +3,7 @@ import Image from "next/image";
 type TeamMember = {
   name: string;
   initials: string;
-  status: "WORKING" | "ON BREAK" | "NOT STARTED";
+  status: "WORKING" | "ON BREAK" | "NOT STARTED" | "COMPLETED";
   hours: string;
   color: string;
   avatar?: string;
@@ -19,6 +19,7 @@ const statusStyles: Record<TeamMember["status"], { label: string; color: string 
   WORKING: { label: "WORKING", color: "text-[#2da05b]" },
   "ON BREAK": { label: "ON BREAK", color: "text-[#ffb800]" },
   "NOT STARTED": { label: "NOT STARTED", color: "text-[#a0aec0]" },
+  COMPLETED: { label: "COMPLETED", color: "text-[#0050d5]" },
 };
 
 export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewProps) {
@@ -43,6 +44,7 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
           const style = statusStyles[member.status];
           const isNotStarted = member.status === "NOT STARTED";
           const isOnBreak = member.status === "ON BREAK";
+          const isCompleted = member.status === "COMPLETED";
 
           // First name only for inside avatar
           const firstName = member.name.replace(/^(Ms\.|Mr\.)\s*/, "").split(" ")[0];
@@ -57,6 +59,8 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
                       ? "border-[#444] bg-[#333]"
                       : isOnBreak
                       ? "border-[#ffb800] bg-white"
+                      : isCompleted
+                      ? "border-[#0050d5] bg-white"
                       : "border-[#2da05b] bg-white"
                   }`}
                 >
@@ -68,6 +72,8 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
                         <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
                       </svg>
                     </div>
+                  ) : member.avatar ? (
+                    <Image src={member.avatar} alt={member.name} fill className="object-cover" />
                   ) : (
                     <div
                       className="w-full h-full flex items-center justify-center text-[15px] font-extrabold"
@@ -85,7 +91,7 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
                 {/* Status dot */}
                 <span
                   className={`absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
-                    isNotStarted ? "bg-[#a0aec0]" : isOnBreak ? "bg-[#ffb800]" : "bg-[#2da05b]"
+                    isNotStarted ? "bg-[#a0aec0]" : isOnBreak ? "bg-[#ffb800]" : isCompleted ? "bg-[#0050d5]" : "bg-[#2da05b]"
                   }`}
                 />
               </div>
