@@ -11,26 +11,28 @@ if (!dbName) {
   throw new Error("Please define the MONGODB_DB environment variable inside .env.local");
 }
 
-let client: MongoClient;
-let db: Db;
-
 declare global {
   var _mongoClient: MongoClient | undefined;
   var _mongoDb: Db | undefined;
 }
 
 export async function connectToDatabase() {
+  // Always use the cached connection to avoid reconnect delays
   if (globalThis._mongoClient && globalThis._mongoDb) {
     return { client: globalThis._mongoClient, db: globalThis._mongoDb };
   }
 
-  client = await MongoClient.connect(uri);
-  db = client.db(dbName);
+  const client = await MongoClient.connect(uri, {
+    maxPoolSize: 10,        // Allow up to 10 simultaneous connections
+    minPoolSize: 2,         // Keep 2 connections warm
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 10000,
+  });
+  const db = client.db(dbName);
 
-  if (process.env.NODE_ENV !== "production") {
-    globalThis._mongoClient = client;
-    globalThis._mongoDb = db;
-  }
+  globalThis._mongoClient = client;
+  globalThis._mongoDb = db;
 
   return { client, db };
 }
+

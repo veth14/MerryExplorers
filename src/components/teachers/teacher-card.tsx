@@ -1,44 +1,88 @@
+"use client";
+
+import { useState } from "react";
 import type { Teacher } from "@/data/teachers";
+import { Modal } from "@/components/ui/modal";
 
 type TeacherCardProps = {
   teacher: Teacher;
 };
 
 function EmailIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-      <path d="M1.5 8.322v7.928A2.25 2.25 0 0 0 3.75 18.5h16.5a2.25 2.25 0 0 0 2.25-2.25V8.322l-9.47 5.58a.75.75 0 0 1-.76 0L1.5 8.322Z" />
-      <path d="M22.5 6.908V6.75a2.25 2.25 0 0 0-2.25-2.25H3.75A2.25 2.25 0 0 0 1.5 6.75v.158l10.5 6.188 10.5-6.188Z" />
-    </svg>
-  );
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>;
 }
 
 function PhoneIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-      <path fillRule="evenodd" d="M1.5 4.5a3 3 0 0 1 3-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 0 1-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 0 0 6.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 0 1 1.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 0 1-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5Z" clipRule="evenodd" />
-    </svg>
-  );
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>;
 }
 
 function DotsIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-      <path fillRule="evenodd" d="M4.5 12a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm6 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm6 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Z" clipRule="evenodd" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-      <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
-    </svg>
-  );
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg>;
 }
 
 export function TeacherCard({ teacher }: TeacherCardProps) {
+  const [loading, setLoading] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [shiftClass, setShiftClass] = useState(teacher.classAssigned || "");
+  
+  // Leave Form State
+  const [leaveType, setLeaveType] = useState("Sick Leave");
+  const [leaveStartDate, setLeaveStartDate] = useState("");
+  const [leaveEndDate, setLeaveEndDate] = useState("");
+  const [leaveReason, setLeaveReason] = useState("");
+  
   const isOnLeave = teacher.status === "on-leave";
+
+  async function handleFileLeave() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/leaves`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacherId: teacher.id,
+          teacherName: teacher.name,
+          type: leaveType,
+          startDate: leaveStartDate,
+          endDate: leaveEndDate,
+          reason: leaveReason,
+        }),
+      });
+      if (res.ok) {
+        setIsLeaveModalOpen(false);
+        setLeaveReason("");
+        setLeaveStartDate("");
+        setLeaveEndDate("");
+        setLeaveType("Sick Leave");
+        setIsSuccessModalOpen(true);
+      }
+    } catch (e) {
+      console.error("Failed to file leave", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveShifts() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/accounts/${teacher.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedRoom: shiftClass }),
+      });
+      if (res.ok) {
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error("Failed to save shifts", e);
+    } finally {
+      setLoading(false);
+      setIsEditModalOpen(false);
+    }
+  }
 
   return (
     <article
@@ -62,12 +106,21 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
         <div className="flex items-start gap-3">
           {/* Avatar */}
           <div className="relative shrink-0">
-            <div
-              className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-extrabold text-[18px] border-[3px] border-white shadow-md ${isOnLeave ? "grayscale" : ""}`}
-              style={{ backgroundColor: teacher.avatarColor }}
-            >
-              {teacher.initials}
-            </div>
+            {teacher.avatarUrl ? (
+              <img
+                src={teacher.avatarUrl}
+                alt={teacher.name}
+                referrerPolicy="no-referrer"
+                className={`w-14 h-14 rounded-full object-cover border-[3px] border-white shadow-md ${isOnLeave ? "grayscale opacity-80" : ""}`}
+              />
+            ) : (
+              <div
+                className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-extrabold text-[18px] border-[3px] border-white shadow-md ${isOnLeave ? "grayscale" : ""}`}
+                style={{ backgroundColor: teacher.avatarColor }}
+              >
+                {teacher.initials}
+              </div>
+            )}
             {/* Online dot — only for active */}
             {!isOnLeave && (
               <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-[#2da05b] border-2 border-white" />
@@ -87,11 +140,10 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
         <div>
           {teacher.classAssigned ? (
             <span
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-bold border ${
-                teacher.role === "Lead Teacher"
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-bold border ${teacher.role === "Lead Teacher"
                   ? "bg-[#fff8e1] text-[#a07000] border-[#ffd54f]"
                   : "bg-[#e8effe] text-[#0050d5] border-[#c5d6ff]"
-              }`}
+                }`}
             >
               {teacher.classAssigned}
             </span>
@@ -130,15 +182,178 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
           </button>
         ) : (
           <>
-            <button className="flex-1 rounded-[10px] border border-[#c5d6ff] bg-[#f0f5ff] py-2 text-[13px] font-bold text-[#0050d5] hover:bg-[#dde8ff] transition-colors">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="flex-1 rounded-[10px] border border-[#c5d6ff] bg-[#f0f5ff] py-2 text-[12.5px] font-bold text-[#0050d5] hover:bg-[#dde8ff] transition-colors truncate px-1"
+            >
               Edit
             </button>
-            <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#ffd5d5] bg-[#fff0f0] text-[#e53935] hover:bg-[#ffe0e0] transition-colors">
-              <TrashIcon />
+            <button
+              onClick={() => setIsLeaveModalOpen(true)}
+              className="flex-1 rounded-[10px] border border-[#e2e8f0] bg-white py-2 text-[12.5px] font-bold text-[#4a5568] hover:bg-[#f0f4f9] transition-colors truncate px-1"
+            >
+              File Leave
             </button>
           </>
         )}
       </div>
+
+      <Modal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        title="File Leave"
+        description={`Submit a leave request for ${teacher.name}.`}
+        footer={
+          <>
+            <button
+              onClick={() => setIsLeaveModalOpen(false)}
+              className="px-4 py-2 rounded-lg font-bold text-[13px] text-[#4a5568] hover:bg-[#e2e8f0] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleFileLeave}
+              disabled={loading || !leaveStartDate || !leaveEndDate}
+              className="px-4 py-2 rounded-lg font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-colors disabled:opacity-50"
+            >
+              {loading ? "Filing..." : "Confirm Leave"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="bg-[#fff0f0] border border-[#ffd5d5] rounded-xl p-3 text-[12.5px] font-bold text-[#ba1a1a]">
+            This action will immediately update their status on the dashboard and remove them from active shifts.
+          </div>
+          
+          <div>
+            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Leave Type</label>
+            <select 
+              value={leaveType}
+              onChange={e => setLeaveType(e.target.value)}
+              className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
+            >
+              <option value="Sick Leave">Sick Leave</option>
+              <option value="Vacation Leave">Vacation Leave</option>
+              <option value="Emergency Leave">Emergency Leave</option>
+              <option value="Unpaid Leave">Unpaid Leave</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Start Date</label>
+              <input 
+                type="date" 
+                value={leaveStartDate}
+                onChange={e => setLeaveStartDate(e.target.value)}
+                className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">End Date</label>
+              <input 
+                type="date" 
+                value={leaveEndDate}
+                onChange={e => setLeaveEndDate(e.target.value)}
+                className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Reason (Optional)</label>
+            <textarea 
+              value={leaveReason}
+              onChange={e => setLeaveReason(e.target.value)}
+              rows={2}
+              placeholder="Provide a brief reason..."
+              className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-semibold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm resize-none"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Shifts"
+        description={`Modify class assignments for ${teacher.name}.`}
+        footer={
+          <>
+            <button
+              onClick={() => setIsEditModalOpen(false)}
+              className="px-4 py-2 rounded-lg font-bold text-[13px] text-[#4a5568] hover:bg-[#e2e8f0] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveShifts}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-colors disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Assigned Class</label>
+            <select
+              value={shiftClass}
+              onChange={(e) => setShiftClass(e.target.value)}
+              className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
+            >
+              <option value="">Unassigned</option>
+              <option value="Little Explorers">Little Explorers</option>
+              <option value="Tiny Explorers">Tiny Explorers</option>
+              <option value="Pre-K">Pre-K</option>
+              <option value="Toddlers">Toddlers</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Shift Time</label>
+            <input
+              type="text"
+              defaultValue="8:00 AM - 5:00 PM"
+              disabled
+              className="w-full border border-[#e2e8f0] bg-[#f8fafc] rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#9aa3b2] cursor-not-allowed shadow-sm"
+            />
+            <p className="text-[11px] text-[#a0aec0] mt-1.5 font-bold">Standard shifting applies. Custom times coming soon.</p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        title="Leave Request Submitted"
+        footer={
+          <button
+            onClick={() => setIsSuccessModalOpen(false)}
+            className="px-5 py-2 rounded-lg font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-colors"
+          >
+            Got it
+          </button>
+        }
+      >
+        <div className="flex flex-col items-center gap-4 py-2 text-center">
+          <div className="w-14 h-14 rounded-full bg-[#e8f9ef] flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2da05b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-extrabold text-[14px] text-[#002f76]">Request Submitted!</p>
+            <p className="text-[13px] font-semibold text-[#5a6e8c] mt-1">
+              Leave request for <span className="font-extrabold text-[#002f76]">{teacher.name}</span> has been submitted and is pending admin approval.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </article>
   );
 }

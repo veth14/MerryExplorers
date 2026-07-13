@@ -5,33 +5,42 @@ import { AppShell } from "@/components/app-shell";
 import { TeacherMetricCard } from "@/components/teachers/teacher-metric-card";
 import { TeacherCard } from "@/components/teachers/teacher-card";
 import type { FilterTab, Teacher } from "@/data/teachers";
+import { cachedFetch, invalidateCachePrefix } from "@/lib/cache";
 
 type AccountDoc = {
-  _id: string;
-  firstName: string;
-  lastName: string;
+  _id?: string;
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
   email: string;
   phone?: string;
-  role: "teacher" | "lead_teacher";
+  role: string;
   status?: string;
   classAssigned?: string;
+  assignedRoom?: string;
   avatarUrl?: string;
+  avatarColor?: string;
+  initials?: string;
 };
 
 function mapAccountToTeacher(acc: AccountDoc): Teacher {
-  const initials = `${acc.firstName?.[0] ?? ""}${acc.lastName?.[0] ?? ""}`.toUpperCase();
+  const name = acc.fullName || `${acc.firstName ?? ""} ${acc.lastName ?? ""}`.trim() || "Unknown Teacher";
+  const initials = acc.initials || name.slice(0, 2).toUpperCase();
   const COLORS = ["#ffb347", "#4a90d9", "#9b9b9b", "#6c5ce7", "#e17055", "#00b894"];
-  const colorIndex = (acc.firstName?.charCodeAt(0) ?? 0) % COLORS.length;
+  const colorIndex = name.charCodeAt(0) % COLORS.length;
+  
   return {
-    id: acc._id,
-    name: `${acc.firstName} ${acc.lastName}`,
+    id: acc.id || acc._id || "",
+    name,
     initials,
-    role: acc.role === "lead_teacher" ? "Lead Teacher" : "Assistant Teacher",
+    role: (acc.role === "Lead Teacher" || acc.role === "lead_teacher") ? "Lead Teacher" : "Assistant Teacher",
     status: (acc.status as "active" | "on-leave") || "active",
-    classAssigned: acc.classAssigned ?? null,
+    classAssigned: acc.assignedRoom || acc.classAssigned || null,
     email: acc.email,
     phone: acc.phone ?? "–",
-    avatarColor: COLORS[colorIndex],
+    avatarColor: acc.avatarColor || COLORS[colorIndex],
+    avatarUrl: acc.avatarUrl,
   };
 }
 
@@ -43,11 +52,9 @@ export default function TeachersPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch("/api/accounts");
-        const json = await res.json();
-        if (json.success) {
-          const mapped = json.data.map(mapAccountToTeacher);
-          setAccounts(mapped);
+        const json = await cachedFetch<any[]>("accounts:all", "/api/accounts", 60_000);
+        if (Array.isArray(json)) {
+          setAccounts(json.map(mapAccountToTeacher));
         }
       } catch (err) {
         console.error("Failed to fetch teachers:", err);
@@ -70,7 +77,7 @@ export default function TeachersPage() {
 
   const teacherMetrics = [
     { label: "Total Teachers", value: accounts.length.toString(), meta: "Registered accounts", type: "total" as const },
-    { label: "Active Today", value: totalActive.toString(), meta: `${totalLeads} lead teachers`, type: "active" as const },
+    { label: "Active Today", value: totalActive.toString(), meta: `${totalLeads} lead teachers`, type: "active" as const, totalValue: accounts.length.toString() },
     { label: "On Leave", value: totalOnLeave.toString(), meta: "Currently on leave", type: "leave" as const },
   ];
 
@@ -85,6 +92,7 @@ export default function TeachersPage() {
             value={metric.value}
             meta={metric.meta}
             type={metric.type}
+            totalValue={metric.totalValue}
           />
         ))}
       </section>

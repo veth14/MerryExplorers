@@ -13,7 +13,11 @@ export async function GET() {
       _id: undefined
     }));
     
-    return NextResponse.json(formattedAccounts);
+    return NextResponse.json(formattedAccounts, {
+      headers: {
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120"
+      }
+    });
   } catch (error) {
     console.error("Failed to fetch accounts:", error);
     return NextResponse.json({ error: "Failed to fetch accounts" }, { status: 500 });

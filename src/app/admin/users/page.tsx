@@ -9,6 +9,7 @@ import { uploadAvatar } from "@/lib/supabase";
 import { firebaseConfig } from "@/lib/firebase";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
@@ -696,9 +697,8 @@ export default function UsersPage() {
   useEffect(() => {
     async function fetchAccounts() {
       try {
-        const res = await fetch("/api/accounts");
-        if (res.ok) {
-          const data = await res.json();
+        const data = await cachedFetch<UserAccount[]>("accounts:all", "/api/accounts", 60_000);
+        if (Array.isArray(data)) {
           setAccounts(data);
         }
       } catch (e) {
@@ -738,6 +738,7 @@ export default function UsersPage() {
       });
       if (res.ok) {
         setAccounts((prev) => prev.map((a) => (a.id === id ? { ...account, id } : a)));
+        invalidateCache("accounts:all"); // Bust cache so other pages see new data
       }
     } else {
       // Add
@@ -767,6 +768,7 @@ export default function UsersPage() {
         if (res.ok) {
           const newAccount = await res.json();
           setAccounts((prev) => [newAccount, ...prev]);
+          invalidateCache("accounts:all");
         } else {
           console.error("Failed to save to MongoDB");
         }
@@ -803,6 +805,7 @@ export default function UsersPage() {
 
     if (res.ok) {
       setAccounts((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      invalidateCache("accounts:all");
     }
     setDeleteTarget(null);
   }

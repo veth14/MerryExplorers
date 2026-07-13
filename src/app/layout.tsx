@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { PageProgress } from "@/components/ui/page-progress";
 
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -36,6 +37,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-on-background">
+        <PageProgress />
         <AuthProvider>
           {children}
         </AuthProvider>
@@ -43,3 +45,4 @@ export default function RootLayout({
     </html>
   );
 }
+

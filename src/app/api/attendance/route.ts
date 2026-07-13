@@ -30,7 +30,11 @@ export async function GET(request: Request) {
     }
 
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
-    return NextResponse.json({ success: true, data: attendanceRecords });
+    return NextResponse.json({ success: true, data: attendanceRecords }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30"
+      }
+    });
   } catch (error: any) {
     console.error("Failed to fetch attendance:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch" }, { status: 500 });

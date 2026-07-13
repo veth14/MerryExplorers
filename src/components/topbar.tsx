@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { notifications as initialNotifications, notificationMeta } from "@/data/notifications";
+import { notifications as initialNotifications, notificationMeta, AppNotification, NotificationType } from "@/data/notifications";
 
 type TopbarProps = {
   title: string;
@@ -10,8 +10,21 @@ type TopbarProps = {
 
 export function Topbar({ title, description }: TopbarProps) {
   const [notifOpen, setNotifOpen] = useState(false);
-  const [items, setItems] = useState(initialNotifications);
+  const [items, setItems] = useState<AppNotification[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function fetchNotifs() {
+      try {
+        const res = await fetch("/api/notifications");
+        const json = await res.json();
+        if (json.success) setItems(json.data);
+      } catch (err) {
+        console.error("Failed to fetch notifications:", err);
+      }
+    }
+    fetchNotifs();
+  }, []);
 
   const unreadCount = items.filter((n) => !n.read).length;
 

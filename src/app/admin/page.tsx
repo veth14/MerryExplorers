@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { cachedFetch, invalidateCachePrefix } from "@/lib/cache";
 import { AttendanceHub } from "@/components/dashboard/attendance-hub";
 import { DailyTeamOverview } from "@/components/dashboard/daily-team-overview";
 import { MetricCard } from "@/components/dashboard/metric-card";
@@ -48,17 +49,14 @@ export default function Home() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [metricsRes, attendanceRes, accountsRes] = await Promise.all([
-          fetch("/api/dashboard/metrics"),
-          fetch("/api/attendance?date=today"),
-          fetch("/api/accounts"),
+        const [metricsJson, attendanceJson, accountsJson] = await Promise.all([
+          cachedFetch<any>("dashboard:metrics", "/api/dashboard/metrics", 60_000),
+          cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 20_000),
+          cachedFetch<any>("accounts:all", "/api/accounts", 60_000),
         ]);
-        const metricsJson = await metricsRes.json();
-        const attendanceJson = await attendanceRes.json();
-        const accountsJson = await accountsRes.json();
-        
-        if (metricsJson.success) setMetricsData(metricsJson.data);
-        if (attendanceJson.success) setTodayAttendance(attendanceJson.data);
+
+        if (metricsJson?.success) setMetricsData(metricsJson.data);
+        if (attendanceJson?.success) setTodayAttendance(attendanceJson.data);
         if (Array.isArray(accountsJson)) setAccounts(accountsJson);
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
@@ -72,13 +70,11 @@ export default function Home() {
   const metrics = metricsData
     ? [
         { label: "Total Teachers", value: metricsData.totalTeachers.value, meta: metricsData.totalTeachers.meta, type: "teachers" as const },
-        { label: "Active Sessions", value: metricsData.activeSessions.value, meta: metricsData.activeSessions.meta, type: "sessions" as const },
         { label: "Punctuality Rate", value: metricsData.punctualityRate.value, meta: metricsData.punctualityRate.meta, type: "punctuality" as const },
         { label: "Total Clock-Ins", value: metricsData.totalClockIns.value, meta: metricsData.totalClockIns.meta, type: "clockins" as const },
       ]
     : [
         { label: "Total Teachers", value: "–", meta: "Loading...", type: "teachers" as const },
-        { label: "Active Sessions", value: "–", meta: "Loading...", type: "sessions" as const },
         { label: "Punctuality Rate", value: "–", meta: "Loading...", type: "punctuality" as const },
         { label: "Total Clock-Ins", value: "–", meta: "Loading...", type: "clockins" as const },
       ];
@@ -161,7 +157,7 @@ export default function Home() {
   return (
     <AppShell title="Welcome back, Admin!" description="Here's what's happening today across all playgroups.">
       {/* Metric cards */}
-      <section className="grid gap-4 grid-cols-2 xl:grid-cols-4 shrink-0">
+      <section className="grid gap-4 grid-cols-1 md:grid-cols-3 shrink-0">
         {metrics.map((metric) => (
           <MetricCard
             key={metric.label}

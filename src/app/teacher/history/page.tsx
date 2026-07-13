@@ -17,14 +17,14 @@ type ShiftRecord = {
 type ShiftStatus = "completed" | "inprogress" | "absent";
 
 const STATUS_STYLES: Record<ShiftStatus, string> = {
-  completed:  "bg-green-100 text-green-800",
+  completed: "bg-green-100 text-green-800",
   inprogress: "bg-blue-100 text-blue-800",
-  absent:     "bg-red-100 text-red-800",
+  absent: "bg-red-100 text-red-800",
 };
 const STATUS_LABELS: Record<ShiftStatus, string> = {
-  completed:  "Completed",
+  completed: "Completed",
   inprogress: "In Progress",
-  absent:     "Absent",
+  absent: "Absent",
 };
 
 function formatT(iso: string | null) {
@@ -202,9 +202,8 @@ export default function ShiftHistoryPage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`text-xs font-bold px-4 py-1.5 rounded-lg transition-all ${
-                    activeTab === tab ? "bg-white text-brand-navy shadow-sm" : "text-slate-500 hover:text-brand-navy"
-                  }`}
+                  className={`text-xs font-bold px-4 py-1.5 rounded-lg transition-all ${activeTab === tab ? "bg-white text-brand-navy shadow-sm" : "text-slate-500 hover:text-brand-navy"
+                    }`}
                 >
                   {tab === "this" ? "This Week" : "Last Week"}
                 </button>

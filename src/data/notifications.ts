@@ -9,48 +9,7 @@ export type AppNotification = {
   read: boolean;
 };
 
-export const notifications: AppNotification[] = [
-  {
-    id: "n1",
-    type: "late",
-    title: "Late clock-in",
-    message: "Mr. David clocked in 15 minutes late today.",
-    time: "5 min ago",
-    read: false,
-  },
-  {
-    id: "n2",
-    type: "absent",
-    title: "Absent teacher",
-    message: "Ms. Rachel is marked absent for today's session.",
-    time: "32 min ago",
-    read: false,
-  },
-  {
-    id: "n3",
-    type: "success",
-    title: "All classes started",
-    message: "Every class began on time this morning.",
-    time: "1 hour ago",
-    read: false,
-  },
-  {
-    id: "n4",
-    type: "info",
-    title: "Weekly report ready",
-    message: "The punctuality report for W4 is available to download.",
-    time: "3 hours ago",
-    read: true,
-  },
-  {
-    id: "n5",
-    type: "info",
-    title: "Schedule updated",
-    message: "Tomorrow's roster has been updated by Admin.",
-    time: "Yesterday",
-    read: true,
-  },
-];
+export const notifications: any[] = [];
 
 export const notificationMeta: Record<
   NotificationType,

@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const { db } = await connectToDatabase();
     const activity = await db.collection("activity").find({}).sort({ createdAt: -1 }).toArray();
-    
+
     // Seed default data if empty
     if (activity.length === 0) {
       const defaultData = [
@@ -35,7 +35,11 @@ export async function GET() {
       return NextResponse.json({ success: true, data: defaultData });
     }
 
-    return NextResponse.json({ success: true, data: activity });
+    return NextResponse.json({ success: true, data: activity }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60"
+      }
+    });
   } catch (error: any) {
     console.error("Failed to fetch activity:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch" }, { status: 500 });
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     const { db } = await connectToDatabase();
-    
+
     const newRecord = {
       author,
       authorRole: authorRole || "Teacher",

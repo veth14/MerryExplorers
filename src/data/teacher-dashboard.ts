@@ -2,6 +2,7 @@ export const teacherNavItems = [
   { label: "Dashboard", href: "/teacher" },
   { label: "Clock In/Out", href: "/teacher/clock" },
   { label: "History", href: "/teacher/history" },
+  { label: "Leaves", href: "/teacher/leaves" },
   { label: "Profile", href: "/teacher/profile" },
 ] as const;
 

@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { AttendanceMetricCard } from "@/components/attendance/attendance-metric-card";
 import { AttendanceRoster } from "@/components/attendance/attendance-roster";
 import type { StaffAttendance } from "@/data/attendance";
+import { cachedFetch } from "@/lib/cache";
 
 type AttendanceRecord = {
   _id: string;
@@ -24,9 +25,8 @@ export default function AttendancePage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch("/api/attendance?date=today");
-        const json = await res.json();
-        if (json.success) setRecords(json.data);
+        const json = await cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 20_000);
+        if (json?.success) setRecords(json.data);
       } catch (err) {
         console.error("Failed to fetch attendance:", err);
       } finally {

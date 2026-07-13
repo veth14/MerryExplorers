@@ -7,7 +7,7 @@ export async function GET() {
     const { db } = await connectToDatabase();
     // Sort by most recent first
     const announcements = await db.collection("announcements").find({}).sort({ createdAt: -1 }).toArray();
-    
+
     // If empty, return a default set based on the static data for the demo
     if (announcements.length === 0) {
       const defaultData = [
@@ -30,7 +30,11 @@ export async function GET() {
       return NextResponse.json({ success: true, data: defaultData });
     }
 
-    return NextResponse.json({ success: true, data: announcements });
+    return NextResponse.json({ success: true, data: announcements }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60"
+      }
+    });
   } catch (error: any) {
     console.error("Failed to fetch announcements:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch" }, { status: 500 });
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     const { db } = await connectToDatabase();
-    
+
     const newRecord = {
       title,
       content,

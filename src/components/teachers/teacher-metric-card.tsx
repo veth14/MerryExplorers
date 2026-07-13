@@ -3,6 +3,7 @@ type TeacherMetricCardProps = {
   value: string;
   meta: string;
   type: "total" | "active" | "leave";
+  totalValue?: string;
 };
 
 function TotalTeachersGraphic() {
@@ -19,18 +20,19 @@ function TotalTeachersGraphic() {
   );
 }
 
-function ActiveTodayGraphic() {
+function ActiveTodayGraphic({ value, total }: { value: number; total: number }) {
+  const ratio = total > 0 ? value / total : 0;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full">
       <circle cx="40" cy="28" r="22" fill="none" stroke="#d4f0e2" strokeWidth="5" />
       <circle cx="40" cy="28" r="22" fill="none" stroke="#2da05b" strokeWidth="5"
-        strokeDasharray={`${(18 / 22) * 138.2} 138.2`}
+        strokeDasharray={`${ratio * 138.2} 138.2`}
         strokeDashoffset="34.5"
         strokeLinecap="round"
         transform="rotate(-90 40 28)"
       />
       <circle cx="40" cy="28" r="14" fill="#e8f9f0" />
-      <text x="40" y="33" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#2da05b">18/22</text>
+      <text x="40" y="33" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#2da05b">{value}/{total}</text>
     </svg>
   );
 }
@@ -52,32 +54,35 @@ const configs = {
     metaIcon: "↑",
     metaColor: "text-[#2da05b]",
     borderColor: "border-[#0050d5]",
-    graphic: <TotalTeachersGraphic />,
   },
   active: {
     labelColor: "text-[#2da05b]",
     metaIcon: "📅",
     metaColor: "text-[#555]",
     borderColor: "border-[#2da05b]",
-    graphic: <ActiveTodayGraphic />,
   },
   leave: {
     labelColor: "text-[#ffb800]",
     metaIcon: "🔄",
     metaColor: "text-[#555]",
     borderColor: "border-[#ffb800]",
-    graphic: <OnLeaveGraphic />,
   },
 };
 
-export function TeacherMetricCard({ label, value, meta, type }: TeacherMetricCardProps) {
+export function TeacherMetricCard({ label, value, meta, type, totalValue }: TeacherMetricCardProps) {
   const cfg = configs[type];
+  
+  let graphic;
+  if (type === "total") graphic = <TotalTeachersGraphic />;
+  else if (type === "active") graphic = <ActiveTodayGraphic value={parseInt(value) || 0} total={parseInt(totalValue || "0") || 0} />;
+  else if (type === "leave") graphic = <OnLeaveGraphic />;
+
   return (
     <article
       className={`relative overflow-hidden rounded-[1.25rem] bg-white px-5 pb-5 pt-5 border-b-[4px] ${cfg.borderColor} shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)]`}
     >
       <div className="absolute right-2 top-2 w-[72px] h-[54px] opacity-70 pointer-events-none">
-        {cfg.graphic}
+        {graphic}
       </div>
       <p className={`text-[11.5px] font-extrabold uppercase tracking-widest ${cfg.labelColor}`}>
         {label}
