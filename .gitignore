@@ -47,3 +47,7 @@ ui-ux-pro-max-skill/
 #Agents Files
 AGENTS.md
 CLAUDE.md
+
+# Graphify
+graphify-out/
+.graphify*
