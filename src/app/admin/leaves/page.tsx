@@ -217,8 +217,8 @@ export default function LeavePage() {
         </div>
       ) : (
         <div className="bg-white rounded-[1.25rem] border border-[#e8effe] shadow-[0_4px_20px_-4px_rgba(0,47,118,0.10)] overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-[2fr_1.2fr_1.2fr_1fr_1fr_1.4fr] gap-4 px-6 py-3 border-b border-[#f0f4f9] bg-[#f8fafc]">
+          {/* Desktop table header — hidden on mobile */}
+          <div className="hidden md:grid grid-cols-[2fr_1.2fr_1.2fr_1fr_1fr_1.4fr] gap-4 px-6 py-3 border-b border-[#f0f4f9] bg-[#f8fafc]">
             {["Teacher", "Leave Type", "Duration", "Date Filed", "Status", "Action"].map(
               (h) => (
                 <p
@@ -237,71 +237,60 @@ export default function LeavePage() {
             return (
               <div
                 key={leave.id}
-                className="grid grid-cols-[2fr_1.2fr_1.2fr_1fr_1fr_1.4fr] gap-4 items-center px-6 py-4 border-b border-[#f0f4f9] last:border-0 hover:bg-[#f8fafc] transition-colors"
+                className="border-b border-[#f0f4f9] last:border-0 hover:bg-[#f8fafc] transition-colors"
               >
-                {/* Teacher */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-[#e8effe] flex items-center justify-center text-[#0050d5] font-extrabold text-[12px] shrink-0">
-                    {leave.teacherName
-                      ?.split(" ")
-                      .map((n: string) => n[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase() || "?"}
+                {/* Mobile card layout */}
+                <div className="md:hidden p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-[#e8effe] flex items-center justify-center text-[#0050d5] font-extrabold text-[12px] shrink-0">
+                        {leave.teacherName
+                          ?.split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase() || "?"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-[13px] text-[#002f76] truncate">
+                          {leave.teacherName || "Unknown"}
+                        </p>
+                        <p className="text-[12px] font-bold text-[#002f76]">
+                          {leaveTypeIcons[leave.type] || "📋"} {leave.type}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${sc.bg} ${sc.text} shrink-0`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                      {leave.status}
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-extrabold text-[13px] text-[#002f76] truncate">
-                      {leave.teacherName || "Unknown"}
+
+                  {leave.reason && (
+                    <p className="text-[11px] text-[#9aa3b2] font-semibold">
+                      {leave.reason}
                     </p>
-                    {leave.reason && (
-                      <p className="text-[11px] text-[#9aa3b2] font-semibold truncate max-w-[180px]">
-                        {leave.reason}
-                      </p>
-                    )}
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-y-1 text-[11px] font-semibold">
+                    <div className="text-[#9aa3b2]">
+                      {formatDate(leave.startDate)} – {formatDate(leave.endDate)} <span className="font-bold text-[#002f76]">({getDuration(leave.startDate, leave.endDate)})</span>
+                    </div>
+                    {leave.createdAt && <div className="text-[#5a6e8c]">Filed: {formatDate(leave.createdAt)}</div>}
                   </div>
-                </div>
 
-                {/* Type */}
-                <p className="text-[13px] font-bold text-[#002f76]">
-                  {leaveTypeIcons[leave.type] || "📋"} {leave.type}
-                </p>
-
-                {/* Duration */}
-                <div>
-                  <p className="text-[13px] font-bold text-[#002f76]">
-                    {getDuration(leave.startDate, leave.endDate)}
-                  </p>
-                  <p className="text-[11px] text-[#9aa3b2] font-semibold">
-                    {formatDate(leave.startDate)} – {formatDate(leave.endDate)}
-                  </p>
-                </div>
-
-                {/* Date filed */}
-                <p className="text-[12px] font-semibold text-[#5a6e8c]">
-                  {leave.createdAt ? formatDate(leave.createdAt) : "—"}
-                </p>
-
-                {/* Status only */}
-                <div>
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${sc.bg} ${sc.text}`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                    {leave.status}
-                  </span>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-2">
-                  {leave.status === "Pending" ? (
-                    <>
+                  {/* Action buttons */}
+                  {leave.status === "Pending" && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-[#f0f4f9]">
                       <button
                         onClick={() => {
                           setSelectedLeave(leave);
                           setConfirmAction("Approved");
                         }}
                         disabled={actionLoading === leave.id}
-                        className="px-3 py-1.5 rounded-full bg-[#e8f9ef] text-[#1a7f4b] text-[11px] font-bold hover:bg-[#d1f5e2] transition-colors border border-[#b3e8c9] disabled:opacity-50"
+                        className="flex-1 py-1.5 rounded-full bg-[#e8f9ef] text-[#1a7f4b] text-[11px] font-bold hover:bg-[#d1f5e2] transition-colors border border-[#b3e8c9] disabled:opacity-50"
                       >
                         Approve
                       </button>
@@ -311,14 +300,97 @@ export default function LeavePage() {
                           setConfirmAction("Rejected");
                         }}
                         disabled={actionLoading === leave.id}
-                        className="px-3 py-1.5 rounded-full bg-[#fff0f0] text-[#ba1a1a] text-[11px] font-bold hover:bg-[#ffe0e0] transition-colors border border-[#ffd5d5] disabled:opacity-50"
+                        className="flex-1 py-1.5 rounded-full bg-[#fff0f0] text-[#ba1a1a] text-[11px] font-bold hover:bg-[#ffe0e0] transition-colors border border-[#ffd5d5] disabled:opacity-50"
                       >
                         Reject
                       </button>
-                    </>
-                  ) : (
-                    <span className="text-[12px] font-semibold text-[#9aa3b2]">—</span>
+                    </div>
                   )}
+                </div>
+
+                {/* Desktop row layout */}
+                <div className="hidden md:grid grid-cols-[2fr_1.2fr_1.2fr_1fr_1fr_1.4fr] gap-4 items-center px-6 py-4">
+                  {/* Teacher */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-[#e8effe] flex items-center justify-center text-[#0050d5] font-extrabold text-[12px] shrink-0">
+                      {leave.teacherName
+                        ?.split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase() || "?"}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-extrabold text-[13px] text-[#002f76] truncate">
+                        {leave.teacherName || "Unknown"}
+                      </p>
+                      {leave.reason && (
+                        <p className="text-[11px] text-[#9aa3b2] font-semibold truncate max-w-[180px]">
+                          {leave.reason}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Type */}
+                  <p className="text-[13px] font-bold text-[#002f76]">
+                    {leaveTypeIcons[leave.type] || "📋"} {leave.type}
+                  </p>
+
+                  {/* Duration */}
+                  <div>
+                    <p className="text-[13px] font-bold text-[#002f76]">
+                      {getDuration(leave.startDate, leave.endDate)}
+                    </p>
+                    <p className="text-[11px] text-[#9aa3b2] font-semibold">
+                      {formatDate(leave.startDate)} – {formatDate(leave.endDate)}
+                    </p>
+                  </div>
+
+                  {/* Date filed */}
+                  <p className="text-[12px] font-semibold text-[#5a6e8c]">
+                    {leave.createdAt ? formatDate(leave.createdAt) : "—"}
+                  </p>
+
+                  {/* Status only */}
+                  <div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${sc.bg} ${sc.text}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                      {leave.status}
+                    </span>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2">
+                    {leave.status === "Pending" ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedLeave(leave);
+                            setConfirmAction("Approved");
+                          }}
+                          disabled={actionLoading === leave.id}
+                          className="px-3 py-1.5 rounded-full bg-[#e8f9ef] text-[#1a7f4b] text-[11px] font-bold hover:bg-[#d1f5e2] transition-colors border border-[#b3e8c9] disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedLeave(leave);
+                            setConfirmAction("Rejected");
+                          }}
+                          disabled={actionLoading === leave.id}
+                          className="px-3 py-1.5 rounded-full bg-[#fff0f0] text-[#ba1a1a] text-[11px] font-bold hover:bg-[#ffe0e0] transition-colors border border-[#ffd5d5] disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[12px] font-semibold text-[#9aa3b2]">—</span>
+                    )}
+                  </div>
                 </div>
               </div>
             );

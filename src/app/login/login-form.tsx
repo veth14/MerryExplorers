@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { useAuth } from "@/lib/auth-context";
 
@@ -218,12 +219,12 @@ export function LoginForm() {
               />
               Remember me for 30 days
             </label>
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="text-[13px] font-bold text-[#0033A0] transition-colors hover:text-[#FFC107]"
             >
               Forgot Password?
-            </a>
+            </Link>
           </div>
 
           {/* Error */}
@@ -259,9 +260,9 @@ export function LoginForm() {
         {/* Footer */}
         <p className="mt-8 text-center text-[12px] font-medium text-[#9aa3b2]">
           Secure Portal Access • Need help?{" "}
-          <a href="#" className="font-bold text-[#0033A0] hover:underline">
+          <Link href="/support" className="font-bold text-[#0033A0] hover:underline">
             Contact Support
-          </a>
+          </Link>
         </p>
       </div>
     </div>

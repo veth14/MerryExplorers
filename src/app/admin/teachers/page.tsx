@@ -98,9 +98,9 @@ export default function TeachersPage() {
       </section>
 
       {/* Controls row */}
-      <div className="flex items-center justify-between gap-4 mt-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-2">
         {/* Tabs */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {(["All Staff", "Lead Teachers", "Assistants"] as FilterTab[]).map((tab) => (
             <button
               key={tab}

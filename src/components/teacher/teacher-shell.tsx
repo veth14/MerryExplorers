@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar";
 import { TeacherTopbar } from "@/components/teacher/teacher-topbar";
 
@@ -8,13 +11,28 @@ type TeacherShellProps = {
 };
 
 export function TeacherShell({ title, description, children }: TeacherShellProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <div className="h-screen bg-[#f0f4f9] text-on-background flex overflow-hidden">
-      <TeacherSidebar />
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-      <main className="flex-1 px-8 py-8 h-screen overflow-y-auto w-full">
+      <TeacherSidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+
+      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 h-screen overflow-y-auto w-full min-w-0">
         <div className="w-full h-full flex flex-col gap-4">
-          <TeacherTopbar title={title} description={description} />
+          <TeacherTopbar
+            title={title}
+            description={description}
+            onMenuClick={() => setMobileOpen(true)}
+          />
           {children}
         </div>
       </main>

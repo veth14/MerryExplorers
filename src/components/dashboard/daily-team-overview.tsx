@@ -38,8 +38,9 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
         <span className="text-[12px] font-bold text-[#0050d5]">{activeCount} Members Active</span>
       </div>
 
-      {/* Members — evenly spread across full width */}
-      <div className="flex items-start justify-around">
+      {/* Members — horizontally scrollable on mobile, spread on desktop */}
+      <div className="overflow-x-auto -mx-2 px-2">
+        <div className="flex items-start justify-start gap-4 sm:justify-around min-w-max sm:min-w-0">
         {members.map((member) => {
           const style = statusStyles[member.status];
           const isNotStarted = member.status === "NOT STARTED";
@@ -113,6 +114,7 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
             </div>
           );
         })}
+        </div>
       </div>
     </section>
   );

@@ -6,9 +6,10 @@ import { useAuth } from "@/lib/auth-context";
 type TeacherTopbarProps = {
   title?: string;
   description?: string;
+  onMenuClick?: () => void;
 };
 
-export function TeacherTopbar({ title, description }: TeacherTopbarProps) {
+export function TeacherTopbar({ title, description, onMenuClick }: TeacherTopbarProps) {
   const { user, userProfile } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -47,21 +48,35 @@ export function TeacherTopbar({ title, description }: TeacherTopbarProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <header className="flex items-center justify-between gap-4 shrink-0 mb-6 relative">
-      {/* Left: greeting */}
-      <div>
-        <h1 className="font-headline text-[28px] font-extrabold tracking-tight text-[#002f76] flex items-center gap-2">
-          {title || `Welcome back, ${userProfile?.fullName?.split(' ')[0] || 'Teacher'}!`} <span className="text-[26px]">👋</span>
-        </h1>
-        <p className="mt-0.5 text-[14px] font-semibold text-[#0050d5]/70">
-          {description || "Here's what's happening today across all playgroups."}
-        </p>
+    <header className="flex items-center justify-between gap-3 shrink-0 mb-4 lg:mb-6 relative">
+      {/* Left: hamburger (mobile) + greeting */}
+      <div className="flex items-center gap-3 min-w-0">
+        {/* Hamburger — only on mobile */}
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-white shadow-sm border border-[#e2e8f0]/80 text-[#0050d5] hover:bg-[#f0f5ff] transition-colors flex-shrink-0"
+          aria-label="Open navigation menu"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+
+        <div className="min-w-0">
+          <h1 className="font-headline text-[22px] sm:text-[28px] font-extrabold tracking-tight text-[#002f76] flex items-center gap-2 leading-tight">
+            <span className="truncate">{title || `Welcome back, ${userProfile?.fullName?.split(' ')[0] || 'Teacher'}!`}</span>
+            <span className="text-[20px] sm:text-[26px] flex-shrink-0">👋</span>
+          </h1>
+          <p className="mt-0.5 text-[13px] sm:text-[14px] font-semibold text-[#0050d5]/70 truncate">
+            {description || "Here's what's happening today across all playgroups."}
+          </p>
+        </div>
       </div>
 
       {/* Right: search + icons */}
-      <div className="flex items-center gap-3 shrink-0">
-        {/* Search */}
-        <label className="flex items-center gap-2.5 rounded-full bg-white px-4 py-2.5 shadow-sm border border-[#e2e8f0]/80 w-[220px] cursor-text">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Search — hidden on small screens */}
+        <label className="hidden sm:flex items-center gap-2.5 rounded-full bg-white px-4 py-2.5 shadow-sm border border-[#e2e8f0]/80 w-[180px] lg:w-[220px] cursor-text">
           <span className="text-[#a0aec0] flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -90,7 +105,7 @@ export function TeacherTopbar({ title, description }: TeacherTopbarProps) {
 
           {/* Notifications Dropdown */}
           {showNotifications && (
-            <div className="absolute right-0 top-full mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-[#e2e8f0] overflow-hidden z-50">
+            <div className="absolute right-0 top-full mt-2 w-[300px] sm:w-[320px] bg-white rounded-2xl shadow-xl border border-[#e2e8f0] overflow-hidden z-50">
               <div className="px-4 py-3 border-b border-[#e2e8f0] flex items-center justify-between bg-[#f8fafc]">
                 <h3 className="font-extrabold text-[13px] text-[#002f76]">Notifications</h3>
                 {unreadCount > 0 && (
@@ -136,8 +151,8 @@ export function TeacherTopbar({ title, description }: TeacherTopbarProps) {
           )}
         </div>
 
-        {/* Calendar */}
-        <button className="flex items-center gap-1.5 h-[40px] rounded-full border border-[#e2e8f0]/80 bg-white px-4 shadow-sm">
+        {/* Calendar — hidden on small screens */}
+        <button className="hidden sm:flex items-center gap-1.5 h-[40px] rounded-full border border-[#e2e8f0]/80 bg-white px-3 sm:px-4 shadow-sm">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#ffb800]">
             <path d="M12.75 12.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM7.5 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8.25 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM9.75 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM10.5 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM12.75 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM14.25 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM15 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM16.5 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM15 12.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM16.5 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" />
             <path fillRule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clipRule="evenodd" />

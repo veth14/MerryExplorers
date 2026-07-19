@@ -89,7 +89,7 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
       <div className="w-full overflow-x-auto">
 
         {/* Column headers — always visible, never scrolls away */}
-        <table className="w-full text-left border-collapse table-fixed">
+        <table className="w-full min-w-[800px] text-left border-collapse table-fixed">
           <colgroup>
             <col className="w-[16%]" />
             <col className="w-[22%]" />
@@ -112,7 +112,7 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
 
         {/* Body rows in a fixed-height container */}
         <div style={{ height: `${ROW_HEIGHT * ROWS_PER_PAGE}px`, overflow: "hidden" }}>
-          <table className="w-full text-left border-collapse table-fixed">
+          <table className="w-full min-w-[800px] text-left border-collapse table-fixed">
             <colgroup>
               <col className="w-[16%]" />
               <col className="w-[22%]" />

@@ -141,8 +141,8 @@ export default function TeacherLeavesPage() {
         </div>
       ) : (
         <div className="bg-white rounded-[2rem] border border-[#e8effe] shadow-lg overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 px-6 py-4 border-b border-[#f0f4f9] bg-[#f8fafc]">
+          {/* Desktop table header — hidden on mobile */}
+          <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 px-6 py-4 border-b border-[#f0f4f9] bg-[#f8fafc]">
             {["Leave Type", "Duration", "Date Filed", "Status"].map(
               (h) => (
                 <p
@@ -161,43 +161,69 @@ export default function TeacherLeavesPage() {
             return (
               <div
                 key={leave.id}
-                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 items-center px-6 py-4 border-b border-[#f0f4f9] last:border-0 hover:bg-[#f8fafc] transition-colors"
+                className="border-b border-[#f0f4f9] last:border-0 hover:bg-[#f8fafc] transition-colors"
               >
-                {/* Type */}
-                <div>
-                  <p className="text-[14px] font-black text-[#002f76]">
-                    {leaveTypeIcons[leave.type] || "📋"} {leave.type}
-                  </p>
-                  {leave.reason && (
-                    <p className="text-[12px] text-[#9aa3b2] font-semibold mt-0.5 truncate max-w-[250px]">
-                      {leave.reason}
+                {/* Mobile card layout */}
+                <div className="md:hidden p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[14px] font-black text-[#002f76]">
+                      {leaveTypeIcons[leave.type] || "📋"} {leave.type}
                     </p>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${sc.bg} ${sc.text} shrink-0`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                      {leave.status}
+                    </span>
+                  </div>
+                  {leave.reason && (
+                    <p className="text-[12px] text-[#9aa3b2] font-semibold">{leave.reason}</p>
                   )}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[#5a6e8c] font-semibold">
+                    <span>{formatDate(leave.startDate)} – {formatDate(leave.endDate)}</span>
+                    <span>({getDuration(leave.startDate, leave.endDate)})</span>
+                    {leave.createdAt && <span className="text-[#9aa3b2]">Filed: {formatDate(leave.createdAt)}</span>}
+                  </div>
                 </div>
 
-                {/* Duration */}
-                <div>
-                  <p className="text-[13px] font-bold text-[#002f76]">
-                    {getDuration(leave.startDate, leave.endDate)}
-                  </p>
-                  <p className="text-[11px] text-[#9aa3b2] font-semibold mt-0.5">
-                    {formatDate(leave.startDate)} – {formatDate(leave.endDate)}
-                  </p>
-                </div>
+                {/* Desktop row layout */}
+                <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 items-center px-6 py-4">
+                  {/* Type */}
+                  <div>
+                    <p className="text-[14px] font-black text-[#002f76]">
+                      {leaveTypeIcons[leave.type] || "📋"} {leave.type}
+                    </p>
+                    {leave.reason && (
+                      <p className="text-[12px] text-[#9aa3b2] font-semibold mt-0.5 truncate max-w-[250px]">
+                        {leave.reason}
+                      </p>
+                    )}
+                  </div>
 
-                {/* Date filed */}
-                <p className="text-[12px] font-semibold text-[#5a6e8c]">
-                  {leave.createdAt ? formatDate(leave.createdAt) : "—"}
-                </p>
+                  {/* Duration */}
+                  <div>
+                    <p className="text-[13px] font-bold text-[#002f76]">
+                      {getDuration(leave.startDate, leave.endDate)}
+                    </p>
+                    <p className="text-[11px] text-[#9aa3b2] font-semibold mt-0.5">
+                      {formatDate(leave.startDate)} – {formatDate(leave.endDate)}
+                    </p>
+                  </div>
 
-                {/* Status */}
-                <div>
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${sc.bg} ${sc.text}`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                    {leave.status}
-                  </span>
+                  {/* Date filed */}
+                  <p className="text-[12px] font-semibold text-[#5a6e8c]">
+                    {leave.createdAt ? formatDate(leave.createdAt) : "—"}
+                  </p>
+
+                  {/* Status */}
+                  <div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${sc.bg} ${sc.text}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                      {leave.status}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

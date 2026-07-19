@@ -21,8 +21,8 @@ export function ReportsFilterBar() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky overflow-visible flex-wrap gap-4">
-      <div className="flex items-center gap-5 overflow-visible">
+    <div className="flex flex-col md:flex-row md:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky overflow-visible gap-4 w-full">
+      <div className="flex flex-wrap items-center gap-3 overflow-visible">
         {/* Label */}
         <div className="flex items-center gap-2.5 shrink-0">
           <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "20px" }}>
@@ -32,7 +32,7 @@ export function ReportsFilterBar() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Report Type */}
           <button
             id="report-type-selector"

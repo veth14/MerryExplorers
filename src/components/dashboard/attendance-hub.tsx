@@ -63,8 +63,8 @@ export function AttendanceHub({ activeStatus, history }: AttendanceHubProps) {
           <h2 className="font-headline text-[18px] font-extrabold text-[#002f76]">Attendance Hub</h2>
         </div>
 
-        {/* Two columns */}
-        <div className="grid grid-cols-2 gap-6 flex-1 min-h-0 overflow-auto">
+        {/* Two columns - stacks on mobile, side-by-side on sm+ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 flex-1 min-h-0 overflow-auto">
           {/* Active Status */}
           <div>
             <div className="flex items-center gap-1.5 mb-3">
