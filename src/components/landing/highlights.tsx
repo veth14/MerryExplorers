@@ -20,7 +20,7 @@ const DISPLAY_TITLES: Record<string, string> = {
 
 export function HighlightsSection() {
   return (
-    <section className="relative bg-white py-14 sm:py-20">
+    <section className="relative py-14 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
         {/* Highlight cards row */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -38,8 +38,7 @@ export function HighlightsSection() {
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.55, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group flex flex-col items-center gap-4 rounded-[32px] border-2 bg-white px-5 py-8 text-center transition-shadow hover:shadow-lg"
-                style={{ borderColor: cfg.border }}
+                className="group flex flex-col items-center gap-4 rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white px-5 py-8 text-center shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.08)]"
               >
                 {/* Icon */}
                 <motion.span

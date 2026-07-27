@@ -6,7 +6,7 @@ import { ArrowRightIcon } from "./icons";
 
 export function ParentPortalCTA() {
   return (
-    <section id="admissions" className="relative bg-white py-16 sm:py-24">
+    <section id="admissions" className="relative py-16 sm:py-24">
       <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
         <motion.div
           initial={{ opacity: 0, y: 32, scale: 0.97 }}

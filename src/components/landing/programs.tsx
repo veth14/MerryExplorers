@@ -32,7 +32,7 @@ const PROGRAM_THEMES = {
 
 export function ProgramsSection() {
   return (
-    <section id="programs" className="relative bg-white py-16 sm:py-24">
+    <section id="programs" className="relative py-16 sm:py-24">
       <div className="relative mx-auto w-full max-w-5xl px-5 sm:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -60,12 +60,13 @@ export function ProgramsSection() {
             // Define schedules based on program
             const schedules = program.name === "Little Explorers" 
               ? [
-                  { icon: "☀️", label: "MORNING", symbol: "⚡", times: ["9:00 - 10:15 AM", "10:30 - 11:45 AM"] },
-                  { icon: "🌙", label: "AFTERNOON", symbol: "✨", times: ["12:45 - 2:00 PM", "2:15 - 3:30 PM"] }
+                  { icon: "☀️", label: "MORNING", symbol: "⚡", times: ["9:00 am to 10:15 am", "10:30 am to 11:45 am"] },
+                  { icon: "🌙", label: "AFTERNOON", symbol: "✨", times: ["12:45 pm to 2:00 pm", "2:15 pm to 3:30 pm"] }
                 ]
               : [
-                  { icon: "☀️", label: "MORNING", symbol: "⚡", times: ["9:30 - 10:30 AM"] },
-                  { icon: "🌙", label: "AFTERNOON", symbol: "✨", times: ["4:00 - 5:00 PM"] }
+                  { icon: "☀️", label: "MORNING", symbol: "⚡", times: ["9:30 to 10:30 am"] },
+                  { icon: "☁️", label: "AFTERNOON", symbol: "✨", times: ["1:30 to 2:30 pm"] },
+                  { icon: "🌙", label: "LATE AFTERNOON", symbol: "💤", times: ["4:00 to 5:00 pm"] }
                 ];
 
             return (
@@ -76,8 +77,7 @@ export function ProgramsSection() {
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.65, delay: i * 0.15, ease: [0.22, 1, 0.36, 1] }}
                 whileHover={{ y: -4, transition: { duration: 0.25 } }}
-                className="relative overflow-hidden rounded-[32px] border-[3px] bg-white text-center transition-shadow hover:shadow-xl"
-                style={{ borderColor: theme.borderColor }}
+                className="relative flex flex-col h-full overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white text-center shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.08)]"
               >
                 {/* Top Half */}
                 <div 
@@ -112,7 +112,7 @@ export function ProgramsSection() {
                 </div>
 
                 {/* Bottom Half */}
-                <div className="space-y-4 p-6 pt-5">
+                <div className="space-y-4 p-6 pt-5 flex-1 flex flex-col">
                   {schedules.map((schedule, j) => (
                     <div 
                       key={j} 
@@ -137,6 +137,11 @@ export function ProgramsSection() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Days/Sessions Footer */}
+                <div className="bg-[#f0f5ff]/80 py-4 text-[13px] font-extrabold text-[#0033A0] tracking-wider border-t border-black/5 mt-auto">
+                  {program.name === "Little Explorers" ? "12 SESSIONS - TUESDAY, THURSDAY & FRIDAY" : "8 SESSIONS - MONDAY & WEDNESDAY"}
                 </div>
               </motion.article>
             );
