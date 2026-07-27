@@ -1,9 +1,9 @@
 // Content for the public landing page. Centralized so copy is easy to tweak.
 
 export const NAV_LINKS = [
-  { label: "About Us", href: "#about" },
-  { label: "Programs", href: "#programs" },
-  { label: "Teachers", href: "#about" },
+  { label: "About Us", href: "/#about" },
+  { label: "Programs", href: "/#programs" },
+  { label: "Inquire", href: "/inquire" },
 ] as const;
 
 export const HIGHLIGHTS = [

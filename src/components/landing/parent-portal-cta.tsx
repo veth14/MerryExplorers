@@ -58,14 +58,14 @@ export function ParentPortalCTA() {
             {/* Copy (Right) */}
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               {/* Top badge */}
-              <motion.div
+                <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.2, duration: 0.5 }}
                 className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-white backdrop-blur-sm"
               >
-                FOR PARENTS
+                📬 INQUIRE NOW
               </motion.div>
 
               <motion.h2
@@ -75,7 +75,7 @@ export function ParentPortalCTA() {
                 transition={{ delay: 0.25, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 className="font-headline text-[32px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[40px] lg:text-[44px]"
               >
-                Stay Connected with the Parent Portal
+                Interested in Our Playgroup?
               </motion.h2>
 
               <motion.p
@@ -85,7 +85,7 @@ export function ParentPortalCTA() {
                 transition={{ delay: 0.35, duration: 0.6 }}
                 className="mt-5 max-w-md text-[16px] font-medium leading-relaxed text-white/80"
               >
-                Real-time updates, attendance tracking, and seamless communication with our loving teachers—all in one playful place.
+                Have questions about enrollment, programs, or schedules? Send us an inquiry and our team will get back to you within 1–2 business days.
               </motion.p>
 
               <motion.div
@@ -96,11 +96,11 @@ export function ParentPortalCTA() {
                 className="mt-8"
               >
                 <Link
-                  href="/login"
-                  id="portal-access-btn"
+                  href="/inquire"
+                  id="inquire-now-btn"
                   className="group inline-flex items-center gap-2 rounded-full bg-[#FFC107] px-8 py-3.5 text-[15px] font-bold text-[#0b1a3d] shadow-lg transition-all hover:bg-[#FFB800] hover:-translate-y-0.5"
                 >
-                  Explore Portal
+                  Inquire Now
                   <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </motion.div>
