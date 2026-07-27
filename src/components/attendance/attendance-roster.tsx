@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { StaffAttendance } from "@/data/attendance";
+import { Modal } from "@/components/ui/modal";
 
 type AttendanceRosterProps = {
   data: StaffAttendance[];
@@ -10,6 +11,9 @@ type AttendanceRosterProps = {
 export function AttendanceRoster({ data }: AttendanceRosterProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<StaffAttendance["status"] | "All">("All");
+  
+  // Modal state
+  const [selectedStaff, setSelectedStaff] = useState<StaffAttendance | null>(null);
 
   const filteredData = data.filter(staff => filterStatus === "All" || staff.status === filterStatus);
 
@@ -99,7 +103,11 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
           </thead>
           <tbody className="divide-y divide-[#f1f5f9]">
             {filteredData.map((staff) => (
-              <tr key={staff.id} className="group hover:bg-[#f8fafc] transition-colors">
+              <tr 
+                key={staff.id} 
+                onClick={() => setSelectedStaff(staff)}
+                className="group hover:bg-[#f8fafc] transition-colors cursor-pointer"
+              >
                 <td className="py-4">
                   <div className="flex items-center gap-3">
                     <div
@@ -120,6 +128,111 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Attendance Details Modal */}
+      {selectedStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-[#001a4d]/40 backdrop-blur-sm"
+            onClick={() => setSelectedStaff(null)}
+          />
+
+          {/* Modal Panel */}
+          <div className="relative w-full max-w-lg bg-white rounded-[1.5rem] shadow-2xl border border-[#e8effe] overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="bg-gradient-to-br from-[#002f76] to-[#0050d5] px-6 py-5 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-white text-[18px] font-extrabold">Attendance Details</h3>
+                <p className="text-white/60 text-[12px] font-semibold mt-0.5">Daily check-in record</p>
+              </div>
+              <button
+                onClick={() => setSelectedStaff(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="overflow-y-auto flex-1">
+
+              {/* Teacher Info */}
+              <div className="px-6 pt-5 pb-4 flex items-center gap-4 border-b border-[#f1f5f9]">
+                <div
+                  className="w-14 h-14 rounded-full shrink-0 flex items-center justify-center text-white text-[18px] font-extrabold shadow-md"
+                  style={{ backgroundColor: selectedStaff.avatarColor }}
+                >
+                  {selectedStaff.avatarInitials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-[16px] font-extrabold text-[#002f76] truncate">{selectedStaff.name}</h4>
+                  <p className="text-[13px] font-semibold text-[#5a6e8c] truncate">{selectedStaff.group}</p>
+                </div>
+                <div className="shrink-0">
+                  {getStatusBadge(selectedStaff.status)}
+                </div>
+              </div>
+
+              {/* Time Info */}
+              <div className="px-6 py-4 grid grid-cols-2 gap-4 border-b border-[#f1f5f9]">
+                <div className="bg-[#f8fafc] rounded-xl p-4">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock In</p>
+                  <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeIn}</p>
+                </div>
+                <div className="bg-[#f8fafc] rounded-xl p-4">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock Out</p>
+                  <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeOut}</p>
+                </div>
+              </div>
+
+              {/* Photos */}
+              <div className="px-6 py-5 space-y-5">
+                {selectedStaff.clockInPhotoUrl ? (
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-3">Clock In Photo</p>
+                    <div className="w-full rounded-2xl overflow-hidden border border-[#e2e8f0] bg-[#f8fafc]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedStaff.clockInPhotoUrl}
+                        alt="Clock In"
+                        className="w-full h-auto object-contain"
+                        style={{ maxHeight: "320px" }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-3">Clock In Photo</p>
+                    <div className="w-full h-32 rounded-2xl border-2 border-dashed border-[#e2e8f0] bg-[#f8fafc] flex items-center justify-center">
+                      <p className="text-[13px] font-semibold text-[#a0aec0]">No photo available</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedStaff.clockOutPhotoUrl && (
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-3">Clock Out Photo</p>
+                    <div className="w-full rounded-2xl overflow-hidden border border-[#e2e8f0] bg-[#f8fafc]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedStaff.clockOutPhotoUrl}
+                        alt="Clock Out"
+                        className="w-full h-auto object-contain"
+                        style={{ maxHeight: "320px" }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

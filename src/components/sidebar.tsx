@@ -127,7 +127,6 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   }, []);
 
   async function handleLogout() {
-    setUserMenuOpen(false);
     await signOut();
   }
 
@@ -235,7 +234,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             {/* Report a Bug */}
             <Link
               href="/admin/contact"
-              onClick={() => { setUserMenuOpen(false); onClose?.(); }}
+              onClick={() => { onClose?.(); }}
               className="flex items-center gap-3 px-4 py-3 text-[13px] font-bold text-[#005cc8] hover:bg-[#005cc8]/10 transition-colors"
             >
               <span className="text-[#005cc8]"><BugReportIcon /></span>

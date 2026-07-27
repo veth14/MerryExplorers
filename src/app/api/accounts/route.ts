@@ -6,12 +6,34 @@ export async function GET() {
     const { db } = await connectToDatabase();
     const accounts = await db.collection("accounts").find({}).toArray();
     
+    // Get all currently active leaves to dynamically compute 'on-leave' status
+    const today = new Date().toISOString().split("T")[0];
+    const activeLeaves = await db.collection("leaves").find({
+      status: "Approved",
+      startDate: { $lte: today },
+      endDate: { $gte: today }
+    }).toArray();
+    
+    const teachersOnLeave = new Set(activeLeaves.map(l => l.teacherId));
+    
     // Map _id back to id for frontend compatibility
-    const formattedAccounts = accounts.map(acc => ({
-      ...acc,
-      id: acc._id.toString(),
-      _id: undefined
-    }));
+    const formattedAccounts = accounts.map(acc => {
+      const id = acc._id.toString();
+      const isOnLeave = teachersOnLeave.has(id);
+      let status = acc.status;
+      if (isOnLeave) {
+        status = "on-leave";
+      } else if (status === "on-leave") {
+        status = "active";
+      }
+      
+      return {
+        ...acc,
+        id,
+        _id: undefined,
+        status
+      };
+    });
     
     return NextResponse.json(formattedAccounts, {
       headers: {

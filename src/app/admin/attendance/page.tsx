@@ -16,6 +16,8 @@ type AttendanceRecord = {
   clockInTime: string;
   clockOutTime: string | null;
   status: string;
+  clockInPhotoUrl?: string;
+  clockOutPhotoUrl?: string;
 };
 
 export default function AttendancePage() {
@@ -62,6 +64,8 @@ export default function AttendancePage() {
       ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
       : "-",
     status: r.status === "In Progress" ? "On Time" : r.status === "Completed" ? "Completed" : "Absent",
+    clockInPhotoUrl: r.clockInPhotoUrl,
+    clockOutPhotoUrl: r.clockOutPhotoUrl,
   }));
 
   return (

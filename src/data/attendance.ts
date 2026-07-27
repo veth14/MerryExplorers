@@ -10,6 +10,8 @@ export type StaffAttendance = {
   timeIn: string;
   timeOut: string;
   status: AttendanceStatus;
+  clockInPhotoUrl?: string;
+  clockOutPhotoUrl?: string;
 };
 
 export const attendanceMetrics: any[] = [];

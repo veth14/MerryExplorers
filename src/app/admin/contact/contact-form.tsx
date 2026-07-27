@@ -132,7 +132,7 @@ export function ContactForm() {
             </h3>
             
             <p className="mt-3 max-w-sm text-[14px] font-medium text-[#555555] leading-relaxed">
-              Your email client should open with your report pre-filled. If it didn't, you can always write directly to{" "}
+              Your email client should open with your report pre-filled. If it didn&apos;t, you can always write directly to{" "}
               <span className="font-bold text-[#0033A0]">{DEVELOPER_EMAIL}</span>.
             </p>
             

@@ -12,7 +12,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ ...account, id: account._id }, {
+    // Dynamically compute 'on-leave' status
+    const today = new Date().toISOString().split("T")[0];
+    const activeLeave = await db.collection("leaves").findOne({
+      teacherId: id,
+      status: "Approved",
+      startDate: { $lte: today },
+      endDate: { $gte: today }
+    });
+
+    let status = account.status;
+    if (activeLeave) {
+      status = "on-leave";
+    } else if (status === "on-leave") {
+      status = "active";
+    }
+
+    return NextResponse.json({ ...account, id: account._id, status }, {
       headers: {
         "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60"
       }

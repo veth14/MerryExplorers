@@ -1,9 +1,7 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { teacherNavItems } from "@/data/teacher-dashboard";
 
@@ -93,17 +91,6 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   const pathname = usePathname();
   const { signOut, userProfile } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   async function handleLogout() {
     setUserMenuOpen(false);
@@ -169,13 +156,24 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
 
       {/* Footer: clickable user with dropdown */}
       <div className="p-3 mb-2">
-        <div className="relative" ref={userMenuRef}>
+        <div className="relative">
+          {/* Transparent Overlay for click-outside */}
+          {userMenuOpen && (
+            <div 
+              className="fixed inset-0 z-40"
+              onClick={(e) => {
+                e.stopPropagation();
+                setUserMenuOpen(false);
+              }}
+            />
+          )}
+
           <button
             onClick={() => setUserMenuOpen((open) => !open)}
             aria-label="Open user menu"
             aria-expanded={userMenuOpen}
             className={[
-              "flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 transition-colors",
+              "flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 transition-colors relative z-50",
               userMenuOpen ? "bg-[#005cc8]/10" : "hover:bg-[#005cc8]/10",
             ].join(" ")}
           >

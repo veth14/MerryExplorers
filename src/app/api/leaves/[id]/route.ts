@@ -25,10 +25,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const leave = await db.collection("leaves").findOne({ _id: new ObjectId(id) });
     if (leave?.teacherId) {
       if (status === "Approved") {
-        await db.collection("accounts").updateOne(
-          { _id: leave.teacherId as any },
-          { $set: { status: "on-leave", updatedAt: new Date() } }
-        );
+        // Status is now computed dynamically in /api/accounts based on active leaves.
       }
       
       // Send notification to the teacher
