@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,7 @@ const navItems = [
   { label: "Accounts", href: "/admin/users" },
   { label: "Attendance", href: "/admin/attendance" },
   { label: "Leave Requests", href: "/admin/leaves" },
+  { label: "Inquiries", href: "/admin/inquiries" },
   { label: "Reports", href: "/admin/reports" },
 ] as const;
 
@@ -95,12 +96,21 @@ function LeaveIcon() {
   );
 }
 
+function InquiriesIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  );
+}
+
 const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   Teachers: TeachersIcon,
   Accounts: UsersIcon,
   Attendance: AttendanceIcon,
   "Leave Requests": LeaveIcon,
+  Inquiries: InquiriesIcon,
   Reports: ReportsIcon,
 };
 
@@ -113,20 +123,9 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { signOut } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close user menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   async function handleLogout() {
+    setUserMenuOpen(false);
     await signOut();
   }
 
@@ -187,15 +186,23 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         </div>
       </nav>
 
-      {/* Footer: clickable admin user with dropdown (Settings + Logout) */}
+      {/* Footer: clickable admin user with dropdown */}
       <div className="p-3 mb-2">
-        <div className="relative" ref={userMenuRef}>
+        <div className="relative">
+          {/* Transparent overlay to close dropdown on outside click */}
+          {userMenuOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setUserMenuOpen(false)}
+            />
+          )}
+
           <button
             onClick={() => setUserMenuOpen((open) => !open)}
             aria-label="Open user menu"
             aria-expanded={userMenuOpen}
             className={[
-              "flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 transition-colors",
+              "relative z-50 flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 transition-colors",
               userMenuOpen ? "bg-[#005cc8]/10" : "hover:bg-[#005cc8]/10",
             ].join(" ")}
           >
@@ -223,7 +230,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             </svg>
           </button>
 
-          {/* Dropdown */}
+          {/* Dropdown — z-50 so it sits above the overlay */}
           <div
             className={`absolute bottom-full left-0 right-0 mb-2 z-50 overflow-hidden rounded-2xl bg-white border-2 border-[#e2e8f0] shadow-xl transition-all duration-200 origin-bottom ${
               userMenuOpen
@@ -234,7 +241,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             {/* Report a Bug */}
             <Link
               href="/admin/contact"
-              onClick={() => { onClose?.(); }}
+              onClick={() => { setUserMenuOpen(false); onClose?.(); }}
               className="flex items-center gap-3 px-4 py-3 text-[13px] font-bold text-[#005cc8] hover:bg-[#005cc8]/10 transition-colors"
             >
               <span className="text-[#005cc8]"><BugReportIcon /></span>
