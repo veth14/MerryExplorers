@@ -15,6 +15,7 @@ import { ReportsFooterBanner } from "@/components/reports/reports-footer-banner"
 type AttendanceRecord = {
   _id: string;
   name: string;
+  group?: string;
   dateStr: string;
   clockInTime: string;
   clockOutTime: string | null;
@@ -47,14 +48,22 @@ function getWeekOfMonth(dateStr: string) {
 
 export default function ReportsPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter Bar State
+  const [selectedRole, setSelectedRole] = useState("All Staff");
+  const [selectedDate, setSelectedDate] = useState("");
 
   useEffect(() => {
     async function fetchData() {
       try {
         const res = await fetch("/api/attendance");
         const json = await res.json();
-        if (json.success) setRecords(json.data);
+        if (json.success) {
+          setRecords(json.data);
+          setFilteredRecords(json.data);
+        }
       } catch (err) {
         console.error("Failed to fetch attendance records:", err);
       } finally {
@@ -64,8 +73,22 @@ export default function ReportsPage() {
     fetchData();
   }, []);
 
+  function handleGenerate() {
+    let result = [...records];
+    
+    if (selectedRole !== "All Staff") {
+      result = result.filter(r => r.group === selectedRole);
+    }
+    
+    if (selectedDate) {
+      result = result.filter(r => r.dateStr === selectedDate);
+    }
+    
+    setFilteredRecords(result);
+  }
+
   // Build detailed logs from attendance records
-  const logs = records.map((r, i) => ({
+  const logs = filteredRecords.map((r, i) => ({
     id: r._id,
     date: formatDate(r.dateStr),
     teacherName: r.name,
@@ -81,7 +104,7 @@ export default function ReportsPage() {
 
   // Build chart trends grouped by week
   const weekMap: Record<string, { clockIns: number; onTime: number }> = {};
-  for (const r of records) {
+  for (const r of filteredRecords) {
     const week = getWeekOfMonth(r.dateStr);
     if (!weekMap[week]) weekMap[week] = { clockIns: 0, onTime: 0 };
     weekMap[week].clockIns += 1;
@@ -100,10 +123,10 @@ export default function ReportsPage() {
   });
 
   // Compute metric cards
-  const totalClockIns = records.length;
+  const totalClockIns = filteredRecords.length;
   const onTimeCount = logs.filter((l) => l.status === "ON TIME").length;
   const avgPunctuality = totalClockIns > 0 ? Math.round((onTimeCount / totalClockIns) * 100) : 0;
-  const completedToday = records.filter((r) => {
+  const completedToday = filteredRecords.filter((r) => {
     const today = new Date().toISOString().slice(0, 10);
     return r.dateStr === today;
   }).length;
@@ -117,7 +140,13 @@ export default function ReportsPage() {
   return (
     <AppShell title="Reports" description="Explore key metrics and detailed data visualizations for your activities.">
       {/* Filter Bar */}
-      <ReportsFilterBar />
+      <ReportsFilterBar 
+        selectedRole={selectedRole}
+        setSelectedRole={setSelectedRole}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        onGenerate={handleGenerate}
+      />
 
       {/* Metric Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

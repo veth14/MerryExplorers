@@ -1,12 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 
 const roleOptions = ["All Staff", "Lead", "Teachers", "Assistant"] as const;
 
-export function ReportsFilterBar() {
+export function ReportsFilterBar({
+  selectedRole,
+  setSelectedRole,
+  selectedDate,
+  setSelectedDate,
+  onGenerate,
+}: {
+  selectedRole: string;
+  setSelectedRole: (role: string) => void;
+  selectedDate: string;
+  setSelectedDate: (date: string) => void;
+  onGenerate: () => void;
+}) {
   const [roleOpen, setRoleOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<string>("Role");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -45,15 +57,10 @@ export function ReportsFilterBar() {
           </button>
 
           {/* Date Picker */}
-          <button
-            id="date-picker-button"
-            className="flex items-center gap-2.5 rounded-full border border-brand-sky bg-brand-sky/40 px-4 py-2 text-[12px] font-bold text-brand-navy hover:bg-brand-sky transition-all duration-200 whitespace-nowrap"
-          >
-            dd/mm/yyyy
-            <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "16px" }}>
-              calendar_month
-            </span>
-          </button>
+          <CustomDatePicker 
+            selectedDate={selectedDate} 
+            onChange={setSelectedDate} 
+          />
 
           {/* Divider */}
           <div className="w-[1px] h-6 bg-brand-sky mx-1 hidden sm:block" />
@@ -126,6 +133,7 @@ export function ReportsFilterBar() {
       {/* Generate Action */}
       <button
         id="generate-report-button"
+        onClick={onGenerate}
         className="flex items-center gap-2 rounded-full bg-brand-blue px-6 py-2.5 text-[13px] font-bold text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0 shrink-0 ml-auto md:ml-0"
       >
         <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
