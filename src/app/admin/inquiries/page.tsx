@@ -15,6 +15,7 @@ type Inquiry = {
   message: string;
   status: InquiryStatus;
   createdAt: string;
+  replies?: { message: string; sentAt: string }[];
 };
 
 const STATUS_STYLES: Record<InquiryStatus, { bg: string; text: string; dot: string }> = {
@@ -64,6 +65,11 @@ export default function InquiriesPage() {
   const [search, setSearch] = useState("");
   const [updating, setUpdating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  
+  // Reply State
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   const fetchInquiries = useCallback(async () => {
     try {
@@ -99,6 +105,45 @@ export default function InquiriesPage() {
     setInquiries((prev) => prev.filter((inq) => inq.id !== id));
     setDeleteConfirm(null);
     if (selectedInquiry?.id === id) setSelectedInquiry(null);
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedInquiry || !replyMessage.trim()) return;
+    
+    setSendingReply(true);
+    try {
+      const res = await fetch(`/api/inquiries/${selectedInquiry.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replyMessage }),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        // Update local status and append the new reply to history
+        const newReply = { message: replyMessage, sentAt: new Date().toISOString() };
+        
+        setInquiries((prev) => prev.map((inq) => 
+          inq.id === selectedInquiry.id 
+            ? { ...inq, status: "Replied", replies: [...(inq.replies || []), newReply] } 
+            : inq
+        ));
+        
+        setSelectedInquiry((prev) => 
+          prev ? { ...prev, status: "Replied", replies: [...(prev.replies || []), newReply] } : null
+        );
+        
+        setIsReplying(false);
+        setReplyMessage("");
+      } else {
+        alert("Failed to send reply: " + data.error);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("An error occurred while sending the reply.");
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   const handleExport = () => {
@@ -336,7 +381,7 @@ export default function InquiriesPage() {
       {/* Detail Modal */}
       {selectedInquiry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-[#001a4d]/40 backdrop-blur-sm" onClick={() => setSelectedInquiry(null)} />
+          <div className="fixed inset-0 bg-[#001a4d]/40 backdrop-blur-sm" onClick={() => { setSelectedInquiry(null); setIsReplying(false); }} />
           <div className="relative w-full max-w-lg bg-white rounded-[1.5rem] shadow-2xl border border-[#e8effe] overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="bg-gradient-to-br from-[#002f76] to-[#0050d5] px-6 py-5 flex items-center justify-between shrink-0">
@@ -345,7 +390,7 @@ export default function InquiriesPage() {
                 <p className="text-white/60 text-[12px] font-semibold mt-0.5">{formatDate(selectedInquiry.createdAt)}</p>
               </div>
               <button
-                onClick={() => setSelectedInquiry(null)}
+                onClick={() => { setSelectedInquiry(null); setIsReplying(false); }}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
@@ -388,11 +433,30 @@ export default function InquiriesPage() {
 
               {/* Message */}
               <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-2">Message</p>
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-2">Original Message</p>
                 <div className="bg-[#f8fafc] rounded-xl p-4 text-[14px] font-semibold text-[#002f76] leading-relaxed border border-[#e2e8f0]">
                   {selectedInquiry.message}
                 </div>
               </div>
+
+              {/* Reply History */}
+              {selectedInquiry.replies && selectedInquiry.replies.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#1a7f4b] mb-2">Reply History</p>
+                  <div className="space-y-3">
+                    {selectedInquiry.replies.map((reply, idx) => (
+                      <div key={idx} className="bg-[#e8f9ef] rounded-xl p-4 border border-[#bbf7d0]">
+                        <p className="text-[10px] font-extrabold text-[#2da05b] uppercase tracking-wider mb-1">
+                          Sent on {formatDate(reply.sentAt)}
+                        </p>
+                        <div className="text-[13px] font-bold text-[#14532d] leading-relaxed whitespace-pre-wrap">
+                          {reply.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Change Status */}
               <div>
@@ -416,16 +480,53 @@ export default function InquiriesPage() {
               </div>
 
               {/* Reply via Email */}
-              <a
-                href={`mailto:${selectedInquiry.email}?subject=Re: Merry Explorers Playgroup Inquiry&body=Hi ${selectedInquiry.parentName},%0D%0A%0D%0AThank you for your inquiry about our playgroup.%0D%0A%0D%0A`}
-                onClick={() => updateStatus(selectedInquiry.id, "Replied")}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#005cc8] text-white text-[14px] font-bold hover:bg-[#004bb0] transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
-                </svg>
-                Reply via Email
-              </a>
+              {!isReplying ? (
+                <button
+                  onClick={() => setIsReplying(true)}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#005cc8] text-white text-[14px] font-bold hover:bg-[#004bb0] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4Z"/>
+                  </svg>
+                  Reply via Email
+                </button>
+              ) : (
+                <div className="border-t border-[#f1f5f9] pt-5 mt-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-2">Compose Reply</p>
+                  <textarea
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Type your reply here..."
+                    className="w-full min-h-[120px] p-3 text-[13px] font-semibold text-[#002f76] border border-[#e2e8f0] rounded-xl focus:outline-none focus:border-[#005cc8] bg-[#f8fafc] mb-3 resize-y"
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setIsReplying(false); setReplyMessage(""); }}
+                      disabled={sendingReply}
+                      className="flex-1 py-2.5 rounded-xl border border-[#e2e8f0] text-[13px] font-bold text-[#002f76] hover:bg-[#f8fafc] transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyMessage.trim()}
+                      className="flex-1 py-2.5 rounded-xl bg-[#005cc8] text-white text-[13px] font-bold hover:bg-[#004bb0] transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+                    >
+                      {sendingReply ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Sending...
+                        </>
+                      ) : (
+                        <>Send Reply</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

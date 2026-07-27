@@ -125,7 +125,7 @@ export default function InquirePage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
-      
+
       {/* ── Dreamy Background Orbs ── */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]"></div>
@@ -152,11 +152,10 @@ export default function InquirePage() {
                 <Link
                   key={link.label}
                   href={link.href}
-                  className={`rounded-full px-6 py-2.5 text-[15px] font-bold transition-all ${
-                    isActive
+                  className={`rounded-full px-6 py-2.5 text-[15px] font-bold transition-all ${isActive
                       ? "text-[#0033A0] bg-[#0033A0]/10"
                       : "text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]"
-                  }`}
+                    }`}
                 >
                   {link.label}
                 </Link>
@@ -175,7 +174,7 @@ export default function InquirePage() {
       {/* ── Main Content ── */}
       <main className="relative z-10 flex-grow flex items-center justify-center px-5 py-16 sm:py-24">
         <div className="w-full max-w-[760px]">
-          
+
           {/* Header Text */}
           <div className="text-center mb-12">
             <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
@@ -219,7 +218,7 @@ export default function InquirePage() {
                 </motion.div>
               ) : (
                 <motion.form key="form" onSubmit={handleSubmit} className="space-y-6">
-                  
+
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div>
                       <input type="text" value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="Parent's Name *" className={inputCls} />
@@ -254,7 +253,7 @@ export default function InquirePage() {
 
                   {error && (
                     <div className="bg-[#fef2f2] text-[#e11d48] px-5 py-4 rounded-2xl text-[15px] font-bold flex items-center gap-3">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-5 h-5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-5 h-5 shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                       {error}
                     </div>
                   )}
