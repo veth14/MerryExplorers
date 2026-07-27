@@ -7,12 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { NAV_LINKS } from "@/data/landing";
 
 const CHILD_AGE_OPTIONS = [
-  "6 months – 1 year",
-  "1 – 2 years",
-  "2 – 3 years",
-  "3 – 4 years",
-  "4 – 5 years",
-  "5 years and above",
+  "1.6 – 2.5 years (Tiny Explorers)",
+  "2.6 – 4.11 years (Little Explorers)",
 ];
 
 function CheckIcon() {
@@ -128,12 +124,14 @@ export default function InquirePage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative overflow-hidden">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
       
       {/* ── Dreamy Background Orbs ── */}
-      <div aria-hidden className="pointer-events-none absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07] animate-pulse"></div>
-      <div aria-hidden className="pointer-events-none absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1] animate-pulse" style={{ animationDelay: '2s' }}></div>
-      <div aria-hidden className="pointer-events-none absolute -bottom-40 left-1/3 w-[700px] h-[700px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05] animate-pulse" style={{ animationDelay: '4s' }}></div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]"></div>
+        <div aria-hidden className="absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1]"></div>
+        <div aria-hidden className="absolute -bottom-40 left-1/3 w-[700px] h-[700px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05]"></div>
+      </div>
 
       {/* ── Header ── */}
       <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">

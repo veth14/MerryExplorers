@@ -20,7 +20,7 @@ export const HIGHLIGHTS = [
     icon: "heart",
   },
   {
-    title: "Fun Activities",
+    title: "Age-Appropriate Learning Activities",
     description:
       "Play-based learning designed to delight curious little minds.",
     icon: "puzzle",

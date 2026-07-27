@@ -31,13 +31,13 @@ export function SiteHeader() {
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={`sticky top-0 z-50 transition-all duration-300 ${scrolled
-          ? "bg-white/95 shadow-[0_4px_24px_-8px_rgba(0,51,160,0.12)] backdrop-blur-md"
-          : "bg-white backdrop-blur-sm"
+          ? "bg-white/60 shadow-[0_2px_16px_rgba(0,0,0,0.03)] border-b border-black/5 backdrop-blur-xl"
+          : "bg-transparent"
         }`}
     >
       <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center justify-between px-5 sm:px-8">
         {/* Logo */}
-        <Link href="#home" className="group flex items-center gap-2.5">
+        <Link href="/#home" className="group flex items-center gap-2.5">
           <div className="relative h-9 w-9 overflow-hidden rounded-xl">
             <Image
               src="/LOGO-noBG.png"
@@ -82,7 +82,7 @@ export function SiteHeader() {
           >
             <Link
               href="/login"
-              className="flex items-center gap-2 rounded-full bg-[#FFB800] px-5 py-2.5 text-[14px] font-bold text-white shadow-[0_6px_18px_-4px_rgba(255,184,0,0.5)] transition-all hover:bg-[#F0A800] hover:shadow-[0_8px_22px_-4px_rgba(255,184,0,0.6)]"
+              className="flex items-center gap-2 rounded-full bg-white border-2 border-[#f1f5f9] px-6 py-2.5 text-[15px] font-bold text-[#0033A0] shadow-sm hover:border-[#0033A0]/20 hover:bg-[#f8fafc] transition-all hover:-translate-y-0.5"
             >
               {/* Login arrow icon */}
               <svg
@@ -157,7 +157,7 @@ export function SiteHeader() {
                   Portal Login
                 </Link>
                 <Link
-                  href="#admissions"
+                  href="/#admissions"
                   onClick={() => setOpen(false)}
                   className="rounded-full bg-[#FFC107] px-4 py-2.5 text-center text-[14px] font-bold text-[#0b1a3d]"
                 >

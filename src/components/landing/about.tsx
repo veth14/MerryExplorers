@@ -23,7 +23,7 @@ const MOMENTS = [
 
 export function AboutSection() {
   return (
-    <section id="about" className="relative overflow-hidden bg-white py-16 sm:py-24">
+    <section id="about" className="relative overflow-hidden py-16 sm:py-24">
       <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8">
         {/* Section heading */}
         <motion.div
@@ -61,7 +61,7 @@ export function AboutSection() {
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.6, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
                 whileHover={{ y: -6, rotate: 0, scale: 1.02, transition: { duration: 0.25 } }}
-                className="group relative flex flex-col bg-white p-3 pb-5 rounded-md shadow-[0_12px_40px_-12px_rgba(0,0,0,0.15)] ring-1 ring-black/5"
+                className="group relative flex flex-col bg-white/95 backdrop-blur-md p-3 pb-5 rounded-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] border border-white"
                 style={{ rotate: rotation }}
               >
                 {/* Polaroid Image */}
