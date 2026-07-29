@@ -29,6 +29,7 @@ export type UserAccount = {
   assignedRoom: string;
   employeeId: string;
   scheduleType: string;
+  shiftTime: string;
 
   // Emergency contacts (optional)
   emergencyContacts: EmergencyContact[];

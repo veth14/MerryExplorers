@@ -105,6 +105,7 @@ function emptyDraft(): Draft {
     assignedRoom: "",
     employeeId: "",
     scheduleType: "Full-Time (M–F)",
+    shiftTime: "08:00 AM - 05:00 PM",
     status: "active",
     tags: [],
     joinDate: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
@@ -125,6 +126,7 @@ function draftFromUser(u: UserAccount): Draft {
     assignedRoom: u.assignedRoom,
     employeeId: u.employeeId,
     scheduleType: u.scheduleType,
+    shiftTime: u.shiftTime || "08:00 AM - 05:00 PM",
     status: u.status,
     tags: [...u.tags],
     joinDate: u.joinDate,
@@ -217,6 +219,7 @@ function UserModal({
         assignedRoom: draft.assignedRoom || "Unassigned",
         employeeId: draft.employeeId,
         scheduleType: draft.scheduleType,
+        shiftTime: draft.shiftTime,
         emergencyContacts: draft.emergencyContacts.filter((c) => c.name.trim()),
       };
 
@@ -493,11 +496,23 @@ function UserModal({
                   </select>
                 </Field>
               </div>
-              <Field label="Schedule Type">
-                <select value={draft.scheduleType} onChange={(e) => set("scheduleType", e.target.value)} className={SELECT_CLS}>
-                  {SCHEDULE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Schedule Type">
+                  <select value={draft.scheduleType} onChange={(e) => set("scheduleType", e.target.value)} className={SELECT_CLS}>
+                    {SCHEDULE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </Field>
+                <Field label="Shift Time">
+                  <input
+                    type="text"
+                    placeholder="e.g. 08:00 AM - 01:00 PM"
+                    value={draft.shiftTime}
+                    onChange={(e) => set("shiftTime", e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </Field>
+              </div>
+              
               {/* Role preview */}
               <div className="rounded-xl bg-[#f0f5ff] border border-[#c5d6ff] px-4 py-3 flex items-center gap-3">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[#0050d5] shrink-0">

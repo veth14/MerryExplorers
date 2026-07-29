@@ -15,12 +15,19 @@ import { ReportsFooterBanner } from "@/components/reports/reports-footer-banner"
 type AttendanceRecord = {
   _id: string;
   name: string;
+  teacherId?: string;
   group?: string;
   dateStr: string;
   clockInTime: string;
   clockOutTime: string | null;
   breaks: { start: string; end: string | null }[];
   status: string;
+};
+
+type AccountRecord = {
+  id: string;
+  fullName: string;
+  shiftTime?: string;
 };
 
 const COLORS = ["#0066cc", "#ffb800", "#339933", "#9333ea", "#ef4444", "#0891b2", "#d97706", "#16a34a"];
@@ -49,6 +56,7 @@ function getWeekOfMonth(dateStr: string) {
 export default function ReportsPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
+  const [accounts, setAccounts] = useState<Record<string, AccountRecord>>({});
   const [loading, setLoading] = useState(true);
 
   // Filter Bar State
@@ -58,14 +66,22 @@ export default function ReportsPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch("/api/attendance");
-        const json = await res.json();
-        if (json.success) {
-          setRecords(json.data);
-          setFilteredRecords(json.data);
+        const [attRes, accRes] = await Promise.all([
+          fetch("/api/attendance"),
+          fetch("/api/accounts"),
+        ]);
+        const [attJson, accJson] = await Promise.all([attRes.json(), accRes.json()]);
+        if (attJson.success) {
+          setRecords(attJson.data);
+          setFilteredRecords(attJson.data);
+        }
+        if (Array.isArray(accJson)) {
+          const map: Record<string, AccountRecord> = {};
+          for (const a of accJson) map[a.id] = a;
+          setAccounts(map);
         }
       } catch (err) {
-        console.error("Failed to fetch attendance records:", err);
+        console.error("Failed to fetch data:", err);
       } finally {
         setLoading(false);
       }
@@ -93,7 +109,7 @@ export default function ReportsPage() {
     date: formatDate(r.dateStr),
     teacherName: r.name,
     initials: r.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
-    scheduledIn: "08:00 AM",
+    scheduledIn: accounts[r.teacherId ?? ""]?.shiftTime?.split(" - ")[0] ?? "–",
     actualIn: r.clockInTime
       ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
       : "–",

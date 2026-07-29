@@ -282,7 +282,7 @@ export default function TeacherDashboardPage() {
             {/* Shift title + time */}
             <div className="mb-6 relative z-10">
               <h2 className="text-[32px] font-black text-brand-navy leading-tight">Today&apos;s Shift</h2>
-              <p className="text-[15px] font-bold text-brand-blue mt-1">08:00 AM - 01:00 PM</p>
+              <p className="text-[15px] font-bold text-brand-blue mt-1">{(userProfile as any)?.shiftTime || "08:00 AM - 05:00 PM"}</p>
             </div>
 
             {/* Info tiles */}
