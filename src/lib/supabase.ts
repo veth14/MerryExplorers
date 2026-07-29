@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import imageCompression from "browser-image-compression";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
@@ -10,9 +11,17 @@ export async function uploadAvatar(file: File, accountId: string): Promise<strin
   const fileName = `${accountId}-${Date.now()}.${fileExt}`;
   const filePath = `${fileName}`;
 
+  // Compress the image before uploading
+  const options = {
+    maxSizeMB: 0.2, // Max file size in MB (200KB)
+    maxWidthOrHeight: 500, // Max width/height
+    useWebWorker: true,
+  };
+  const compressedFile = await imageCompression(file, options);
+
   const { error } = await supabase.storage
     .from("AccountProfile")
-    .upload(filePath, file, { upsert: true });
+    .upload(filePath, compressedFile, { upsert: true });
 
   if (error) {
     console.error("Error uploading avatar to Supabase:", error);
@@ -41,9 +50,19 @@ export async function uploadAttendanceLog(
   const timestamp = Date.now();
   const filePath = `${teacherUid}/${type}-${timestamp}.jpg`;
 
+  // Compress the webcam snapshot before uploading
+  const options = {
+    maxSizeMB: 0.2, // 200KB
+    maxWidthOrHeight: 800,
+    useWebWorker: true,
+  };
+  
+  // imageCompression accepts File or Blob
+  const compressedBlob = await imageCompression(blob as File, options);
+
   const { error } = await supabase.storage
     .from("AttendanceLogs")
-    .upload(filePath, blob, { contentType: "image/jpeg", upsert: false });
+    .upload(filePath, compressedBlob, { contentType: "image/jpeg", upsert: false });
 
   if (error) {
     console.error("Error uploading attendance photo:", error);

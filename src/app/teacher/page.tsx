@@ -17,7 +17,10 @@ type ShiftRecord = {
   _id: string;
   status: string;
   clockInTime: string;
+  clockOutTime?: string;
+  breaks?: { start: string; end: string | null }[];
   group: string;
+  dateStr: string;
 };
 
 function ClockIcon() {
@@ -117,6 +120,12 @@ export default function TeacherDashboardPage() {
   const [todayShift, setTodayShift] = useState<ShiftRecord | null>(null);
   const [loadingAnn, setLoadingAnn] = useState(true);
   const [loadingShift, setLoadingShift] = useState(true);
+  const [weeklyStats, setWeeklyStats] = useState({
+    hours: "–",
+    shifts: "–",
+    onTime: "–",
+    avgIn: "–"
+  });
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -124,11 +133,90 @@ export default function TeacherDashboardPage() {
       try {
         const [annRes, shiftRes] = await Promise.all([
           fetch("/api/announcements"),
-          fetch(`/api/attendance?date=today&uid=${user!.uid}`),
+          fetch(`/api/attendance?uid=${user!.uid}`),
         ]);
         const [annJson, shiftJson] = await Promise.all([annRes.json(), shiftRes.json()]);
+        
         if (annJson.success) setAnnouncements(annJson.data);
-        if (shiftJson.success && shiftJson.data.length > 0) setTodayShift(shiftJson.data[0]);
+        
+        if (shiftJson.success && Array.isArray(shiftJson.data)) {
+          const records: ShiftRecord[] = shiftJson.data;
+          
+          // Find today's shift
+          const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
+          const today = new Date(todayStr);
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const dd = String(today.getDate()).padStart(2, '0');
+          const todayDateStr = `${yyyy}-${mm}-${dd}`;
+          
+          const todaysRecord = records.find(r => r.dateStr === todayDateStr);
+          if (todaysRecord) setTodayShift(todaysRecord);
+
+          // Calculate weekly stats
+          const now = new Date();
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday is 0
+          startOfWeek.setHours(0, 0, 0, 0);
+
+          const thisWeekRecords = records.filter((r) => {
+            if (!r.clockInTime) return false;
+            const d = new Date(r.clockInTime);
+            return d >= startOfWeek;
+          });
+
+          // Shifts count
+          const completedThisWeek = thisWeekRecords.filter((r) => r.status === "Completed");
+          const shiftCountStr = `${completedThisWeek.length}`;
+
+          // Hours
+          let totalMs = 0;
+          for (const r of completedThisWeek) {
+            if (r.clockInTime && r.clockOutTime) {
+              let ms = new Date(r.clockOutTime).getTime() - new Date(r.clockInTime).getTime();
+              for (const b of r.breaks || []) {
+                if (b.start && b.end) ms -= new Date(b.end).getTime() - new Date(b.start).getTime();
+              }
+              totalMs += ms;
+            }
+          }
+          const hoursStr = totalMs > 0 
+            ? `${Math.floor(totalMs / 3600000)}h ${Math.floor((totalMs % 3600000) / 60000)}m`
+            : "0h 0m";
+
+          // Avg In & On-Time Rate
+          let avgInStr = "–";
+          let onTimeStr = "–";
+
+          if (thisWeekRecords.length > 0) {
+            let totalMins = 0;
+            let onTimeCount = 0;
+
+            for (const r of thisWeekRecords) {
+              const d = new Date(r.clockInTime);
+              const m = d.getHours() * 60 + d.getMinutes();
+              totalMins += m;
+              if (m <= 8 * 60) onTimeCount++;
+            }
+
+            const avg = Math.floor(totalMins / thisWeekRecords.length);
+            const ah = Math.floor(avg / 60);
+            const am = avg % 60;
+            const period = ah >= 12 ? "PM" : "AM";
+            const h12 = ah % 12 || 12;
+            avgInStr = `${h12}:${am.toString().padStart(2, "0")} ${period}`;
+
+            const rate = Math.round((onTimeCount / thisWeekRecords.length) * 100);
+            onTimeStr = `${rate}%`;
+          }
+
+          setWeeklyStats({
+            hours: hoursStr,
+            shifts: shiftCountStr,
+            onTime: onTimeStr,
+            avgIn: avgInStr
+          });
+        }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
       } finally {
@@ -199,31 +287,31 @@ export default function TeacherDashboardPage() {
 
             {/* Info tiles */}
             <div className="grid grid-cols-3 gap-3 mb-6 relative z-10">
-              {/* Assigned Group */}
+              {/* Role */}
               <div className="rounded-2xl bg-brand-yellow/10 border border-brand-yellow/30 p-4">
                 <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-brand-yellow mb-2">
                   <GroupIcon />
-                  Assigned Group
+                  Role
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">{todayShift?.group ?? "–"}</div>
+                <div className="text-[15px] font-black text-brand-navy">{(userProfile as any)?.role || "Teacher"}</div>
               </div>
 
-              {/* Students */}
+              {/* Room */}
               <div className="rounded-2xl bg-brand-sky/20 border border-brand-sky/30 p-4">
                 <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-brand-blue mb-2">
                   <UsersIcon />
-                  Students
+                  Room
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">–</div>
+                <div className="text-[15px] font-black text-brand-navy">{(userProfile as any)?.assignedRoom || "Unassigned"}</div>
               </div>
 
-              {/* Co-Teacher */}
+              {/* Schedule */}
               <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
                 <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-purple-400 mb-2">
-                  <CoTeacherIcon />
-                  Co-Teacher
+                  <InfoIcon />
+                  Schedule
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">–</div>
+                <div className="text-[15px] font-black text-brand-navy">{(userProfile as any)?.scheduleType || "Full-Time"}</div>
               </div>
             </div>
 
@@ -336,19 +424,19 @@ export default function TeacherDashboardPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-brand-yellow/10 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">–</div>
+                <div className="text-[22px] font-black text-brand-navy">{weeklyStats.hours}</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-amber-600 mt-0.5">Hours</div>
               </div>
               <div className="bg-brand-sky/20 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">–</div>
+                <div className="text-[22px] font-black text-brand-navy">{weeklyStats.shifts}</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-brand-blue mt-0.5">Shifts</div>
               </div>
               <div className="bg-green-50 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">–</div>
+                <div className="text-[22px] font-black text-brand-navy">{weeklyStats.onTime}</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-green-600 mt-0.5">On Time</div>
               </div>
               <div className="bg-purple-50 rounded-2xl p-3 text-center">
-                <div className="text-[22px] font-black text-brand-navy">–</div>
+                <div className="text-[22px] font-black text-brand-navy">{weeklyStats.avgIn}</div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-purple-500 mt-0.5">Avg In</div>
               </div>
             </div>
