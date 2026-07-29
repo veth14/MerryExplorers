@@ -7,17 +7,17 @@ const MOMENTS = [
   {
     id: "storytelling",
     title: "Creative Playtime",
-    image: "/joyful-storytelling.png",
+    image: "/IMAGE2.jpg",
   },
   {
     id: "learning-sunset",
     title: "Building Dreams",
-    image: "/golden-sunset.png",
+    image: "/IMAGE3.jpg",
   },
   {
     id: "team-learning",
     title: "Happy Hearts",
-    image: "/learning-concept.png",
+    image: "/IMAGE1.jpg",
   },
 ];
 
@@ -65,7 +65,7 @@ export function AboutSection() {
                 style={{ rotate: rotation }}
               >
                 {/* Polaroid Image */}
-                <div 
+                <div
                   className="relative w-full overflow-hidden rounded-sm"
                   style={{ aspectRatio: "4/3" }}
                 >
@@ -83,7 +83,7 @@ export function AboutSection() {
                     {moment.title}
                   </p>
                 </div>
-                
+
                 {/* Tape accent */}
                 <div className="absolute -top-3 left-1/2 h-6 w-16 -translate-x-1/2 bg-white/40 backdrop-blur-sm shadow-sm ring-1 ring-black/5" />
               </motion.div>
