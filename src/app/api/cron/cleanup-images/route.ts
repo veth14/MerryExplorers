@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const BUCKETS_TO_CLEAN = ["AttendanceLogs", "AccountProfile"];
+    const BUCKETS_TO_CLEAN = ["AttendanceLogs"];
     
     // Calculate the cutoff date (6 months ago)
     const sixMonthsAgo = new Date();
