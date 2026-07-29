@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
 import { auth } from "@/lib/firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
+import { sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { Modal } from "@/components/ui/modal";
 
 const initialTeacherData = {
@@ -53,6 +53,12 @@ export default function TeacherProfilePage() {
   const [saving, setSaving] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
+  const [successModal, setSuccessModal] = useState<string | null>(null);
+
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -154,13 +160,42 @@ export default function TeacherProfilePage() {
   };
 
   const handleResetPassword = async () => {
+    // Open the new password change modal instead of sending email
+    setIsPasswordModalOpen(true);
+    setPasswordError(null);
+    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  };
+
+  const handleChangePasswordSubmit = async () => {
     if (!user?.email) return;
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordError(null);
+
     try {
-      await sendPasswordResetEmail(auth, user.email);
-      setResetSent(true);
-      setTimeout(() => setResetSent(false), 5000);
+      // Re-authenticate
+      const credential = EmailAuthProvider.credential(user.email, passwordForm.currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // Update password
+      await updatePassword(user, passwordForm.newPassword);
+      
+      setIsPasswordModalOpen(false);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setSuccessModal("Password changed successfully.");
     } catch (e: any) {
-      setErrorModal("Error sending reset email: " + e.message);
+      console.error(e);
+      setPasswordError(e.message || "Failed to change password. Please check your current password.");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -428,10 +463,9 @@ export default function TeacherProfilePage() {
                     </div>
                     <button
                       onClick={handleResetPassword}
-                      disabled={resetSent}
                       className="px-4 py-2 rounded-xl border border-[#d0d8e8] text-[12px] font-bold text-[#5a6e8c] hover:bg-[#f0f4f9] transition-all whitespace-nowrap self-start sm:self-auto"
                     >
-                      {resetSent ? "Email Sent ✓" : "Change Password"}
+                      Change Password
                     </button>
                   </div>
                 </div>
@@ -599,6 +633,41 @@ export default function TeacherProfilePage() {
         </div>
       </TeacherShell>
 
+      {/* Success Modal */}
+      <Modal
+        isOpen={!!successModal}
+        onClose={() => setSuccessModal(null)}
+        title="Success"
+        footer={
+          <button
+            onClick={() => setSuccessModal(null)}
+            className="px-5 py-2 rounded-lg font-bold text-[13px] text-white bg-green-600 hover:bg-green-700 transition-colors"
+          >
+            Close
+          </button>
+        }
+      >
+        <div className="flex flex-col items-center gap-4 py-2 text-center">
+          <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#16a34a"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-7 h-7"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <p className="text-[13px] font-semibold text-[#5a6e8c]">
+            {successModal}
+          </p>
+        </div>
+      </Modal>
+
       {/* Error Modal */}
       <Modal
         isOpen={!!errorModal}
@@ -633,6 +702,77 @@ export default function TeacherProfilePage() {
           <p className="text-[13px] font-semibold text-[#5a6e8c]">
             {errorModal}
           </p>
+        </div>
+      </Modal>
+
+      {/* Password Change Modal */}
+      <Modal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        title="Change Password"
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              onClick={() => setIsPasswordModalOpen(false)}
+              className="px-5 py-2 rounded-lg font-bold text-[13px] text-brand-navy bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleChangePasswordSubmit}
+              disabled={isChangingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+              className="px-5 py-2 rounded-lg font-bold text-[13px] text-white bg-brand-orange hover:bg-brand-orange/90 transition-colors disabled:opacity-50"
+            >
+              {isChangingPassword ? "Saving..." : "Save Password"}
+            </button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-4 py-2">
+          {passwordError && (
+            <div className="p-3 bg-red-50 text-red-600 text-[12px] font-semibold rounded-lg border border-red-100">
+              {passwordError}
+            </div>
+          )}
+          
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-brand-navy uppercase tracking-wider ml-1">
+              Current Password
+            </label>
+            <input
+              type="password"
+              className="p-3 rounded-xl bg-white border border-gray-200 font-semibold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+              placeholder="Enter current password"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-brand-navy uppercase tracking-wider ml-1">
+              New Password
+            </label>
+            <input
+              type="password"
+              className="p-3 rounded-xl bg-white border border-gray-200 font-semibold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+              placeholder="Enter new password (min. 6 characters)"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-brand-navy uppercase tracking-wider ml-1">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              className="p-3 rounded-xl bg-white border border-gray-200 font-semibold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all"
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+              placeholder="Confirm new password"
+            />
+          </div>
         </div>
       </Modal>
     </>
