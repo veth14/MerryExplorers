@@ -84,7 +84,7 @@ export default function Home() {
   const activeStatus = todayAttendance
     .map((r) => ({
       name: r.name,
-      time: `In: ${new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
+      time: `In: ${new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}`,
       status: r.status === "Completed" ? ("COMPLETED" as const) : ("ON TIME" as const),
       avatar: r.clockInPhotoUrl,
     }));
@@ -151,7 +151,7 @@ export default function Home() {
 
   const todayHistory = todayAttendance.map((r) => ({
     name: `${r.name} Clocked In`,
-    time: new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    time: new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
     type: "in" as const,
   }));
 

@@ -59,10 +59,10 @@ export default function AttendancePage() {
     avatarColor: r.status === "In Progress" ? "#2da05b" : r.status === "Completed" ? "#0050d5" : "#e0e0e0",
     group: r.group,
     timeIn: r.clockInTime
-      ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "-",
     timeOut: r.clockOutTime
-      ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "-",
     status: r.status === "In Progress" ? "On Time" : r.status === "Completed" ? "Completed" : "Absent",
     clockInPhotoUrl: r.clockInPhotoUrl,

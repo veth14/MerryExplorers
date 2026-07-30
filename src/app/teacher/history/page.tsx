@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<ShiftStatus, string> = {
 
 function formatT(iso: string | null) {
   if (!iso) return "–";
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
 }
 
 function calcBreakDuration(breaks: { start: string; end: string | null }[]) {

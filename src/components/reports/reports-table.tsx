@@ -94,15 +94,15 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
         {/* Column headers — always visible, never scrolls away */}
         <table className="w-full min-w-[1100px] text-left border-collapse table-fixed">
           <colgroup>
-            <col className="w-[10%]" /> {/* Date */}
-            <col className="w-[18%]" /> {/* Teacher Name */}
-            <col className="w-[12%]" /> {/* Group */}
-            <col className="w-[10%]" /> {/* Scheduled In */}
-            <col className="w-[10%]" /> {/* Actual In */}
-            <col className="w-[10%]" /> {/* Clock Out */}
-            <col className="w-[10%]" /> {/* Breaks */}
-            <col className="w-[10%]" /> {/* Status */}
-            <col className="w-[10%]" /> {/* Total Hours */}
+            <col className="w-[10%]" />
+            <col className="w-[18%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-brand-sky">

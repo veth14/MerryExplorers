@@ -164,10 +164,10 @@ export default function ReportsPage() {
     group: r.group || "Unassigned",
     scheduledIn: accounts[r.teacherId ?? ""]?.shiftTime?.split(" - ")[0] ?? "08:00 AM", // default schedule if missing
     actualIn: r.clockInTime
-      ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "–",
     clockOut: r.clockOutTime
-      ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "Missing",
     breaksDuration: r.breaks ? calcBreakDuration(r.breaks) : "–",
     status: (r.clockInTime && new Date(r.clockInTime).getHours() < 8 ? "ON TIME" : "LATE") as "ON TIME" | "LATE",
