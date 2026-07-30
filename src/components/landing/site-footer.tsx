@@ -36,7 +36,7 @@ export function SiteFooter() {
                 <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">
                   Merry
                 </span>
-                <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#b47b00]">
+                <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">
                   Explorers
                 </span>
               </span>
