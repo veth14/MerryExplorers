@@ -712,8 +712,8 @@ function DeleteModal({
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
-type FilterTab = "All" | "Lead Teachers" | "Assistants" | "On Leave";
-const TABS: FilterTab[] = ["All", "Lead Teachers", "Assistants", "On Leave"];
+type FilterTab = "All" | "Admins" | "Lead Teachers" | "Assistants" | "On Leave";
+const TABS: FilterTab[] = ["All", "Admins", "Lead Teachers", "Assistants", "On Leave"];
 
 export default function UsersPage() {
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
@@ -743,6 +743,7 @@ export default function UsersPage() {
 
   const filtered = accounts
     .filter((u) => {
+      if (activeTab === "Admins") return (u.role || "").toLowerCase() === "admin";
       if (activeTab === "Lead Teachers") return u.role === "Lead Teacher";
       if (activeTab === "Assistants") return u.role === "Assistant Teacher";
       if (activeTab === "On Leave") return u.status === "on-leave";
@@ -845,7 +846,9 @@ export default function UsersPage() {
   const total = accounts.length;
   const active = accounts.filter((u) => u.status === "active").length;
   const onLeave = accounts.filter((u) => u.status === "on-leave").length;
+  const admins = accounts.filter((u) => (u.role || "").toLowerCase() === "admin").length;
   const leads = accounts.filter((u) => u.role === "Lead Teacher").length;
+  const assistants = accounts.filter((u) => u.role === "Assistant Teacher").length;
 
   return (
     <AppShell
@@ -857,7 +860,7 @@ export default function UsersPage() {
         <UserMetricCard label="Total Accounts" value={String(total)} meta="+1 this month" type="total" />
         <UserMetricCard label="Active" value={String(active)} meta="Currently working" type="active" />
         <UserMetricCard label="On Leave" value={String(onLeave)} meta="Returning soon" type="leave" />
-        <UserMetricCard label="Lead Teachers" value={String(leads)} meta={`${accounts.length - leads} assistants`} type="new" />
+        <UserMetricCard label="Lead Teachers" value={String(leads)} meta={`${assistants} assistants`} type="new" />
       </section>
 
       {/* Controls */}
@@ -867,9 +870,10 @@ export default function UsersPage() {
           {TABS.map((tab) => {
             const count =
               tab === "All" ? accounts.length :
-                tab === "Lead Teachers" ? leads :
-                  tab === "Assistants" ? accounts.length - leads :
-                    onLeave;
+                tab === "Admins" ? admins :
+                  tab === "Lead Teachers" ? leads :
+                    tab === "Assistants" ? assistants :
+                      onLeave;
             return (
               <button
                 key={tab}
