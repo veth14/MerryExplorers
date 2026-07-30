@@ -1,5 +1,5 @@
 import { TeacherShell } from "@/components/teacher/teacher-shell";
-import { ContactForm } from "@/app/admin/contact/contact-form";
+import { ContactForm } from "@/app/(auth)/admin/contact/contact-form";
 
 export default function TeacherContactPage() {
   return (
