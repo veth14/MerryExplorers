@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   description: "Merry Explorers — Nurturing, inspiring young minds.",
   icons: {
     icon: "/LOGO.ico",
+    apple: "/LOGO.jpg",
   },
 };
 

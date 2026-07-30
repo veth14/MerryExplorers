@@ -10,7 +10,7 @@ import { ParentPortalCTA } from "@/components/landing/parent-portal-cta";
 import { SiteFooter } from "@/components/landing/site-footer";
 
 export const metadata: Metadata = {
-  title: "Merry Explorers — Nurturing Joyful Hearts, Inspiring Young Minds",
+  title: "Merry Explorers — Joyful Hearts, Inspiring Minds",
   description:
     "Nurturing joyful hearts, inspiring young minds through play, storytelling, and caring guidance. A safe, creative, and fun environment for little explorers.",
 };
