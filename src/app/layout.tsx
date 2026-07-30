@@ -33,23 +33,6 @@ export default function RootLayout({
       <head>
         {/* ── Preconnects: only origins used by the landing page ── */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-
-        {/* ── LCP image preload (landing page logo) ── */}
-        <link
-          rel="preload"
-          as="image"
-          href="/LOGO-noBG.png"
-          // @ts-ignore - fetchpriority is a valid attribute
-          fetchpriority="high"
-          type="image/png"
-        />
-
-        {/* ── Material Symbols — loaded after preconnects are established ── */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-        />
       </head>
       <body className="min-h-full flex flex-col bg-background text-on-background">
         <PageProgress />
