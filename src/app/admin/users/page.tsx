@@ -128,9 +128,9 @@ function draftFromUser(u: UserAccount): Draft {
     scheduleType: u.scheduleType,
     shiftTime: u.shiftTime || "08:00 AM - 05:00 PM",
     status: u.status,
-    tags: [...u.tags],
+    tags: [...(u.tags || [])],
     joinDate: u.joinDate,
-    emergencyContacts: u.emergencyContacts.map((c) => ({ ...c })),
+    emergencyContacts: (u.emergencyContacts || []).map((c) => ({ ...c })),
   };
 }
 
