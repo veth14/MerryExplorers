@@ -2,7 +2,9 @@
 
 export const NAV_LINKS = [
   { label: "About Us", href: "/#about" },
+  { label: "Mission", href: "/#mission" },
   { label: "Programs", href: "/#programs" },
+  { label: "Uniform", href: "/#uniform" },
   { label: "Inquire", href: "/inquire" },
 ] as const;
 
@@ -80,3 +82,53 @@ export const MOMENTS = [
     color: "#0033A0",
   },
 ] as const;
+
+export const MISSION_VISION_PURPOSE = [
+  {
+    id: "mission",
+    emoji: "🌟",
+    label: "Mission",
+    title: "Our Mission",
+    body: "To provide a joyful and nurturing learning environment where children are encouraged to never stop exploring, develop curiosity and kindness, celebrate their uniqueness, and faithfully grow in the God-given talents and abilities entrusted to them—because what they learn today shapes tomorrow.",
+    accent: "#0033A0",
+    accentSoft: "#E1ECFF",
+  },
+  {
+    id: "vision",
+    emoji: "🌍",
+    label: "Vision",
+    title: "Our Vision",
+    body: "To raise confident young explorers who dream boldly, discover joyfully, appreciate the wonders of God's creation, and grow into individuals ready to make a difference in the world.",
+    accent: "#FFB800",
+    accentSoft: "#FFF8E1",
+  },
+  {
+    id: "purpose",
+    emoji: "⭐",
+    label: "Purpose",
+    title: "Our Purpose",
+    body: "Merry Explorers exists to guide children to become curious thinkers, compassionate hearts, and courageous learners who recognize their God-given potential, appreciate His creation, and confidently use their gifts to bless others and help change the world.",
+    accent: "#0066CC",
+    accentSoft: "#EDF4FF",
+  },
+] as const;
+
+export const UNIFORM = {
+  image: "/uniform.jpg",
+  price: "₱550",
+  unit: "/ set",
+  items: ["Polo Shirt", "Jogging Pants"],
+  note: "Optional",
+} as const;
+
+export const BALLET = {
+  name: "Ballet",
+  emoji: "🩰",
+  day: "Every Saturday",
+  time: "9:00 AM – 10:00 AM",
+  sessions: 10,
+  feature: "Ends with a Mini-Performance 🎭",
+  accent: "#C2185B",
+  accentSoft: "#FCE4EC",
+} as const;
+

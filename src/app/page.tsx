@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/landing/site-header";
 import { HeroSection } from "@/components/landing/hero";
 import { HighlightsSection } from "@/components/landing/highlights";
+import { MissionVisionSection } from "@/components/landing/mission-vision";
 import { ProgramsSection } from "@/components/landing/programs";
+import { UniformSection } from "@/components/landing/uniform";
 import { AboutSection } from "@/components/landing/about";
 import { ParentPortalCTA } from "@/components/landing/parent-portal-cta";
 import { SiteFooter } from "@/components/landing/site-footer";
@@ -28,7 +30,9 @@ export default function LandingPage() {
       <div className="relative z-10 flex flex-col">
         <HeroSection />
         <HighlightsSection />
+        <MissionVisionSection />
         <ProgramsSection />
+        <UniformSection />
         <AboutSection />
         <ParentPortalCTA />
         <SiteFooter />
