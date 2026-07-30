@@ -31,12 +31,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${plusJakartaSans.variable} ${manrope.variable} h-full antialiased`}>
       <head>
-        {/* ── Preconnects: establish connections early ── */}
+        {/* ── Preconnects: only origins used by the landing page ── */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://merryexplorers.firebaseapp.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://apis.google.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://www.googleapis.com" crossOrigin="anonymous" />
 
         {/* ── LCP image preload (landing page logo) ── */}
         <link

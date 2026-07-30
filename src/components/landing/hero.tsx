@@ -79,8 +79,8 @@ export function HeroSection() {
 
         {/* ── Right: Logo circle ── */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.88 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ scale: 0.88 }}
+          animate={{ scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           className="relative mx-auto flex w-full max-w-[420px] items-center justify-center lg:max-w-none mobile-no-animate"
         >
@@ -95,7 +95,7 @@ export function HeroSection() {
                 src="/LOGO-noBG.png"
                 alt="Merry Explorers"
                 fill
-                sizes="(max-width: 640px) 288px, 380px"
+                sizes="(max-width: 640px) 288px, (max-width: 1024px) 380px, 504px"
                 className="object-contain drop-shadow-2xl"
                 priority
                 // @ts-ignore

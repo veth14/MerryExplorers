@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
     ],
+    // Add 512px breakpoint so logo isn't served at 640px for a 504px slot
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384, 512],
   },
   experimental: {
     // Faster server-side rendering
