@@ -12,17 +12,16 @@ export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
     
-    // Look up the user in the "accounts" collection where _id is the Firebase UID
-    // Note: Since we'll manually set the MongoDB _id to match the Firebase UID as a string
+    // Look up the user in the "accounts" collection by their Firebase UID
     const user = await db.collection("accounts").findOne({ _id: uid as any });
     
-    if (user) {
-      // If found in accounts, they are a teacher
-      return NextResponse.json({ role: "teacher" });
+    if (user && user.role) {
+      // Return the actual role stored on the account document (e.g. "admin" or "teacher")
+      return NextResponse.json({ role: user.role });
     }
     
-    // If they aren't in the teacher 'accounts' collection, they must be the hardcoded Admin
-    return NextResponse.json({ role: "admin" });
+    // Not found in accounts — default to teacher for safety
+    return NextResponse.json({ role: "teacher" });
   } catch (error) {
     console.error("Failed to fetch role:", error);
     return NextResponse.json({ error: "Failed to fetch role" }, { status: 500 });
