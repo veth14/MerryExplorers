@@ -48,20 +48,11 @@ export default function RootLayout({
           type="image/png"
         />
 
-        {/* ── Material Symbols — non-render-blocking via media trick ── */}
+        {/* ── Material Symbols — loaded after preconnects are established ── */}
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-          media="print"
-          // @ts-ignore
-          onLoad="this.media='all'"
         />
-        <noscript>
-          <link
-            rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-          />
-        </noscript>
       </head>
       <body className="min-h-full flex flex-col bg-background text-on-background">
         <PageProgress />
