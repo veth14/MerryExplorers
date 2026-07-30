@@ -58,7 +58,7 @@ export function ParentPortalCTA() {
             {/* Copy (Right) */}
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               {/* Top badge */}
-                <motion.div
+              <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -85,7 +85,7 @@ export function ParentPortalCTA() {
                 transition={{ delay: 0.35, duration: 0.6 }}
                 className="mt-5 max-w-md text-[16px] font-medium leading-relaxed text-white/80"
               >
-                Have questions about enrollment, programs, or schedules? Send us an inquiry and our team will get back to you within 1–2 business days.
+                Have questions about registration, programs, or schedules? Send us an inquiry and our team will get back to you within 1–2 business days.
               </motion.p>
 
               <motion.div
