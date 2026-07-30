@@ -51,11 +51,12 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
     
-    const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
-    const today = new Date(todayStr);
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+    const now = new Date();
+    const todayStr = now.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    const todayInPht = new Date(todayStr);
+    const yyyy = todayInPht.getFullYear();
+    const mm = String(todayInPht.getMonth() + 1).padStart(2, '0');
+    const dd = String(todayInPht.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}-${mm}-${dd}`;
 
     // Check if already clocked in today
@@ -69,13 +70,13 @@ export async function POST(request: Request) {
       name,
       group: group || "Unassigned",
       dateStr,
-      clockInTime: today.toISOString(),
+      clockInTime: now.toISOString(),
       clockInPhotoUrl: clockInPhotoUrl || null,
       clockOutTime: null,
       clockOutPhotoUrl: null,
       status: "In Progress",
       breaks: [],
-      createdAt: today,
+      createdAt: now,
     };
 
     const result = await db.collection("attendance").insertOne(newRecord);
