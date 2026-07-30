@@ -133,18 +133,18 @@ export default function ReportsPage() {
     
     // Create CSV rows
     const rows = logs.map(l => [
-      l.date,
+      `"${l.date}"`,
       `"${l.teacherName}"`,
       `"${l.group}"`,
-      l.scheduledIn,
-      l.actualIn,
-      l.clockOut,
-      l.breaksDuration,
-      l.status,
-      l.totalHours
+      `"${l.scheduledIn}"`,
+      `"${l.actualIn}"`,
+      `"${l.clockOut}"`,
+      `"${l.breaksDuration === "–" ? "None" : l.breaksDuration}"`,
+      `"${l.status}"`,
+      `"${l.totalHours === "–" ? "0h" : l.totalHours}"`
     ].join(","));
     
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
