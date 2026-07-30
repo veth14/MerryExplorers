@@ -97,7 +97,7 @@ export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
         </div>
 
         {/* Tags */}
-        {user.tags.length > 0 && (
+        {user.tags && user.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {user.tags.map((tag) => (
               <span
