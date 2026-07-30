@@ -16,8 +16,8 @@ export async function GET(request: Request) {
     const user = await db.collection("accounts").findOne({ _id: uid as any });
     
     if (user && user.role) {
-      // Return the actual role stored on the account document (e.g. "admin" or "teacher")
-      return NextResponse.json({ role: user.role });
+      // Normalize to lowercase so "Admin", "ADMIN", "admin" all work consistently
+      return NextResponse.json({ role: user.role.toLowerCase() });
     }
     
     // Not found in accounts — default to teacher for safety
