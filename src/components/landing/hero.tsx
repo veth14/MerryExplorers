@@ -57,7 +57,7 @@ export function HeroSection() {
             className="mt-5 max-w-sm text-[16px] font-medium leading-relaxed text-[#0066CC] mobile-no-animate"
           >
             A safe, creative, and fun environment where your little explorers
-            can dream, discover, and grow.
+            can dream, discover, and grow, nurturing joyful hearts and inspiring young minds.
           </motion.p>
 
           <motion.div

@@ -10,9 +10,9 @@ import { ParentPortalCTA } from "@/components/landing/parent-portal-cta";
 import { SiteFooter } from "@/components/landing/site-footer";
 
 export const metadata: Metadata = {
-  title: "Merry Explorers — Where Little Adventures Begin",
+  title: "Merry Explorers — Nurturing Joyful Hearts, Inspiring Young Minds",
   description:
-    "Nurturing, inspiring young minds through play, storytelling, and caring guidance. Enroll your child at Merry Explorers preschool and kindergarten.",
+    "Nurturing joyful hearts, inspiring young minds through play, storytelling, and caring guidance. A safe, creative, and fun environment for little explorers.",
 };
 
 export default function LandingPage() {
