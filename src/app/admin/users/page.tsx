@@ -264,7 +264,7 @@ function UserModal({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-[17px] font-extrabold text-white">
-                {mode === "add" ? "Add Teacher Account" : "Edit Teacher Account"}
+                {mode === "add" ? "Add Teacher Account" : (isTeacher ? "Edit Teacher Account" : "Edit Admin Account")}
               </h2>
               <p className="text-[11px] text-white/60 mt-0.5">{STEPS[step]}</p>
             </div>
@@ -348,25 +348,37 @@ function UserModal({
               </div>
 
               {/* Role */}
-              <Field label="Teacher Role" required>
-                <div className="grid grid-cols-2 gap-3">
-                  {(["Lead Teacher", "Assistant Teacher"] as TeacherRole[]).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => set("role", r)}
-                      className={`rounded-xl border-2 py-3 text-[13px] font-bold transition-all ${draft.role === r
-                          ? r === "Lead Teacher"
-                            ? "border-[#ffb800] bg-[#fff8e1] text-[#a07000]"
-                            : "border-[#0050d5] bg-[#f0f5ff] text-[#0050d5]"
-                          : "border-[#e2e8f0] bg-white text-[#8898aa] hover:border-[#c5d6ff]"
-                        }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
+              {isTeacher ? (
+                <Field label="Teacher Role" required>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["Lead Teacher", "Assistant Teacher"] as TeacherRole[]).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => set("role", r)}
+                        className={`rounded-xl border-2 py-3 text-[13px] font-bold transition-all ${draft.role === r
+                            ? r === "Lead Teacher"
+                              ? "border-[#ffb800] bg-[#fff8e1] text-[#a07000]"
+                              : "border-[#0050d5] bg-[#f0f5ff] text-[#0050d5]"
+                            : "border-[#e2e8f0] bg-white text-[#8898aa] hover:border-[#c5d6ff]"
+                          }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              ) : (
+                <div className="mb-4 rounded-xl bg-[#f0f5ff] border border-[#c5d6ff] px-4 py-3 flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[#0050d5] shrink-0">
+                    <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#0050d5]">Role</p>
+                    <p className="text-[14px] font-extrabold text-[#002f76]">Administrator</p>
+                  </div>
                 </div>
-              </Field>
+              )}
 
               {/* Status */}
               <Field label="Status">
