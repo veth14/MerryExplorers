@@ -25,6 +25,7 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [shiftClass, setShiftClass] = useState(teacher.classAssigned || "");
   
   // Leave Form State
@@ -96,9 +97,37 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
       )}
 
       {/* Three-dots menu */}
-      <button className="absolute top-3 right-3 text-[#a0aec0] hover:text-[#002f76] transition-colors p-0.5 rounded-md hover:bg-[#f0f4f9]">
-        <DotsIcon />
-      </button>
+      <div className="absolute top-3 right-3 z-10">
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="text-[#a0aec0] hover:text-[#002f76] transition-colors p-0.5 rounded-md hover:bg-[#f0f4f9]"
+        >
+          <DotsIcon />
+        </button>
+        
+        {isMenuOpen && (
+          <>
+            {/* Invisible backdrop to close menu when clicking outside */}
+            <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)} />
+            
+            {/* Dropdown Menu */}
+            <div className="absolute right-0 mt-1 w-36 bg-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,47,118,0.15)] border border-[#e8effe] z-20 py-1 overflow-hidden">
+              <button 
+                onClick={() => { setIsMenuOpen(false); setIsEditModalOpen(true); }}
+                className="w-full text-left px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-[#f0f5ff] transition-colors"
+              >
+                Edit Shifts
+              </button>
+              <button 
+                onClick={() => { setIsMenuOpen(false); setIsLeaveModalOpen(true); }}
+                className="w-full text-left px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-[#f0f5ff] transition-colors"
+              >
+                File Leave
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Card body */}
       <div className="px-5 pt-5 pb-4 flex flex-col gap-3 flex-1">
