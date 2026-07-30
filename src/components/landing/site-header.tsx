@@ -108,6 +108,7 @@ export function SiteHeader() {
                         className="block rounded-2xl px-4 py-3 text-[15px] font-semibold transition-colors text-[#334155] hover:bg-[#0033A0]/5 hover:text-[#0033A0]"
                       >
                         {link.label}
+                        <span className="sr-only"> (Mobile)</span>
                       </Link>
                     </li>
                   ))}

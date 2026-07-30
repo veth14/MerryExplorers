@@ -79,13 +79,13 @@ export function SiteFooter() {
               </h2>
               <nav className="flex flex-col gap-3">
                 <Link href="/contact" className="text-[14px] font-semibold text-[#475569] hover:text-[#0033A0] transition-colors">
-                  Contact Us
+                  Contact Information
                 </Link>
                 <Link href="/location" className="text-[14px] font-semibold text-[#475569] hover:text-[#0033A0] transition-colors">
-                  Location
+                  Our Location
                 </Link>
                 <Link href="/inquire" className="text-[14px] font-semibold text-[#475569] hover:text-[#0033A0] transition-colors">
-                  Inquire
+                  Send an Inquiry
                 </Link>
               </nav>
             </div>
