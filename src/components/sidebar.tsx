@@ -121,8 +121,16 @@ type SidebarProps = {
 
 export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { signOut } = useAuth();
+  const { signOut, user, userProfile } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const displayName = userProfile?.fullName || user?.email || "Admin User";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0].toUpperCase())
+    .join("") || "AU";
 
   async function handleLogout() {
     setUserMenuOpen(false);
@@ -208,10 +216,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#ffb800] bg-[#1a1a1a] text-[10px] font-black text-white relative">
               <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-[#2da05b]"></span>
-              AU
+              {initials}
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-[13px] font-bold text-[#005cc8] leading-tight">Admin User</p>
+              <p className="truncate text-[13px] font-bold text-[#005cc8] leading-tight">{displayName}</p>
               <p className="truncate text-[10px] font-semibold text-[#005cc8]/80">Administrator</p>
             </div>
             <svg

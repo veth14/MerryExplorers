@@ -14,12 +14,9 @@ type CameraStatus = "idle" | "loading" | "active" | "denied" | "unavailable";
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(d: Date) {
-  let h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, "0");
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  if (h === 0) h = 12;
-  return { time: `${h}:${m}`, ampm };
+  const str = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" });
+  const [timePart, ampm] = str.split(" ");
+  return { time: timePart, ampm };
 }
 
 function formatLongDate(d: Date) {
@@ -28,6 +25,7 @@ function formatLongDate(d: Date) {
     month: "long",
     day: "numeric",
     year: "numeric",
+    timeZone: "Asia/Manila",
   });
 }
 
@@ -50,7 +48,7 @@ function totalBreakMs(breaks: BreakEntry[]): number {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ClockPage() {
-  const [now, setNow] = useState<Date>(() => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })));
+  const [now, setNow] = useState<Date>(() => new Date());
   const [state, setState] = useState<ClockState>("ready");
 
   // Session tracking
@@ -443,7 +441,7 @@ export default function ClockPage() {
   // ── Live clock ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }))), 1000);
+    const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
