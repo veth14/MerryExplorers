@@ -50,9 +50,9 @@ export default function Home() {
     async function fetchData() {
       try {
         const [metricsJson, attendanceJson, accountsJson] = await Promise.all([
-          cachedFetch<any>("dashboard:metrics", "/api/dashboard/metrics", 60_000),
-          cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 20_000),
-          cachedFetch<any>("accounts:all", "/api/accounts", 60_000),
+          cachedFetch<any>("dashboard:metrics", "/api/dashboard/metrics", 300_000),
+          cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 300_000),
+          cachedFetch<any>("accounts:all", "/api/accounts", 300_000),
         ]);
 
         if (metricsJson?.success) setMetricsData(metricsJson.data);
