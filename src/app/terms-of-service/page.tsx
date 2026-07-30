@@ -120,11 +120,11 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section title="7. Termination of Registration">
-              <p>The Center reserves the right to terminate a student's registration under exceptional circumstances, including but not limited to non-payment, behavioral concerns, or falsification of records. One month's written notice will be provided where possible.</p>
+              <p>The playgroup reserves the right to terminate a student's registration under exceptional circumstances, including but not limited to non-payment or behavioral concerns.</p>
             </Section>
 
             <Section title="8. Changes to Terms">
-              <p>Merry Explorers reserves the right to update these Terms of Service at any time. Parents/guardians will be notified of significant changes via email or playgroup announcements.</p>
+              <p>Merry Explorers reserves the right to update these Terms of Service at any time. Parents/guardians will be notified of significant changes via social media announcements.</p>
             </Section>
 
             <Section title="9. Contact">
@@ -132,8 +132,7 @@ export default function TermsOfServicePage() {
               <p className="mt-2">
                 <strong className="text-[#0033A0]">Merry Explorers Playgroup & Learning Center</strong><br />
                 Unit C, 2nd Floor, Starla 88 Bldg, Camarin Rd., Caloocan<br />
-                Email: <a href="mailto:Merryexplorerscenter@gmail.com
-" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">Merryexplorerscenter@gmail.com
+                Email: <a href="mailto:Merryexplorerscenter@gmail.com" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">Merryexplorerscenter@gmail.com
                 </a>
               </p>
             </Section>

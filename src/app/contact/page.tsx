@@ -39,12 +39,7 @@ export default function ContactPage() {
               </Link>
             ))}
           </nav>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 rounded-full bg-white border-2 border-[#f1f5f9] px-6 py-2.5 text-[15px] font-bold text-[#0033A0] shadow-sm hover:border-[#0033A0]/20 hover:bg-[#f8fafc] transition-all hover:-translate-y-0.5"
-          >
-            Portal Login
-          </Link>
+          <div className="w-10 shrink-0" aria-hidden="true" />
         </div>
       </header>
 

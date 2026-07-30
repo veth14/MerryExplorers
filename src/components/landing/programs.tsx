@@ -15,7 +15,7 @@ const LITTLE_EXPLORERS = {
   subtitleColor: "rgba(255,255,255,0.85)",
   pillBg: "#FFC107",
   pillText: "#0033A0",
-  iconLeft: "🎨",
+  iconLeft: "🚀",
   iconRight: "🧩",
   fullTime: {
     label: "FULL TIME LITTLE EXPLORERS PLAYGROUP",

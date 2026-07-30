@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { NAV_LINKS } from "@/data/landing";
+import { SiteFooter } from "@/components/landing/site-footer";
 
 const CHILD_AGE_OPTIONS = [
   "1.6 – 2.5 years (Tiny Explorers)",
@@ -133,7 +134,7 @@ export default function InquirePage() {
         <div aria-hidden className="absolute -bottom-40 left-1/3 w-[700px] h-[700px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05]"></div>
       </div>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">
         <div className="mx-auto flex h-[80px] w-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
@@ -146,28 +147,17 @@ export default function InquirePage() {
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-2">
-            {NAV_LINKS.map((link) => {
-              const isActive = link.href === "/inquire";
-              return (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className={`rounded-full px-6 py-2.5 text-[15px] font-bold transition-all ${isActive
-                      ? "text-[#0033A0] bg-[#0033A0]/10"
-                      : "text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]"
-                    }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="rounded-full px-6 py-2.5 text-[15px] font-bold transition-all text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 rounded-full bg-white border-2 border-[#f1f5f9] px-6 py-2.5 text-[15px] font-bold text-[#0033A0] shadow-sm hover:border-[#0033A0]/20 hover:bg-[#f8fafc] transition-all hover:-translate-y-0.5"
-          >
-            Portal Login
-          </Link>
+          <div className="w-10 shrink-0" aria-hidden="true" />
         </div>
       </header>
 
@@ -282,15 +272,16 @@ export default function InquirePage() {
           {/* Quick Contact Pills below form */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }} className="mt-12 flex flex-wrap items-center justify-center gap-4 text-[#64748b]">
             <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full border border-black/5 text-[14px] font-bold">
-              <span className="text-xl leading-none">📧</span> info@merryexplorers.ph
+              <span className="text-xl leading-none">📧</span> Merryexplorerscenter@gmail.com
             </div>
             <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full border border-black/5 text-[14px] font-bold">
-              <span className="text-xl leading-none">📞</span> +63 917 123 4567
+              <span className="text-xl leading-none">📞</span> (0947) 782 0606
             </div>
           </motion.div>
 
         </div>
       </main>
+      <SiteFooter />
     </motion.div>
   );
 }
