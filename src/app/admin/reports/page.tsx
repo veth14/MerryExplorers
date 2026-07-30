@@ -28,6 +28,7 @@ type AccountRecord = {
   id: string;
   fullName: string;
   shiftTime?: string;
+  role?: string;
 };
 
 const COLORS = ["#0066cc", "#ffb800", "#339933", "#9333ea", "#ef4444", "#0891b2", "#d97706", "#16a34a"];
@@ -46,6 +47,11 @@ function calcTotalHours(record: AttendanceRecord) {
 function formatDate(dateStr: string) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function getWeekOfMonth(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return `W${Math.ceil(d / 7)}`;
 }
 
 function calcBreakDuration(breaks: { start: string; end: string | null }[]) {
