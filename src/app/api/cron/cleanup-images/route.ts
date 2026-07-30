@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: Request) {
+  // Guard: only allow calls from Vercel Cron (or an authorized client)
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // It's recommended to use a Service Role Key for administrative tasks like deleting old files.
     // If not provided, it falls back to the ANON key, which might fail depending on your Storage RLS policies.
