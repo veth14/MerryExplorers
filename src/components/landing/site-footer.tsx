@@ -36,7 +36,7 @@ export function SiteFooter() {
                 <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">
                   Merry
                 </span>
-                <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">
+                <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#b47b00]">
                   Explorers
                 </span>
               </span>
@@ -48,7 +48,7 @@ export function SiteFooter() {
               1421 Metro Manila
             </p>
 
-            <p className="mt-5 text-[12px] font-semibold text-[#94a3b8]">
+            <p className="mt-5 text-[12px] font-semibold text-[#475569]">
               © {new Date().getFullYear()} Merry Explorers Playgroup & Learning Center.
             </p>
 
@@ -74,9 +74,9 @@ export function SiteFooter() {
 
             {/* Quick Links */}
             <div>
-              <h4 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#0033A0] mb-4">
+              <h2 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#0033A0] mb-4">
                 Quick Links
-              </h4>
+              </h2>
               <nav className="flex flex-col gap-3">
                 <Link href="/contact" className="text-[14px] font-semibold text-[#475569] hover:text-[#0033A0] transition-colors">
                   Contact Us
@@ -92,9 +92,9 @@ export function SiteFooter() {
 
             {/* Legal */}
             <div>
-              <h4 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#0033A0] mb-4">
+              <h2 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#0033A0] mb-4">
                 Legal
-              </h4>
+              </h2>
               <nav className="flex flex-col gap-3">
                 <Link href="/privacy-policy" className="text-[14px] font-semibold text-[#475569] hover:text-[#0033A0] transition-colors">
                   Privacy Policy
@@ -107,9 +107,9 @@ export function SiteFooter() {
 
             {/* Programs */}
             <div>
-              <h4 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#0033A0] mb-4">
+              <h2 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#0033A0] mb-4">
                 Programs
-              </h4>
+              </h2>
               <nav className="flex flex-col gap-3">
                 <Link href="/#programs" className="text-[14px] font-semibold text-[#475569] hover:text-[#0033A0] transition-colors">
                   Tiny Explorers
@@ -124,7 +124,7 @@ export function SiteFooter() {
 
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-black/5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-[12px] font-semibold text-[#94a3b8]">
+          <p className="text-[12px] font-semibold text-[#475569]">
             Made with ❤️ for every little explorer.
           </p>
           <div className="flex items-center gap-1">
