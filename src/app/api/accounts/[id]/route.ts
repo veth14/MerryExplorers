@@ -7,7 +7,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const id = (await params).id;
     const { db } = await connectToDatabase();
 
-    const account = await db.collection("accounts").findOne({ _id: id as any });
+    // Try matching by string _id (Firebase UID stored as MongoDB _id)
+    let account = await db.collection("accounts").findOne({ _id: id as any });
+
+    // Fallback: try ObjectId in case the document was created differently
+    if (!account) {
+      try {
+        account = await db.collection("accounts").findOne({ _id: new ObjectId(id) });
+      } catch {
+        // id is not a valid ObjectId, ignore
+      }
+    }
+
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
@@ -28,7 +39,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       status = "active";
     }
 
-    return NextResponse.json({ ...account, id: account._id, status }, {
+    return NextResponse.json({ ...account, id: account._id?.toString() ?? id, status }, {
       headers: {
         "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60"
       }
