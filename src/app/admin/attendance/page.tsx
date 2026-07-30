@@ -6,6 +6,7 @@ import { AttendanceMetricCard } from "@/components/attendance/attendance-metric-
 import { AttendanceRoster } from "@/components/attendance/attendance-roster";
 import type { StaffAttendance } from "@/data/attendance";
 import { cachedFetch } from "@/lib/cache";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type AttendanceRecord = {
   _id: string;
@@ -92,9 +93,14 @@ export default function AttendancePage() {
 
       {/* Staff Roster Table */}
       <section className="mt-2">
-        {loading ? (
-          <div className="flex items-center justify-center h-40 text-[#5a6e8c] font-bold text-sm">
-            Loading attendance records…
+      {loading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <Skeleton className="h-10 flex-1 rounded-2xl" />
+              </div>
+            ))}
           </div>
         ) : roster.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-[#9aa3b2] gap-2">

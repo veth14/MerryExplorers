@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ShiftRecord = {
   _id: string;
@@ -213,8 +214,10 @@ export default function ShiftHistoryPage() {
 
           {/* Table */}
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-[#5a6e8c] font-bold text-sm">
-              Loading shift history…
+            <div className="flex flex-col gap-3 py-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-xl" />
+              ))}
             </div>
           ) : rows.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-[#9aa3b2] font-bold text-sm">

@@ -6,6 +6,7 @@ import { cachedFetch, invalidateCachePrefix } from "@/lib/cache";
 import { AttendanceHub } from "@/components/dashboard/attendance-hub";
 import { DailyTeamOverview } from "@/components/dashboard/daily-team-overview";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type MetricData = {
   totalTeachers: { value: string; meta: string };
@@ -158,21 +159,35 @@ export default function Home() {
     <AppShell title="Welcome back, Admin!" description="Here's what's happening today across all playgroups.">
       {/* Metric cards */}
       <section className="grid gap-4 grid-cols-1 md:grid-cols-3 shrink-0">
-        {metrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            meta={metric.meta}
-            type={metric.type}
-          />
-        ))}
+        {loading ? (
+          <>
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </>
+        ) : (
+          metrics.map((metric) => (
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              meta={metric.meta}
+              type={metric.type}
+            />
+          ))
+        )}
       </section>
 
       {/* Daily Team Overview */}
       {loading ? (
-        <div className="flex items-center justify-center h-24 text-[#5a6e8c] font-bold text-sm">
-          Loading team data…
+        <div className="rounded-[2rem] bg-white p-6 shadow-sm border-2 border-brand-sky flex flex-col gap-4">
+          <Skeleton className="h-6 w-48" />
+          <div className="flex gap-4">
+            <Skeleton className="h-14 w-14 rounded-full" />
+            <Skeleton className="h-14 w-14 rounded-full" />
+            <Skeleton className="h-14 w-14 rounded-full" />
+            <Skeleton className="h-14 w-14 rounded-full" />
+          </div>
         </div>
       ) : (
         <DailyTeamOverview members={teamMembers as any} activeCount={activeStatus.length} />
@@ -180,7 +195,14 @@ export default function Home() {
 
       {/* Attendance Hub */}
       <div className="flex-1 min-h-0">
-        <AttendanceHub activeStatus={activeStatus} history={todayHistory} />
+        {loading ? (
+          <div className="h-full w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-full w-full rounded-[2rem]" />
+            <Skeleton className="h-full w-full rounded-[2rem]" />
+          </div>
+        ) : (
+          <AttendanceHub activeStatus={activeStatus} history={todayHistory} />
+        )}
       </div>
     </AppShell>
   );

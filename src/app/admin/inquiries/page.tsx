@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { AppShell } from "@/components/app-shell";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type InquiryStatus = "New" | "Read" | "Replied" | "Closed";
 
@@ -295,7 +296,11 @@ export default function InquiriesPage() {
 
         {/* Table */}
         {loading ? (
-          <div className="py-16 text-center text-[14px] font-semibold text-[#a0aec0]">Loading inquiries...</div>
+          <div className="flex flex-col gap-3 py-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
             <div className="w-14 h-14 bg-[#f0f5ff] rounded-full mx-auto flex items-center justify-center mb-3">

@@ -6,6 +6,7 @@ import { TeacherMetricCard } from "@/components/teachers/teacher-metric-card";
 import { TeacherCard } from "@/components/teachers/teacher-card";
 import type { FilterTab, Teacher } from "@/data/teachers";
 import { cachedFetch, invalidateCachePrefix } from "@/lib/cache";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type AccountDoc = {
   _id?: string;
@@ -130,9 +131,11 @@ export default function TeachersPage() {
 
       {/* Teacher Grid */}
       {loading ? (
-        <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">
-          Loading teachers…
-        </div>
+        <section className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-52 w-full rounded-[2rem]" />
+          ))}
+        </section>
       ) : filteredTeachers.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-[#9aa3b2] gap-2">
           <p className="font-bold text-sm">No teachers found.</p>

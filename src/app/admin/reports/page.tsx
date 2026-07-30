@@ -11,6 +11,7 @@ const ReportsChart = dynamic(() => import("@/components/reports/reports-chart").
 import { ReportsFilterBar } from "@/components/reports/reports-filter-bar";
 import { ReportsMetricCard } from "@/components/reports/reports-metric-card";
 import { ReportsFooterBanner } from "@/components/reports/reports-footer-banner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type AttendanceRecord = {
   _id: string;
@@ -235,17 +236,18 @@ export default function ReportsPage() {
 
       {/* Chart */}
       {loading ? (
-        <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">
-          Loading chart data…
-        </div>
+        <Skeleton className="h-56 w-full rounded-[2rem]" />
       ) : (
         <ReportsChart trends={trends.length > 0 ? trends : undefined} />
       )}
 
       {/* Detailed Logs Table */}
       {loading ? (
-        <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">
-          Loading logs…
+        <div className="rounded-[2rem] bg-white border-2 border-brand-sky shadow-lg w-full p-6 flex flex-col gap-3">
+          <Skeleton className="h-6 w-44" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-xl" />
+          ))}
         </div>
       ) : (
         <ReportsTable logs={logs as any} />

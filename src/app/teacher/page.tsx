@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Announcement = {
   _id?: string;
@@ -256,7 +257,7 @@ export default function TeacherDashboardPage() {
               </div>
               <div className="text-right">
                 {loadingShift ? (
-                  <span className="text-[12px] font-bold text-brand-navy/40">Loading…</span>
+                  <Skeleton className="h-5 w-20 rounded-lg" />
                 ) : isClocked ? (
                   <>
                     <div className="flex items-center gap-1.5 justify-end">
@@ -340,7 +341,11 @@ export default function TeacherDashboardPage() {
 
             <div className="flex flex-col gap-4">
               {loadingAnn ? (
-                <p className="text-[13px] text-brand-navy/40 font-bold">Loading announcements…</p>
+                <div className="flex flex-col gap-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+                  ))}
+                </div>
               ) : announcements.length === 0 ? (
                 <p className="text-[13px] text-brand-navy/40 font-bold">No announcements right now.</p>
               ) : (

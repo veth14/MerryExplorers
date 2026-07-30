@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type LeaveStatus = "Pending" | "Approved" | "Rejected";
 
@@ -204,8 +205,10 @@ export default function LeavePage() {
 
       {/* Leave table */}
       {loading ? (
-        <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">
-          Loading leave requests…
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 gap-2 text-[#9aa3b2]">
