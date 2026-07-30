@@ -99,7 +99,7 @@ export function HeroSection() {
                 className="object-contain drop-shadow-2xl"
                 priority
                 // @ts-ignore
-                fetchpriority="high"
+                fetchPriority="high"
               />
             </motion.div>
           </div>
