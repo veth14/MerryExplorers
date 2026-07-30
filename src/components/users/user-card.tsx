@@ -38,8 +38,8 @@ function TrashIcon() {
 
 export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
   const [imgError, setImgError] = useState(false);
-  const status = statusConfig[user.status];
-  const role = roleConfig[user.role];
+  const status = statusConfig[user.status] || { label: user.status, dot: "bg-gray-400", text: "text-gray-600", bg: "bg-gray-100" };
+  const role = roleConfig[user.role] || { bg: "bg-[#f0f4f9]", text: "text-[#5a6e8c]", border: "border-[#d0d8e8]" };
   const isOnLeave = user.status === "on-leave";
 
   const showInitials = !user.avatarUrl || imgError;
