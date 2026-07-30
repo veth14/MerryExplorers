@@ -18,7 +18,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
-            className="font-headline text-[42px] font-extrabold leading-[1.1] tracking-tight text-[#0b1a3d] sm:text-[52px] lg:text-[56px]"
+            className="font-headline text-[42px] font-extrabold leading-[1.1] tracking-tight text-[#0b1a3d] sm:text-[52px] lg:text-[56px] mobile-no-animate"
           >
             Nurturing
             <br />
@@ -54,7 +54,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-            className="mt-5 max-w-sm text-[16px] font-medium leading-relaxed text-[#0066CC]"
+            className="mt-5 max-w-sm text-[16px] font-medium leading-relaxed text-[#0066CC] mobile-no-animate"
           >
             A safe, creative, and fun environment where your little explorers
             can dream, discover, and grow.
@@ -64,7 +64,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.42, ease: "easeOut" }}
-            className="mt-8"
+            className="mt-8 mobile-no-animate"
           >
             <Link
               href="/inquire"
@@ -82,7 +82,7 @@ export function HeroSection() {
           initial={{ opacity: 0, scale: 0.88 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          className="relative mx-auto flex w-full max-w-[420px] items-center justify-center lg:max-w-none"
+          className="relative mx-auto flex w-full max-w-[420px] items-center justify-center lg:max-w-none mobile-no-animate"
         >
           {/* Frosted Glass Orb */}
           <div className="relative flex h-[360px] w-[360px] items-center justify-center rounded-full bg-white/60 backdrop-blur-3xl sm:h-[460px] sm:w-[460px] shadow-[0_24px_80px_rgba(0,51,160,0.1)] border border-white">
