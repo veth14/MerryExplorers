@@ -115,7 +115,7 @@ export default function LocationPage() {
                     <div>
                       <p className="text-[13px] font-extrabold text-[#0033A0]">Contact</p>
                       <a href="tel:+639123456789" className="text-[13px] font-semibold text-[#0066CC] hover:text-[#FFC107] transition-colors">
-                        +63 912 345 6789
+                        (0947) 782 0606
                       </a>
                     </div>
                   </div>

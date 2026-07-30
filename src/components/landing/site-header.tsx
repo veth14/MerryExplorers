@@ -31,8 +31,8 @@ export function SiteHeader() {
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={`sticky top-0 z-50 transition-all duration-300 ${scrolled
-          ? "bg-white/60 shadow-[0_2px_16px_rgba(0,0,0,0.03)] border-b border-black/5 backdrop-blur-xl"
-          : "bg-transparent"
+        ? "bg-white/60 shadow-[0_2px_16px_rgba(0,0,0,0.03)] border-b border-black/5 backdrop-blur-xl"
+        : "bg-transparent"
         }`}
     >
       <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center justify-between px-5 sm:px-8">

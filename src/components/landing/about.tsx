@@ -7,12 +7,12 @@ const MOMENTS = [
   {
     id: "storytelling",
     title: "Creative Playtime",
-    image: "/IMAGE2.jpg",
+    image: "/IMAGE3.jpg",
   },
   {
     id: "learning-sunset",
     title: "Building Dreams",
-    image: "/IMAGE3.jpg",
+    image: "/IMAGE2.jpg",
   },
   {
     id: "team-learning",

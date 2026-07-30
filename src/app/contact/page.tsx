@@ -94,7 +94,8 @@ export default function ContactPage() {
               <div>
                 <h3 className="font-headline text-[18px] font-extrabold text-[#0033A0] mb-2">Phone</h3>
                 <a href="tel:+639123456789" className="text-[15px] font-semibold text-[#0066CC] hover:text-[#FFC107] transition-colors leading-relaxed block">
-                  +63 912 345 6789
+                  (0947) 782 0606
+
                 </a>
                 <p className="text-[13px] text-[#94a3b8] mt-1 font-medium">Mon–Fri, 8AM–5PM</p>
               </div>
@@ -106,7 +107,7 @@ export default function ContactPage() {
               <div>
                 <h3 className="font-headline text-[18px] font-extrabold text-[#0033A0] mb-2">Email</h3>
                 <a href="mailto:info@merryexplorers.com" className="text-[15px] font-semibold text-[#0066CC] hover:text-[#FFC107] transition-colors leading-relaxed break-all block">
-                  info@merryexplorers.com
+                  Merryexplorerscenter@gmail.com
                 </a>
                 <p className="text-[13px] text-[#94a3b8] mt-1 font-medium">We reply within 1–2 business days</p>
               </div>

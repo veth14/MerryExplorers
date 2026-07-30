@@ -48,12 +48,7 @@ export default function TermsOfServicePage() {
               </Link>
             ))}
           </nav>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 rounded-full bg-white border-2 border-[#f1f5f9] px-6 py-2.5 text-[15px] font-bold text-[#0033A0] shadow-sm hover:border-[#0033A0]/20 hover:bg-[#f8fafc] transition-all hover:-translate-y-0.5"
-          >
-            Portal Login
-          </Link>
+          <div className="w-10 shrink-0" aria-hidden="true" />
         </div>
       </header>
 
@@ -82,23 +77,21 @@ export default function TermsOfServicePage() {
             className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
           >
             <Section title="1. Acceptance of Terms">
-              <p>By enrolling your child at Merry Explorers Playgroup & Learning Center ("the School") or by using our website and online systems, you agree to be bound by these Terms of Service. If you do not agree with these terms, please do not proceed with enrollment or use our services.</p>
+              <p>By registering your child at Merry Explorers Playgroup & Learning Center ("the Center") or by using our website and online systems, you agree to be bound by these Terms of Service. If you do not agree with these terms, please do not proceed with registration or use our services.</p>
             </Section>
 
-            <Section title="2. Enrollment & Fees">
+            <Section title="2. Registration & Fees">
               <ul className="list-disc pl-5 space-y-1">
-                <li>All enrollment fees are non-refundable once the school year has commenced.</li>
-                <li>Monthly tuition fees are due on or before the stated due dates.</li>
-                <li>Late payment may result in suspension of access to the parent portal and school activities.</li>
-                <li>The school reserves the right to adjust tuition rates with prior notice to parents/guardians.</li>
+                <li>All registration fees are non-refundable once the playgroup year has commenced.</li>
+                <li>Monthly registration fees are due on or before the stated due dates.</li>
+                <li>The Center reserves the right to adjust registration fee rates with prior notice to parents/guardians.</li>
               </ul>
             </Section>
 
             <Section title="3. Attendance & Schedules">
               <ul className="list-disc pl-5 space-y-1">
-                <li>Regular attendance is expected of all enrolled students.</li>
-                <li>Parents/guardians must inform the school in advance of any absences.</li>
-                <li>The school follows the official academic calendar; holidays and suspensions will be communicated promptly.</li>
+                <li>Regular attendance is expected of all registered students.</li>
+                <li>Parents/guardians must inform the Center in advance of any absences.</li>
                 <li>Sessions missed due to absences are generally not subject to make-up classes unless otherwise arranged.</li>
               </ul>
             </Section>
@@ -106,32 +99,32 @@ export default function TermsOfServicePage() {
             <Section title="4. Code of Conduct">
               <p>Parents and guardians are expected to:</p>
               <ul className="list-disc pl-5 space-y-1 mt-2">
-                <li>Treat all school staff and other families with courtesy and respect.</li>
-                <li>Adhere to school policies and guidelines as communicated in the school handbook.</li>
-                <li>Ensure their child is fit for school on days of attendance.</li>
+                <li>Treat all Center staff and other families with courtesy and respect.</li>
+                <li>Adhere to Center policies and guidelines as communicated in the Center handbook.</li>
+                <li>Ensure their child is fit for playgroup on days of attendance.</li>
                 <li>Communicate openly with teachers regarding their child's needs and concerns.</li>
               </ul>
             </Section>
 
             <Section title="5. Health & Safety">
               <ul className="list-disc pl-5 space-y-1">
-                <li>Children showing signs of illness should not be brought to school.</li>
-                <li>The school reserves the right to send home a student showing signs of contagious illness.</li>
-                <li>Parents must keep the school informed of any allergies, medical conditions, or medications.</li>
-                <li>The school maintains a safe and nurturing environment but cannot be held liable for accidents beyond reasonable care.</li>
+                <li>Children showing signs of illness should not be brought to playgroup.</li>
+                <li>The Center reserves the right to send home a student showing signs of contagious illness.</li>
+                <li>Parents must keep the Center informed of any allergies, medical conditions, or medications.</li>
+                <li>The Center maintains a safe and nurturing environment but cannot be held liable for accidents beyond reasonable care.</li>
               </ul>
             </Section>
 
             <Section title="6. Photography & Media">
-              <p>By enrolling your child, you grant the school permission to take photographs and videos of your child for internal school records, newsletters, and official social media channels. If you wish to opt out, please notify the school in writing.</p>
+              <p>By registering your child, you grant the Center permission to take photographs and videos of your child for internal records, newsletters, and official social media channels. If you wish to opt out, please notify the Center in writing.</p>
             </Section>
 
-            <Section title="7. Termination of Enrollment">
-              <p>The school reserves the right to terminate a student's enrollment under exceptional circumstances, including but not limited to non-payment, behavioral concerns, or falsification of records. One month's written notice will be provided where possible.</p>
+            <Section title="7. Termination of Registration">
+              <p>The Center reserves the right to terminate a student's registration under exceptional circumstances, including but not limited to non-payment, behavioral concerns, or falsification of records. One month's written notice will be provided where possible.</p>
             </Section>
 
             <Section title="8. Changes to Terms">
-              <p>Merry Explorers reserves the right to update these Terms of Service at any time. Parents/guardians will be notified of significant changes via email or school announcements.</p>
+              <p>Merry Explorers reserves the right to update these Terms of Service at any time. Parents/guardians will be notified of significant changes via email or playgroup announcements.</p>
             </Section>
 
             <Section title="9. Contact">
@@ -139,7 +132,9 @@ export default function TermsOfServicePage() {
               <p className="mt-2">
                 <strong className="text-[#0033A0]">Merry Explorers Playgroup & Learning Center</strong><br />
                 Unit C, 2nd Floor, Starla 88 Bldg, Camarin Rd., Caloocan<br />
-                Email: <a href="mailto:info@merryexplorers.com" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">info@merryexplorers.com</a>
+                Email: <a href="mailto:Merryexplorerscenter@gmail.com
+" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">Merryexplorerscenter@gmail.com
+                </a>
               </p>
             </Section>
           </motion.div>

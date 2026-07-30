@@ -48,12 +48,7 @@ export default function PrivacyPolicyPage() {
               </Link>
             ))}
           </nav>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 rounded-full bg-white border-2 border-[#f1f5f9] px-6 py-2.5 text-[15px] font-bold text-[#0033A0] shadow-sm hover:border-[#0033A0]/20 hover:bg-[#f8fafc] transition-all hover:-translate-y-0.5"
-          >
-            Portal Login
-          </Link>
+          <div className="w-10 shrink-0" aria-hidden="true" />
         </div>
       </header>
 
@@ -82,26 +77,26 @@ export default function PrivacyPolicyPage() {
             className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
           >
             <Section title="1. Information We Collect">
-              <p>We collect personal information that you voluntarily provide when you fill out our inquiry forms, enroll your child, or contact us. This may include:</p>
+              <p>We collect personal information that you voluntarily provide when you fill out our inquiry forms, register your child, or contact us. This may include:</p>
               <ul className="list-disc pl-5 space-y-1 mt-2">
                 <li>Parent or guardian full name, email address, and phone number</li>
                 <li>Child's name, age, and relevant health information</li>
-                <li>Payment and billing information for enrollment fees</li>
+                <li>Payment and billing information for registration fees</li>
               </ul>
             </Section>
 
             <Section title="2. How We Use Your Information">
               <p>We use the information we collect to:</p>
               <ul className="list-disc pl-5 space-y-1 mt-2">
-                <li>Process enrollment applications and manage student records</li>
-                <li>Communicate with parents/guardians about school updates, events, and announcements</li>
+                <li>Process registration applications and manage student records</li>
+                <li>Communicate with parents/guardians about playgroup updates, events, and announcements</li>
                 <li>Comply with legal and regulatory requirements</li>
                 <li>Improve our programs and services</li>
               </ul>
             </Section>
 
             <Section title="3. Data Sharing">
-              <p>We do not sell, trade, or rent your personal information to third parties. We may share information with trusted service providers who assist us in operating our school, provided they agree to keep this information confidential.</p>
+              <p>We do not sell, trade, or rent your personal information to third parties. We may share information with trusted service providers who assist us in operating our playgroup, provided they agree to keep this information confidential.</p>
             </Section>
 
             <Section title="4. Data Retention">
@@ -127,7 +122,7 @@ export default function PrivacyPolicyPage() {
               <p className="mt-2">
                 <strong className="text-[#0033A0]">Merry Explorers Playgroup & Learning Center</strong><br />
                 Unit C, 2nd Floor, Starla 88 Bldg, Camarin Rd., Caloocan<br />
-                Email: <a href="mailto:info@merryexplorers.com" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">info@merryexplorers.com</a>
+                Email: <a href="mailto:Merryexplorerscenter@gmail.com" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">Merryexplorerscenter@gmail.com</a>
               </p>
             </Section>
           </motion.div>
