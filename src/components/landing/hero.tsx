@@ -98,6 +98,8 @@ export function HeroSection() {
                 sizes="(max-width: 640px) 288px, 380px"
                 className="object-contain drop-shadow-2xl"
                 priority
+                // @ts-ignore
+                fetchpriority="high"
               />
             </motion.div>
           </div>
