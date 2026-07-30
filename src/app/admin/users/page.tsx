@@ -37,8 +37,7 @@ const SCHEDULE_OPTIONS = [
 ];
 
 const ASSIGNED_ROOMS = [
-  "Sunshine Room (Toddlers)", "Rainbow Room", "Little Explorers",
-  "Toddler Turtles", "Pre-K Explorers", "Starlight Room", "Unassigned",
+  "Little Explorers", "Tiny Explorers", "Unassigned"
 ];
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
