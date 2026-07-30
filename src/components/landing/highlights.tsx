@@ -22,6 +22,9 @@ export function HighlightsSection() {
   return (
     <section className="relative py-14 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
+        {/* Section heading (visually hidden, keeps heading order intact for a11y) */}
+        <h2 className="sr-only">Why Families Choose Merry Explorers</h2>
+
         {/* Highlight cards row */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {HIGHLIGHTS.map((item, i) => {
