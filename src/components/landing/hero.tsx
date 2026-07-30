@@ -67,7 +67,7 @@ export function HeroSection() {
             className="mt-8"
           >
             <Link
-              href="/#admissions"
+              href="/inquire"
               id="hero-enroll-btn"
               className="group flex items-center gap-3 rounded-[1rem] bg-gradient-to-r from-[#0033A0] to-[#0047df] px-8 py-4 text-[16px] font-extrabold text-white shadow-[0_12px_32px_rgba(0,51,160,0.3)] hover:shadow-[0_16px_40px_rgba(0,51,160,0.4)] transition-all hover:-translate-y-1"
             >

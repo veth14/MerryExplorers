@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { requireInternalAuth } from "@/lib/auth-guard";
 
 // GET /api/attendance
 // Can pass ?date=YYYY-MM-DD or ?uid=teacher_firebase_uid
 export async function GET(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');
@@ -43,6 +46,8 @@ export async function GET(request: Request) {
 
 // POST /api/attendance (Clock in)
 export async function POST(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const data = await request.json();
     const { teacherUid, name, group, clockInPhotoUrl } = data;
@@ -89,6 +94,8 @@ export async function POST(request: Request) {
 
 // PUT /api/attendance (Clock out, start break, end break)
 export async function PUT(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const data = await request.json();
     const { id, action, photoUrl } = data; // action: 'clock-out', 'start-break', 'end-break'

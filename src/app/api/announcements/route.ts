@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireInternalAuth } from "@/lib/auth-guard";
 
 // GET /api/announcements
-export async function GET() {
+export async function GET(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
     // Sort by most recent first
@@ -43,6 +46,8 @@ export async function GET() {
 
 // POST /api/announcements (Admin only)
 export async function POST(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const data = await request.json();
     const { title, content, type } = data;

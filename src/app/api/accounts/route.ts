@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireInternalAuth } from "@/lib/auth-guard";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
     const accounts = await db.collection("accounts").find({}).toArray();
@@ -47,6 +50,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const data = await request.json();
     const { db } = await connectToDatabase();

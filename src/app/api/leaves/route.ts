@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireInternalAuth } from "@/lib/auth-guard";
 
 // GET /api/leaves - get all leave requests
-export async function GET() {
+export async function GET(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
     const leaves = await db
@@ -22,6 +25,8 @@ export async function GET() {
 
 // POST /api/leaves - submit a leave request (called from teacher-card)
 export async function POST(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const data = await request.json();
     const { teacherId, teacherName, type, startDate, endDate, reason } = data;

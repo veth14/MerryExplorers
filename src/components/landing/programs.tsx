@@ -344,7 +344,7 @@ export function ProgramsSection() {
             id="programs-inquire-btn"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#0033A0] to-[#0047df] px-8 py-3.5 text-[15px] font-extrabold text-white shadow-[0_10px_28px_rgba(0,51,160,0.25)] hover:shadow-[0_14px_36px_rgba(0,51,160,0.35)] transition-all hover:-translate-y-1"
           >
-            Register   Now →
+            Register Now →
           </Link>
         </motion.div>
 

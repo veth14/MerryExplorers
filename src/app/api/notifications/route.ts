@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireInternalAuth } from "@/lib/auth-guard";
 
 export async function GET(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");

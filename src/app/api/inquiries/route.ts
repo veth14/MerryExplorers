@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireInternalAuth } from "@/lib/auth-guard";
 import nodemailer from "nodemailer";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
     const inquiries = await db
@@ -111,8 +114,8 @@ export async function POST(request: Request) {
                 Merry Explorers Playgroup & Learning Center 🏫
               </p>
               <p style="color: #475569; font-size: 13px; line-height: 1.6; margin: 0;">
-                Unit C, 2nd Floor, B13 L33 Camarin Rd., North, Caloocan<br/>
-                <a href="mailto:info@merryexplorers.com" style="color: #0066CC; text-decoration: none; font-weight: 700;">info@merryexplorers.com</a> &nbsp;|&nbsp; <span style="color: #475569; font-weight: 700;">+63 912 345 6789</span>
+                Unit C, 2nd Floor, Starla 88 Bldg, Camarin Rd., Caloocan<br/>
+                <a href="mailto:Merryexplorerscenter@gmail.com" style="color: #0066CC; text-decoration: none; font-weight: 700;">Merryexplorerscenter@gmail.com</a> &nbsp;|&nbsp; <span style="color: #475569; font-weight: 700;">(0947) 782 0606</span>
               </p>
             </div>
           </div>
