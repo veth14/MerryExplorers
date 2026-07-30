@@ -287,7 +287,7 @@ export default function TeacherDashboardPage() {
             </div>
 
             {/* Info tiles */}
-            <div className="grid grid-cols-3 gap-3 mb-6 relative z-10">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 relative z-10">
               {/* Role */}
               <div className="rounded-2xl bg-brand-yellow/10 border border-brand-yellow/30 p-4">
                 <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-brand-yellow mb-2">
