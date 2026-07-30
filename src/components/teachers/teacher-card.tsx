@@ -16,24 +16,20 @@ function PhoneIcon() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>;
 }
 
-function DotsIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg>;
-}
-
 export function TeacherCard({ teacher }: TeacherCardProps) {
   const [loading, setLoading] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [shiftClass, setShiftClass] = useState(teacher.classAssigned || "");
-  
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+
   // Leave Form State
   const [leaveType, setLeaveType] = useState("Sick Leave");
   const [leaveStartDate, setLeaveStartDate] = useState("");
   const [leaveEndDate, setLeaveEndDate] = useState("");
   const [leaveReason, setLeaveReason] = useState("");
-  
+
   const isOnLeave = teacher.status === "on-leave";
 
   async function handleFileLeave() {
@@ -91,43 +87,10 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
     >
       {/* ON LEAVE badge */}
       {isOnLeave && (
-        <div className="absolute top-3 right-10 bg-[#f0f0f0] text-[#777] text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full">
+        <div className="absolute top-3 right-5 bg-[#f0f0f0] text-[#777] text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full">
           ON LEAVE
         </div>
       )}
-
-      {/* Three-dots menu */}
-      <div className="absolute top-3 right-3 z-10">
-        <button 
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="text-[#a0aec0] hover:text-[#002f76] transition-colors p-0.5 rounded-md hover:bg-[#f0f4f9]"
-        >
-          <DotsIcon />
-        </button>
-        
-        {isMenuOpen && (
-          <>
-            {/* Invisible backdrop to close menu when clicking outside */}
-            <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)} />
-            
-            {/* Dropdown Menu */}
-            <div className="absolute right-0 mt-1 w-36 bg-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,47,118,0.15)] border border-[#e8effe] z-20 py-1 overflow-hidden">
-              <button 
-                onClick={() => { setIsMenuOpen(false); setIsEditModalOpen(true); }}
-                className="w-full text-left px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-[#f0f5ff] transition-colors"
-              >
-                Edit Shifts
-              </button>
-              <button 
-                onClick={() => { setIsMenuOpen(false); setIsLeaveModalOpen(true); }}
-                className="w-full text-left px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-[#f0f5ff] transition-colors"
-              >
-                File Leave
-              </button>
-            </div>
-          </>
-        )}
-      </div>
 
       {/* Card body */}
       <div className="px-5 pt-5 pb-4 flex flex-col gap-3 flex-1">
@@ -170,8 +133,8 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
           {teacher.classAssigned ? (
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-bold border ${teacher.role === "Lead Teacher"
-                  ? "bg-[#fff8e1] text-[#a07000] border-[#ffd54f]"
-                  : "bg-[#e8effe] text-[#0050d5] border-[#c5d6ff]"
+                ? "bg-[#fff8e1] text-[#a07000] border-[#ffd54f]"
+                : "bg-[#e8effe] text-[#0050d5] border-[#c5d6ff]"
                 }`}
             >
               {teacher.classAssigned}
@@ -254,10 +217,10 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
           <div className="bg-[#fff0f0] border border-[#ffd5d5] rounded-xl p-3 text-[12.5px] font-bold text-[#ba1a1a]">
             This action will immediately update their status on the dashboard and remove them from active shifts.
           </div>
-          
+
           <div>
             <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Leave Type</label>
-            <select 
+            <select
               value={leaveType}
               onChange={e => setLeaveType(e.target.value)}
               className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
@@ -272,8 +235,8 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Start Date</label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={leaveStartDate}
                 onChange={e => setLeaveStartDate(e.target.value)}
                 className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
@@ -281,8 +244,8 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
             </div>
             <div>
               <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">End Date</label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={leaveEndDate}
                 onChange={e => setLeaveEndDate(e.target.value)}
                 className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
@@ -292,7 +255,7 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
 
           <div>
             <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Reason (Optional)</label>
-            <textarea 
+            <textarea
               value={leaveReason}
               onChange={e => setLeaveReason(e.target.value)}
               rows={2}
@@ -327,19 +290,41 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
         }
       >
         <div className="space-y-4">
-          <div>
+          <div className="relative z-20">
             <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Assigned Class</label>
-            <select
-              value={shiftClass}
-              onChange={(e) => setShiftClass(e.target.value)}
-              className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
+            <div 
+              onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
+              className={`w-full border ${isClassDropdownOpen ? "border-[#0050d5] ring-1 ring-[#0050d5]" : "border-[#e2e8f0] hover:border-[#0050d5]"} rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] bg-white shadow-sm cursor-pointer flex justify-between items-center transition-colors`}
             >
-              <option value="">Unassigned</option>
-              <option value="Little Explorers">Little Explorers</option>
-              <option value="Tiny Explorers">Tiny Explorers</option>
-              <option value="Pre-K">Pre-K</option>
-              <option value="Toddlers">Toddlers</option>
-            </select>
+              <span>{shiftClass || "Unassigned"}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`w-4 h-4 transition-transform ${isClassDropdownOpen ? "rotate-180" : ""}`}>
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </div>
+
+            {isClassDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsClassDropdownOpen(false)} />
+                <div className="absolute left-0 right-0 mt-2 bg-white border border-[#e2e8f0] shadow-lg rounded-xl z-20 py-1 overflow-hidden">
+                  {["Unassigned", "Little Explorers", "Tiny Explorers"].map((option) => (
+                    <div 
+                      key={option}
+                      onClick={() => {
+                        setShiftClass(option === "Unassigned" ? "" : option);
+                        setIsClassDropdownOpen(false);
+                      }}
+                      className={`px-4 py-2.5 text-[13px] font-bold cursor-pointer transition-colors ${
+                        (shiftClass === option || (shiftClass === "" && option === "Unassigned"))
+                          ? "bg-[#f0f5ff] text-[#0050d5]"
+                          : "text-[#002f76] hover:bg-[#f8fafc]"
+                      }`}
+                    >
+                      {option}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div>
             <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Shift Time</label>
