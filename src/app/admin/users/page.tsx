@@ -133,8 +133,6 @@ function draftFromUser(u: UserAccount): Draft {
   };
 }
 
-const STEPS = ["Avatar & Role", "Personal Info", "Work Details", "Emergency Contacts"];
-
 function UserModal({
   mode,
   initial,
@@ -152,6 +150,11 @@ function UserModal({
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const isTeacher = (draft.role || "").toLowerCase() !== "admin";
+  const STEPS = isTeacher 
+    ? ["Avatar & Role", "Personal Info", "Work Details", "Emergency Contacts"]
+    : ["Avatar & Role", "Personal Info"];
 
   function set<K extends keyof Draft>(key: K, val: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: val }));
@@ -389,7 +392,8 @@ function UserModal({
               </Field>
 
               {/* Tags */}
-              <Field label="Certifications & Specializations">
+              {isTeacher && (
+                <Field label="Certifications & Specializations">
                 <div className="flex flex-wrap gap-2">
                   {AVAILABLE_TAGS.map((tag) => {
                     const active = draft.tags.includes(tag);
@@ -411,6 +415,7 @@ function UserModal({
                   })}
                 </div>
               </Field>
+              )}
             </div>
           )}
 
