@@ -48,9 +48,17 @@ function formatDate(dateStr: string) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getWeekOfMonth(dateStr: string) {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return `W${Math.ceil(d / 7)}`;
+function calcBreakDuration(breaks: { start: string; end: string | null }[]) {
+  let ms = 0;
+  for (const b of breaks) {
+    if (b.start && b.end) ms += new Date(b.end).getTime() - new Date(b.start).getTime();
+  }
+  if (ms === 0) return "–";
+  const mins = Math.floor(ms / 60000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
 export default function ReportsPage() {
@@ -61,7 +69,8 @@ export default function ReportsPage() {
 
   // Filter Bar State
   const [selectedRole, setSelectedRole] = useState("All Staff");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -93,14 +102,50 @@ export default function ReportsPage() {
     let result = [...records];
     
     if (selectedRole !== "All Staff") {
-      result = result.filter(r => r.group === selectedRole);
+      result = result.filter(r => r.group === selectedRole || accounts[r.teacherId ?? ""]?.role === selectedRole);
     }
     
-    if (selectedDate) {
-      result = result.filter(r => r.dateStr === selectedDate);
+    if (startDate && endDate) {
+      result = result.filter(r => r.dateStr >= startDate && r.dateStr <= endDate);
+    } else if (startDate) {
+      result = result.filter(r => r.dateStr >= startDate);
+    } else if (endDate) {
+      result = result.filter(r => r.dateStr <= endDate);
     }
+    
+    // Sort descending by date
+    result.sort((a, b) => new Date(b.dateStr).getTime() - new Date(a.dateStr).getTime());
     
     setFilteredRecords(result);
+  }
+
+  function handleExportCSV() {
+    if (filteredRecords.length === 0) return alert("No records to export.");
+    
+    // Create CSV headers
+    const headers = ["Date", "Teacher Name", "Group/Room", "Scheduled In", "Actual In", "Clock Out", "Breaks Duration", "Status", "Total Hours"];
+    
+    // Create CSV rows
+    const rows = logs.map(l => [
+      l.date,
+      `"${l.teacherName}"`,
+      `"${l.group}"`,
+      l.scheduledIn,
+      l.actualIn,
+      l.clockOut,
+      l.breaksDuration,
+      l.status,
+      l.totalHours
+    ].join(","));
+    
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `attendance_report_${startDate || "all"}_to_${endDate || "all"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // Build detailed logs from attendance records
@@ -109,10 +154,15 @@ export default function ReportsPage() {
     date: formatDate(r.dateStr),
     teacherName: r.name,
     initials: r.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
-    scheduledIn: accounts[r.teacherId ?? ""]?.shiftTime?.split(" - ")[0] ?? "–",
+    group: r.group || "Unassigned",
+    scheduledIn: accounts[r.teacherId ?? ""]?.shiftTime?.split(" - ")[0] ?? "08:00 AM", // default schedule if missing
     actualIn: r.clockInTime
       ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
       : "–",
+    clockOut: r.clockOutTime
+      ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      : "Missing",
+    breaksDuration: r.breaks ? calcBreakDuration(r.breaks) : "–",
     status: (r.clockInTime && new Date(r.clockInTime).getHours() < 8 ? "ON TIME" : "LATE") as "ON TIME" | "LATE",
     totalHours: calcTotalHours(r),
     color: COLORS[i % COLORS.length],
@@ -141,16 +191,13 @@ export default function ReportsPage() {
   // Compute metric cards
   const totalClockIns = filteredRecords.length;
   const onTimeCount = logs.filter((l) => l.status === "ON TIME").length;
+  const lateCount = totalClockIns - onTimeCount;
   const avgPunctuality = totalClockIns > 0 ? Math.round((onTimeCount / totalClockIns) * 100) : 0;
-  const completedToday = filteredRecords.filter((r) => {
-    const today = new Date().toISOString().slice(0, 10);
-    return r.dateStr === today;
-  }).length;
 
   const reportMetrics = [
     { label: "AVG PUNCTUALITY", value: avgPunctuality.toString(), unit: "%", type: "punctuality" as const },
     { label: "TOTAL CLOCK-INS", value: totalClockIns.toString(), type: "clockins" as const },
-    { label: "DAILY ATTENDANCE", value: completedToday.toString(), unit: " today", type: "attendance" as const },
+    { label: "TOTAL LATES", value: lateCount.toString(), type: "attendance" as const },
   ];
 
   return (
@@ -159,9 +206,12 @@ export default function ReportsPage() {
       <ReportsFilterBar 
         selectedRole={selectedRole}
         setSelectedRole={setSelectedRole}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
         onGenerate={handleGenerate}
+        onExport={handleExportCSV}
       />
 
       {/* Metric Cards Row */}
@@ -192,7 +242,7 @@ export default function ReportsPage() {
           Loading logs…
         </div>
       ) : (
-        <ReportsTable logs={logs} />
+        <ReportsTable logs={logs as any} />
       )}
 
       {/* Footer Banner */}

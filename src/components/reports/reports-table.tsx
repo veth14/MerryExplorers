@@ -8,8 +8,11 @@ type LogEntry = {
   date: string;
   teacherName: string;
   initials: string;
+  group: string;
   scheduledIn: string;
   actualIn: string;
+  clockOut: string;
+  breaksDuration: string;
   status: LogStatus;
   totalHours: string;
   color: string;
@@ -89,37 +92,46 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
       <div className="w-full overflow-x-auto">
 
         {/* Column headers — always visible, never scrolls away */}
-        <table className="w-full min-w-[800px] text-left border-collapse table-fixed">
+        <table className="w-full min-w-[1100px] text-left border-collapse table-fixed">
           <colgroup>
-            <col className="w-[16%]" />
-            <col className="w-[22%]" />
-            <col className="w-[16%]" />
-            <col className="w-[16%]" />
-            <col className="w-[16%]" />
-            <col className="w-[14%]" />
+            <col className="w-[10%]" /> {/* Date */}
+            <col className="w-[18%]" /> {/* Teacher Name */}
+            <col className="w-[12%]" /> {/* Group */}
+            <col className="w-[10%]" /> {/* Scheduled In */}
+            <col className="w-[10%]" /> {/* Actual In */}
+            <col className="w-[10%]" /> {/* Clock Out */}
+            <col className="w-[10%]" /> {/* Breaks */}
+            <col className="w-[10%]" /> {/* Status */}
+            <col className="w-[10%]" /> {/* Total Hours */}
           </colgroup>
           <thead>
             <tr className="border-b border-brand-sky">
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Date</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Teacher Name</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Scheduled In</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Actual In</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Status</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Total Hours</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Date</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Teacher Name</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Group/Room</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Scheduled In</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Actual In</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Clock Out</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Breaks</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Status</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/50">Total Hours</th>
             </tr>
           </thead>
         </table>
 
         {/* Body rows in a fixed-height container */}
         <div style={{ height: `${ROW_HEIGHT * ROWS_PER_PAGE}px`, overflow: "hidden" }}>
-          <table className="w-full min-w-[800px] text-left border-collapse table-fixed">
+          <table className="w-full min-w-[1100px] text-left border-collapse table-fixed">
             <colgroup>
-              <col className="w-[16%]" />
-              <col className="w-[22%]" />
-              <col className="w-[16%]" />
-              <col className="w-[16%]" />
-              <col className="w-[16%]" />
-              <col className="w-[14%]" />
+              <col className="w-[10%]" />
+              <col className="w-[18%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
             </colgroup>
             <tbody>
               {paddedLogs.map((log, idx) =>
@@ -129,10 +141,10 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
                     className="border-b border-brand-sky/40 hover:bg-brand-sky/20 transition-colors group"
                     style={{ height: `${ROW_HEIGHT}px` }}
                   >
-                    <td className="px-8 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
                       <span className="text-[13px] font-bold text-brand-blue">{log.date}</span>
                     </td>
-                    <td className="px-8 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white shadow-sm group-hover:scale-110 transition-transform"
@@ -143,15 +155,24 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
                         <span className="text-[13px] font-black text-brand-navy truncate">{log.teacherName}</span>
                       </div>
                     </td>
-                    <td className="px-8 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
+                      <span className="text-[13px] font-bold text-brand-navy/80">{log.group}</span>
+                    </td>
+                    <td className="px-6 whitespace-nowrap">
                       <span className="text-[13px] font-bold text-brand-navy/60">{log.scheduledIn}</span>
                     </td>
-                    <td className="px-8 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
                       <span className={`text-[13px] font-black ${log.status === "LATE" ? "text-brand-red" : "text-brand-blue"}`}>
                         {log.actualIn}
                       </span>
                     </td>
-                    <td className="px-8 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
+                      <span className="text-[13px] font-bold text-brand-navy/60">{log.clockOut}</span>
+                    </td>
+                    <td className="px-6 whitespace-nowrap">
+                      <span className="text-[13px] font-bold text-[#f59e0b]">{log.breaksDuration}</span>
+                    </td>
+                    <td className="px-6 whitespace-nowrap">
                       <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black tracking-[0.1em] uppercase ${
                         log.status === "ON TIME" ? "bg-brand-green/15 text-brand-green" : "bg-brand-red/10 text-brand-red"
                       }`}>
@@ -159,7 +180,7 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
                         {log.status}
                       </div>
                     </td>
-                    <td className="px-8 whitespace-nowrap">
+                    <td className="px-6 whitespace-nowrap">
                       <span className="text-[13px] font-bold text-brand-blue">{log.totalHours}</span>
                     </td>
                   </tr>
@@ -169,7 +190,7 @@ export function ReportsTable({ logs = [] }: { logs?: LogEntry[] }) {
                     className="border-b border-brand-sky/10"
                     style={{ height: `${ROW_HEIGHT}px` }}
                   >
-                    <td colSpan={6} />
+                    <td colSpan={9} />
                   </tr>
                 )
               )}
