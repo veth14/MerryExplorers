@@ -49,6 +49,7 @@ function totalBreakMs(breaks: BreakEntry[]): number {
 
 export default function ClockPage() {
   const [now, setNow] = useState<Date>(() => new Date());
+  const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<ClockState>("ready");
 
   // Session tracking
@@ -220,8 +221,10 @@ export default function ClockPage() {
 
     let stream: MediaStream;
     try {
+      // Use broad constraints. Some desktop webcams reject strict constraints
+      // (like facingMode: "user") with a NotAllowedError instead of OverconstrainedError.
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
+        video: true,
         audio: false,
       });
     } catch (err) {
@@ -449,6 +452,7 @@ export default function ClockPage() {
   // ── Live clock ───────────────────────────────────────────────────────────
 
   useEffect(() => {
+    setMounted(true);
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
@@ -820,16 +824,16 @@ export default function ClockPage() {
             {/* Live time */}
             <div className="flex items-end justify-center gap-2">
               <span className="font-headline text-[64px] font-extrabold leading-none tracking-tight text-[#002f76]">
-                {timeData.time}
+                {mounted ? timeData.time : "--:--"}
               </span>
               <span className="mb-2 font-headline text-[22px] font-extrabold text-[#0050d5]">
-                {timeData.ampm}
+                {mounted ? timeData.ampm : "--"}
               </span>
             </div>
 
             {/* Date */}
             <p className="mt-2 text-[15px] font-bold text-[#5a6e8c]">
-              {formatLongDate(now)}
+              {mounted ? formatLongDate(now) : "Loading date..."}
             </p>
 
             {/* Elapsed / Break timer */}
@@ -1336,7 +1340,7 @@ export default function ClockPage() {
       )}
 
       {/* Inline keyframe for the slide-up toast animation */}
-      <style jsx global>{`
+      <style>{`
         @keyframes slideUp {
           from {
             opacity: 0;
