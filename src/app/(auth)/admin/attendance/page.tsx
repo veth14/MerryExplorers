@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AttendanceMetricCard } from "@/components/attendance/attendance-metric-card";
 import { AttendanceRoster } from "@/components/attendance/attendance-roster";
 import type { StaffAttendance } from "@/data/attendance";
-import { cachedFetch } from "@/lib/cache";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
 import { computeDailyStatus } from "@/lib/attendance-rules";
 
@@ -43,29 +43,82 @@ export default function AttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [accounts, setAccounts] = useState<AccountDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSuspended, setIsSuspended] = useState(false);
+  const [suspendReason, setSuspendReason] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [attendanceJson, accountsJson] = await Promise.all([
-          cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 20_000),
-          cachedFetch<any[]>("accounts:all", "/api/accounts", 60_000),
-        ]);
-        if (attendanceJson?.success) setRecords(attendanceJson.data);
-        if (Array.isArray(accountsJson)) {
-          // Only non-admin accounts
-          setAccounts(accountsJson.filter((a) => (a.role || "").toLowerCase() !== "admin"));
-        }
-      } catch (err) {
-        console.error("Failed to fetch attendance:", err);
-      } finally {
-        setLoading(false);
+  // Suspend modal state
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [suspendInput, setSuspendInput] = useState("");
+  const [suspendLoading, setSuspendLoading] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [attendanceJson, accountsJson] = await Promise.all([
+        cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 20_000),
+        cachedFetch<any[]>("accounts:all", "/api/accounts", 60_000),
+      ]);
+      if (attendanceJson?.success) {
+        setRecords(attendanceJson.data);
+        setIsSuspended(attendanceJson.isSuspended ?? false);
+        setSuspendReason(attendanceJson.suspendReason ?? null);
       }
+      if (Array.isArray(accountsJson)) {
+        setAccounts(accountsJson.filter((a) => (a.role || "").toLowerCase() !== "admin"));
+      }
+    } catch (err) {
+      console.error("Failed to fetch attendance:", err);
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, []);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const today = new Date();
+
+  // Today's dateStr (Manila time)
+  const todayStr = (() => {
+    const manilaStr = today.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    const d = new Date(manilaStr);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  })();
+
+  const handleSuspend = async () => {
+    setSuspendLoading(true);
+    try {
+      await fetch("/api/attendance/suspend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateStr: todayStr, reason: suspendInput.trim() || "Suspension announced" }),
+      });
+      invalidateCache("dashboard:attendance");
+      setShowSuspendModal(false);
+      setSuspendInput("");
+      setLoading(true);
+      await fetchData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSuspendLoading(false);
+    }
+  };
+
+  const handleUndoSuspend = async () => {
+    setSuspendLoading(true);
+    try {
+      await fetch(`/api/attendance/suspend?dateStr=${todayStr}`, { method: "DELETE" });
+      invalidateCache("dashboard:attendance");
+      setLoading(true);
+      await fetchData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSuspendLoading(false);
+    }
+  };
 
   // Build a map of teacherUid → record for today
   const recordByUid = new Map<string, AttendanceRecord>();
@@ -74,7 +127,7 @@ export default function AttendancePage() {
   }
 
   // Compute per-account daily statuses
-  type AccountStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day";
+  type AccountStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended";
   const accountStatuses: { account: AccountDoc; dailyStatus: AccountStatus }[] = accounts.map((acc) => {
     const uid = acc.id || acc._id || "";
     const record = recordByUid.get(uid) ?? null;
@@ -85,24 +138,32 @@ export default function AttendancePage() {
         noTimeLog: acc.noTimeLog ?? false,
         weeklyHoursTarget: acc.weeklyHoursTarget ?? null,
       },
-      today
+      today,
+      isSuspended
     ) as AccountStatus;
     return { account: acc, dailyStatus };
   });
 
-  // Metrics — only count teachers who are expected today
+  // Metrics
   const workingToday = accountStatuses.filter((a) => a.dailyStatus !== "No Work Day");
   const present = workingToday.filter((a) => a.dailyStatus === "On Time" || a.dailyStatus === "Late" || a.dailyStatus === "Exempt").length;
-  const late = workingToday.filter((a) => a.dailyStatus === "Late").length;
-  const absent = workingToday.filter((a) => a.dailyStatus === "Absent").length;
+  const late = isSuspended ? 0 : workingToday.filter((a) => a.dailyStatus === "Late").length;
+  const absent = isSuspended ? 0 : workingToday.filter((a) => a.dailyStatus === "Absent").length;
   const onLeave = accounts.filter((a) => a.status === "on-leave").length;
+  const suspendedCount = isSuspended ? workingToday.filter((a) => a.dailyStatus === "Suspended").length : 0;
 
-  const attendanceMetrics = [
-    { label: "TOTAL PRESENT", value: present.toString(), type: "present" as const },
-    { label: "LATE ARRIVALS", value: late.toString(), type: "late" as const },
-    { label: "ABSENT", value: absent.toString(), type: "absent" as const },
-    { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
-  ];
+  const attendanceMetrics = isSuspended
+    ? [
+        { label: "CAME IN", value: present.toString(), type: "present" as const },
+        { label: "SUSPENDED", value: suspendedCount.toString(), type: "absent" as const },
+        { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
+      ]
+    : [
+        { label: "TOTAL PRESENT", value: present.toString(), type: "present" as const },
+        { label: "LATE ARRIVALS", value: late.toString(), type: "late" as const },
+        { label: "ABSENT", value: absent.toString(), type: "absent" as const },
+        { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
+      ];
 
   // Build roster from accounts who are supposed to work today (or have a record)
   const rosterAccounts = accountStatuses.filter(
@@ -117,11 +178,11 @@ export default function AttendancePage() {
     const name = account.fullName || `${(account as any).firstName ?? ""} ${(account as any).lastName ?? ""}`.trim() || "Unknown";
     const colorIndex = name.charCodeAt(0) % COLORS.length;
 
-    // Map internal status to display status
     let displayStatus: StaffAttendance["status"] = "Absent";
-    if (dailyStatus === "On Time") displayStatus = "On Time";
+    if (dailyStatus === "Suspended") displayStatus = "Suspended";
+    else if (dailyStatus === "On Time") displayStatus = "On Time";
     else if (dailyStatus === "Late") displayStatus = "Late";
-    else if (dailyStatus === "Exempt") displayStatus = "On Time"; // exempt shows as on-time visually
+    else if (dailyStatus === "Exempt") displayStatus = "On Time";
     else if (dailyStatus === "Absent") displayStatus = "Absent";
 
     return {
@@ -144,16 +205,58 @@ export default function AttendancePage() {
 
   return (
     <AppShell title="Attendance" description="Track daily check-ins and monitor staff availability.">
-      {/* Header Title with yellow line */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-[3px] bg-[#ffb800]" />
-        <h1 className="text-[14px] font-black uppercase tracking-[0.1em] text-[#002f76]">
-          Daily Attendance Overview
-        </h1>
+      {/* Header Row */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-[3px] bg-[#ffb800]" />
+          <h1 className="text-[14px] font-black uppercase tracking-[0.1em] text-[#002f76]">
+            Daily Attendance Overview
+          </h1>
+        </div>
+
+        {/* Suspend / Undo Button */}
+        {isSuspended ? (
+          <button
+            onClick={handleUndoSuspend}
+            disabled={suspendLoading}
+            className="flex items-center gap-2 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 py-2 text-[12px] font-bold text-orange-700 hover:bg-orange-100 transition-all disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>undo</span>
+            Undo Suspension
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowSuspendModal(true)}
+            className="flex items-center gap-2 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2 text-[12px] font-bold text-red-700 hover:bg-red-100 transition-all"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>block</span>
+            Suspend Classes
+          </button>
+        )}
       </div>
 
+      {/* Suspension Banner */}
+      {isSuspended && (
+        <div className="flex items-start gap-3 rounded-2xl border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm">
+          <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-orange-600" style={{ fontSize: "20px" }}>warning</span>
+          </div>
+          <div>
+            <p className="font-black text-[13px] text-orange-800 uppercase tracking-wide">Classes Suspended Today</p>
+            {suspendReason && (
+              <p className="text-[12px] font-semibold text-orange-700 mt-0.5">
+                Reason: <span className="font-bold">{suspendReason}</span>
+              </p>
+            )}
+            <p className="text-[11px] text-orange-600 mt-1">
+              No staff will be marked Late or Absent for today. Teachers who came in can still clock out normally.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Metric cards */}
-      <section className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 shrink-0">
+      <section className={`grid gap-5 shrink-0 ${isSuspended ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
         {attendanceMetrics.map((metric) => (
           <AttendanceMetricCard
             key={metric.label}
@@ -166,7 +269,7 @@ export default function AttendancePage() {
 
       {/* Staff Roster Table */}
       <section className="mt-2">
-      {loading ? (
+        {loading ? (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4">
@@ -184,7 +287,69 @@ export default function AttendancePage() {
           <AttendanceRoster data={roster} />
         )}
       </section>
-    </AppShell>
 
+      {/* Suspend Classes Modal */}
+      {showSuspendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !suspendLoading && setShowSuspendModal(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4 z-10">
+            {/* Icon */}
+            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4 mx-auto">
+              <span className="material-symbols-outlined text-red-600" style={{ fontSize: "30px" }}>block</span>
+            </div>
+
+            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Suspend Classes Today</h2>
+            <p className="text-[12px] font-medium text-[#5a6e8c] text-center mb-5">
+              All staff will be marked <span className="font-bold text-orange-600">"Suspended"</span> for today. No one will be penalized as Late or Absent. This can be reversed.
+            </p>
+
+            {/* Reason Input */}
+            <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">
+              Reason <span className="text-[#9aa3b2] font-normal normal-case tracking-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              autoFocus
+              placeholder="e.g. Typhoon, Public Holiday, Emergency..."
+              value={suspendInput}
+              onChange={(e) => setSuspendInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !suspendLoading && handleSuspend()}
+              className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all mb-5"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowSuspendModal(false); setSuspendInput(""); }}
+                disabled={suspendLoading}
+                className="flex-1 rounded-xl border-2 border-[#e2e8f0] py-2.5 text-[13px] font-bold text-[#5a6e8c] hover:bg-[#f0f4f9] transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSuspend}
+                disabled={suspendLoading}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-[13px] font-bold text-white hover:bg-red-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {suspendLoading ? (
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                    <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>block</span>
+                )}
+                {suspendLoading ? "Suspending..." : "Suspend Classes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AppShell>
   );
 }

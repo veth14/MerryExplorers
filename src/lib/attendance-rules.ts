@@ -41,7 +41,7 @@ export const BASE_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, DaySchedule> = {
 
 // ── Status types ─────────────────────────────────────────────────────────────────
 export type TimeInStatus = "On Time" | "Late" | "Exempt";
-export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day";
+export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -127,6 +127,7 @@ export function computeTimeInStatus(
  * @param record         The MongoDB attendance record for today, or null if absent
  * @param account        The employee account doc
  * @param date           The date being evaluated (defaults to now)
+ * @param isSuspended    Whether the school declared this date suspended/no-class
  */
 export function computeDailyStatus(
   record: { timeInStatus?: string; clockInTime?: string } | null,
@@ -135,10 +136,17 @@ export function computeDailyStatus(
     noTimeLog: boolean;
     weeklyHoursTarget?: number | null;
   },
-  date: Date = new Date()
+  date: Date = new Date(),
+  isSuspended: boolean = false
 ): DailyAttendanceStatus {
   // Not scheduled today
   if (!isWorkDay(account.workDays, date)) return "No Work Day";
+
+  // If the school declared this a suspended/no-class day:
+  // — Teachers who came in still get "Suspended" (no penalty, but record is kept)
+  // — Teachers who didn't come in also get "Suspended" (not "Absent" — it's a school closure,
+  //   no work no pay but not a disciplinary absence)
+  if (isSuspended) return "Suspended";
 
   // OJT/intern tracked by weekly hours — exempt from daily absent check
   if (account.weeklyHoursTarget != null) return "Exempt";

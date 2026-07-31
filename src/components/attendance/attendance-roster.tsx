@@ -49,6 +49,13 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
             Completed
           </span>
         );
+      case "Suspended":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>block</span>
+            Suspended
+          </span>
+        );
     }
   };
 
@@ -69,7 +76,7 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
             </button>
             {filterOpen && (
               <div className="absolute right-0 mt-2 w-40 rounded-xl bg-white shadow-lg border border-[#e2e8f0] py-1 z-20">
-                {(["All", "On Time", "Late", "Absent", "Completed"] as const).map((status) => (
+                {(["All", "On Time", "Late", "Absent", "Completed", "Suspended"] as const).map((status) => (
                   <button
                     key={status}
                     onClick={() => {

@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     const uid = searchParams.get('uid');
 
     const { db } = await connectToDatabase();
-    
+
+    let resolvedDateStr: string | null = null;
     let query: any = {};
     if (dateStr) {
       if (dateStr === "today") {
@@ -24,8 +25,10 @@ export async function GET(request: Request) {
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
-        query.dateStr = `${yyyy}-${mm}-${dd}`;
+        resolvedDateStr = `${yyyy}-${mm}-${dd}`;
+        query.dateStr = resolvedDateStr;
       } else {
+        resolvedDateStr = dateStr;
         query.dateStr = dateStr;
       }
     }
@@ -33,8 +36,19 @@ export async function GET(request: Request) {
       query.teacherUid = uid;
     }
 
+    // Check if this date is marked as suspended
+    let isSuspended = false;
+    let suspendReason: string | null = null;
+    if (resolvedDateStr) {
+      const suspendDoc = await db.collection("suspended_days").findOne({ dateStr: resolvedDateStr });
+      if (suspendDoc) {
+        isSuspended = true;
+        suspendReason = suspendDoc.reason || null;
+      }
+    }
+
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
-    return NextResponse.json({ success: true, data: attendanceRecords }, {
+    return NextResponse.json({ success: true, data: attendanceRecords, isSuspended, suspendReason }, {
       headers: {
         "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30"
       }
