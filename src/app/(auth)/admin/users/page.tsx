@@ -10,6 +10,7 @@ import { firebaseConfig } from "@/lib/firebase";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
@@ -31,10 +32,8 @@ const AVAILABLE_TAGS = [
   "Music Specialist", "Bilingual",
 ];
 
-const SCHEDULE_OPTIONS = [
-  "Full-Time (M–F)", "Part-Time (M/W/F)", "Part-Time (T/Th)",
-  "Morning Only", "Afternoon Only", "Flexible",
-];
+const ALL_WORK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DEFAULT_FULL_TIME_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const ASSIGNED_ROOMS = [
   "Little Explorers", "Tiny Explorers", "Unassigned"
@@ -103,8 +102,11 @@ function emptyDraft(): Draft {
     role: "Assistant Teacher",
     assignedRoom: "",
     employeeId: "",
-    scheduleType: "Full-Time (M–F)",
-    shiftTime: "08:00 AM - 05:00 PM",
+    workDays: [...DEFAULT_FULL_TIME_DAYS],
+    employmentType: "full-time",
+    shiftTime: "08:30 AM - 03:00 PM",
+    noTimeLog: false,
+    weeklyHoursTarget: null,
     status: "active",
     tags: [],
     joinDate: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
@@ -124,8 +126,11 @@ function draftFromUser(u: UserAccount): Draft {
     role: u.role || "",
     assignedRoom: u.assignedRoom || "",
     employeeId: u.employeeId || "",
-    scheduleType: u.scheduleType || "",
-    shiftTime: u.shiftTime || "08:00 AM - 05:00 PM",
+    workDays: u.workDays?.length ? [...u.workDays] : [...DEFAULT_FULL_TIME_DAYS],
+    employmentType: u.employmentType || "full-time",
+    shiftTime: u.shiftTime || "08:30 AM - 03:00 PM",
+    noTimeLog: u.noTimeLog ?? false,
+    weeklyHoursTarget: u.weeklyHoursTarget ?? null,
     status: u.status || "Active",
     tags: [...(u.tags || [])],
     joinDate: u.joinDate || "",
@@ -220,8 +225,11 @@ function UserModal({
         role: draft.role,
         assignedRoom: draft.assignedRoom || "Unassigned",
         employeeId: draft.employeeId,
-        scheduleType: draft.scheduleType,
+        workDays: draft.workDays,
+        employmentType: draft.employmentType,
         shiftTime: draft.shiftTime,
+        noTimeLog: draft.noTimeLog,
+        weeklyHoursTarget: draft.weeklyHoursTarget,
         emergencyContacts: draft.emergencyContacts.filter((c) => c.name.trim()),
       };
 
@@ -445,11 +453,10 @@ function UserModal({
                   />
                 </Field>
                 <Field label="Date of Birth">
-                  <input
-                    value={draft.dateOfBirth}
-                    onChange={(e) => set("dateOfBirth", e.target.value)}
-                    placeholder="e.g. May 1, 2002"
-                    className={INPUT_CLS}
+                  <CustomDatePicker
+                    selectedDate={draft.dateOfBirth}
+                    onChange={(date) => set("dateOfBirth", date)}
+                    triggerClassName={`${INPUT_CLS} flex justify-between items-center`}
                   />
                 </Field>
               </div>
@@ -495,6 +502,7 @@ function UserModal({
           {/* ── STEP 2: Work Details ── */}
           {step === 2 && (
             <div className="space-y-4">
+              {/* Employee ID + Assigned Room */}
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Employee ID" required>
                   <input
@@ -512,23 +520,153 @@ function UserModal({
                   </select>
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Schedule Type">
-                  <select value={draft.scheduleType} onChange={(e) => set("scheduleType", e.target.value)} className={SELECT_CLS}>
-                    {SCHEDULE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </Field>
-                <Field label="Shift Time">
-                  <input
-                    type="text"
-                    placeholder="e.g. 08:00 AM - 01:00 PM"
-                    value={draft.shiftTime}
-                    onChange={(e) => set("shiftTime", e.target.value)}
-                    className={INPUT_CLS}
-                  />
-                </Field>
+
+              {/* Employment Type */}
+              <Field label="Employment Type">
+                <div className="grid grid-cols-2 gap-3">
+                  {(["full-time", "part-time"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => {
+                        set("employmentType", t);
+                        // Reset weekly hours target when switching to full-time
+                        if (t === "full-time") set("weeklyHoursTarget", null);
+                      }}
+                      className={`rounded-xl border-2 py-2.5 text-[13px] font-bold capitalize transition-all ${
+                        draft.employmentType === t
+                          ? t === "full-time"
+                            ? "border-[#0050d5] bg-[#f0f5ff] text-[#0050d5]"
+                            : "border-[#ffb800] bg-[#fff8e1] text-[#a07000]"
+                          : "border-[#e2e8f0] bg-white text-[#8898aa] hover:border-[#c5d6ff]"
+                      }`}
+                    >
+                      {t === "full-time" ? "Full-Time" : "Part-Time"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              {/* Work Days */}
+              <Field label="Work Days">
+                <div className="flex flex-wrap gap-2">
+                  {ALL_WORK_DAYS.map((day) => {
+                    const active = draft.workDays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() =>
+                          set(
+                            "workDays",
+                            active
+                              ? draft.workDays.filter((d) => d !== day)
+                              : [...draft.workDays, day]
+                          )
+                        }
+                        className={`rounded-full px-3.5 py-1.5 text-[12px] font-extrabold uppercase tracking-wide transition-all border-2 ${
+                          active
+                            ? day === "Sat" || day === "Sun"
+                              ? "border-[#6c5ce7] bg-[#ede9ff] text-[#6c5ce7]"
+                              : "border-[#0050d5] bg-[#e8f0ff] text-[#0050d5]"
+                            : "border-[#e2e8f0] bg-white text-[#b0bec5] hover:border-[#c5d6ff] hover:text-[#5a6e8c]"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+                {draft.workDays.length === 0 && (
+                  <p className="text-[11px] font-bold text-[#e53935] mt-1">Please select at least one work day.</p>
+                )}
+              </Field>
+
+              {/* Shift Information */}
+              <div className="flex items-start gap-3 rounded-xl bg-blue-50/50 p-4 border border-blue-100">
+                <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: '20px' }}>schedule</span>
+                <div>
+                  <p className="text-[13px] font-bold text-brand-navy">Standard Schedule Applies</p>
+                  <p className="text-[11.5px] font-medium text-[#5a6e8c] mt-0.5 leading-relaxed">
+                    Start time is <strong>8:30 AM</strong> (Grace period until 8:45 AM). End times automatically adjust based on the day (3:00 PM for Mon/Wed/Fri, 5:00 PM for Tue/Thu).
+                  </p>
+                </div>
               </div>
-              
+
+              {/* Special options */}
+              <div className="space-y-3 rounded-xl border border-[#e2e8f0] bg-[#f8faff] px-4 py-3.5">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#5a6e8c] mb-2">Special Arrangements</p>
+
+                {/* No Time Log toggle */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="relative mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={draft.noTimeLog}
+                      onChange={(e) => set("noTimeLog", e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-[38px] h-[22px] rounded-full transition-colors ${
+                      draft.noTimeLog ? "bg-[#0050d5]" : "bg-[#d0d8e8]"
+                    }`}>
+                      <div className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                        draft.noTimeLog ? "translate-x-[18px]" : "translate-x-[3px]"
+                      }`} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#002f76] group-hover:text-[#0050d5] transition-colors">
+                      No Time Log Required
+                    </p>
+                    <p className="text-[11px] font-semibold text-[#8898aa] leading-snug mt-0.5">
+                      Employee is exempt from late/absent tracking. No clock-in verification needed on their scheduled days.
+                    </p>
+                  </div>
+                </label>
+
+                {/* Weekly Hours Target (OJT/Intern) */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="relative mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={draft.weeklyHoursTarget !== null}
+                      onChange={(e) =>
+                        set("weeklyHoursTarget", e.target.checked ? 8 : null)
+                      }
+                      className="sr-only"
+                    />
+                    <div className={`w-[38px] h-[22px] rounded-full transition-colors ${
+                      draft.weeklyHoursTarget !== null ? "bg-[#6c5ce7]" : "bg-[#d0d8e8]"
+                    }`}>
+                      <div className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                        draft.weeklyHoursTarget !== null ? "translate-x-[18px]" : "translate-x-[3px]"
+                      }`} />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-bold text-[#002f76] group-hover:text-[#6c5ce7] transition-colors">
+                      OJT / Intern — Weekly Hours Target
+                    </p>
+                    <p className="text-[11px] font-semibold text-[#8898aa] leading-snug mt-0.5">
+                      Tracked by total hours per week, not daily presence.
+                    </p>
+                    {draft.weeklyHoursTarget !== null && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={40}
+                          value={draft.weeklyHoursTarget ?? 8}
+                          onChange={(e) => set("weeklyHoursTarget", Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-20 rounded-lg border border-[#c5d6ff] bg-white px-3 py-1.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#6c5ce7] focus:ring-2 focus:ring-[#6c5ce7]/15 transition-all"
+                        />
+                        <span className="text-[12px] font-bold text-[#5a6e8c]">hours / week</span>
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </div>
+
               {/* Role preview */}
               <div className="rounded-xl bg-[#f0f5ff] border border-[#c5d6ff] px-4 py-3 flex items-center gap-3">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[#0050d5] shrink-0">

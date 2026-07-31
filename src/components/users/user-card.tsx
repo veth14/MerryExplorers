@@ -145,7 +145,7 @@ export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
             {user.employeeId}
           </span>
           <span className="text-[11px] font-bold text-[#8898aa] bg-[#f0f4f9] px-2.5 py-1 rounded-lg truncate">
-            {user.scheduleType}
+            {user.employmentType === "part-time" ? (user.weeklyHoursTarget ? `OJT (${user.weeklyHoursTarget}h)` : "Part-Time") : "Full-Time"}
           </span>
         </div>
 

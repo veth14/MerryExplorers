@@ -1,4 +1,4 @@
-export type AttendanceStatus = "On Time" | "Late" | "Absent" | "Completed";
+export type AttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "Completed";
 
 export type StaffAttendance = {
   id: string;

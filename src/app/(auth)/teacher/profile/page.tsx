@@ -19,7 +19,8 @@ const initialTeacherData = {
     role: "Lead Teacher",
     assignedRoom: "Sunshine Room (Toddlers)",
     employeeId: "ME-2021-042",
-    scheduleType: "Full-Time (M-F)",
+    employmentType: "full-time",
+    weeklyHoursTarget: null as number | null,
   },
   profileCard: {
     firstName: "Iya",
@@ -74,7 +75,8 @@ export default function TeacherProfilePage() {
           role: userProfile.role || "",
           assignedRoom: userProfile.assignedRoom || "",
           employeeId: userProfile.employeeId || "",
-          scheduleType: userProfile.scheduleType || "",
+          employmentType: userProfile.employmentType || "full-time",
+          weeklyHoursTarget: userProfile.weeklyHoursTarget ?? null,
         },
         profileCard: {
           firstName: userProfile.fullName?.split(" ")[0] || "",
@@ -140,7 +142,8 @@ export default function TeacherProfilePage() {
           role: userProfile.role || "",
           assignedRoom: userProfile.assignedRoom || "",
           employeeId: userProfile.employeeId || "",
-          scheduleType: userProfile.scheduleType || "",
+          employmentType: userProfile.employmentType || "full-time",
+          weeklyHoursTarget: userProfile.weeklyHoursTarget ?? null,
         },
         profileCard: {
           firstName: userProfile.fullName?.split(" ")[0] || "",
@@ -518,10 +521,10 @@ export default function TeacherProfilePage() {
                 {/* Schedule Type */}
                 <div className="flex flex-col gap-1">
                   <label className="font-bold text-[10px] text-brand-blue uppercase tracking-wider ml-1">
-                    Schedule Type
+                    Employment Type
                   </label>
                   <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
-                    {formData.workDetails.scheduleType}
+                    {formData.workDetails.employmentType === "part-time" ? (formData.workDetails.weeklyHoursTarget ? `OJT (${formData.workDetails.weeklyHoursTarget}h)` : "Part-Time") : "Full-Time"}
                   </div>
                 </div>
               </div>

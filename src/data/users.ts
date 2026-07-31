@@ -1,5 +1,6 @@
 export type TeacherRole = "Lead Teacher" | "Assistant Teacher";
 export type UserStatus = "active" | "inactive" | "on-leave";
+export type EmploymentType = "full-time" | "part-time";
 
 export type EmergencyContact = {
   name: string;
@@ -28,11 +29,28 @@ export type UserAccount = {
   role: TeacherRole;
   assignedRoom: string;
   employeeId: string;
-  scheduleType: string;
-  shiftTime: string;
+
+  /** Structured work schedule — replaces the old free-text scheduleType */
+  workDays: string[];              // e.g. ["Mon","Tue","Wed","Thu","Fri"]
+  employmentType: EmploymentType;  // "full-time" | "part-time"
+  shiftTime: string;               // display string e.g. "08:30 AM - 03:00 PM"
+
+  /**
+   * When true, this employee is exempt from late/absent checks.
+   * Used for employees who do not log clock-in/out on their regular days.
+   */
+  noTimeLog: boolean;
+
+  /**
+   * For OJT / intern staff who track total weekly hours rather than daily
+   * presence. null means not applicable (standard daily tracking).
+   * e.g. 8 means they need 8 hours per week total.
+   */
+  weeklyHoursTarget: number | null;
 
   // Emergency contacts (optional)
   emergencyContacts: EmergencyContact[];
 };
+
 
 export const userAccounts: any[] = [];

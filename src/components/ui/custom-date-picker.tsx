@@ -1,32 +1,68 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export function CustomDatePicker({
   selectedDate,
   onChange,
+  triggerClassName,
 }: {
   selectedDate: string;
   onChange: (date: string) => void;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   // Default to today or selected date
   const [currentMonth, setCurrentMonth] = useState(() => {
-    if (selectedDate) return new Date(selectedDate);
+    if (selectedDate) {
+      const parsed = new Date(selectedDate);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
     return new Date();
   });
-  
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target) &&
+        (!portalRef.current || !portalRef.current.contains(target))
+      ) {
         setOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    function handleScroll(e: Event) {
+      // Don't close if scrolling inside the date picker itself
+      if (portalRef.current && portalRef.current.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    if (open) {
+      window.addEventListener("scroll", handleScroll, true);
+    }
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [open]);
+
+  const handleToggleOpen = () => {
+    if (!open && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+    }
+    setOpen(!open);
+  };
 
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
@@ -54,16 +90,32 @@ export function CustomDatePicker({
   // Display value
   let displayValue = "dd/mm/yyyy";
   if (selectedDate) {
-    const [y, m, d] = selectedDate.split("-");
-    displayValue = `${d}/${m}/${y}`;
+    if (selectedDate.includes("-")) {
+      const parts = selectedDate.split("-");
+      if (parts.length === 3) {
+        displayValue = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      } else {
+        displayValue = selectedDate;
+      }
+    } else {
+      const parsed = new Date(selectedDate);
+      if (!isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, "0");
+        const d = String(parsed.getDate()).padStart(2, "0");
+        displayValue = `${d}/${m}/${y}`;
+      } else {
+        displayValue = selectedDate;
+      }
+    }
   }
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-2.5 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap ${
+        onClick={handleToggleOpen}
+        className={triggerClassName || `flex items-center justify-between gap-2.5 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap ${
           open || selectedDate
             ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm"
             : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
@@ -75,8 +127,12 @@ export function CustomDatePicker({
         </span>
       </button>
 
-      {open && (
-        <div className="absolute top-[calc(100%+8px)] left-0 z-50 w-[280px] rounded-3xl bg-white border-2 border-brand-sky shadow-[0_20px_60px_-15px_rgba(0,51,160,0.15)] p-5 overflow-hidden origin-top animate-in fade-in zoom-in-95 duration-200">
+      {open && typeof document !== "undefined" && createPortal(
+        <div 
+          ref={portalRef}
+          style={{ position: 'fixed', top: coords.top, left: coords.left }}
+          className="z-[99999] w-[280px] rounded-3xl bg-white border-2 border-brand-sky shadow-[0_20px_60px_-15px_rgba(0,51,160,0.15)] p-5 origin-top animate-in fade-in zoom-in-95 duration-200"
+        >
           
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
@@ -138,28 +194,32 @@ export function CustomDatePicker({
           </div>
 
           {/* Footer Actions */}
-          <div className="mt-5 pt-3 border-t-2 border-brand-sky/40 flex justify-between">
-            <button 
-              onClick={() => { onChange(""); setOpen(false); }}
-              className="text-[12px] font-bold text-[#64748b] hover:text-[#0f172a] transition-colors"
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => {
+                setOpen(false);
+                onChange("");
+              }}
+              className="flex-1 py-1.5 rounded-xl border border-[#d0d8e8] text-[11px] font-bold text-[#5a6e8c] hover:bg-[#f0f4f9] transition-colors"
             >
               Clear
             </button>
-            <button 
+            <button
               onClick={() => {
                 const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, "0");
-                const dd = String(today.getDate()).padStart(2, "0");
-                onChange(`${yyyy}-${mm}-${dd}`);
+                const y = today.getFullYear();
+                const m = String(today.getMonth() + 1).padStart(2, "0");
+                const d = String(today.getDate()).padStart(2, "0");
+                onChange(`${y}-${m}-${d}`);
                 setOpen(false);
               }}
-              className="text-[12px] font-bold text-[#0033A0] hover:text-[#002080] transition-colors"
+              className="flex-1 py-1.5 rounded-xl bg-brand-sky/50 border border-brand-sky text-[11px] font-bold text-brand-navy hover:bg-brand-sky transition-colors"
             >
               Today
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

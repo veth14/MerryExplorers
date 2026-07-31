@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
+import { computeTimeInStatus } from "@/lib/attendance-rules";
 
 // GET /api/attendance
 // Can pass ?date=YYYY-MM-DD or ?uid=teacher_firebase_uid
@@ -70,6 +71,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Already clocked in today", data: existing }, { status: 400 });
     }
 
+    // Look up the account to get noTimeLog flag for status computation
+    const accountDoc = await db.collection("accounts").findOne({ _id: teacherUid as any });
+    const noTimeLog = accountDoc?.noTimeLog ?? false;
+
+    // Compute whether this clock-in is on time or late
+    const timeInStatus = computeTimeInStatus(now.toISOString(), noTimeLog);
+
     const newRecord = {
       teacherUid,
       name,
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
       clockInPhotoUrl: clockInPhotoUrl || null,
       clockOutTime: null,
       clockOutPhotoUrl: null,
+      timeInStatus,
       status: "In Progress",
       breaks: [],
       createdAt: now,

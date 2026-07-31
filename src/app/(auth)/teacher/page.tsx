@@ -312,7 +312,7 @@ export default function TeacherDashboardPage() {
                   <InfoIcon />
                   Schedule
                 </div>
-                <div className="text-[15px] font-black text-brand-navy">{(userProfile as any)?.scheduleType || "Full-Time"}</div>
+                <div className="text-[15px] font-black text-brand-navy">{(userProfile as any)?.employmentType === "part-time" ? ((userProfile as any)?.weeklyHoursTarget ? `OJT (${(userProfile as any).weeklyHoursTarget}h)` : "Part-Time") : "Full-Time"}</div>
               </div>
             </div>
 
