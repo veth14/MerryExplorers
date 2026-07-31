@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
 import { auth } from "@/lib/firebase";
 import { sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { Modal } from "@/components/ui/modal";
+import { uploadAvatar } from "@/lib/supabase";
 
 const initialTeacherData = {
   personalInfo: {
@@ -56,6 +57,9 @@ export default function TeacherProfilePage() {
   const [errorModal, setErrorModal] = useState<string | null>(null);
   const [successModal, setSuccessModal] = useState<string | null>(null);
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -98,13 +102,19 @@ export default function TeacherProfilePage() {
     if (!user) return;
     setSaving(true);
     try {
+      let finalAvatarUrl = formData.profileCard.avatarUrl;
+      if (selectedFile) {
+        finalAvatarUrl = await uploadAvatar(selectedFile, user.uid);
+      }
+
       const payload = {
         fullName: formData.personalInfo.fullName,
         dateOfBirth: formData.personalInfo.dateOfBirth,
         email: formData.personalInfo.email,
         phone: formData.personalInfo.phone,
         homeAddress: formData.personalInfo.homeAddress,
-        emergencyContacts: formData.emergencyContacts,
+        emergencyContacts: formData.emergencyContacts.filter((c) => c.name.trim() !== ""),
+        avatarUrl: finalAvatarUrl,
       };
 
       const res = await fetch(`/api/accounts/${user.uid}`, {
@@ -216,10 +226,17 @@ export default function TeacherProfilePage() {
 
                 {/* Avatar */}
                 <div
-                  className="w-32 h-32 rounded-full border-4 border-white bg-surface-container-low shadow-md overflow-hidden relative z-10 mb-6 flex items-center justify-center text-white text-5xl font-black"
+                  className={`w-32 h-32 rounded-full border-4 border-white bg-surface-container-low shadow-md overflow-hidden relative z-10 mb-6 flex items-center justify-center text-white text-5xl font-black ${isEditing ? 'cursor-pointer group' : ''}`}
                   style={{ backgroundColor: formData.profileCard.avatarColor }}
+                  onClick={() => isEditing && fileRef.current?.click()}
                 >
-                  {formData.profileCard.avatarUrl ? (
+                  {selectedFile ? (
+                    <img
+                      alt="New Profile Picture"
+                      className="w-full h-full object-cover"
+                      src={URL.createObjectURL(selectedFile)}
+                    />
+                  ) : formData.profileCard.avatarUrl ? (
                     <img
                       alt="Teacher Profile Picture"
                       className="w-full h-full object-cover"
@@ -228,7 +245,27 @@ export default function TeacherProfilePage() {
                   ) : (
                     formData.profileCard.initials
                   )}
+
+                  {/* Overlay for editing */}
+                  {isEditing && (
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="material-symbols-outlined text-white" style={{ fontSize: '28px' }}>photo_camera</span>
+                      <span className="text-[10px] font-bold text-white uppercase tracking-wider mt-1">Upload</span>
+                    </div>
+                  )}
                 </div>
+                {isEditing && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileRef}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setSelectedFile(file);
+                    }}
+                  />
+                )}
 
                 {/* Name & Title */}
                 <h2 className="text-2xl font-black text-brand-navy text-center mb-1">
@@ -630,6 +667,25 @@ export default function TeacherProfilePage() {
                     </div>
                   </div>
                 ))}
+
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        emergencyContacts: [
+                          ...formData.emergencyContacts,
+                          { name: "", relationship: "", phone: "" },
+                        ],
+                      });
+                    }}
+                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white border-2 border-dashed border-brand-red/30 hover:bg-red-50 hover:border-brand-red/50 transition-all text-brand-red min-h-[88px]"
+                  >
+                    <span className="material-symbols-outlined mb-1">add_circle</span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest">Add Contact</span>
+                  </button>
+                )}
               </div>
             </section>
           </div>
