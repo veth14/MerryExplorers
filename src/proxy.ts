@@ -12,10 +12,11 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Block teachers from accessing admin pages
+    // Only block regular teachers from admin pages
     if (role === 'teacher') {
       return NextResponse.redirect(new URL('/teacher', request.url));
     }
+    // executive partner and admin can both access /admin
   }
 
   // Protect /teacher routes
@@ -23,22 +24,23 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Block admins from accessing teacher pages, but allow executive partner
+    // Only block pure admins from teacher pages (executive partners are employees too)
     if (role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
+    // executive partner can access /teacher
   }
 
   // Redirect authenticated users away from the login page
   if (pathname.startsWith('/login')) {
     if (session) {
-      if (role === 'admin' || role === 'executive partner') {
+      if (role === 'admin') {
         return NextResponse.redirect(new URL('/admin', request.url));
-      } else if (role === 'teacher') {
+      } else if (role === 'executive partner' || role === 'teacher') {
         return NextResponse.redirect(new URL('/teacher', request.url));
       } else {
-        // Fallback
-        return NextResponse.redirect(new URL('/admin', request.url));
+        // Fallback for any unknown role cookie
+        return NextResponse.redirect(new URL('/teacher', request.url));
       }
     }
   }

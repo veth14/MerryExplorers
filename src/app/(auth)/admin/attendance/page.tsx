@@ -71,7 +71,7 @@ export default function AttendancePage() {
         setSuspendReason(attendanceJson.suspendReason ?? null);
       }
       if (Array.isArray(accountsJson)) {
-        setAccounts(accountsJson.filter((a) => !["admin", "executive partner"].includes((a.role || "").toLowerCase())));
+        setAccounts(accountsJson.filter((a) => (a.role || "").toLowerCase() !== "admin"));
       }
     } catch (err) {
       console.error("Failed to fetch attendance:", err);
