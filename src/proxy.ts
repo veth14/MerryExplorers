@@ -23,7 +23,7 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Block admins from accessing teacher pages
+    // Block admins from accessing teacher pages, but allow executive partner
     if (role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
@@ -32,7 +32,7 @@ export function proxy(request: NextRequest) {
   // Redirect authenticated users away from the login page
   if (pathname.startsWith('/login')) {
     if (session) {
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'executive partner') {
         return NextResponse.redirect(new URL('/admin', request.url));
       } else if (role === 'teacher') {
         return NextResponse.redirect(new URL('/teacher', request.url));

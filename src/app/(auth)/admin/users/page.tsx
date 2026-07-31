@@ -156,7 +156,7 @@ function UserModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const isTeacher = (draft.role || "").toLowerCase() !== "admin";
+  const isTeacher = !["admin", "executive partner"].includes((draft.role || "").toLowerCase());
   const STEPS = isTeacher 
     ? ["Avatar & Role", "Personal Info", "Work Details", "Emergency Contacts"]
     : ["Avatar & Role", "Personal Info"];
@@ -383,7 +383,7 @@ function UserModal({
                   </svg>
                   <div>
                     <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#0050d5]">Role</p>
-                    <p className="text-[14px] font-extrabold text-[#002f76]">Administrator</p>
+                    <p className="text-[14px] font-extrabold text-[#002f76] capitalize">{draft.role || "Administrator"}</p>
                   </div>
                 </div>
               )}
@@ -881,7 +881,7 @@ export default function UsersPage() {
 
   const filtered = accounts
     .filter((u) => {
-      if (activeTab === "Admins") return (u.role || "").toLowerCase() === "admin";
+      if (activeTab === "Admins") return ["admin", "executive partner"].includes((u.role || "").toLowerCase());
       if (activeTab === "Lead Teachers") return u.role === "Lead Teacher";
       if (activeTab === "Assistants") return u.role === "Assistant Teacher";
       if (activeTab === "On Leave") return u.status === "on-leave";
@@ -984,7 +984,7 @@ export default function UsersPage() {
   const total = accounts.length;
   const active = accounts.filter((u) => u.status === "active").length;
   const onLeave = accounts.filter((u) => u.status === "on-leave").length;
-  const admins = accounts.filter((u) => (u.role || "").toLowerCase() === "admin").length;
+  const admins = accounts.filter((u) => ["admin", "executive partner"].includes((u.role || "").toLowerCase())).length;
   const leads = accounts.filter((u) => u.role === "Lead Teacher").length;
   const assistants = accounts.filter((u) => u.role === "Assistant Teacher").length;
 

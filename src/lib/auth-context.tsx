@@ -72,8 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.role) role = data.role;
       }
       
-      if (role === "admin") {
-        document.cookie = `role=admin; path=/; max-age=86400`;
+      if (role === "admin" || role === "executive partner") {
+        document.cookie = `role=${role}; path=/; max-age=86400`;
         router.push("/admin");
       } else {
         document.cookie = `role=teacher; path=/; max-age=86400`;

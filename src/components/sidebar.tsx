@@ -246,6 +246,24 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                 : "opacity-0 scale-95 translate-y-1 pointer-events-none"
             }`}
           >
+            {/* Clock In / Out for Executive Partners */}
+            {(userProfile?.role || "").toLowerCase() === "executive partner" && (
+              <>
+                <Link
+                  href="/teacher/clock"
+                  onClick={() => { setUserMenuOpen(false); onClose?.(); }}
+                  className="flex items-center gap-3 px-4 py-3 text-[13px] font-bold text-[#2da05b] hover:bg-[#2da05b]/10 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span>Clock In / Out</span>
+                </Link>
+                <div className="h-[1px] w-full bg-[#e2e8f0]" />
+              </>
+            )}
+
             {/* Report a Bug */}
             <Link
               href="/admin/contact"
