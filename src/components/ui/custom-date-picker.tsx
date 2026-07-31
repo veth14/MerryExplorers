@@ -137,9 +137,26 @@ export function CustomDatePicker({
     <div className="p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <span className="text-[14px] font-extrabold text-brand-navy">
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-        </span>
+        <div className="flex gap-1">
+          <select
+            value={currentMonth.getMonth()}
+            onChange={(e) => setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value), 1))}
+            className="text-[14px] font-extrabold text-[#002f76] bg-transparent outline-none cursor-pointer hover:bg-[#f0f5ff] rounded px-1 -ml-1 appearance-none"
+          >
+            {monthNames.map((m, i) => (
+              <option key={m} value={i}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={currentMonth.getFullYear()}
+            onChange={(e) => setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth(), 1))}
+            className="text-[14px] font-extrabold text-[#002f76] bg-transparent outline-none cursor-pointer hover:bg-[#f0f5ff] rounded px-1 appearance-none"
+          >
+            {Array.from({ length: 130 }, (_, i) => 1920 + i).map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex gap-1">
           <button onClick={handlePrevMonth} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-sky/60 text-brand-blue transition-colors">
             <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>chevron_left</span>

@@ -1322,7 +1322,7 @@ export default function ClockPage() {
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-[slideUp_0.3s_ease-out]">
           <div className="flex items-center gap-4 rounded-full bg-[#002f76] px-5 py-3 shadow-lg">
             <p className="text-[13px] font-bold text-white">
-              You clocked out at {lastClockOutTime.split(", ").pop()}.{" "}
+              You clocked out {lastClockOutTime ? `at ${lastClockOutTime.split(", ").pop()}` : "just now"}.{" "}
               <span className="text-[#9aa3b2]">Auto-dismisses in 10s</span>
             </p>
             <button

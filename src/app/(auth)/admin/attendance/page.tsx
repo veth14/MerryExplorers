@@ -52,10 +52,17 @@ export default function AttendancePage() {
   const [suspendInput, setSuspendInput] = useState("");
   const [suspendLoading, setSuspendLoading] = useState(false);
 
+  const [viewDateStr, setViewDateStr] = useState(() => {
+    const manilaStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    const d = new Date(manilaStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const [attendanceJson, accountsJson] = await Promise.all([
-        cachedFetch<any>("dashboard:attendance", "/api/attendance?date=today", 20_000),
+        cachedFetch<any>(`dashboard:attendance:${viewDateStr}`, `/api/attendance?date=${viewDateStr}`, 20_000),
         cachedFetch<any[]>("accounts:all", "/api/accounts", 60_000),
       ]);
       if (attendanceJson?.success) {
@@ -71,13 +78,15 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewDateStr]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Safe parse for local day checking (e.g. "2026-08-01T00:00:00")
+  const viewDate = new Date(`${viewDateStr}T00:00:00`);
+  
+  // Keep todayStr for defaulting Suspend modal
   const today = new Date();
-
-  // Today's dateStr (Manila time)
   const todayStr = (() => {
     const manilaStr = today.toLocaleString("en-US", { timeZone: "Asia/Manila" });
     const d = new Date(manilaStr);
@@ -97,7 +106,7 @@ export default function AttendancePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dateStr: suspendDateInput, reason: suspendInput.trim() || "Suspension announced" }),
       });
-      invalidateCache("dashboard:attendance");
+      invalidateCache(`dashboard:attendance:${viewDateStr}`);
       setShowSuspendModal(false);
       setSuspendInput("");
       setSuspendDateInput(todayStr);
@@ -113,8 +122,8 @@ export default function AttendancePage() {
   const handleUndoSuspend = async () => {
     setSuspendLoading(true);
     try {
-      await fetch(`/api/attendance/suspend?dateStr=${todayStr}`, { method: "DELETE" });
-      invalidateCache("dashboard:attendance");
+      await fetch(`/api/attendance/suspend?dateStr=${viewDateStr}`, { method: "DELETE" });
+      invalidateCache(`dashboard:attendance:${viewDateStr}`);
       setLoading(true);
       await fetchData();
     } catch (e) {
@@ -142,7 +151,7 @@ export default function AttendancePage() {
         noTimeLog: acc.noTimeLog ?? false,
         weeklyHoursTarget: acc.weeklyHoursTarget ?? null,
       },
-      today,
+      viewDate,
       isSuspended
     ) as AccountStatus;
     return { account: acc, dailyStatus };
@@ -210,7 +219,7 @@ export default function AttendancePage() {
   return (
     <AppShell title="Attendance" description="Track daily check-ins and monitor staff availability.">
       {/* Header Row */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-[3px] bg-[#ffb800]" />
           <h1 className="text-[14px] font-black uppercase tracking-[0.1em] text-[#002f76]">
@@ -218,25 +227,35 @@ export default function AttendancePage() {
           </h1>
         </div>
 
-        {/* Suspend / Undo Button */}
-        {isSuspended ? (
-          <button
-            onClick={handleUndoSuspend}
-            disabled={suspendLoading}
-            className="flex items-center gap-2 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 py-2 text-[12px] font-bold text-orange-700 hover:bg-orange-100 transition-all disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>undo</span>
-            Undo Suspension
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowSuspendModal(true)}
-            className="flex items-center gap-2 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2 text-[12px] font-bold text-red-700 hover:bg-red-100 transition-all"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>block</span>
-            Suspend Classes
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-[180px]">
+            <CustomDatePicker
+              selectedDate={viewDateStr}
+              onChange={(d) => d && setViewDateStr(d)}
+              triggerClassName="flex items-center justify-between w-full rounded-xl border-2 border-[#e2e8f0] bg-white px-4 py-2 text-[12px] font-bold text-[#002f76] transition-all hover:bg-[#f8faff] focus:border-[#0050d5]"
+            />
+          </div>
+
+          {/* Suspend / Undo Button */}
+          {isSuspended ? (
+            <button
+              onClick={handleUndoSuspend}
+              disabled={suspendLoading}
+              className="flex items-center gap-2 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 py-2 text-[12px] font-bold text-orange-700 hover:bg-orange-100 transition-all disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>undo</span>
+              Undo Suspension
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowSuspendModal(true)}
+              className="flex items-center gap-2 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2 text-[12px] font-bold text-red-700 hover:bg-red-100 transition-all"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>block</span>
+              Suspend Classes
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Suspension Banner */}
