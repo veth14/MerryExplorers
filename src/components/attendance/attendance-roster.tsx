@@ -6,9 +6,10 @@ import { Modal } from "@/components/ui/modal";
 
 type AttendanceRosterProps = {
   data: StaffAttendance[];
+  dateStr?: string;
 };
 
-export function AttendanceRoster({ data }: AttendanceRosterProps) {
+export function AttendanceRoster({ data, dateStr }: AttendanceRosterProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<StaffAttendance["status"] | "All">("All");
   
@@ -59,10 +60,40 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
     }
   };
 
+  const handleExport = () => {
+    const headers = ["Teacher Name", "Group", "Time In", "Time Out", "Status"];
+    const rows = filteredData.map(staff => [
+      `"${staff.name}"`,
+      `"${staff.group}"`,
+      `"${staff.timeIn === "—" ? "8:30 AM (Shift)" : staff.timeIn}"`,
+      `"${staff.timeOut}"`,
+      `"${staff.status}"`
+    ]);
+    
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeDate = dateStr || new Date().toISOString().split('T')[0];
+    link.setAttribute("href", url);
+    link.setAttribute("download", `attendance_roster_${safeDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] border border-[#e4e2e1]/50">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-[#002f76] text-[22px] font-extrabold tracking-tight">Staff Roster</h2>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-[#002f76] text-[22px] font-extrabold tracking-tight">Staff Roster</h2>
+          {dateStr && (
+            <p className="text-[13px] font-bold text-[#5a6e8c] mt-0.5">
+              For {new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <button
@@ -91,7 +122,10 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
               </div>
             )}
           </div>
-          <button className="rounded-full bg-[#005cc8] px-5 py-2 text-[13px] font-bold text-white shadow-sm hover:bg-[#004bb0] transition-colors">
+          <button 
+            onClick={handleExport}
+            className="rounded-full bg-[#005cc8] px-5 py-2 text-[13px] font-bold text-white shadow-sm hover:bg-[#004bb0] transition-colors"
+          >
             Export
           </button>
         </div>
@@ -127,7 +161,9 @@ export function AttendanceRoster({ data }: AttendanceRosterProps) {
                   </div>
                 </td>
                 <td className="py-4 text-[13.5px] font-semibold text-[#005cc8]">{staff.group}</td>
-                <td className="py-4 text-[13.5px] font-bold text-[#002f76]">{staff.timeIn}</td>
+                <td className="py-4 text-[13.5px] font-bold text-[#002f76]">
+                  {staff.timeIn !== "—" ? staff.timeIn : <span className="text-[#9aa3b2] font-semibold text-[12px]">8:30 AM (Shift)</span>}
+                </td>
                 <td className="py-4 text-[13.5px] font-bold text-[#002f76]">{staff.timeOut}</td>
                 <td className="py-4">{getStatusBadge(staff.status)}</td>
               </tr>

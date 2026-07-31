@@ -307,7 +307,7 @@ export default function AttendancePage() {
             <p className="text-xs">Teachers will appear here based on their work day schedule.</p>
           </div>
         ) : (
-          <AttendanceRoster data={roster} />
+          <AttendanceRoster data={roster} dateStr={viewDateStr} />
         )}
       </section>
 
