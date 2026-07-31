@@ -64,6 +64,9 @@ export default function ClockPage() {
   // MongoDB record ID for the current shift
   const [attendanceId, setAttendanceId] = useState<string | null>(null);
 
+  const [isSuspended, setIsSuspended] = useState(false);
+  const [suspendReason, setSuspendReason] = useState<string | null>(null);
+
   // Auth
   const { user, userProfile } = useAuth();
 
@@ -76,9 +79,13 @@ export default function ClockPage() {
         const res = await fetch(`/api/attendance?date=today&uid=${user!.uid}`);
         const json = await res.json();
         
-        if (json.success && json.data.length > 0) {
-          const record = json.data[0];
-          setAttendanceId(String(record._id));
+        if (json.success) {
+          setIsSuspended(json.isSuspended || false);
+          setSuspendReason(json.suspendReason || null);
+
+          if (json.data.length > 0) {
+            const record = json.data[0];
+            setAttendanceId(String(record._id));
           
           const newActivities: ActivityEntry[] = [];
           
@@ -149,6 +156,7 @@ export default function ClockPage() {
              return timeA - timeB;
           });
           setActivities(newActivities);
+        }
         }
       } catch (err) {
         console.error("Failed to load today's session", err);
@@ -768,8 +776,7 @@ export default function ClockPage() {
     .pop()?.time;
 
   const lastClockOutTime =
-    activities.filter((a) => a.action === "clock-out").pop()?.time ??
-    "Yesterday, 4:30 PM";
+    activities.filter((a) => a.action === "clock-out").pop()?.time;
 
   // Camera is considered truly ready when active AND feed is not covered/frozen
   const cameraReady = cameraStatus === "active" && !isCameraCovered;
@@ -860,7 +867,12 @@ export default function ClockPage() {
                   Clock Out
                 </button>
               )}
-              {!isActive && (
+              {!isActive && isSuspended && (
+                <div className="w-full rounded-full border border-orange-200 bg-orange-50 py-4 text-center text-[15px] font-extrabold text-orange-600">
+                  Classes Suspended
+                </div>
+              )}
+              {!isActive && !isSuspended && (
                 <button
                   onClick={handleClockIn}
                   disabled={!cameraReady}
@@ -896,7 +908,9 @@ export default function ClockPage() {
             <p className="mt-6 text-[12.5px] font-semibold text-[#9aa3b2]">
               {isActive && lastClockInTime
                 ? `Clocked In at ${lastClockInTime}`
-                : `Last Clock Out: ${lastClockOutTime}`}
+                : lastClockOutTime
+                  ? `Last Clock Out: ${lastClockOutTime}`
+                  : "Ready to start your day"}
             </p>
           </div>
 

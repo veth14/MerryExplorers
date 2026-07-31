@@ -8,6 +8,7 @@ import type { StaffAttendance } from "@/data/attendance";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
 import { computeDailyStatus } from "@/lib/attendance-rules";
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 
 type AttendanceRecord = {
   _id: string;
@@ -86,17 +87,20 @@ export default function AttendancePage() {
     return `${yyyy}-${mm}-${dd}`;
   })();
 
+  const [suspendDateInput, setSuspendDateInput] = useState(todayStr);
+
   const handleSuspend = async () => {
     setSuspendLoading(true);
     try {
       await fetch("/api/attendance/suspend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dateStr: todayStr, reason: suspendInput.trim() || "Suspension announced" }),
+        body: JSON.stringify({ dateStr: suspendDateInput, reason: suspendInput.trim() || "Suspension announced" }),
       });
       invalidateCache("dashboard:attendance");
       setShowSuspendModal(false);
       setSuspendInput("");
+      setSuspendDateInput(todayStr);
       setLoading(true);
       await fetchData();
     } catch (e) {
@@ -304,10 +308,22 @@ export default function AttendancePage() {
               <span className="material-symbols-outlined text-red-600" style={{ fontSize: "30px" }}>block</span>
             </div>
 
-            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Suspend Classes Today</h2>
+            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Suspend Classes</h2>
             <p className="text-[12px] font-medium text-[#5a6e8c] text-center mb-5">
-              All staff will be marked <span className="font-bold text-orange-600">"Suspended"</span> for today. No one will be penalized as Late or Absent. This can be reversed.
+              All staff will be marked <span className="font-bold text-orange-600">"Suspended"</span> for the selected date. No one will be penalized as Late or Absent.
             </p>
+
+            {/* Target Date Input */}
+            <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">
+              Target Date
+            </label>
+            <div className="mb-4">
+              <CustomDatePicker
+                selectedDate={suspendDateInput}
+                onChange={(d) => setSuspendDateInput(d || todayStr)}
+                triggerClassName="w-full flex items-center justify-between gap-2.5 rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] transition-all hover:bg-white focus:border-[#0050d5]"
+              />
+            </div>
 
             {/* Reason Input */}
             <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">
@@ -315,7 +331,6 @@ export default function AttendancePage() {
             </label>
             <input
               type="text"
-              autoFocus
               placeholder="e.g. Typhoon, Public Holiday, Emergency..."
               value={suspendInput}
               onChange={(e) => setSuspendInput(e.target.value)}
