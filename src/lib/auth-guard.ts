@@ -20,9 +20,15 @@ export function requireInternalAuth(request: Request): NextResponse | null {
   }
 
   const authHeader = request.headers.get("authorization");
-  if (!authHeader || authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (authHeader && authHeader === `Bearer ${secret}`) {
+    return null;
   }
 
-  return null;
+  // Allow frontend clients that have a session cookie
+  const cookieHeader = request.headers.get("cookie");
+  if (cookieHeader && cookieHeader.includes("session=")) {
+    return null;
+  }
+
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
