@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CustomDateTimePicker } from "@/components/ui/custom-datetime-picker";
+import { useAuth } from "@/lib/auth-context";
 
 type Announcement = {
   id: string;
@@ -19,6 +20,7 @@ type Announcement = {
 };
 
 export default function AnnouncementsPage() {
+  const { user, userProfile } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,10 +86,17 @@ export default function AnnouncementsPage() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, announcementTitle?: string) => {
     if (!window.confirm("Are you sure you want to delete this announcement?")) return;
     try {
-      const res = await fetch(`/api/announcements?id=${id}`, { method: "DELETE" });
+      const params = new URLSearchParams({ id });
+      if (user?.uid) {
+        params.set("actorUid", user.uid);
+        params.set("actorName", userProfile?.fullName || user.email || "Unknown");
+        params.set("actorRole", userProfile?.role || "Unknown");
+        if (announcementTitle) params.set("targetTitle", announcementTitle);
+      }
+      const res = await fetch(`/api/announcements?${params.toString()}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
         fetchData();
@@ -111,6 +120,10 @@ export default function AnnouncementsPage() {
         type,
         startDate: new Date(startDate).toISOString(),
         endDate: endDate ? new Date(endDate).toISOString() : null,
+        // Audit log actor info
+        actorUid: user?.uid || null,
+        actorName: userProfile?.fullName || user?.email || "Unknown",
+        actorRole: userProfile?.role || "Unknown",
       };
 
       const url = "/api/announcements";
@@ -254,7 +267,7 @@ export default function AnnouncementsPage() {
                     <span className="material-symbols-outlined text-[18px]">edit</span>
                   </button>
                   <button 
-                    onClick={() => handleDelete(a.id)} 
+                    onClick={() => handleDelete(a.id, a.title)} 
                     className="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-md transition-colors"
                     title="Delete"
                   >

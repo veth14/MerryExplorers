@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   if (deny) return deny;
   try {
     const data = await request.json();
-    const { title, content, type, startDate, endDate } = data;
+    const { title, content, type, startDate, endDate, actorUid, actorName, actorRole } = data;
 
     if (!title || !content || !type || !startDate) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -85,13 +85,29 @@ export async function POST(request: Request) {
       title,
       content,
       type,
-      startDate, // ISO String
-      endDate: endDate || null, // ISO String or null
+      startDate,
+      endDate: endDate || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     const result = await db.collection("announcements").insertOne(newRecord);
+
+    // Write audit log
+    if (actorUid) {
+      await db.collection("audit_log").insertOne({
+        actorUid,
+        actorName: actorName || "Unknown",
+        actorRole: actorRole || "Unknown",
+        action: "CREATE",
+        category: "announcement",
+        targetId: result.insertedId.toString(),
+        targetTitle: title,
+        details: `Created announcement: "${title}"`,
+        createdAt: new Date(),
+      });
+    }
+
     return NextResponse.json({ success: true, data: { ...newRecord, id: result.insertedId.toString() } });
   } catch (error: any) {
     console.error("Failed to create announcement:", error);
@@ -105,7 +121,7 @@ export async function PUT(request: Request) {
   if (deny) return deny;
   try {
     const data = await request.json();
-    const { id, title, content, type, startDate, endDate } = data;
+    const { id, title, content, type, startDate, endDate, actorUid, actorName, actorRole } = data;
 
     if (!id || !title || !content || !type || !startDate) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -133,6 +149,21 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
     }
 
+    // Write audit log
+    if (actorUid) {
+      await db.collection("audit_log").insertOne({
+        actorUid,
+        actorName: actorName || "Unknown",
+        actorRole: actorRole || "Unknown",
+        action: "EDIT",
+        category: "announcement",
+        targetId: id,
+        targetTitle: title,
+        details: `Edited announcement: "${title}"`,
+        createdAt: new Date(),
+      });
+    }
+
     const updated = await db.collection("announcements").findOne({ _id: new ObjectId(id) });
     return NextResponse.json({ success: true, data: { ...updated, id: updated?._id.toString(), _id: undefined } });
   } catch (error: any) {
@@ -148,6 +179,10 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const actorUid = searchParams.get("actorUid") || null;
+    const actorName = searchParams.get("actorName") || "Unknown";
+    const actorRole = searchParams.get("actorRole") || "Unknown";
+    const targetTitle = searchParams.get("targetTitle") || null;
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -155,10 +190,29 @@ export async function DELETE(request: Request) {
 
     const { db } = await connectToDatabase();
 
+    // Fetch the title before deletion for the audit log
+    const existing = await db.collection("announcements").findOne({ _id: new ObjectId(id) });
+
     const result = await db.collection("announcements").deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
+    }
+
+    // Write audit log
+    if (actorUid) {
+      const title = existing?.title || targetTitle || "Unknown";
+      await db.collection("audit_log").insertOne({
+        actorUid,
+        actorName,
+        actorRole,
+        action: "DELETE",
+        category: "announcement",
+        targetId: id,
+        targetTitle: title,
+        details: `Deleted announcement: "${title}"`,
+        createdAt: new Date(),
+      });
     }
 
     return NextResponse.json({ success: true });
