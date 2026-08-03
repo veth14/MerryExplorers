@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomDateTimePicker } from "@/components/ui/custom-datetime-picker";
 
 type Announcement = {
   id: string;
@@ -66,14 +67,20 @@ export default function AnnouncementsPage() {
     setShowModal(true);
   };
 
+  const formatLocal = (dateString: string) => {
+    const d = new Date(dateString);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const openEditModal = (a: Announcement) => {
     setIsEditing(true);
     setCurrentId(a.id);
     setTitle(a.title);
     setContent(a.content);
     setType(a.type);
-    setStartDate(a.startDate ? new Date(a.startDate).toISOString().slice(0, 16) : "");
-    setEndDate(a.endDate ? new Date(a.endDate).toISOString().slice(0, 16) : "");
+    setStartDate(a.startDate ? formatLocal(a.startDate) : "");
+    setEndDate(a.endDate ? formatLocal(a.endDate) : "");
     setShowModal(true);
   };
 
@@ -371,12 +378,9 @@ export default function AnnouncementsPage() {
                     <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">
                       Start Date & Time
                     </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={startDate}
-                      onChange={e => setStartDate(e.target.value)}
-                      className="w-full rounded-xl border border-[#d0d8e8] bg-[#f8faff] px-3 py-2.5 text-[13.5px] font-semibold text-[#002f76] outline-none focus:border-[#0050d5] focus:ring-2 focus:ring-[#0050d5]/15 transition-all"
+                    <CustomDateTimePicker
+                      selectedDateTime={startDate}
+                      onChange={setStartDate}
                     />
                   </div>
                   <div>
@@ -384,11 +388,10 @@ export default function AnnouncementsPage() {
                       <span>End Date & Time</span>
                       <span className="text-[#9aa3b2] font-normal tracking-normal normal-case">(Optional)</span>
                     </label>
-                    <input
-                      type="datetime-local"
-                      value={endDate}
-                      onChange={e => setEndDate(e.target.value)}
-                      className="w-full rounded-xl border border-[#d0d8e8] bg-[#f8faff] px-3 py-2.5 text-[13.5px] font-semibold text-[#002f76] outline-none focus:border-[#0050d5] focus:ring-2 focus:ring-[#0050d5]/15 transition-all"
+                    <CustomDateTimePicker
+                      selectedDateTime={endDate}
+                      onChange={setEndDate}
+                      placeholder="--/--/---- --:-- --"
                     />
                   </div>
                 </div>

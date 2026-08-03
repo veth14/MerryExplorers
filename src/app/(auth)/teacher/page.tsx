@@ -174,16 +174,23 @@ export default function TeacherDashboardPage() {
           const todaysRecord = records.find(r => r.dateStr === todayDateStr);
           if (todaysRecord) setTodayShift(todaysRecord);
 
-          // Calculate weekly stats
-          const now = new Date();
-          const startOfWeek = new Date(now);
-          startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday is 0
-          startOfWeek.setHours(0, 0, 0, 0);
+          // Calculate weekly stats — use dateStr (YYYY-MM-DD in PH time) to avoid UTC shift bugs
+          const nowPH = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+          const dayOfWeek = nowPH.getDay(); // 0=Sun
+          const startOfWeekDate = new Date(nowPH);
+          startOfWeekDate.setDate(nowPH.getDate() - dayOfWeek);
+          startOfWeekDate.setHours(0, 0, 0, 0);
+
+          const toDateStr = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const dy = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${dy}`;
+          };
 
           const thisWeekRecords = records.filter((r) => {
-            if (!r.clockInTime) return false;
-            const d = new Date(r.clockInTime);
-            return d >= startOfWeek;
+            if (!r.dateStr || !r.clockInTime) return false;
+            return r.dateStr >= toDateStr(startOfWeekDate) && r.dateStr <= toDateStr(nowPH);
           });
 
           // Shifts count
@@ -214,10 +221,14 @@ export default function TeacherDashboardPage() {
             let onTimeCount = 0;
 
             for (const r of thisWeekRecords) {
-              const d = new Date(r.clockInTime);
-              const m = d.getHours() * 60 + d.getMinutes();
+              // Parse clockInTime in PH timezone to get correct local hour/minute
+              const phStr = new Date(r.clockInTime).toLocaleString("en-US", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false });
+              const [hStr, minStr] = phStr.split(":");
+              const h = parseInt(hStr, 10);
+              const mn = parseInt(minStr, 10);
+              const m = h * 60 + mn;
               totalMins += m;
-              if (m <= 8 * 60) onTimeCount++;
+              if (m <= 8 * 60) onTimeCount++; // on time if clocked in by 8:00 AM
             }
 
             const avg = Math.floor(totalMins / thisWeekRecords.length);
@@ -452,9 +463,21 @@ export default function TeacherDashboardPage() {
                             <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                           )}
                         </div>
-                        <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed">
+                        <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed mb-3">
                           {a.content}
                         </p>
+                        <div className="flex flex-col gap-1 text-[10px] font-bold text-brand-navy/40">
+                          <div className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[12px]">calendar_today</span>
+                            Starts: <span className="text-brand-navy/60">{new Date(a.startDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          </div>
+                          {a.endDate && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[12px]">event_busy</span>
+                              Ends: <span className="text-brand-navy/60">{new Date(a.endDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

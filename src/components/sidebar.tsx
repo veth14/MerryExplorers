@@ -100,7 +100,7 @@ function LeaveIcon() {
 function InquiriesIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
@@ -185,11 +185,11 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             <p className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#005cc8] mb-3">MY TEACHER VIEW</p>
             <div className="space-y-1">
               {[
-                { label: "Dashboard", href: "/teacher", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" opacity={0.7}/><rect x="3" y="14" width="7" height="7" rx="1.5" opacity={0.7}/><rect x="14" y="14" width="7" height="7" rx="1.5" opacity={0.7}/></svg> },
-                { label: "Clock In/Out", href: "/teacher/clock", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v5h-5"/><path d="M12 7v5l4 2"/></svg> },
-                { label: "History", href: "/teacher/history", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg> },
-                { label: "Leaves", href: "/teacher/leaves", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg> },
-                { label: "Profile", href: "/teacher/profile", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd"/></svg> },
+                { label: "Dashboard", href: "/teacher", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" opacity={0.7} /><rect x="3" y="14" width="7" height="7" rx="1.5" opacity={0.7} /><rect x="14" y="14" width="7" height="7" rx="1.5" opacity={0.7} /></svg> },
+                { label: "Clock In/Out", href: "/teacher/clock", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M21 12a9 9 0 1 1-9-9" /><path d="M21 3v5h-5" /><path d="M12 7v5l4 2" /></svg> },
+                { label: "History", href: "/teacher/history", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg> },
+                { label: "Leaves", href: "/teacher/leaves", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M9 16l2 2 4-4" /></svg> },
+                { label: "Profile", href: "/teacher/profile", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" /></svg> },
               ].map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -279,9 +279,8 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`h-4 w-4 shrink-0 text-[#005cc8] transition-transform duration-200 ${
-                userMenuOpen ? "rotate-180" : ""
-              }`}
+              className={`h-4 w-4 shrink-0 text-[#005cc8] transition-transform duration-200 ${userMenuOpen ? "rotate-180" : ""
+                }`}
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
@@ -289,11 +288,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
           {/* Dropdown — z-50 so it sits above the overlay */}
           <div
-            className={`absolute bottom-full left-0 right-0 mb-2 z-50 overflow-hidden rounded-2xl bg-white border-2 border-[#e2e8f0] shadow-xl transition-all duration-200 origin-bottom ${
-              userMenuOpen
+            className={`absolute bottom-full left-0 right-0 mb-2 z-50 overflow-hidden rounded-2xl bg-white border-2 border-[#e2e8f0] shadow-xl transition-all duration-200 origin-bottom ${userMenuOpen
                 ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
                 : "opacity-0 scale-95 translate-y-1 pointer-events-none"
-            }`}
+              }`}
           >
             {/* Report a Bug */}
             <Link
@@ -333,9 +331,8 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
       {/* Mobile drawer — slides in from left on small screens */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         aria-label="Mobile navigation"
       >
         {sidebarContent}
