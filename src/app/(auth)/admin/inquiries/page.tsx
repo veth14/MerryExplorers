@@ -39,17 +39,40 @@ function StatusBadge({ status }: { status: InquiryStatus }) {
   );
 }
 
-function MetricCard({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
+function MetricCard({ 
+  label, 
+  value, 
+  borderColor, 
+  textColor, 
+  metaIcon, 
+  metaText, 
+  metaColor, 
+  svgDecoration 
+}: { 
+  label: string; 
+  value: number | string; 
+  borderColor: string; 
+  textColor: string; 
+  metaIcon: string; 
+  metaText: string; 
+  metaColor: string; 
+  svgDecoration: React.ReactNode; 
+}) {
   return (
-    <div className="bg-white rounded-2xl p-5 border border-[#e4e2e1]/50 shadow-sm flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color}`}>
-        {icon}
+    <article className={`relative overflow-hidden rounded-[1.25rem] bg-white px-5 pb-5 pt-5 border-b-[4px] ${borderColor} shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)]`}>
+      <div className="absolute right-2 top-2 w-[72px] h-[54px] opacity-70 pointer-events-none">
+        {svgDecoration}
       </div>
-      <div>
-        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#5a6e8c]">{label}</p>
-        <p className="text-[26px] font-extrabold text-[#002f76] leading-tight">{value}</p>
-      </div>
-    </div>
+      <p className={`text-[11.5px] font-extrabold uppercase tracking-widest ${textColor}`}>
+        {label}
+      </p>
+      <p className="font-headline text-[42px] font-extrabold leading-none tracking-tight text-[#002f76] mt-2">
+        {value}
+      </p>
+      <p className={`mt-2.5 text-[13px] font-bold ${metaColor} flex items-center gap-1.5`}>
+        <span>{metaIcon}</span> {metaText}
+      </p>
+    </article>
   );
 }
 
@@ -250,44 +273,68 @@ export default function InquiriesPage() {
       </div>
 
       {/* Metric Cards */}
-      <section className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label="Total Inquiries"
           value={metrics.total}
-          color="bg-[#f0f5ff] text-[#005cc8]"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          borderColor="border-[#005cc8]"
+          textColor="text-[#005cc8]"
+          metaIcon="💬"
+          metaText="All messages"
+          metaColor="text-[#005cc8]"
+          svgDecoration={
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full">
+              <rect x="24" y="20" width="32" height="24" rx="4" fill="#dbe8ff" stroke="#005cc8" strokeWidth="2" />
+              <line x1="32" y1="28" x2="48" y2="28" stroke="#005cc8" strokeWidth="2" strokeLinecap="round" />
+              <line x1="32" y1="36" x2="40" y2="36" stroke="#005cc8" strokeWidth="2" strokeLinecap="round" />
             </svg>
           }
         />
         <MetricCard
           label="New Today"
           value={metrics.newToday}
-          color="bg-[#fff8e1] text-[#a07000]"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          borderColor="border-[#ffb800]"
+          textColor="text-[#ffb800]"
+          metaIcon="📅"
+          metaText="Received today"
+          metaColor="text-[#ffb800]"
+          svgDecoration={
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full">
+              <circle cx="40" cy="28" r="22" fill="#fff9e6" stroke="#ffb800" strokeWidth="2" />
+              <line x1="40" y1="12" x2="40" y2="28" stroke="#ffb800" strokeWidth="3" strokeLinecap="round" />
+              <line x1="40" y1="28" x2="52" y2="36" stroke="#002f76" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="40" cy="28" r="3" fill="#002f76" />
             </svg>
           }
         />
         <MetricCard
           label="Unread"
           value={metrics.newCount}
-          color="bg-[#fef2f2] text-[#ef4444]"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          borderColor="border-[#e11d48]"
+          textColor="text-[#e11d48]"
+          metaIcon="🚨"
+          metaText="Requires attention"
+          metaColor="text-[#e11d48]"
+          svgDecoration={
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full">
+              <circle cx="40" cy="28" r="22" fill="#fef2f2" stroke="#e11d48" strokeWidth="2" />
+              <path d="M40 14 C36 14 30 18 30 24 V34 L26 38 H54 L50 34 V24 C50 18 44 14 40 14 Z" fill="none" stroke="#e11d48" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M36 40 A4 4 0 0 0 44 40" fill="none" stroke="#e11d48" strokeWidth="3" strokeLinecap="round" />
             </svg>
           }
         />
         <MetricCard
           label="Replied"
           value={metrics.repliedCount}
-          color="bg-[#e8f9ef] text-[#1a7f4b]"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          borderColor="border-[#2da05b]"
+          textColor="text-[#2da05b]"
+          metaIcon="✅"
+          metaText="Responses sent"
+          metaColor="text-[#2da05b]"
+          svgDecoration={
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full">
+              <circle cx="40" cy="28" r="22" fill="#d4f0e2" stroke="#2da05b" strokeWidth="2" />
+              <path d="M28 28 L36 36 L52 20" stroke="#2da05b" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
           }
         />
