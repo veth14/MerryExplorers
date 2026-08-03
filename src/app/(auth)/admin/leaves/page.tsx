@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth-context";
 
 type LeaveStatus = "Pending" | "Approved" | "Rejected";
 
@@ -35,6 +36,7 @@ const leaveTypeIcons: Record<string, string> = {
 };
 
 export default function LeavePage() {
+  const { user, userProfile } = useAuth();
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"All" | LeaveStatus>("All");
@@ -66,6 +68,26 @@ export default function LeavePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
+      
+      const targetLeave = leaves.find((l) => l.id === id);
+      // Write audit log
+      try {
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "Unknown",
+            action: "EDIT",
+            category: "leave request",
+            targetId: id,
+            targetTitle: targetLeave?.teacherName || "Unknown",
+            details: `${status} leave request for ${targetLeave?.teacherName || "Unknown"}`,
+          }),
+        });
+      } catch { /* non-fatal */ }
+
       // Invalidate so next fetch is fresh
       invalidateCache("leaves:all");
       invalidateCache("dashboard:metrics");

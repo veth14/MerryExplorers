@@ -9,6 +9,7 @@ import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
 import { computeDailyStatus } from "@/lib/attendance-rules";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
+import { useAuth } from "@/lib/auth-context";
 
 type AttendanceRecord = {
   _id: string;
@@ -41,6 +42,7 @@ type AccountDoc = {
 };
 
 export default function AttendancePage() {
+  const { user, userProfile } = useAuth();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [accounts, setAccounts] = useState<AccountDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +110,24 @@ export default function AttendancePage() {
         body: JSON.stringify({ dateStr: suspendDateInput, reason: suspendInput.trim() || "Suspension announced" }),
       });
 
+      // Write audit log
+      try {
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "Unknown",
+            action: "CREATE",
+            category: "suspension",
+            targetId: suspendDateInput,
+            targetTitle: suspendDateInput,
+            details: `Suspended classes on ${suspendDateInput} for: ${suspendInput.trim() || "Suspension announced"}`,
+          }),
+        });
+      } catch { /* non-fatal */ }
+
       if (autoAnnounce) {
         const suspendReason = suspendInput.trim() || "Suspension announced";
         const startDate = new Date().toISOString(); // Start immediately
@@ -145,6 +165,25 @@ export default function AttendancePage() {
     setSuspendLoading(true);
     try {
       await fetch(`/api/attendance/suspend?dateStr=${viewDateStr}`, { method: "DELETE" });
+      
+      // Write audit log
+      try {
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "Unknown",
+            action: "DELETE",
+            category: "suspension",
+            targetId: viewDateStr,
+            targetTitle: viewDateStr,
+            details: `Lifted suspension for ${viewDateStr}`,
+          }),
+        });
+      } catch { /* non-fatal */ }
+
       invalidateCache(`dashboard:attendance:${viewDateStr}`);
       setLoading(true);
       await fetchData();

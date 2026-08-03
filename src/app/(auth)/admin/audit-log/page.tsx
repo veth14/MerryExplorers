@@ -26,6 +26,8 @@ const CATEGORY_ICON: Record<string, string> = {
   suspension: "event_busy",
   attendance: "fingerprint",
   account: "manage_accounts",
+  "leave request": "event_available",
+  inquiry: "forum",
 };
 
 function formatDateTime(iso: string) {
@@ -121,6 +123,8 @@ const CATEGORY_OPTIONS: DropdownOption[] = [
   { value: "suspension", label: "Suspensions", icon: "event_busy" },
   { value: "attendance", label: "Attendance", icon: "fingerprint" },
   { value: "account", label: "Accounts", icon: "manage_accounts" },
+  { value: "leave request", label: "Leave Requests", icon: "event_available" },
+  { value: "inquiry", label: "Inquiries", icon: "forum" },
 ];
 
 const ACTION_OPTIONS: DropdownOption[] = [

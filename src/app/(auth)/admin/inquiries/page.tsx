@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth-context";
 
 type InquiryStatus = "New" | "Read" | "Replied" | "Closed";
 
@@ -58,6 +59,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function InquiriesPage() {
+  const { user, userProfile } = useAuth();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
@@ -96,16 +98,54 @@ export default function InquiriesPage() {
       });
       setInquiries((prev) => prev.map((inq) => inq.id === id ? { ...inq, status } : inq));
       if (selectedInquiry?.id === id) setSelectedInquiry((prev) => prev ? { ...prev, status } : null);
+      const targetInq = inquiries.find(i => i.id === id);
+      // Write audit log
+      try {
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "Unknown",
+            action: "EDIT",
+            category: "inquiry",
+            targetId: id,
+            targetTitle: targetInq?.parentName || "Unknown",
+            details: `Changed inquiry status to ${status} for ${targetInq?.parentName || "Unknown"}`,
+          }),
+        });
+      } catch { /* non-fatal */ }
+
     } finally {
       setUpdating(false);
     }
   };
 
   const deleteInquiry = async (id: string) => {
+    const targetInq = inquiries.find(i => i.id === id);
     await fetch(`/api/inquiries/${id}`, { method: "DELETE" });
     setInquiries((prev) => prev.filter((inq) => inq.id !== id));
     setDeleteConfirm(null);
     if (selectedInquiry?.id === id) setSelectedInquiry(null);
+
+    // Write audit log
+    try {
+      await fetch("/api/audit-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorUid: user?.uid || null,
+          actorName: userProfile?.fullName || user?.email || "Unknown",
+          actorRole: userProfile?.role || "Unknown",
+          action: "DELETE",
+          category: "inquiry",
+          targetId: id,
+          targetTitle: targetInq?.parentName || "Unknown",
+          details: `Deleted inquiry from ${targetInq?.parentName || "Unknown"}`,
+        }),
+      });
+    } catch { /* non-fatal */ }
   };
 
   const handleSendReply = async () => {
@@ -136,6 +176,24 @@ export default function InquiriesPage() {
         
         setIsReplying(false);
         setReplyMessage("");
+
+        // Write audit log
+        try {
+          await fetch("/api/audit-log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              actorUid: user?.uid || null,
+              actorName: userProfile?.fullName || user?.email || "Unknown",
+              actorRole: userProfile?.role || "Unknown",
+              action: "EDIT",
+              category: "inquiry",
+              targetId: selectedInquiry.id,
+              targetTitle: selectedInquiry.parentName,
+              details: `Sent reply to inquiry from ${selectedInquiry.parentName}`,
+            }),
+          });
+        } catch { /* non-fatal */ }
       } else {
         alert("Failed to send reply: " + data.error);
       }
