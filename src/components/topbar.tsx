@@ -148,7 +148,7 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
                 </div>
               ) : (
                 items.map((n) => {
-                  const meta = notificationMeta[n.type];
+                  const meta = notificationMeta[n.type] ?? notificationMeta["info"];
                   return (
                     <button
                       key={n.id}
