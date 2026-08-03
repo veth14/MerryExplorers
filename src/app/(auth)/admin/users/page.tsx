@@ -11,6 +11,7 @@ import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
+import { useAuth } from "@/lib/auth-context";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
@@ -854,6 +855,7 @@ type FilterTab = "All" | "Admins" | "Lead Teachers" | "Assistants" | "On Leave";
 const TABS: FilterTab[] = ["All", "Admins", "Lead Teachers", "Assistants", "On Leave"];
 
 export default function UsersPage() {
+  const { user, userProfile } = useAuth();
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>("All");
   const [search, setSearch] = useState("");
@@ -899,6 +901,26 @@ export default function UsersPage() {
     });
 
   async function handleSave(account: Omit<UserAccount, "id">, id?: string) {
+    // Helper to write an audit log entry
+    const writeAudit = async (action: string, targetName: string, targetRole: string, targetId: string) => {
+      try {
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "Unknown",
+            action,
+            category: "account",
+            targetId,
+            targetTitle: targetName,
+            details: `${action === "CREATE" ? "Created" : "Edited"} account for ${targetName} (${targetRole})`,
+          }),
+        });
+      } catch { /* non-fatal */ }
+    };
+
     if (id) {
       // Edit
       const res = await fetch(`/api/accounts/${id}`, {
@@ -908,7 +930,8 @@ export default function UsersPage() {
       });
       if (res.ok) {
         setAccounts((prev) => prev.map((a) => (a.id === id ? { ...account, id } : a)));
-        invalidateCache("accounts:all"); // Bust cache so other pages see new data
+        invalidateCache("accounts:all");
+        await writeAudit("EDIT", account.fullName, account.role, id);
       }
     } else {
       // Add
@@ -939,6 +962,7 @@ export default function UsersPage() {
           const newAccount = await res.json();
           setAccounts((prev) => [newAccount, ...prev]);
           invalidateCache("accounts:all");
+          await writeAudit("CREATE", account.fullName, account.role, firebaseUid);
         } else {
           console.error("Failed to save to MongoDB");
         }
@@ -976,6 +1000,23 @@ export default function UsersPage() {
     if (res.ok) {
       setAccounts((prev) => prev.filter((a) => a.id !== deleteTarget.id));
       invalidateCache("accounts:all");
+      // Write audit log
+      try {
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "Unknown",
+            action: "DELETE",
+            category: "account",
+            targetId: deleteTarget.id,
+            targetTitle: deleteTarget.fullName,
+            details: `Deleted account for ${deleteTarget.fullName} (${deleteTarget.role})`,
+          }),
+        });
+      } catch { /* non-fatal */ }
     }
     setDeleteTarget(null);
   }
