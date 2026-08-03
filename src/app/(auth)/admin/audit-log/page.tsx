@@ -97,16 +97,16 @@ function FilterDropdown({ options, value, onChange, triggerIcon, fullWidth }: {
             return (
               <button key={opt.value} type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-bold text-left transition-colors ${isActive ? "bg-[#005cc8] text-white" : "text-[#002f76] hover:bg-[#f0f5ff]"
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-[13px] font-bold text-left transition-colors ${isActive ? "bg-[#005cc8] text-white" : "text-[#002f76] hover:bg-[#f0f5ff]"
                   }`}
               >
                 {opt.icon ? (
-                  <span className={`material-symbols-outlined text-[16px] ${isActive ? "text-white" : "text-[#005cc8]"}`}>{opt.icon}</span>
+                  <span className={`material-symbols-outlined text-[16px] shrink-0 ${isActive ? "text-white" : "text-[#005cc8]"}`}>{opt.icon}</span>
                 ) : opt.dot ? (
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isActive ? "bg-white/80" : opt.dot}`} />
                 ) : null}
-                <span className="flex-1">{opt.label}</span>
-                {isActive && <span className="material-symbols-outlined text-[15px] text-white">check</span>}
+                <span className="flex-1 truncate">{opt.label}</span>
+                {isActive && <span className="material-symbols-outlined text-[16px] text-white shrink-0">check</span>}
               </button>
             );
           })}
