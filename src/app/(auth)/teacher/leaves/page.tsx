@@ -5,6 +5,8 @@ import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 
 type LeaveStatus = "Pending" | "Approved" | "Rejected";
 
@@ -111,6 +113,10 @@ export default function TeacherLeavesPage() {
       year: "numeric",
     });
   }
+
+  // Live preview values for the modal
+  const previewDuration =
+    leaveStartDate && leaveEndDate ? getDuration(leaveStartDate, leaveEndDate) : null;
 
   return (
     <TeacherShell title="My Leaves" description="View and file your leave requests.">
@@ -234,7 +240,7 @@ export default function TeacherLeavesPage() {
         </div>
       )}
 
-      {/* File Leave Modal */}
+      {/* ── File Leave Modal (redesigned) ───────────────────────── */}
       <Modal
         isOpen={isLeaveModalOpen}
         onClose={() => setIsLeaveModalOpen(false)}
@@ -244,64 +250,111 @@ export default function TeacherLeavesPage() {
           <>
             <button
               onClick={() => setIsLeaveModalOpen(false)}
-              className="px-4 py-2 rounded-full font-bold text-[13px] text-[#4a5568] hover:bg-[#e2e8f0] transition-colors"
+              className="px-4 py-2.5 rounded-full font-bold text-[13px] text-[#5a6e8c] hover:bg-[#eef2f7] transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleFileLeave}
               disabled={filing || !leaveStartDate || !leaveEndDate}
-              className="px-5 py-2 rounded-full font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-colors disabled:opacity-50"
+              className="px-5 py-2.5 rounded-full font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
-              {filing ? "Filing..." : "Submit Request"}
+              {filing ? (
+                <>
+                  <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Filing…
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Submit Request
+                </>
+              )}
             </button>
           </>
         }
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Leave Type</label>
-            <select
+        <div className="space-y-5">
+          {/* Leave Type */}
+          <div className="z-20 relative">
+            <label className="flex items-center gap-1.5 text-[12px] font-extrabold uppercase tracking-wide text-[#5a6e8c] mb-2">
+              <span className="text-[14px]">{leaveTypeIcons[leaveType] || "📋"}</span>
+              Leave Type
+            </label>
+            <CustomSelect
               value={leaveType}
-              onChange={(e) => setLeaveType(e.target.value)}
-              className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
-            >
-              <option value="Sick Leave">Sick Leave</option>
-              <option value="Vacation Leave">Vacation Leave</option>
-              <option value="Emergency Leave">Emergency Leave</option>
-              <option value="Unpaid Leave">Unpaid Leave</option>
-            </select>
+              onChange={setLeaveType}
+              options={[
+                { value: "Sick Leave", label: "🤒  Sick Leave" },
+                { value: "Vacation Leave", label: "🏖️  Vacation Leave" },
+                { value: "Emergency Leave", label: "🚨  Emergency Leave" },
+                { value: "Unpaid Leave", label: "📋  Unpaid Leave" },
+              ]}
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Start Date</label>
-              <input
-                type="date"
-                value={leaveStartDate}
-                onChange={(e) => setLeaveStartDate(e.target.value)}
-                className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
-              />
+          {/* Dates — grouped card */}
+          <div className="z-10 relative bg-[#f8fafc] border border-[#eef2f9] rounded-2xl p-5">
+            <label className="flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-wide text-[#5a6e8c] mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0050d5" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0">
+                <rect x="3" y="4" width="18" height="18" rx="3" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span className="leading-none">Leave Dates</span>
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[11px] font-bold text-[#9aa3b2] mb-2">Start Date</p>
+                <CustomDatePicker
+                  selectedDate={leaveStartDate}
+                  onChange={setLeaveStartDate}
+                  triggerClassName="w-full h-12 border-2 border-[#e2e8f0] hover:border-[#a8c4f0] rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-[#002f76] bg-white shadow-sm transition-colors"
+                />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-[#9aa3b2] mb-2">End Date</p>
+                <CustomDatePicker
+                  selectedDate={leaveEndDate}
+                  onChange={setLeaveEndDate}
+                  triggerClassName="w-full h-12 border-2 border-[#e2e8f0] hover:border-[#a8c4f0] rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-[#002f76] bg-white shadow-sm transition-colors"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">End Date</label>
-              <input
-                type="date"
-                value={leaveEndDate}
-                onChange={(e) => setLeaveEndDate(e.target.value)}
-                className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2 text-[13px] font-bold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm"
-              />
-            </div>
+
+            {/* Live duration preview */}
+            {previewDuration && (
+              <div className="mt-4 pt-3 border-t border-[#e8effe] flex items-center gap-1.5 text-[12px] font-bold text-[#0050d5]">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                {previewDuration} total
+              </div>
+            )}
           </div>
 
+          {/* Reason */}
           <div>
-            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Reason (Optional)</label>
+            <label className="flex items-center gap-1.5 text-[12px] font-extrabold uppercase tracking-wide text-[#5a6e8c] mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0050d5" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              </svg>
+              Reason
+              <span className="text-[10px] font-bold text-[#c2cbd8] normal-case tracking-normal">(Optional)</span>
+            </label>
             <textarea
               value={leaveReason}
               onChange={(e) => setLeaveReason(e.target.value)}
-              rows={2}
+              rows={3}
               placeholder="Provide a brief reason..."
-              className="w-full border border-[#e2e8f0] rounded-xl px-3 py-2.5 text-[13px] font-semibold text-[#002f76] focus:outline-none focus:border-[#0050d5] focus:ring-1 focus:ring-[#0050d5] bg-white shadow-sm resize-none"
+              className="w-full border-2 border-[#e2e8f0] hover:border-[#a8c4f0] rounded-xl px-3.5 py-3 text-[13px] font-semibold text-[#002f76] focus:outline-none focus:border-[#005cc8] focus:ring-2 focus:ring-[#005cc8]/15 bg-white shadow-sm resize-none transition-all placeholder:text-[#b0bec5] placeholder:font-medium"
             />
           </div>
         </div>
@@ -315,7 +368,7 @@ export default function TeacherLeavesPage() {
         footer={
           <button
             onClick={() => setIsSuccessModalOpen(false)}
-            className="px-5 py-2 rounded-full font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-colors"
+            className="px-5 py-2.5 rounded-full font-bold text-[13px] text-white bg-[#0050d5] hover:bg-[#003c9e] transition-colors"
           >
             Got it
           </button>
