@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         userId: leave.teacherId, // Target the specific teacher
         title: `Leave Request ${status}`,
         message: `Your leave request for ${leave.startDate} to ${leave.endDate} has been ${status.toLowerCase()}.`,
-        type: status === "Approved" ? "success" : "error",
+        type: status === "Approved" ? "success" : "absent",
         read: false,
         createdAt: new Date(),
       });

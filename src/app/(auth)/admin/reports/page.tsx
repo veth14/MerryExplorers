@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/app-shell";
 import { ReportsTable } from "@/components/reports/reports-table";
+import { BASE_SCHEDULE, getDayAbbr } from "@/lib/attendance-rules";
 const ReportsChart = dynamic(() => import("@/components/reports/reports-chart").then(m => m.ReportsChart), {
   loading: () => <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">Loading chart…</div>,
   ssr: false,
@@ -162,7 +163,21 @@ export default function ReportsPage() {
     teacherName: r.name,
     initials: r.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
     group: r.group || "Unassigned",
-    scheduledIn: accounts[r.teacherId ?? ""]?.shiftTime?.split(" - ")[0] ?? "08:00 AM", // default schedule if missing
+    scheduledIn: (() => {
+      // Use stored shiftTime from account if available
+      const shiftStart = accounts[r.teacherId ?? ""]?.shiftTime?.split(" - ")[0];
+      if (shiftStart) return shiftStart;
+      // Otherwise derive from BASE_SCHEDULE for that day
+      const [y, mo, d] = r.dateStr.split("-").map(Number);
+      const dateObj = new Date(y, mo - 1, d, 12); // noon avoids DST edge cases
+      const day = getDayAbbr(dateObj);
+      const sched = day !== "Sun" ? BASE_SCHEDULE[day] : null;
+      if (!sched) return "08:30 AM";
+      const [h, m] = sched.start.split(":").map(Number);
+      const ampm = h < 12 ? "AM" : "PM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+    })(),
     actualIn: r.clockInTime
       ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "–",
@@ -170,7 +185,7 @@ export default function ReportsPage() {
       ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "Missing",
     breaksDuration: r.breaks ? calcBreakDuration(r.breaks) : "–",
-    status: (r.clockInTime && new Date(r.clockInTime).getHours() < 8 ? "ON TIME" : "LATE") as "ON TIME" | "LATE",
+    status: ((r as any).timeInStatus === "On Time" ? "ON TIME" : (r as any).timeInStatus === "Late" ? "LATE" : "ON TIME") as "ON TIME" | "LATE",
     totalHours: calcTotalHours(r),
     color: COLORS[i % COLORS.length],
   }));
@@ -182,7 +197,7 @@ export default function ReportsPage() {
     if (!weekMap[week]) weekMap[week] = { clockIns: 0, onTime: 0 };
     weekMap[week].clockIns += 1;
     const hour = r.clockInTime ? new Date(r.clockInTime).getHours() : 99;
-    if (hour < 8) weekMap[week].onTime += 1;
+    if ((r as any).timeInStatus === "On Time") weekMap[week].onTime += 1;
   }
   const trends = Object.entries(weekMap).map(([week, data]) => {
     const rate = data.clockIns > 0 ? Math.round((data.onTime / data.clockIns) * 100) : 0;

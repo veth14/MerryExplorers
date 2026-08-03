@@ -11,8 +11,11 @@ export async function GET(request: Request) {
     
     const { db } = await connectToDatabase();
     
-    // If userId is provided, fetch notifications for that user OR global notifications (no userId)
-    const query = userId ? { $or: [{ userId }, { userId: { $exists: false } }] } : {};
+    // If userId is provided, fetch notifications for that user OR global notifications (no userId).
+    // If NO userId (admin), fetch ONLY global notifications (those without a userId).
+    const query = userId
+      ? { $or: [{ userId }, { userId: { $exists: false } }] }
+      : { userId: { $exists: false } };
     
     const notifications = await db.collection("notifications").find(query).sort({ createdAt: -1 }).toArray();
     

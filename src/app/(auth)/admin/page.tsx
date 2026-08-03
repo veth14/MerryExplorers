@@ -82,16 +82,25 @@ export default function Home() {
 
   // Build activeStatus from today's attendance (include completed)
   const activeStatus = todayAttendance
-    .map((r) => ({
-      name: r.name,
-      time: `In: ${new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}`,
-      status: r.status === "Completed" ? ("COMPLETED" as const) : ("ON TIME" as const),
-      avatar: r.clockInPhotoUrl,
-    }));
+    .map((r) => {
+      const isCompleted = !!r.clockOutTime;
+      const timeLabel = isCompleted
+        ? `Out: ${new Date(r.clockOutTime!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}`
+        : `In: ${new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}`;
+      return {
+        name: r.name,
+        time: timeLabel,
+        status: isCompleted ? ("COMPLETED" as const) : ("ON TIME" as const),
+        avatar: r.clockInPhotoUrl,
+      };
+    });
 
-  // Build teamMembers from ALL teacher accounts
+  // Build teamMembers from ALL teacher + executive partner accounts
   const teamMembers = accounts
-    .filter((acc) => acc.role && acc.role.toLowerCase().includes("teacher"))
+    .filter((acc) => {
+      const role = (acc.role || "").toLowerCase();
+      return role.includes("teacher") || role === "executive partner";
+    })
     .map((acc) => {
       const r = todayAttendance.find((att) => att.teacherUid === acc.id);
       
@@ -149,11 +158,28 @@ export default function Home() {
       };
     });
 
-  const todayHistory = todayAttendance.map((r) => ({
-    name: `${r.name} Clocked In`,
-    time: new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
-    type: "in" as const,
-  }));
+  const todayHistory = todayAttendance
+    .flatMap((r) => {
+      const entries: { name: string; time: string; type: "in" | "out"; _ts: number }[] = [
+        {
+          name: `${r.name} Clocked In`,
+          time: new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
+          type: "in",
+          _ts: new Date(r.clockInTime).getTime(),
+        },
+      ];
+      if (r.clockOutTime) {
+        entries.push({
+          name: `${r.name} Clocked Out`,
+          time: new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
+          type: "out",
+          _ts: new Date(r.clockOutTime).getTime(),
+        });
+      }
+      return entries;
+    })
+    .sort((a, b) => b._ts - a._ts) // newest first
+    .map(({ _ts, ...rest }) => rest);
 
   return (
     <AppShell title="Welcome back, Admin!" description="Here's what's happening today across all playgroups.">
@@ -190,7 +216,7 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <DailyTeamOverview members={teamMembers as any} activeCount={activeStatus.length} />
+        <DailyTeamOverview members={teamMembers as any} activeCount={teamMembers.filter((m) => m.status === "WORKING" || m.status === "ON BREAK").length} />
       )}
 
       {/* Attendance Hub */}

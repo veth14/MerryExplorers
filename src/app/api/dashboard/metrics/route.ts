@@ -8,25 +8,40 @@ export async function GET(request: Request) {
   if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
-    
-    // 1. Get total teachers
-    const totalTeachers = await db.collection("accounts").countDocuments({ role: "teacher" });
 
-    // 2. Get today's attendance
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+    // 1. Total staff = Lead Teacher + Assistant Teacher + executive partner
+    const totalTeachers = await db.collection("accounts").countDocuments({
+      role: { $in: ["Lead Teacher", "Assistant Teacher", "executive partner"] },
+    });
+
+    // 2. Today's date in Manila timezone (avoids UTC off-by-one)
+    const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    const todayPHT = new Date(todayStr);
+    const yyyy = todayPHT.getFullYear();
+    const mm = String(todayPHT.getMonth() + 1).padStart(2, "0");
+    const dd = String(todayPHT.getDate()).padStart(2, "0");
     const dateStr = `${yyyy}-${mm}-${dd}`;
 
-    const todayAttendance = await db.collection("attendance").find({ dateStr }).toArray();
-    
-    const activeSessions = todayAttendance.filter(a => a.status === "In Progress").length;
+    const todayAttendance = await db
+      .collection("attendance")
+      .find({ dateStr })
+      .toArray();
+
+    const activeSessions = todayAttendance.filter(
+      (a) => a.status === "In Progress"
+    ).length;
     const totalClockIns = todayAttendance.length;
 
-    // 3. Punctuality (we can calculate this based on a mock threshold or just return a default for now)
-    // For simplicity, we'll return a static rate or calculate it if there's enough data
-    const punctualityRate = "94%"; 
+    // 3. Real punctuality from stored timeInStatus ("On Time" | "Late" | "Exempt")
+    const onTimeCount = todayAttendance.filter(
+      (a) => a.timeInStatus === "On Time" || a.timeInStatus === "Exempt"
+    ).length;
+    const punctualityRate =
+      totalClockIns > 0
+        ? `${Math.round((onTimeCount / totalClockIns) * 100)}%`
+        : "–";
+    const punctualityMeta =
+      totalClockIns > 0 ? `${onTimeCount} on time today` : "No clock-ins yet";
 
     const data = {
       totalTeachers: {
@@ -39,21 +54,25 @@ export async function GET(request: Request) {
       },
       punctualityRate: {
         value: punctualityRate,
-        meta: "+1% from last week",
+        meta: punctualityMeta,
       },
       totalClockIns: {
         value: totalClockIns.toString(),
         meta: "Total today",
-      }
+      },
     };
 
     return NextResponse.json({ success: true, data }, {
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
-      }
+        // Shorter cache so dashboard refreshes more frequently
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      },
     });
   } catch (error: any) {
     console.error("Failed to fetch dashboard metrics:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch metrics" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch metrics" },
+      { status: 500 }
+    );
   }
 }
