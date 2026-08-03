@@ -1,41 +1,64 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
+import { ObjectId } from "mongodb";
 
 // GET /api/announcements
+// Modes:
+//   (default)   — active (now >= startDate) + upcoming (startDate in future), non-expired
+//   ?all=true   — all records (admin manage view)
+//   ?admin=true — all records + readCount + totalTeachers (admin stats view)
 export async function GET(request: Request) {
   const deny = requireInternalAuth(request);
   if (deny) return deny;
   try {
-    const { db } = await connectToDatabase();
-    // Sort by most recent first
-    const announcements = await db.collection("announcements").find({}).sort({ createdAt: -1 }).toArray();
+    const { searchParams } = new URL(request.url);
+    const fetchAll = searchParams.get("all") === "true";
+    const adminView = searchParams.get("admin") === "true";
 
-    // If empty, return a default set based on the static data for the demo
-    if (announcements.length === 0) {
-      const defaultData = [
-        {
-          title: "Fire Drill Practice Tomorrow",
-          timeAgo: "2 hrs ago", // We'll store strings for demo simplicity, or timestamps
-          content: "Please ensure all toddlers are familiarized with the exit routes. Practice will be at 10:30 AM.",
-          type: "alert",
-          createdAt: new Date()
-        },
-        {
-          title: "Staff Meeting Moved",
-          timeAgo: "Yesterday",
-          content: "The Friday staff meeting has been moved to Thursday afternoon during nap time (1:00 PM) in the main hall.",
-          type: "info",
-          createdAt: new Date(Date.now() - 86400000) // 1 day ago
-        },
-      ];
-      await db.collection("announcements").insertMany(defaultData);
-      return NextResponse.json({ success: true, data: defaultData });
+    const { db } = await connectToDatabase();
+    
+    let query: any = {};
+    if (!fetchAll && !adminView) {
+      // Teacher view: active + upcoming, no expired
+      const now = new Date().toISOString();
+      query = {
+        $or: [
+          // Expired check: endDate must be null, missing, or in the future
+          { endDate: null },
+          { endDate: { $exists: false } },
+          { endDate: { $gte: now } },
+        ],
+      };
+    }
+    // fetchAll=true or admin=true → no filter, return everything
+
+    const announcements = await db.collection("announcements").find(query).sort({ startDate: -1 }).toArray();
+
+    let totalTeachers = 0;
+    if (adminView) {
+      totalTeachers = await db.collection("accounts").countDocuments({
+        role: { $in: ["Lead Teacher", "Assistant Teacher", "executive partner"] },
+      });
     }
 
-    return NextResponse.json({ success: true, data: announcements }, {
+    // Map _id to id and optionally attach read stats
+    const mapped = await Promise.all(
+      announcements.map(async (a) => {
+        const base = { ...a, id: a._id.toString(), _id: undefined };
+        if (adminView) {
+          const readCount = await db.collection("announcement_reads").countDocuments({
+            announcementId: a._id.toString(),
+          });
+          return { ...base, readCount, totalTeachers };
+        }
+        return base;
+      })
+    );
+
+    return NextResponse.json({ success: true, data: mapped }, {
       headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60"
+        "Cache-Control": "no-store", // Read counts must stay fresh
       }
     });
   } catch (error: any) {
@@ -50,9 +73,9 @@ export async function POST(request: Request) {
   if (deny) return deny;
   try {
     const data = await request.json();
-    const { title, content, type } = data;
+    const { title, content, type, startDate, endDate } = data;
 
-    if (!title || !content || !type) {
+    if (!title || !content || !type || !startDate) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -62,14 +85,85 @@ export async function POST(request: Request) {
       title,
       content,
       type,
-      timeAgo: "Just now", // In a real app, compute this on the frontend using createdAt
+      startDate, // ISO String
+      endDate: endDate || null, // ISO String or null
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const result = await db.collection("announcements").insertOne(newRecord);
-    return NextResponse.json({ success: true, data: { ...newRecord, _id: result.insertedId } });
+    return NextResponse.json({ success: true, data: { ...newRecord, id: result.insertedId.toString() } });
   } catch (error: any) {
     console.error("Failed to create announcement:", error);
     return NextResponse.json({ error: error.message || "Failed to create" }, { status: 500 });
+  }
+}
+
+// PUT /api/announcements (Admin only)
+export async function PUT(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
+  try {
+    const data = await request.json();
+    const { id, title, content, type, startDate, endDate } = data;
+
+    if (!id || !title || !content || !type || !startDate) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const { db } = await connectToDatabase();
+
+    const updateDoc = {
+      $set: {
+        title,
+        content,
+        type,
+        startDate,
+        endDate: endDate || null,
+        updatedAt: new Date(),
+      }
+    };
+
+    const result = await db.collection("announcements").updateOne(
+      { _id: new ObjectId(id) },
+      updateDoc
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
+    }
+
+    const updated = await db.collection("announcements").findOne({ _id: new ObjectId(id) });
+    return NextResponse.json({ success: true, data: { ...updated, id: updated?._id.toString(), _id: undefined } });
+  } catch (error: any) {
+    console.error("Failed to update announcement:", error);
+    return NextResponse.json({ error: error.message || "Failed to update" }, { status: 500 });
+  }
+}
+
+// DELETE /api/announcements (Admin only)
+export async function DELETE(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    const { db } = await connectToDatabase();
+
+    const result = await db.collection("announcements").deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Failed to delete announcement:", error);
+    return NextResponse.json({ error: error.message || "Failed to delete" }, { status: 500 });
   }
 }

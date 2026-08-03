@@ -6,11 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Announcement = {
+  id: string;
   _id?: string;
   title: string;
-  timeAgo: string;
   content: string;
   type: string;
+  startDate: string;
+  endDate: string | null;
   createdAt?: string;
 };
 
@@ -118,6 +120,7 @@ function timeAgoFromDate(isoString: string) {
 export default function TeacherDashboardPage() {
   const { user, userProfile } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [todayShift, setTodayShift] = useState<ShiftRecord | null>(null);
   const [loadingAnn, setLoadingAnn] = useState(true);
   const [loadingShift, setLoadingShift] = useState(true);
@@ -138,7 +141,24 @@ export default function TeacherDashboardPage() {
         ]);
         const [annJson, shiftJson] = await Promise.all([annRes.json(), shiftRes.json()]);
         
-        if (annJson.success) setAnnouncements(annJson.data);
+        if (annJson.success) {
+          const annData: Announcement[] = annJson.data;
+          setAnnouncements(annData);
+
+          // Fetch which announcements this teacher has already read
+          const visibleIds = annData.map(a => a.id).filter(Boolean);
+          if (visibleIds.length > 0 && user?.uid) {
+            try {
+              const readRes = await fetch(`/api/announcements/read?uid=${user!.uid}&ids=${visibleIds.join(",")}`);
+              const readJson = await readRes.json();
+              if (readJson.success) {
+                setReadIds(new Set(readJson.readIds as string[]));
+              }
+            } catch {
+              // non-fatal, just no unread tracking
+            }
+          }
+        }
         
         if (shiftJson.success && Array.isArray(shiftJson.data)) {
           const records: ShiftRecord[] = shiftJson.data;
@@ -232,6 +252,29 @@ export default function TeacherDashboardPage() {
   const isClocked = todayShift?.status === "In Progress";
   const isClockedOut = todayShift?.status === "Completed";
   const clockInTimeStr = todayShift?.clockInTime ? formatTime(todayShift.clockInTime) : null;
+
+  // Visibility helpers
+  const now = new Date();
+  const getVisibility = (a: Announcement): "active" | "upcoming" | "expired" => {
+    const start = new Date(a.startDate);
+    const end = a.endDate ? new Date(a.endDate) : null;
+    if (end && now > end) return "expired";
+    if (now >= start) return "active";
+    return "upcoming";
+  };
+
+  // Filter out expired, sort active first then upcoming
+  const visibleAnnouncements = announcements
+    .filter(a => getVisibility(a) !== "expired")
+    .sort((a, b) => {
+      const va = getVisibility(a);
+      const vb = getVisibility(b);
+      if (va === "active" && vb !== "active") return -1;
+      if (vb === "active" && va !== "active") return 1;
+      return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+    });
+
+  const unreadCount = visibleAnnouncements.filter(a => !readIds.has(a.id)).length;
 
   return (
     <TeacherShell
@@ -333,10 +376,18 @@ export default function TeacherDashboardPage() {
               <div className="flex items-center gap-3">
                 <span className="block w-7 h-[3px] rounded-full bg-brand-yellow" />
                 <h2 className="text-[20px] font-black text-brand-navy">Announcements</h2>
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                    {unreadCount}
+                  </span>
+                )}
               </div>
-              <button className="text-[10px] font-black uppercase tracking-widest text-brand-blue hover:underline">
+              <a
+                href="/teacher/announcements"
+                className="text-[10px] font-black uppercase tracking-widest text-brand-blue hover:underline"
+              >
                 View All
-              </button>
+              </a>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -346,48 +397,68 @@ export default function TeacherDashboardPage() {
                     <Skeleton key={i} className="h-16 w-full rounded-2xl" />
                   ))}
                 </div>
-              ) : announcements.length === 0 ? (
+              ) : visibleAnnouncements.length === 0 ? (
                 <p className="text-[13px] text-brand-navy/40 font-bold">No announcements right now.</p>
               ) : (
-                announcements.slice(0, 3).map((a, i) => (
-                  <div
-                    key={a._id ?? i}
-                    className={`flex gap-4 p-4 rounded-2xl border relative overflow-hidden ${
-                      a.type === "alert"
-                        ? "bg-amber-50/60 border-brand-yellow/30"
-                        : "bg-blue-50/40 border-brand-sky/40"
-                    }`}
-                  >
-                    {/* Left accent bar */}
+                visibleAnnouncements.slice(0, 3).map((a, i) => {
+                  const visibility = getVisibility(a);
+                  const isUnread = !readIds.has(a.id);
+                  return (
                     <div
-                      className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${
-                        a.type === "alert" ? "bg-brand-yellow" : "bg-brand-blue"
-                      }`}
-                    />
-                    {/* Icon */}
-                    <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                      key={a.id ?? i}
+                      className={`flex gap-4 p-4 rounded-2xl border relative overflow-hidden ${
                         a.type === "alert"
-                          ? "bg-brand-yellow/20 text-amber-600"
-                          : "bg-brand-sky/40 text-brand-blue"
-                      }`}
+                          ? "bg-amber-50/60 border-brand-yellow/30"
+                          : a.type === "success"
+                          ? "bg-emerald-50/60 border-emerald-200/50"
+                          : "bg-blue-50/40 border-brand-sky/40"
+                      } ${isUnread ? "ring-2 ring-brand-blue/20" : ""}`}
                     >
-                      {a.type === "alert" ? <AlertIcon /> : <InfoIcon />}
-                    </div>
-                    {/* Text */}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="text-[13px] font-black text-brand-navy">{a.title}</h3>
-                        <span className="text-[10px] font-bold text-brand-navy/40">
-                          {a.createdAt ? timeAgoFromDate(a.createdAt) : a.timeAgo}
-                        </span>
+                      {/* Left accent bar */}
+                      <div
+                        className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${
+                          a.type === "alert" ? "bg-brand-yellow" :
+                          a.type === "success" ? "bg-emerald-400" :
+                          "bg-brand-blue"
+                        }`}
+                      />
+                      {/* Icon */}
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                          a.type === "alert"
+                            ? "bg-brand-yellow/20 text-amber-600"
+                            : a.type === "success"
+                            ? "bg-emerald-100 text-emerald-600"
+                            : "bg-brand-sky/40 text-brand-blue"
+                        }`}
+                      >
+                        {a.type === "alert" ? <AlertIcon /> : <InfoIcon />}
                       </div>
-                      <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed">
-                        {a.content}
-                      </p>
+                      {/* Text */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="text-[13px] font-black text-brand-navy">{a.title}</h3>
+                          {/* Visibility badge */}
+                          {visibility === "active" ? (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                              Live
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              Upcoming
+                            </span>
+                          )}
+                          {isUnread && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[12px] font-medium text-brand-navy/70 leading-relaxed">
+                          {a.content}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

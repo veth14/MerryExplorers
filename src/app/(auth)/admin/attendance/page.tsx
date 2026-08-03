@@ -97,6 +97,7 @@ export default function AttendancePage() {
   })();
 
   const [suspendDateInput, setSuspendDateInput] = useState(todayStr);
+  const [autoAnnounce, setAutoAnnounce] = useState(true);
 
   const handleSuspend = async () => {
     setSuspendLoading(true);
@@ -106,6 +107,27 @@ export default function AttendancePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dateStr: suspendDateInput, reason: suspendInput.trim() || "Suspension announced" }),
       });
+
+      if (autoAnnounce) {
+        const suspendReason = suspendInput.trim() || "Suspension announced";
+        const startDate = new Date().toISOString(); // Start immediately
+        // End date at 11:59 PM of the suspended day
+        const endDateObj = new Date(suspendDateInput);
+        endDateObj.setHours(23, 59, 59, 999);
+        
+        await fetch("/api/announcements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: `Classes Suspended: ${suspendDateInput}`,
+            content: `Please be advised that classes are suspended on ${suspendDateInput}. Reason: ${suspendReason}.`,
+            type: "alert",
+            startDate: startDate,
+            endDate: endDateObj.toISOString(),
+          }),
+        });
+      }
+
       invalidateCache(`dashboard:attendance:${viewDateStr}`);
       setShowSuspendModal(false);
       setSuspendInput("");
@@ -354,8 +376,22 @@ export default function AttendancePage() {
               value={suspendInput}
               onChange={(e) => setSuspendInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !suspendLoading && handleSuspend()}
-              className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all mb-5"
+              className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all mb-4"
             />
+
+            {/* Auto Announce Checkbox */}
+            <div className="flex items-center gap-2 mb-6 ml-1">
+              <input
+                type="checkbox"
+                id="autoAnnounce"
+                checked={autoAnnounce}
+                onChange={(e) => setAutoAnnounce(e.target.checked)}
+                className="w-4 h-4 text-[#005cc8] rounded border-gray-300 focus:ring-[#005cc8]"
+              />
+              <label htmlFor="autoAnnounce" className="text-[12px] font-bold text-[#002f76] cursor-pointer">
+                Auto-generate announcement
+              </label>
+            </div>
 
             <div className="flex gap-3">
               <button
