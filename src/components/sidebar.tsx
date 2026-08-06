@@ -15,6 +15,7 @@ const navItems = [
   { label: "Inquiries", href: "/admin/inquiries" },
   { label: "Reports", href: "/admin/reports" },
   { label: "Announcements", href: "/admin/announcements" },
+  { label: "Payroll", href: "/admin/payroll" },
   { label: "Audit Log", href: "/admin/audit-log" },
 ] as const;
 
@@ -115,6 +116,17 @@ function AnnouncementsIcon() {
   );
 }
 
+function PayrollIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+      <path d="M7 15h.01" />
+      <path d="M11 15h2" />
+    </svg>
+  );
+}
+
 function AuditIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -136,6 +148,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Inquiries: InquiriesIcon,
   Reports: ReportsIcon,
   Announcements: AnnouncementsIcon,
+  Payroll: PayrollIcon,
   "Audit Log": AuditIcon,
 };
 
@@ -148,6 +161,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { signOut, user, userProfile } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>("HR & People");
 
   const displayName = userProfile?.fullName || user?.email || "Admin User";
   const initials = displayName
@@ -230,27 +244,79 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
         <div>
           <p className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#005cc8] mb-3">ADMIN TOOLS</p>
-          <div className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = iconMap[item.label];
-              const isActive = pathname === item.href;
+          <div className="space-y-2">
+            <Link
+              href="/admin"
+              onClick={handleNavClick}
+              className={[
+                "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-bold transition-colors",
+                pathname === "/admin"
+                  ? "bg-[#005cc8] text-white shadow-sm"
+                  : "text-[#005cc8] hover:bg-[#005cc8]/10 font-semibold",
+              ].join(" ")}
+            >
+              <span className={pathname === "/admin" ? "text-white" : "text-[#005cc8]"}>
+                {(() => { const Icon = iconMap["Dashboard"]; return Icon ? <Icon active={pathname === "/admin"} /> : null; })()}
+              </span>
+              <span>Dashboard</span>
+            </Link>
+            
+            {[
+              {
+                title: "HR & People",
+                items: ["Teachers", "Accounts", "Payroll"]
+              },
+              {
+                title: "Time & Attendance",
+                items: ["Attendance", "Leave Requests"]
+              },
+              {
+                title: "Operations",
+                items: ["Inquiries", "Reports", "Announcements", "Audit Log"]
+              }
+            ].map((group) => {
+              const isExpanded = expandedGroup === group.title;
+              const groupItems = group.items.map(label => navItems.find(i => i.label === label)).filter(Boolean) as {label: string, href: string}[];
+              const hasActiveItem = groupItems.some(item => pathname === item.href || pathname.startsWith(item.href + "/"));
+              
               return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={handleNavClick}
-                  className={[
-                    "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-bold transition-colors",
-                    isActive
-                      ? "bg-[#005cc8] text-white shadow-sm"
-                      : "text-[#005cc8] hover:bg-[#005cc8]/10 font-semibold",
-                  ].join(" ")}
-                >
-                  <span className={isActive ? "text-white" : "text-[#005cc8]"}>
-                    {Icon && <Icon active={isActive} />}
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
+                <div key={group.title} className="mb-1">
+                  <button
+                    onClick={() => setExpandedGroup(isExpanded ? null : group.title)}
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-widest text-[#005cc8] hover:bg-[#005cc8]/5 rounded-lg transition-colors"
+                  >
+                    <span className={hasActiveItem ? "text-[#005cc8]" : "text-[#005cc8]/70"}>{group.title}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className={`w-3.5 h-3.5 text-[#005cc8]/50 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? "max-h-96 opacity-100 mt-1" : "max-h-0 opacity-0"}`}>
+                    <div className="space-y-1 pl-2 border-l-2 border-[#005cc8]/10 ml-4">
+                      {groupItems.map((item) => {
+                        const Icon = iconMap[item.label];
+                        const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+                        return (
+                          <Link
+                            key={item.label}
+                            href={item.href}
+                            onClick={handleNavClick}
+                            className={[
+                              "flex items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] font-bold transition-colors",
+                              isActive
+                                ? "bg-[#005cc8] text-white shadow-sm"
+                                : "text-[#005cc8] hover:bg-[#005cc8]/10 font-semibold",
+                            ].join(" ")}
+                          >
+                            <span className={isActive ? "text-white" : "text-[#005cc8] scale-90"}>
+                              {Icon && <Icon active={isActive} />}
+                            </span>
+                            <span>{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               );
             })}
           </div>
