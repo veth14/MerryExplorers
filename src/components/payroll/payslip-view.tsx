@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 
@@ -205,7 +206,6 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
   );
 }
 
-import { useEffect } from "react";
 
 export function PayslipView() {
   const CUT_OFFS = generateCutOffs();
@@ -242,8 +242,46 @@ export function PayslipView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
+      <style type="text/css" media="print">
+        {`
+          @page { size: letter portrait; margin: 0; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .print-page-wrapper {
+            width: 100%;
+            height: 100vh; /* Exactly one page */
+            page-break-after: always;
+            break-after: page;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+          }
+          .print-payslip-card {
+            width: 500px; /* Fixed base width */
+            transform: scale(1.45); /* Scale up to fill 8.5x11 page (~725px scaled width) */
+            transform-origin: center center;
+            border: none !important;
+            box-shadow: none !important;
+          }
+          /* Remove the last page break */
+          .print-page-wrapper:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
+        `}
+      </style>
+      
       {/* Filter Bar */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky gap-4 w-full">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky gap-4 w-full print:hidden">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2.5 shrink-0">
             <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "20px" }}>
@@ -351,7 +389,7 @@ export function PayslipView() {
           className="flex items-center gap-2 rounded-full bg-brand-blue px-6 py-2.5 text-[13px] font-bold text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0 shrink-0"
         >
           <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>print</span>
-          Print Payslip
+          Print Payslips
         </button>
       </div>
 
@@ -383,14 +421,30 @@ export function PayslipView() {
         ) : (
           <motion.div
             key={`${selectedEmployeeId}-${selectedCutOffValue}`}
-            className="flex flex-col lg:flex-row gap-5 w-full"
+            className="flex flex-col lg:flex-row gap-5 w-full print:block print:w-auto"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.3 }}
           >
-            <PayslipCard data={payslipRecord} variant="employee" dateLabel={selectedCutOff.dateLabel} periodLabel={selectedCutOff.periodLabel} />
-            <PayslipCard data={payslipRecord} variant="accounting" dateLabel={selectedCutOff.dateLabel} periodLabel={selectedCutOff.periodLabel} />
+            <div className="print:hidden lg:flex lg:flex-row lg:gap-5 w-full">
+              <PayslipCard data={payslipRecord} variant="employee" dateLabel={selectedCutOff.dateLabel} periodLabel={selectedCutOff.periodLabel} />
+              <PayslipCard data={payslipRecord} variant="accounting" dateLabel={selectedCutOff.dateLabel} periodLabel={selectedCutOff.periodLabel} />
+            </div>
+
+            {/* Print-only layout */}
+            <div className="hidden print:block w-full">
+              <div className="print-page-wrapper">
+                <div className="print-payslip-card">
+                  <PayslipCard data={payslipRecord} variant="employee" dateLabel={selectedCutOff.dateLabel} periodLabel={selectedCutOff.periodLabel} />
+                </div>
+              </div>
+              <div className="print-page-wrapper">
+                <div className="print-payslip-card">
+                  <PayslipCard data={payslipRecord} variant="accounting" dateLabel={selectedCutOff.dateLabel} periodLabel={selectedCutOff.periodLabel} />
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

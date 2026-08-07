@@ -23,7 +23,7 @@ export default function PayrollPage() {
   return (
     <AppShell title="Payroll" description="Manage and generate payroll for staff.">
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 bg-white p-2 rounded-[2rem] border-2 border-brand-sky shadow-sm w-fit max-w-full overflow-x-auto">
+      <div className="flex flex-wrap gap-2 bg-white p-2 rounded-[2rem] border-2 border-brand-sky shadow-sm w-fit max-w-full overflow-x-auto print:hidden">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
