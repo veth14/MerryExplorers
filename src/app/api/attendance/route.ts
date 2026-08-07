@@ -47,8 +47,12 @@ export async function GET(request: Request) {
       }
     }
 
+    // Also fetch all suspended days for bulk queries
+    const allSuspendedDocs = await db.collection("suspended_days").find({}).toArray();
+    const suspendedDays = allSuspendedDocs.map(d => d.dateStr);
+
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
-    return NextResponse.json({ success: true, data: attendanceRecords, isSuspended, suspendReason }, {
+    return NextResponse.json({ success: true, data: attendanceRecords, isSuspended, suspendReason, suspendedDays }, {
       headers: {
         "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30"
       }

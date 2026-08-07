@@ -39,6 +39,46 @@ export const BASE_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, DaySchedule> = {
   Sat: { start: "08:30", graceUntil: "08:45", normalEnd: "12:00", flexFloor: "10:30" },
 };
 
+/**
+ * Per-day break schedule (minutes to deduct from raw clock-in/out hours).
+ *
+ * TUESDAY, THURSDAY, FRIDAY:
+ *   - 11:45 AM–12:45 PM  = 60 min
+ *   - 3:30 PM–4:00 PM    = 30 min
+ *   - Total              = 90 min
+ *
+ * MONDAY AND WEDNESDAY:
+ *   - 11:30 AM–12:00 PM  = 30 min
+ *   Note: schedule may change depending on program. Update this constant as needed.
+ *
+ * SATURDAY: No break deduction.
+ *
+ * This is the single source of truth — imported by both API routes and UI components.
+ * Do NOT duplicate this logic locally; always import from this module.
+ */
+export const BREAK_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, number> = {
+  Mon: 30,  // 30 min (11:30–12:00) — configurable if program changes
+  Tue: 90,  // 90 min (11:45–12:45 + 3:30–4:00)
+  Wed: 30,  // 30 min
+  Thu: 90,  // 90 min
+  Fri: 90,  // 90 min
+  Sat: 0,   // No break deduction on Saturdays
+};
+
+/**
+ * Returns the number of break minutes to deduct for a given day-of-week index
+ * (0 = Sunday, 1 = Monday, …, 6 = Saturday).
+ *
+ * This replaces all local getBreakMinutes() copies in the codebase.
+ *
+ * @param dayOfWeek  JS Date.getDay() value (0–6)
+ */
+export function getBreakMinutes(dayOfWeek: number): number {
+  if (dayOfWeek === 0) return 0; // Sunday
+  const abbr = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[dayOfWeek] as Exclude<DayAbbr, "Sun">;
+  return BREAK_SCHEDULE[abbr] ?? 0;
+}
+
 // ── Status types ─────────────────────────────────────────────────────────────────
 export type TimeInStatus = "On Time" | "Late" | "Exempt";
 export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended";

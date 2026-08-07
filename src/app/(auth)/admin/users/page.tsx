@@ -111,6 +111,15 @@ function emptyDraft(): Draft {
     status: "active",
     tags: [],
     joinDate: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+    monthlyRate: 0,
+    dailyRate: 0,
+    hourlyRate: 0,
+    sssContribution: 0,
+    philhealthContribution: 0,
+    pagibigContribution: 0,
+    communicationAllowance: 0,
+    perfectAttendanceIncentive: 0,
+    birthdayGift: 0,
     emergencyContacts: [],
   };
 }
@@ -135,6 +144,15 @@ function draftFromUser(u: UserAccount): Draft {
     status: u.status || "Active",
     tags: [...(u.tags || [])],
     joinDate: u.joinDate || "",
+    monthlyRate: u.monthlyRate || 0,
+    dailyRate: u.dailyRate || 0,
+    hourlyRate: u.hourlyRate || 0,
+    sssContribution: u.sssContribution || 0,
+    philhealthContribution: u.philhealthContribution || 0,
+    pagibigContribution: u.pagibigContribution || 0,
+    communicationAllowance: u.communicationAllowance || 0,
+    perfectAttendanceIncentive: u.perfectAttendanceIncentive || 0,
+    birthdayGift: u.birthdayGift || 0,
     emergencyContacts: (u.emergencyContacts || []).map((c) => ({ ...c })),
   };
 }
@@ -159,8 +177,8 @@ function UserModal({
 
   const isTeacher = !["admin", "executive partner"].includes((draft.role || "").toLowerCase());
   const STEPS = isTeacher 
-    ? ["Avatar & Role", "Personal Info", "Work Details", "Emergency Contacts"]
-    : ["Avatar & Role", "Personal Info"];
+    ? ["Avatar & Role", "Personal Info", "Work Details", "Payroll Details", "Emergency Contacts"]
+    : ["Avatar & Role", "Personal Info", "Payroll Details"];
 
   function set<K extends keyof Draft>(key: K, val: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: val }));
@@ -184,7 +202,15 @@ function UserModal({
       if (!draft.fullName.trim()) { setError("Full name is required."); return false; }
       if (!draft.email.trim()) { setError("Email is required."); return false; }
     }
-    if (step === 2 && !draft.employeeId.trim()) { setError("Employee ID is required."); return false; }
+    if (step === 2 && isTeacher && !draft.employeeId.trim()) { setError("Employee ID is required."); return false; }
+    return true;
+  }
+
+  function validateAll() {
+    if (!draft.role) { setError("Please select a role in Avatar & Role."); return false; }
+    if (!draft.fullName.trim()) { setError("Full name is required in Personal Info."); return false; }
+    if (!draft.email.trim()) { setError("Email is required in Personal Info."); return false; }
+    if (isTeacher && !draft.employeeId.trim()) { setError("Employee ID is required in Work Details."); return false; }
     return true;
   }
 
@@ -199,7 +225,7 @@ function UserModal({
   }
 
   async function handleSubmit() {
-    if (!validate()) return;
+    if (!validateAll()) return;
     setLoading(true);
     setError("");
 
@@ -231,6 +257,15 @@ function UserModal({
         shiftTime: draft.shiftTime,
         noTimeLog: draft.noTimeLog,
         weeklyHoursTarget: draft.weeklyHoursTarget,
+        monthlyRate: draft.monthlyRate,
+        dailyRate: draft.dailyRate,
+        hourlyRate: draft.hourlyRate,
+        sssContribution: draft.sssContribution,
+        philhealthContribution: draft.philhealthContribution,
+        pagibigContribution: draft.pagibigContribution,
+        communicationAllowance: draft.communicationAllowance,
+        perfectAttendanceIncentive: draft.perfectAttendanceIncentive,
+        birthdayGift: draft.birthdayGift,
         emergencyContacts: draft.emergencyContacts.filter((c) => c.name.trim()),
       };
 
@@ -280,13 +315,17 @@ function UserModal({
             <StepDots current={step} total={STEPS.length} />
           </div>
           {/* Step labels */}
-          <div className="flex gap-0">
+          <div className="flex gap-0 mt-1">
             {STEPS.map((label, i) => (
-              <div key={label} className="flex-1 text-center">
-                <p className={`text-[10px] font-bold truncate transition-colors ${i === step ? "text-white" : i < step ? "text-white/50" : "text-white/30"}`}>
+              <button 
+                key={label} 
+                onClick={() => setStep(i)}
+                className="flex-1 text-center py-1.5 focus:outline-none hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <p className={`text-[10px] font-bold truncate transition-colors ${i === step ? "text-white" : i < step ? "text-white/60" : "text-white/40 hover:text-white/60"}`}>
                   {label}
                 </p>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -681,8 +720,121 @@ function UserModal({
             </div>
           )}
 
-          {/* ── STEP 3: Emergency Contacts ── */}
-          {step === 3 && (
+          {/* ── STEP 3/2: Payroll Details ── */}
+          {((isTeacher && step === 3) || (!isTeacher && step === 2)) && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="Monthly Rate">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.monthlyRate || ""}
+                      onChange={(e) => set("monthlyRate", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+                <Field label="Daily Rate">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.dailyRate || ""}
+                      onChange={(e) => set("dailyRate", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+                <Field label="Hourly Rate">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.hourlyRate || ""}
+                      onChange={(e) => set("hourlyRate", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="SSS Contribution">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.sssContribution || ""}
+                      onChange={(e) => set("sssContribution", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+                <Field label="PhilHealth">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.philhealthContribution || ""}
+                      onChange={(e) => set("philhealthContribution", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+                <Field label="Pag-ibig">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.pagibigContribution || ""}
+                      onChange={(e) => set("pagibigContribution", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="Comm Allowance">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.communicationAllowance || ""}
+                      onChange={(e) => set("communicationAllowance", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+                <Field label="Perfect Attendance">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.perfectAttendanceIncentive || ""}
+                      onChange={(e) => set("perfectAttendanceIncentive", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+                <Field label="Birthday Gift">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
+                    <input
+                      type="number"
+                      value={draft.birthdayGift || ""}
+                      onChange={(e) => set("birthdayGift", parseFloat(e.target.value) || 0)}
+                      className={`${INPUT_CLS} pl-7`}
+                    />
+                  </div>
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 4: Emergency Contacts ── */}
+          {isTeacher && step === 4 && (
             <div className="space-y-4">
               <div className="rounded-xl bg-[#fff8e1] border border-[#ffd54f] px-4 py-3 text-[12px] font-semibold text-[#a07000]">
                 ℹ️ Emergency contacts are optional. Leave blank to skip.

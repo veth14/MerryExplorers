@@ -48,6 +48,17 @@ export type UserAccount = {
    */
   weeklyHoursTarget: number | null;
 
+  // Payroll details
+  monthlyRate?: number;
+  dailyRate?: number;
+  hourlyRate?: number;
+  sssContribution?: number;
+  philhealthContribution?: number;
+  pagibigContribution?: number;
+  communicationAllowance?: number;
+  perfectAttendanceIncentive?: number;
+  birthdayGift?: number;
+
   // Emergency contacts (optional)
   emergencyContacts: EmergencyContact[];
 };

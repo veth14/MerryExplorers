@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/app-shell";
 import { ReportsTable } from "@/components/reports/reports-table";
-import { BASE_SCHEDULE, getDayAbbr } from "@/lib/attendance-rules";
+import { BASE_SCHEDULE, getDayAbbr, getBreakMinutes } from "@/lib/attendance-rules";
+
 const ReportsChart = dynamic(() => import("@/components/reports/reports-chart").then(m => m.ReportsChart), {
   loading: () => <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">Loading chart…</div>,
   ssr: false,
@@ -38,12 +39,16 @@ const COLORS = ["#0066cc", "#ffb800", "#339933", "#9333ea", "#ef4444", "#0891b2"
 function calcTotalHours(record: AttendanceRecord) {
   if (!record.clockInTime || !record.clockOutTime) return "–";
   let ms = new Date(record.clockOutTime).getTime() - new Date(record.clockInTime).getTime();
-  for (const b of record.breaks) {
-    if (b.start && b.end) ms -= new Date(b.end).getTime() - new Date(b.start).getTime();
-  }
+  
+  // Deduct automatic break time based on the day (from shared attendance-rules)
+  const [y, m, d] = record.dateStr.split("-").map(Number);
+  const dayOfWeek = new Date(y, m - 1, d).getDay();
+  const breakMs = getBreakMinutes(dayOfWeek) * 60000;
+  ms = Math.max(0, ms - breakMs);
+
   const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  return `${h}h ${m.toString().padStart(2, "0")}m`;
+  const min = Math.floor((ms % 3600000) / 60000);
+  return `${h}h ${min.toString().padStart(2, "0")}m`;
 }
 
 function formatDate(dateStr: string) {
@@ -56,17 +61,15 @@ function getWeekOfMonth(dateStr: string) {
   return `W${Math.ceil(d / 7)}`;
 }
 
-function calcBreakDuration(breaks: { start: string; end: string | null }[]) {
-  let ms = 0;
-  for (const b of breaks) {
-    if (b.start && b.end) ms += new Date(b.end).getTime() - new Date(b.start).getTime();
-  }
-  if (ms === 0) return "–";
-  const mins = Math.floor(ms / 60000);
+function calcBreakDuration(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dayOfWeek = new Date(y, m - 1, d).getDay();
+  const mins = getBreakMinutes(dayOfWeek);
+  if (mins === 0) return "–";
   const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  const rem = mins % 60;
+  if (h > 0) return `${h}h ${rem > 0 ? `${rem}m` : ""}`;
+  return `${rem}m`;
 }
 
 export default function ReportsPage() {
@@ -184,7 +187,7 @@ export default function ReportsPage() {
     clockOut: r.clockOutTime
       ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
       : "Missing",
-    breaksDuration: r.breaks ? calcBreakDuration(r.breaks) : "–",
+    breaksDuration: calcBreakDuration(r.dateStr),
     status: ((r as any).timeInStatus === "On Time" ? "ON TIME" : (r as any).timeInStatus === "Late" ? "LATE" : "ON TIME") as "ON TIME" | "LATE",
     totalHours: calcTotalHours(r),
     color: COLORS[i % COLORS.length],

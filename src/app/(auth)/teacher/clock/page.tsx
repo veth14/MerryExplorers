@@ -889,23 +889,7 @@ export default function ClockPage() {
                 </button>
               )}
 
-              {/* Break / End Break */}
-              {clockedIn && (
-                <button
-                  onClick={handleTakeBreak}
-                  className="w-full rounded-full border border-[#e2e8f0] bg-white py-3 text-[14px] font-bold text-[#5a6e8c] transition-colors hover:bg-[#f0f4f9]"
-                >
-                  Take Break
-                </button>
-              )}
-              {onBreak && (
-                <button
-                  onClick={handleEndBreak}
-                  className="w-full rounded-full bg-[#0050d5] py-3 text-[14px] font-bold text-white shadow-[0_6px_18px_-4px_rgba(0,80,213,0.5)] transition-all hover:bg-[#0046b8] active:translate-y-px"
-                >
-                  End Break
-                </button>
-              )}
+              {/* Manual break buttons removed: breaks are now automatically deducted based on the day. */}
             </div>
 
             {/* Last activity */}
