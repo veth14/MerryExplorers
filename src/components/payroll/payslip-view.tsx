@@ -48,8 +48,8 @@ function generateCutOffs(): { label: string; value: string; startStr: string; en
     cutOffs.push({
       label: `${monthName} ${pay2.getDate()}, ${year} (${monthName.slice(0, 3)} 11–25)`,
       value: `${year}-${month}-2h`,
-      startStr: `${year}-${String(month+1).padStart(2, "0")}-11`,
-      endStr: `${year}-${String(month+1).padStart(2, "0")}-25`,
+      startStr: `${year}-${String(month + 1).padStart(2, "0")}-11`,
+      endStr: `${year}-${String(month + 1).padStart(2, "0")}-25`,
       dateLabel: `${monthName.toUpperCase()} ${pay2.getDate()}, ${year}`,
       periodLabel: `${monthName} 11, ${year} to ${monthName} 25, ${year}`,
     });
@@ -59,7 +59,7 @@ function generateCutOffs(): { label: string; value: string; startStr: string; en
       label: `${monthName} ${pay1.getDate()}, ${year} (${new Date(year, month - 1).toLocaleString("en-US", { month: "short" })} 26–${monthName.slice(0, 3)} 10)`,
       value: `${year}-${month}-1h`,
       startStr: `${year}-${String(month).padStart(2, "0")}-26`,
-      endStr: `${year}-${String(month+1).padStart(2, "0")}-10`,
+      endStr: `${year}-${String(month + 1).padStart(2, "0")}-10`,
       dateLabel: `${monthName.toUpperCase()} 15, ${year}`,
       periodLabel: `${new Date(year, month - 1).toLocaleString("en-US", { month: "long" })} 26, ${year} to ${monthName} 10, ${year}`,
     });
@@ -72,7 +72,7 @@ const fmt = (val: number) =>
 
 function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollRecord; variant: "employee" | "accounting", dateLabel: string, periodLabel: string }) {
   const isEmployee = variant === "employee";
-  
+
   // Choose which values to display based on the copy
   const sssVal = isEmployee ? data.sss : (data.employer?.sss ?? 0);
   const philhealthVal = isEmployee ? data.philhealth : (data.employer?.philhealth ?? 0);
@@ -102,9 +102,8 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
             <span className="font-bold text-brand-navy">₱ {fmt(data.rate)}</span>
           </div>
         </div>
-        <div className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border-2 ${
-          isEmployee ? "border-brand-blue/30 text-brand-blue/60 bg-brand-sky/30" : "border-brand-orange/30 text-brand-orange/80 bg-brand-orange/5"
-        }`}>
+        <div className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border-2 ${isEmployee ? "border-brand-blue/30 text-brand-blue/60 bg-brand-sky/30" : "border-brand-orange/30 text-brand-orange/80 bg-brand-orange/5"
+          }`}>
           {isEmployee ? "Employee's Copy" : "Accounting's Copy"}
         </div>
       </div>
@@ -279,7 +278,7 @@ export function PayslipView() {
           }
         `}
       </style>
-      
+
       {/* Filter Bar */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky gap-4 w-full print:hidden">
         <div className="flex flex-wrap items-center gap-3">
@@ -294,9 +293,8 @@ export function PayslipView() {
           <div className="relative">
             <button
               onClick={() => { setEmpOpen(!empOpen); setCutOffOpen(false); }}
-              className={`flex items-center gap-3 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap min-w-[160px] justify-between ${
-                empOpen ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm" : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
-              }`}
+              className={`flex items-center gap-3 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap min-w-[160px] justify-between ${empOpen ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm" : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
+                }`}
             >
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "15px" }}>person</span>
@@ -320,9 +318,8 @@ export function PayslipView() {
                       <button
                         key={emp.id}
                         onClick={() => { setSelectedEmployeeId(emp.id); setEmpOpen(false); }}
-                        className={`w-full px-5 py-2 text-left text-[13px] font-bold transition-colors flex items-center gap-2 ${
-                          selectedEmployeeId === emp.id ? "bg-brand-sky/40 text-brand-blue" : "text-brand-navy/70 hover:bg-brand-sky/20 hover:text-brand-navy"
-                        }`}
+                        className={`w-full px-5 py-2 text-left text-[13px] font-bold transition-colors flex items-center gap-2 ${selectedEmployeeId === emp.id ? "bg-brand-sky/40 text-brand-blue" : "text-brand-navy/70 hover:bg-brand-sky/20 hover:text-brand-navy"
+                          }`}
                       >
                         {selectedEmployeeId === emp.id ? (
                           <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "15px" }}>check</span>
@@ -340,9 +337,8 @@ export function PayslipView() {
           <div className="relative">
             <button
               onClick={() => { setCutOffOpen(!cutOffOpen); setEmpOpen(false); }}
-              className={`flex items-center gap-3 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap min-w-[220px] justify-between ${
-                cutOffOpen ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm" : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
-              }`}
+              className={`flex items-center gap-3 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap min-w-[220px] justify-between ${cutOffOpen ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm" : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
+                }`}
             >
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "15px" }}>date_range</span>
@@ -366,9 +362,8 @@ export function PayslipView() {
                       <button
                         key={c.value}
                         onClick={() => { setSelectedCutOffValue(c.value); setCutOffOpen(false); }}
-                        className={`w-full px-5 py-2 text-left text-[13px] font-bold transition-colors flex items-center gap-2 ${
-                          selectedCutOffValue === c.value ? "bg-brand-sky/40 text-brand-blue" : "text-brand-navy/70 hover:bg-brand-sky/20 hover:text-brand-navy"
-                        }`}
+                        className={`w-full px-5 py-2 text-left text-[13px] font-bold transition-colors flex items-center gap-2 ${selectedCutOffValue === c.value ? "bg-brand-sky/40 text-brand-blue" : "text-brand-navy/70 hover:bg-brand-sky/20 hover:text-brand-navy"
+                          }`}
                       >
                         {selectedCutOffValue === c.value ? (
                           <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "15px" }}>check</span>
