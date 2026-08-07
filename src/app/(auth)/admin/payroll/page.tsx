@@ -70,7 +70,7 @@ export default function PayrollPage() {
         </AnimatePresence>
       </div>
 
-      <div className="h-4" />
+      <div className="h-4 print:hidden" />
     </AppShell>
   );
 }
