@@ -15,6 +15,7 @@ type PayrollRecord = {
   perfectAttendance: number;
   birthdayGift: number;
   gross: number;
+  lateDeduction?: number;
   sss: number;
   philhealth: number;
   pagibig: number;
@@ -64,7 +65,9 @@ function generateCutOffs(): { label: string; value: string; startStr: string; en
       periodLabel: `${new Date(year, month - 1).toLocaleString("en-US", { month: "long" })} 26, ${year} to ${monthName} 10, ${year}`,
     });
   }
-  return cutOffs;
+  
+  // System began operation August 1, 2026. Earliest cutoff is Aug 15 (end date: Aug 10)
+  return cutOffs.filter(c => c.endStr >= "2026-08-10");
 }
 
 const fmt = (val: number) =>
@@ -166,6 +169,13 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
             {isEmployee ? "Employee Deductions" : "Employer Contributions"}
           </p>
           <div className="space-y-1 pl-3">
+            {/* Late Arrival Deduction — employee copy only, shown only when > 0 */}
+            {isEmployee && data.lateDeduction != null && data.lateDeduction > 0 && (
+              <div className="flex justify-between">
+                <span className="text-[11px] font-bold text-brand-navy/70">Less: Late Arrival Deduction</span>
+                <span className="text-[11px] font-bold text-brand-red/70">{fmt(data.lateDeduction)}</span>
+              </div>
+            )}
             {[
               { label: "SSS Contribution", val: sssVal },
               { label: "Philhealth Contribution", val: philhealthVal },
@@ -178,7 +188,12 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
             ))}
             <div className="flex justify-between pt-1 border-t border-gray-100">
               <span className="text-[11px] font-black text-brand-navy/60">{isEmployee ? "Total Deduction" : "Total ER Cost"}</span>
-              <span className={`text-[11px] font-black ${isEmployee ? "text-brand-red" : "text-brand-orange"}`}>{fmt(totalDeductionVal)}</span>
+              <span className={`text-[11px] font-black ${isEmployee ? "text-brand-red" : "text-brand-orange"}`}>
+                {isEmployee
+                  ? fmt(totalDeductionVal + (data.lateDeduction ?? 0))
+                  : fmt(totalDeductionVal)
+                }
+              </span>
             </div>
           </div>
         </div>

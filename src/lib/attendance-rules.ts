@@ -31,38 +31,30 @@ type DaySchedule = {
  * Tue/Thu/Fri: standard hours, no flexible floor.
  */
 export const BASE_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, DaySchedule> = {
-  Mon: { start: "08:30", graceUntil: "08:45", normalEnd: "15:00", flexFloor: "14:00" },
-  Tue: { start: "08:30", graceUntil: "08:45", normalEnd: "17:00", flexFloor: null },
-  Wed: { start: "08:30", graceUntil: "08:45", normalEnd: "15:00", flexFloor: "14:00" },
-  Thu: { start: "08:30", graceUntil: "08:45", normalEnd: "17:00", flexFloor: null },
-  Fri: { start: "08:30", graceUntil: "08:45", normalEnd: "15:00", flexFloor: null },
-  Sat: { start: "08:30", graceUntil: "08:45", normalEnd: "12:00", flexFloor: "10:30" },
+  Mon: { start: "08:30", graceUntil: "08:45", normalEnd: "17:30", flexFloor: "14:30" },
+  Tue: { start: "08:30", graceUntil: "08:45", normalEnd: "17:30", flexFloor: null },
+  Wed: { start: "08:30", graceUntil: "08:45", normalEnd: "17:30", flexFloor: "14:30" },
+  Thu: { start: "08:30", graceUntil: "08:45", normalEnd: "17:30", flexFloor: null },
+  Fri: { start: "08:30", graceUntil: "08:45", normalEnd: "17:30", flexFloor: null },
+  Sat: { start: "08:30", graceUntil: "10:00", normalEnd: "15:00", flexFloor: "1:30" },
 };
 
 /**
  * Per-day break schedule (minutes to deduct from raw clock-in/out hours).
  *
- * TUESDAY, THURSDAY, FRIDAY:
- *   - 11:45 AM–12:45 PM  = 60 min
- *   - 3:30 PM–4:00 PM    = 30 min
- *   - Total              = 90 min
- *
- * MONDAY AND WEDNESDAY:
- *   - 11:30 AM–12:00 PM  = 30 min
- *   Note: schedule may change depending on program. Update this constant as needed.
- *
+ * MONDAY TO FRIDAY: 60 minutes
  * SATURDAY: No break deduction.
  *
  * This is the single source of truth — imported by both API routes and UI components.
  * Do NOT duplicate this logic locally; always import from this module.
  */
 export const BREAK_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, number> = {
-  Mon: 30,  // 30 min (11:30–12:00) — configurable if program changes
-  Tue: 90,  // 90 min (11:45–12:45 + 3:30–4:00)
-  Wed: 30,  // 30 min
-  Thu: 90,  // 90 min
-  Fri: 90,  // 90 min
-  Sat: 0,   // No break deduction on Saturdays
+  Mon: 60,
+  Tue: 60,
+  Wed: 60,
+  Thu: 60,
+  Fri: 60,
+  Sat: 0,
 };
 
 /**
@@ -225,4 +217,160 @@ export function formatEmploymentLabel(
 ): string {
   if (weeklyHoursTarget != null) return `OJT / Intern (${weeklyHoursTarget} hrs/wk)`;
   return employmentType === "full-time" ? "Full-Time" : "Part-Time";
+}
+
+// ── Late-arrival deduction ────────────────────────────────────────────────────
+
+/**
+ * Configurable late-deduction policy.
+ *
+ * Do NOT hardcode these values inside payroll calculations — always import this
+ * object and read from it so the thresholds can be changed in one place.
+ *
+ * scheduledStart   — deduction is applied for any clock-in AFTER this time.
+ * lateThreshold    — at or after this time the deduction becomes one full
+ *                    hourly rate regardless of exact late minutes.
+ *
+ * NOTE: This is entirely separate from graceUntil / computeTimeInStatus.
+ * The attendance "On Time" / "Late" label does NOT suppress the deduction.
+ * Example: clock-in at 8:44 AM → status "On Time", deduction = 14 min × rate.
+ */
+export const LATE_DEDUCTION_CONFIG = {
+  scheduledStart: "08:30" as const, // 24h "HH:MM"
+  lateThreshold: "09:00" as const, // 24h "HH:MM"
+  beforeThresholdMethod: "per-minute" as const,
+  atThresholdMethod: "one-hourly-rate" as const,
+};
+
+export type LateDeductionMethod = "none" | "per-minute" | "threshold";
+
+export type LateDeductionResult = {
+  /** Minutes late relative to scheduledStart. 0 when not late or threshold applies. */
+  lateMinutes: number;
+  /** Peso amount to deduct from gross pay. */
+  deduction: number;
+  /** Which deduction rule was applied. */
+  method: LateDeductionMethod;
+};
+
+/**
+ * Computes the late-arrival payroll deduction for a single clock-in event.
+ *
+ * Rules (driven by LATE_DEDUCTION_CONFIG — never hardcoded here):
+ *   clockIn ≤ 08:30               → deduction = 0
+ *   08:30 < clockIn < 09:00       → per-minute: round(hourlyRate / 60 × minutesLate, 2)
+ *   clockIn ≥ 09:00               → one full hourlyRate
+ *
+ * IMPORTANT SEPARATION:
+ *   This function must NOT consult graceUntil or computeTimeInStatus.
+ *   Attendance status and payroll deduction are independent rules.
+ *
+ * @param clockInISO  ISO timestamp of the clock-in event
+ * @param hourlyRate  Employee's hourly rate (sourced from payroll data, not hardcoded)
+ * @param noTimeLog   Whether this employee is exempt from time checks
+ */
+export function computeLateDeduction(
+  clockInISO: string,
+  hourlyRate: number,
+  noTimeLog: boolean,
+): LateDeductionResult {
+  if (noTimeLog) return { lateMinutes: 0, deduction: 0, method: "none" };
+
+  const { scheduledStart, lateThreshold } = LATE_DEDUCTION_CONFIG;
+
+  // Work in Manila local time — same pattern as computeTimeInStatus
+  const clockIn = new Date(clockInISO);
+  const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+  const manilaIn = new Date(manilaStr);
+
+  const [startH, startM] = scheduledStart.split(":").map(Number);
+  const [threshH, threshM] = lateThreshold.split(":").map(Number);
+
+  const startBoundary = new Date(manilaIn);
+  startBoundary.setHours(startH, startM, 0, 0);
+
+  const threshBoundary = new Date(manilaIn);
+  threshBoundary.setHours(threshH, threshM, 0, 0);
+
+  // On time or early
+  if (manilaIn <= startBoundary) {
+    return { lateMinutes: 0, deduction: 0, method: "none" };
+  }
+
+  // At or after threshold → one full hourly rate
+  if (manilaIn >= threshBoundary) {
+    return { lateMinutes: 0, deduction: hourlyRate, method: "threshold" };
+  }
+
+  // Between scheduledStart and threshold → per-minute
+  const lateMinutes = Math.floor(
+    (manilaIn.getTime() - startBoundary.getTime()) / 60_000,
+  );
+  const deduction = parseFloat(((hourlyRate / 60) * lateMinutes).toFixed(2));
+  return { lateMinutes, deduction, method: "per-minute" };
+}
+
+// ── Scheduled-hours clamping ──────────────────────────────────────────────────
+
+/**
+ * Computes regular credited work hours for a single day, clamped to the
+ * employee's scheduled start and end times.
+ *
+ * SCOPE — regular payroll hours ONLY:
+ *   This function replaces the raw "clockOut - clockIn - break" calculation
+ *   ONLY when determining regular credited payroll hours.
+ *   It must NOT replace or modify any calculation used for approved OT or
+ *   offset functionality.
+ *
+ * Clamping rules:
+ *   effectiveStart = max(clockIn,  scheduledStart)  → early arrivals ignored
+ *   effectiveEnd   = min(clockOut, scheduledEnd)    → late departures ignored
+ *   creditedHours  = max(0, effectiveEnd - effectiveStart - breakMins)
+ *
+ * Early arrivals and late departures are silently excluded. They must NOT
+ * automatically generate OT or offset credit. Existing approved OT and offset
+ * workflows remain unchanged and process separately according to their own rules.
+ *
+ * @param clockInISO     ISO timestamp of the clock-in event
+ * @param clockOutISO    ISO timestamp of the clock-out event
+ * @param scheduledStart Scheduled start time (24h "HH:MM"), e.g. "08:30"
+ * @param scheduledEnd   Scheduled end time (24h "HH:MM"),   e.g. "15:00"
+ * @param breakMins      Break minutes to deduct (from BREAK_SCHEDULE via getBreakMinutes)
+ * @returns Credited hours as a number rounded to 2 decimal places
+ */
+export function computeCreditedHours(
+  clockInISO: string,
+  clockOutISO: string,
+  scheduledStart: string,
+  scheduledEnd: string,
+  breakMins: number,
+): number {
+  const clockIn = new Date(clockInISO);
+  const clockOut = new Date(clockOutISO);
+
+  // Convert to Manila local time
+  const manilaInStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+  const manilaOutStr = clockOut.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+  const manilaIn = new Date(manilaInStr);
+  const manilaOut = new Date(manilaOutStr);
+
+  // Build schedule boundaries on the same Manila date as clock-in
+  const [startH, startM] = scheduledStart.split(":").map(Number);
+  const [endH, endM] = scheduledEnd.split(":").map(Number);
+
+  const schedStart = new Date(manilaIn);
+  schedStart.setHours(startH, startM, 0, 0);
+
+  const schedEnd = new Date(manilaIn);
+  schedEnd.setHours(endH, endM, 0, 0);
+
+  // Clamp to scheduled window
+  const effectiveStart = manilaIn < schedStart ? schedStart : manilaIn;
+  const effectiveEnd = manilaOut > schedEnd ? schedEnd : manilaOut;
+
+  const creditedMs = Math.max(
+    0,
+    effectiveEnd.getTime() - effectiveStart.getTime() - breakMins * 60_000,
+  );
+  return parseFloat((creditedMs / 3_600_000).toFixed(2));
 }

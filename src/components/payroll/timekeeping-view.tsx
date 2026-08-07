@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { getBreakMinutes } from "@/lib/attendance-rules";
+import {
+  getBreakMinutes,
+  BASE_SCHEDULE,
+  type DayAbbr,
+  computeLateDeduction,
+  computeCreditedHours,
+} from "@/lib/attendance-rules";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,11 +21,17 @@ type TimekeepingRow = {
   type: DayType;
   timeIn: string | null;
   timeOut: string | null;
+  /** Raw clock-to-clock elapsed hours before breaks. Informational only — NOT used for pay. */
   numHours: number | null;
   breakHours: number | null;
+  /** Schedule-clamped credited hours. Used for regular payroll calculations. */
   totalHours: number | null;
   hourlyRate: number | null;
   hoursXRate: number | null;
+  /** Late-arrival deduction amount for this day. null when not applicable. */
+  lateDeduction: number | null;
+  /** Which deduction method was applied. null when not applicable. */
+  lateMethod: "none" | "per-minute" | "threshold" | null;
   remarks: string;
 };
 
@@ -33,6 +45,8 @@ type TimekeepingSheet = {
   salaryDate: string;
   cutOffPeriod: string;
   grandTotal: number;
+  /** Sum of all per-day late deductions for this cut-off period. */
+  totalLateDeduction: number;
   rows: TimekeepingRow[];
 };
 
@@ -44,6 +58,7 @@ type Account = {
   monthlyRate?: number;
   dailyRate?: number;
   hourlyRate?: number;
+  noTimeLog?: boolean;
   sssContribution?: number;
   philhealthContribution?: number;
   pagibigContribution?: number;
@@ -99,7 +114,8 @@ function generateCutOffs(): { label: string; value: string; start: Date; end: Da
     });
   }
 
-  const cutoffLimit = new Date(2026, 7, 1); // August 1, 2026
+  // System began operation August 1, 2026. Earliest cutoff ends Aug 10.
+  const cutoffLimit = new Date(2026, 7, 10);
   return cutOffs.filter(c => c.end >= cutoffLimit).slice(0, 10);
 }
 
@@ -146,12 +162,14 @@ function buildSheet(
   const hourlyRate = account.hourlyRate ?? 0;
   const dailyRate = account.dailyRate ?? 0;
   const monthlyRate = account.monthlyRate ?? 0;
+  const noTimeLog = account.noTimeLog ?? false;
 
   // Work days abbreviated (e.g. ["Mon","Tue","Wed","Thu","Fri","Sat"])
   const accountWorkDays = new Set(account.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
 
   const days = eachDayInRange(cutOff.start, cutOff.end);
   let grandTotal = 0;
+  let totalLateDeduction = 0;
   const rows: TimekeepingRow[] = [];
 
   for (const day of days) {
@@ -198,6 +216,8 @@ function buildSheet(
         totalHours: type === "ABSENT" ? 0 : null,
         hourlyRate: type === "ABSENT" ? hourlyRate : null,
         hoursXRate: type === "ABSENT" ? 0 : null,
+        lateDeduction: null,
+        lateMethod: null,
         remarks: type === "ABSENT" ? "Absent" : type === "LEAVE" ? "On Leave" : type === "FUTURE" ? "" : type === "SUSPENDED" ? "Suspended" : "",
       });
       continue;
@@ -210,16 +230,34 @@ function buildSheet(
     const timeIn = fmtTime12(rec!.clockInTime!);
     const timeOut = clockOut ? fmtTime12(rec!.clockOutTime!) : "–";
 
+    // # of Hours — raw clock-to-clock elapsed time. Informational only, NOT used for pay.
     const rawMs = clockOut ? clockOut.getTime() - clockIn.getTime() : 0;
     const numHours = rawMs > 0 ? parseFloat((rawMs / 3600000).toFixed(2)) : 0;
 
     const breakMins = getBreakMinutes(dow);
     const breakHours = parseFloat((breakMins / 60).toFixed(2));
-    const totalHoursMs = Math.max(0, rawMs - breakMins * 60000);
-    const totalHours = parseFloat((totalHoursMs / 3600000).toFixed(2));
+
+    // Total Hours — schedule-clamped credited hours (ONLY for regular payroll).
+    // Early arrivals and late departures are excluded. Does not affect OT/offset.
+    const schedule = abbr !== "Sun" ? BASE_SCHEDULE[abbr as Exclude<DayAbbr, "Sun">] : null;
+    const totalHours = clockOut && schedule
+      ? computeCreditedHours(rec!.clockInTime!, rec!.clockOutTime!, schedule.start, schedule.normalEnd, breakMins)
+      : 0;
     const hoursXRate = parseFloat((totalHours * hourlyRate).toFixed(2));
 
     grandTotal += hoursXRate;
+
+    // Late deduction — independent of attendance status / graceUntil
+    const lateResult = computeLateDeduction(rec!.clockInTime!, hourlyRate, noTimeLog);
+    totalLateDeduction += lateResult.deduction;
+
+    // Build remarks from late method
+    const lateRemark =
+      lateResult.method === "threshold"
+        ? "Late (threshold)"
+        : lateResult.method === "per-minute"
+        ? `Late (${lateResult.lateMinutes} min)`
+        : "";
 
     rows.push({
       id: dateStr,
@@ -233,7 +271,9 @@ function buildSheet(
       totalHours: parseFloat(totalHours.toFixed(2)),
       hourlyRate,
       hoursXRate,
-      remarks: "",
+      lateDeduction: lateResult.deduction > 0 ? parseFloat(lateResult.deduction.toFixed(2)) : null,
+      lateMethod: lateResult.method !== "none" ? lateResult.method : null,
+      remarks: lateRemark,
     });
   }
 
@@ -250,6 +290,7 @@ function buildSheet(
     salaryDate,
     cutOffPeriod: `${fmtDateLabel(cutOff.start).toUpperCase()} – ${fmtDateLabel(cutOff.end).toUpperCase()}`,
     grandTotal: parseFloat(grandTotal.toFixed(2)),
+    totalLateDeduction: parseFloat(totalLateDeduction.toFixed(2)),
     rows,
   };
 }
@@ -522,6 +563,7 @@ export function TimekeepingView() {
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Total Hours</th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Hourly Rate</th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Hours × Rate</th>
+                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-red/60 text-right bg-brand-red/5">Late Ded.</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60">Remarks</th>
                   </tr>
                 </thead>
@@ -584,9 +626,20 @@ export function TimekeepingView() {
                             <span className="text-[13px] font-black text-brand-blue">{fmt2(row.hoursXRate)}</span>
                           )}
                         </td>
+                        <td className="px-4 py-2.5 text-right bg-brand-red/5">
+                          {!isOff && (
+                            row.lateDeduction != null && row.lateDeduction > 0
+                              ? <span className="text-[12px] font-bold text-brand-red/80">−{fmt2(row.lateDeduction)}</span>
+                              : <span className="text-[11px] text-brand-navy/30">—</span>
+                          )}
+                        </td>
                         <td className="px-6 py-2.5">
                           {row.remarks && (
-                            <span className="text-[11px] font-bold text-brand-navy/50">{row.remarks}</span>
+                            <span className={`text-[11px] font-bold ${
+                              row.lateMethod === "threshold" ? "text-brand-red" :
+                              row.lateMethod === "per-minute" ? "text-brand-orange" :
+                              "text-brand-navy/50"
+                            }`}>{row.remarks}</span>
                           )}
                         </td>
                       </motion.tr>
@@ -602,9 +655,18 @@ export function TimekeepingView() {
                 <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "18px" }}>calculate</span>
                 <span className="text-[13px] font-black text-brand-navy uppercase tracking-wide">Grand Total</span>
               </div>
-              <span className="text-[18px] font-black text-brand-blue">
-                ₱ {fmt2(sheet.grandTotal)}
-              </span>
+              <div className="flex items-center gap-6">
+                {sheet.totalLateDeduction > 0 && (
+                  <div className="text-right">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-brand-red/60">Late Deduction</p>
+                    <p className="text-[14px] font-black text-brand-red">−{fmt2(sheet.totalLateDeduction)}</p>
+                  </div>
+                )}
+                <div className="text-right">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-brand-blue/60">Hours × Rate</p>
+                  <p className="text-[18px] font-black text-brand-blue">₱ {fmt2(sheet.grandTotal)}</p>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}

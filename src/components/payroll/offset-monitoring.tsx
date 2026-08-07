@@ -21,6 +21,8 @@ const rowVariants: Variants = {
 type RenderedSession = {
   id: string;
   date: string;
+  timeIn?: string;
+  timeOut?: string;
   type: string;
   holiday: string;
   hours: number;
@@ -30,6 +32,8 @@ type PendingGroup = {
   id: string;
   holidayDate: string;
   holidayName: string;
+  timeIn?: string;
+  timeOut?: string;
   required: number;
   remaining: number;
 };
@@ -42,6 +46,13 @@ type Account = {
 
 const EMPTY_ROWS = 6;
 
+function formatHours(decimalHours: number): string {
+  if (!decimalHours) return "0 hrs 0 mins";
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  return `${h} hrs ${m} mins`;
+}
+
 function RenderedTable({ records }: { records: RenderedSession[] }) {
   const isEmpty = records.length === 0;
   const padCount = Math.max(0, EMPTY_ROWS - records.length);
@@ -51,18 +62,18 @@ function RenderedTable({ records }: { records: RenderedSession[] }) {
       <thead>
         <tr className="border-b border-brand-sky">
           <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50">Date</th>
-          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-center">Type</th>
-          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-center">Offset For</th>
-          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-right">Hours</th>
+          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-center whitespace-nowrap">Time In</th>
+          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-center whitespace-nowrap">Time Out</th>
+          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-right">Total # Of Hours</th>
         </tr>
       </thead>
       <motion.tbody variants={containerVariants} initial="hidden" animate="visible">
         {records.map((r) => (
           <motion.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
             <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.date}</td>
-            <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap uppercase text-[10px] tracking-wider">{r.type.replace("_", " ")}</td>
-            <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.holiday}</td>
-            <td className="px-4 py-2.5 text-right font-black text-brand-navy whitespace-nowrap">{r.hours.toFixed(2)}</td>
+            <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.timeIn || "—"}</td>
+            <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.timeOut || "—"}</td>
+            <td className="px-4 py-2.5 text-right font-black text-brand-navy whitespace-nowrap">{formatHours(r.hours)}</td>
           </motion.tr>
         ))}
         {isEmpty && (
@@ -90,19 +101,19 @@ function PendingTable({ records }: { records: PendingGroup[] }) {
     <table className="w-full text-left border-collapse text-xs">
       <thead>
         <tr className="border-b border-brand-sky">
-          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70">Holiday</th>
-          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-center">Date</th>
-          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-center">Req'd</th>
-          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-right">Remaining</th>
+          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70">Date</th>
+          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-center whitespace-nowrap">Time In</th>
+          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-center whitespace-nowrap">Time Out</th>
+          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-right">Total # Of Hours</th>
         </tr>
       </thead>
       <motion.tbody variants={containerVariants} initial="hidden" animate="visible">
         {records.map((r) => (
           <motion.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
-            <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.holidayName}</td>
-            <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.holidayDate}</td>
-            <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.required.toFixed(2)}</td>
-            <td className="px-4 py-2.5 text-right font-black text-brand-red whitespace-nowrap">{r.remaining.toFixed(2)}</td>
+            <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.holidayDate}</td>
+            <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.timeIn || "—"}</td>
+            <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.timeOut || "—"}</td>
+            <td className="px-4 py-2.5 text-right font-black text-brand-red whitespace-nowrap">{formatHours(r.required)}</td>
           </motion.tr>
         ))}
         {isEmpty && (
@@ -151,34 +162,50 @@ export function OffsetMonitoring() {
       .then((r) => r.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data)) {
-          const allRendered: RenderedSession[] = [];
+          let allRendered: RenderedSession[] = [];
           const allPending: PendingGroup[] = [];
 
           for (const group of json.data) {
             if (group.remainingHours > 0) {
               allPending.push({
                 id: group.id,
-                holidayDate: group.sourceHoliday?.dateStr ?? "–",
+                holidayDate: group.sourceHoliday?.dateStr ?? "",
                 holidayName: group.sourceHoliday?.name ?? "Unknown",
+                timeIn: group.timeIn,
+                timeOut: group.timeOut,
                 required: group.requiredHours,
                 remaining: group.remainingHours,
               });
             }
             if (Array.isArray(group.renderedSessions)) {
-              for (const s of group.renderedSessions) {
+              (group.renderedSessions || []).forEach((s: any) => {
                 allRendered.push({
                   id: `${group.id}-${s.attendanceDateStr}`,
                   date: s.attendanceDateStr,
+                  timeIn: s.timeIn,
+                  timeOut: s.timeOut,
                   type: s.type,
                   holiday: group.sourceHoliday?.name ?? "Unknown",
                   hours: s.hours,
                 });
-              }
+              });
             }
           }
-          
+
+          // Group by date to merge split sessions
+          const groupedRendered: Record<string, RenderedSession> = {};
+          allRendered.forEach(r => {
+            const key = `${r.date}_${r.timeIn}_${r.timeOut}`;
+            if (!groupedRendered[key]) {
+              groupedRendered[key] = { ...r };
+            } else {
+              groupedRendered[key].hours += r.hours;
+            }
+          });
+          allRendered = Object.values(groupedRendered);
+
           allRendered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          
+
           setRendered(allRendered);
           setPendingGroups(allPending);
         } else {
@@ -301,7 +328,7 @@ export function OffsetMonitoring() {
               <div className="flex-1 border-b-2 md:border-b-0 md:border-r-2 border-brand-sky">
                 <div className="flex items-center gap-2 px-6 py-3 bg-brand-sky/40 border-b border-brand-sky">
                   <div className="w-2.5 h-2.5 rounded-full bg-brand-blue" />
-                  <span className="text-[11px] font-black uppercase tracking-widest text-brand-blue">Rendered Sessions</span>
+                  <span className="text-[11px] font-black uppercase tracking-widest text-brand-blue">RENDERED</span>
                 </div>
                 <RenderedTable records={rendered} />
               </div>
@@ -310,7 +337,7 @@ export function OffsetMonitoring() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 px-6 py-3 bg-brand-yellow/10 border-b border-brand-sky">
                   <div className="w-2.5 h-2.5 rounded-full bg-brand-orange" />
-                  <span className="text-[11px] font-black uppercase tracking-widest text-brand-orange">Pending Holidays</span>
+                  <span className="text-[11px] font-black uppercase tracking-widest text-brand-orange">TO RENDER</span>
                 </div>
                 <PendingTable records={pendingGroups} />
               </div>

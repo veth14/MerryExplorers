@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
-import { getBreakMinutes } from "@/lib/attendance-rules";
+import {
+  getBreakMinutes,
+  BASE_SCHEDULE,
+  type DayAbbr,
+  computeLateDeduction,
+  computeCreditedHours,
+} from "@/lib/attendance-rules";
 import { computeContributions } from "@/lib/contributions";
 
 function eachDayInRange(start: Date, end: Date): Date[] {
@@ -63,24 +69,33 @@ export async function GET(request: Request) {
       const empAttendance = attendanceMap.get(uid) || new Map();
 
       let totalHours = 0;
+      let totalLateDeduction = 0;
+      const noTimeLog: boolean = acc.noTimeLog ?? false;
 
       for (const day of days) {
         const dow = day.getDay();
-        const abbr = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dow];
+        const abbr = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[dow];
         const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-        
+
         const isWorkDay = accountWorkDays.has(abbr);
         const rec = empAttendance.get(dateStr);
 
         if (isWorkDay && rec && rec.clockInTime) {
-          const clockIn = new Date(rec.clockInTime);
-          const clockOut = rec.clockOutTime ? new Date(rec.clockOutTime) : null;
-          
-          if (clockOut) {
-            const rawMs = clockOut.getTime() - clockIn.getTime();
+          // Late deduction — separate from credited hours, independent of graceUntil/status
+          const lateResult = computeLateDeduction(rec.clockInTime, hourlyRate, noTimeLog);
+          totalLateDeduction += lateResult.deduction;
+
+          // Regular credited hours — clamped to scheduled window (ONLY regular hours)
+          if (rec.clockOutTime && abbr !== "Sun") {
+            const schedule = BASE_SCHEDULE[abbr as Exclude<DayAbbr, "Sun">];
             const breakMins = getBreakMinutes(dow);
-            const totalHoursMs = Math.max(0, rawMs - breakMins * 60000);
-            totalHours += parseFloat((totalHoursMs / 3600000).toFixed(2));
+            totalHours += computeCreditedHours(
+              rec.clockInTime,
+              rec.clockOutTime,
+              schedule.start,
+              schedule.normalEnd,
+              breakMins,
+            );
           }
         }
       }
@@ -89,7 +104,9 @@ export async function GET(request: Request) {
       const comms = acc.communicationAllowance ?? 0;
       const perfectAttendance = 0;
       const birthdayGift = 0;
-      const grossPay = basicPay + comms + perfectAttendance + birthdayGift;
+      // Late deduction is applied after basic pay is computed and before contributions
+      const lateDeduction = parseFloat(totalLateDeduction.toFixed(2));
+      const grossPay = basicPay + comms + perfectAttendance + birthdayGift - lateDeduction;
 
       // Use live contribution calculation (SSS table lookup, not stored flat values)
       const monthlySalary = acc.monthlyRate ?? 0;
@@ -121,6 +138,7 @@ export async function GET(request: Request) {
         perfectAttendance,
         birthdayGift,
         gross: parseFloat(grossPay.toFixed(2)),
+        lateDeduction,
         // Employee deductions (payslip + net pay)
         sss: empSSS,
         philhealth: empPhilHealth,

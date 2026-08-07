@@ -70,11 +70,11 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
     const { teacherUid, name, group, clockInPhotoUrl } = data;
-    
+
     if (!teacherUid) return NextResponse.json({ error: "Missing teacherUid" }, { status: 400 });
 
     const { db } = await connectToDatabase();
-    
+
     const now = new Date();
     const todayStr = now.toLocaleString("en-US", { timeZone: "Asia/Manila" });
     const todayInPht = new Date(todayStr);
@@ -131,7 +131,7 @@ export async function PUT(request: Request) {
 
     const { db } = await connectToDatabase();
     const record = await db.collection("attendance").findOne({ _id: new ObjectId(id) });
-    
+
     if (!record) return NextResponse.json({ error: "Record not found" }, { status: 404 });
 
     const now = new Date();
@@ -155,8 +155,75 @@ export async function PUT(request: Request) {
     }
 
     await db.collection("attendance").updateOne({ _id: new ObjectId(id) }, updateDoc);
-    
+
     const updated = await db.collection("attendance").findOne({ _id: new ObjectId(id) });
+
+    // --- AUTO-DEDUCT OFFSETS ON SATURDAY ---
+    if (action === "clock-out" && updated) {
+      const localDate = new Date(new Date(updated.clockInTime).toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+      if (localDate.getDay() === 6) { // 6 = Saturday
+        const clockInMs = new Date(updated.clockInTime).getTime();
+        const clockOutMs = new Date(updated.clockOutTime).getTime();
+
+        let breakMs = 0;
+        if (Array.isArray(updated.breaks)) {
+          updated.breaks.forEach((b: any) => {
+            if (b.start && b.end) {
+              breakMs += new Date(b.end).getTime() - new Date(b.start).getTime();
+            }
+          });
+        }
+
+        let rawWorkedHours = Math.max(0, (clockOutMs - clockInMs - breakMs) / 3600000);
+        if (rawWorkedHours > 0) {
+          // Find pending offsets for this teacher
+          const pendingOffsets = await db.collection("offsets")
+            .find({ employeeId: updated.teacherUid, status: { $in: ["pending", "partial"] } })
+            .sort({ "sourceHoliday.dateStr": 1 })
+            .toArray();
+
+          let remainingWorked = rawWorkedHours;
+          for (const group of pendingOffsets) {
+            if (remainingWorked <= 0) break;
+
+            let deduct = Math.min(remainingWorked, group.remainingHours);
+            deduct = parseFloat(deduct.toFixed(2));
+            if (deduct <= 0) continue;
+
+            const session = {
+              attendanceDateStr: updated.dateStr,
+              hours: deduct,
+              attendanceId: updated._id.toString(),
+              type: "saturday",
+              notes: "Auto-deducted at clock-out",
+              recordedAt: now,
+              recordedBy: "system"
+            };
+
+            const newRenderedTotal = parseFloat((group.renderedTotal + deduct).toFixed(2));
+            const newRemaining = Math.max(0, parseFloat((group.remainingHours - deduct).toFixed(2)));
+            const newStatus = newRemaining <= 0 ? "completed" : "partial";
+
+            await db.collection("offsets").updateOne(
+              { _id: group._id },
+              {
+                $set: {
+                  renderedTotal: newRenderedTotal,
+                  remainingHours: newRemaining,
+                  status: newStatus,
+                  updatedAt: now
+                },
+                $push: { renderedSessions: session }
+              } as any
+            );
+
+            remainingWorked -= deduct;
+          }
+        }
+      }
+    }
+    // ---------------------------------------
+
     return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {
     console.error("Failed to update attendance:", error);

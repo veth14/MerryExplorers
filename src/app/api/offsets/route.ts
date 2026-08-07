@@ -42,9 +42,13 @@ export async function GET(request: Request) {
       id: g._id.toString(),
       employeeId: g.employeeId,
       sourceHoliday: g.sourceHoliday ?? null,       // { dateStr, name }
+      timeIn: g.timeIn ?? null,
+      timeOut: g.timeOut ?? null,
       requiredHours: g.requiredHours ?? 0,
       renderedSessions: (g.renderedSessions ?? []).map((s: any) => ({
         attendanceDateStr: s.attendanceDateStr,
+        timeIn: s.timeIn ?? null,
+        timeOut: s.timeOut ?? null,
         hours: s.hours,
         attendanceId: s.attendanceId ?? null,
         type: s.type,  // "saturday" | "weekday_ot"

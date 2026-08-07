@@ -36,7 +36,8 @@ function generateCutOffs(): { label: string; value: string; start: Date; end: Da
       endStr: `${year}-${String(month+1).padStart(2, "0")}-10`,
     });
   }
-  const cutoffLimit = new Date(2026, 7, 1);
+  // System began operation August 1, 2026. Earliest cutoff ends Aug 10.
+  const cutoffLimit = new Date(2026, 7, 10);
   return cutOffs.filter(c => c.end >= cutoffLimit).slice(0, 10);
 }
 
@@ -68,6 +69,7 @@ type PayrollRecord = {
   perfectAttendance: number;
   birthdayGift: number;
   gross: number;
+  lateDeduction?: number;
   sss: number;
   philhealth: number;
   pagibig: number;
@@ -256,6 +258,7 @@ export function SummaryTable() {
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Hours</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Hourly Rate</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Basic Pay</th>
+                        <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-red/60 text-center bg-brand-red/5">Late Ded.</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">Comms</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">Attendance</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">B-day Gift</th>
@@ -301,6 +304,12 @@ export function SummaryTable() {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="text-[13px] font-bold text-brand-navy">{fmt(r.basic)}</span>
+                          </td>
+                          <td className="px-3 py-4 text-center bg-brand-red/5">
+                            {r.lateDeduction != null && r.lateDeduction > 0
+                              ? <span className="text-[12px] font-bold text-brand-red/80">−{fmt(r.lateDeduction)}</span>
+                              : <span className="text-[11px] text-brand-navy/30">—</span>
+                            }
                           </td>
                           <td className="px-3 py-4 text-center bg-brand-orange/5">
                             <span className="text-[12px] font-bold text-brand-navy/60">{r.comms > 0 ? fmt(r.comms) : "—"}</span>
