@@ -758,41 +758,11 @@ function UserModal({
                   </div>
                 </Field>
               </div>
-              
-              <div className="grid grid-cols-3 gap-4">
-                <Field label="SSS Contribution">
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
-                    <input
-                      type="number"
-                      value={draft.sssContribution || ""}
-                      onChange={(e) => set("sssContribution", parseFloat(e.target.value) || 0)}
-                      className={`${INPUT_CLS} pl-7`}
-                    />
-                  </div>
-                </Field>
-                <Field label="PhilHealth">
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
-                    <input
-                      type="number"
-                      value={draft.philhealthContribution || ""}
-                      onChange={(e) => set("philhealthContribution", parseFloat(e.target.value) || 0)}
-                      className={`${INPUT_CLS} pl-7`}
-                    />
-                  </div>
-                </Field>
-                <Field label="Pag-ibig">
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
-                    <input
-                      type="number"
-                      value={draft.pagibigContribution || ""}
-                      onChange={(e) => set("pagibigContribution", parseFloat(e.target.value) || 0)}
-                      className={`${INPUT_CLS} pl-7`}
-                    />
-                  </div>
-                </Field>
+              <div className="rounded-xl bg-[#f0f5ff] border border-[#c5d6ff] p-4 flex items-center justify-center text-center">
+                <p className="text-[12px] font-bold text-[#002f76]">
+                  <span className="material-symbols-outlined text-[16px] align-middle mr-1.5 text-[#0050d5]">auto_awesome</span>
+                  SSS, PhilHealth, and Pag-IBIG contributions are automatically calculated from the Monthly Rate.
+                </p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
