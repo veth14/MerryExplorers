@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { m, AnimatePresence } from "framer-motion";
@@ -10,6 +10,7 @@ import { MenuIcon, CloseIcon } from "./icons";
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const scrollbarWidthRef = useRef(0);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 5);
@@ -18,30 +19,37 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
+    if (open) {
+      // Measure scrollbar width before locking
+      scrollbarWidthRef.current = window.innerWidth - document.documentElement.clientWidth;
+      // Compensate for scrollbar removal so layout doesn't shift
+      document.documentElement.style.setProperty("--scrollbar-w", `${scrollbarWidthRef.current}px`);
+      document.documentElement.classList.add("menu-open");
+    } else {
+      document.documentElement.classList.remove("menu-open");
+      document.documentElement.style.removeProperty("--scrollbar-w");
+    }
     return () => {
-      document.body.style.overflow = "";
+      document.documentElement.classList.remove("menu-open");
+      document.documentElement.style.removeProperty("--scrollbar-w");
     };
   }, [open]);
 
   return (
-    // The outer header is the fixed full-width container.
-    // It uses padding to create the "floating" gap from the screen edges.
-    // pointer-events-none lets clicks pass through the gaps. update
     <m.header
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed top-0 inset-x-0 z-50 pointer-events-none px-6 pt-4 md:pt-6 md:px-8"
+      className="fixed top-0 left-0 right-0 z-50 pointer-events-none pt-4 md:pt-6"
     >
-      {/* The pill — always centered, never clips its edges */}
+      {/* The pill */}
       <m.div
         animate={{
           backgroundColor: scrolled ? "rgba(255,255,255,0.98)" : "rgba(255,255,255,0.85)",
           boxShadow: scrolled ? "0 10px 40px -10px rgba(0,51,160,0.12)" : "0 4px 20px -10px rgba(0,51,160,0)",
         }}
         transition={{ duration: 0.2 }}
-        className="relative z-50 pointer-events-auto mx-auto flex h-[68px] md:h-[76px] w-full max-w-[1200px] items-center justify-between rounded-full px-6 py-2 sm:px-8 backdrop-blur-2xl border border-white/80"
+        className="relative z-50 pointer-events-auto mx-4 md:mx-8 max-w-[1200px] lg:mx-auto flex h-[68px] md:h-[76px] items-center justify-between rounded-full px-5 md:px-8 backdrop-blur-2xl border border-white/80"
       >
 
         {/* ── Logo ── */}
@@ -116,7 +124,7 @@ export function SiteHeader() {
       <AnimatePresence>
         {open && (
           <div className="md:hidden pointer-events-auto">
-            {/* Backdrop — full screen so blur covers behind the pill too */}
+            {/* Full-screen blur backdrop */}
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -127,13 +135,13 @@ export function SiteHeader() {
               aria-hidden="true"
             />
 
-            {/* Menu Panel */}
+            {/* Menu Panel — uses same mx-4 to match pill */}
             <m.div
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="absolute left-1/2 -translate-x-1/2 top-[100px] z-50 w-[calc(100%-4rem)] md:w-[calc(100%-5rem)] rounded-[2rem] bg-white/95 backdrop-blur-2xl p-3 shadow-[0_32px_80px_-15px_rgba(0,51,160,0.3)] border border-[#eaf0fe]"
+              className="relative z-50 mx-4 mt-3 rounded-[2rem] bg-white/95 backdrop-blur-2xl p-3 shadow-[0_32px_80px_-15px_rgba(0,51,160,0.3)] border border-[#eaf0fe]"
             >
               <nav aria-label="Mobile Navigation">
                 <ul className="flex flex-col gap-1">

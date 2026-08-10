@@ -4,6 +4,14 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Prevent layout shift when mobile menu locks scroll.
+   Adds padding-right equal to the scrollbar width so fixed elements don't jump. */
+html.menu-open {
+  overflow: hidden;
+  padding-right: var(--scrollbar-w, 0px);
+}
+
+
 :root {
   --surface: #fbf9f8;
   --surface-dim: #dcd9d9;
