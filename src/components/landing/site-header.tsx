@@ -32,7 +32,7 @@ export function SiteHeader() {
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed top-0 inset-x-0 z-50 pointer-events-none px-4 pt-4 md:pt-6"
+      className="fixed top-0 inset-x-0 z-50 pointer-events-none px-6 pt-4 md:pt-6 md:px-8"
     >
       {/* The pill — always centered, never clips its edges */}
       <m.div
@@ -41,7 +41,7 @@ export function SiteHeader() {
           boxShadow: scrolled ? "0 10px 40px -10px rgba(0,51,160,0.12)" : "0 4px 20px -10px rgba(0,51,160,0)",
         }}
         transition={{ duration: 0.2 }}
-        className="relative z-50 pointer-events-auto mx-auto flex h-[68px] md:h-[76px] w-full max-w-[1200px] items-center justify-between rounded-full px-4 py-2 sm:px-8 backdrop-blur-2xl border border-white/80"
+        className="relative z-50 pointer-events-auto mx-auto flex h-[68px] md:h-[76px] w-full max-w-[1200px] items-center justify-between rounded-full px-6 py-2 sm:px-8 backdrop-blur-2xl border border-white/80"
       >
 
         {/* ── Logo ── */}
@@ -133,7 +133,7 @@ export function SiteHeader() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="absolute inset-x-0 top-[84px] z-50 rounded-[2rem] bg-white/95 backdrop-blur-2xl p-3 shadow-[0_32px_80px_-15px_rgba(0,51,160,0.3)] border border-[#eaf0fe]"
+              className="absolute left-1/2 -translate-x-1/2 top-[100px] z-50 w-[calc(100%-4rem)] md:w-[calc(100%-5rem)] rounded-[2rem] bg-white/95 backdrop-blur-2xl p-3 shadow-[0_32px_80px_-15px_rgba(0,51,160,0.3)] border border-[#eaf0fe]"
             >
               <nav aria-label="Mobile Navigation">
                 <ul className="flex flex-col gap-1">
