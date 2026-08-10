@@ -252,11 +252,12 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   const [expandedGroup, setExpandedGroup] = useState<string | null>("HR & People");
 
   const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive partner";
+  const isDeveloper = (userProfile?.role || "").toLowerCase() === "developer";
 
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
 
-  // Admin groups for executive partner view
+  // Admin groups for executive partner & developer view
   const adminGroups = useMemo(() => [
     {
       title: "HR & People",
@@ -285,7 +286,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   ], []);
 
   useEffect(() => {
-    const activeGroup = adminGroups.find(g => 
+    const activeGroup = adminGroups.find(g =>
       g.items.some(item => pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href)))
     );
     if (activeGroup) {
@@ -342,7 +343,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
           </div>
         </div>
 
-        {/* Admin View — Executive Partners only */}
+        {/* Admin View — Executive Partners & Developer only */}
         {isExecPartner && (
           <div>
             {/* Section separator */}

@@ -114,7 +114,7 @@ export const MISSION_VISION_PURPOSE = [
 ] as const;
 
 export const UNIFORM = {
-  image: "/uniform.jpg",
+  image: "/uniform.png",
   price: "₱550",
   unit: "/ set",
   items: ["Polo Shirt", "Jogging Pants"],

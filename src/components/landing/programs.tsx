@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { BALLET } from "@/data/landing";
+import { ArrowRightIcon } from "./icons";
 
 // ─── Static schedule data (sourced from official flyer) ──────────────────────
 
@@ -85,42 +86,49 @@ const TINY_EXPLORERS = {
 export function ProgramsSection() {
   return (
     <section id="programs" className="relative py-16 sm:py-24">
+      {/* Decorative background grid */}
+      <div
+        className="absolute inset-0 z-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }}
+      />
+
       <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
 
         {/* Heading */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
+        <m.div
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
           className="mb-12 text-center"
         >
-          <motion.span
+          <m.span
             animate={{ y: [0, -4, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             className="mb-3 inline-block text-3xl"
           >
             🚀
-          </motion.span>
+          </m.span>
           <h2 className="font-headline text-[32px] font-extrabold tracking-tight text-[#0033A0] sm:text-[40px]">
             Our Programs
           </h2>
           <p className="mx-auto mt-3 max-w-md text-[15px] font-medium leading-relaxed text-[#0066CC]">
             Every child learns differently — we have a schedule that fits your family.
           </p>
-        </motion.div>
+        </m.div>
 
         {/* ── Playgroup Cards ── */}
         <div className="grid gap-8 lg:grid-cols-2">
 
           {/* ── Little Explorers ── */}
-          <motion.article
-            initial={{ opacity: 0, y: 36 }}
-            whileInView={{ opacity: 1, y: 0 }}
+          <m.article
+            initial={{ opacity: 0, x: -40 }}
+            whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ y: -4, transition: { duration: 0.25 } }}
-            className="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.10)] transition-shadow"
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.10)] transition-all duration-300 hover:-translate-y-2"
           >
             {/* Header */}
             <div className="relative px-6 pb-7 pt-8 text-center" style={{ backgroundColor: LITTLE_EXPLORERS.bgTop }}>
@@ -187,16 +195,15 @@ export function ProgramsSection() {
               </div>
 
             </div>
-          </motion.article>
+          </m.article>
 
           {/* ── Tiny Explorers ── */}
-          <motion.article
-            initial={{ opacity: 0, y: 36 }}
-            whileInView={{ opacity: 1, y: 0 }}
+          <m.article
+            initial={{ opacity: 0, x: 40 }}
+            whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.65, delay: 0.13, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ y: -4, transition: { duration: 0.25 } }}
-            className="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(255,193,7,0.15)] transition-shadow"
+            transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+            className="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(255,193,7,0.15)] transition-all duration-300 hover:-translate-y-2"
           >
             {/* Header */}
             <div className="relative px-6 pb-7 pt-8 text-center" style={{ backgroundColor: TINY_EXPLORERS.bgTop }}>
@@ -254,17 +261,16 @@ export function ProgramsSection() {
                 ))}
               </div>
             </div>
-          </motion.article>
+          </m.article>
         </div>
 
         {/* ── Ballet Card (full-width) ── */}
-        <motion.article
-          initial={{ opacity: 0, y: 36 }}
+        <m.article
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.65, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ y: -4, transition: { duration: 0.25 } }}
-          className="relative mt-8 overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(194,24,91,0.12)] transition-shadow"
+          transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+          className="relative mt-8 overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(194,24,91,0.12)] transition-all duration-300 hover:-translate-y-2"
         >
           {/* Top bar */}
           <div className="h-2 w-full" style={{ backgroundColor: BALLET.accent }} />
@@ -273,13 +279,13 @@ export function ProgramsSection() {
 
             {/* Left: Title */}
             <div className="flex items-center gap-4">
-              <motion.span
+              <m.span
                 animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
                 transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
                 className="text-5xl"
               >
                 {BALLET.emoji}
-              </motion.span>
+              </m.span>
               <div>
                 <span className="mb-1 inline-block rounded-full px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest"
                   style={{ backgroundColor: BALLET.accentSoft, color: BALLET.accent }}>
@@ -326,14 +332,14 @@ export function ProgramsSection() {
 
           {/* Corner glow */}
           <div aria-hidden className="pointer-events-none absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-[#C2185B] opacity-10 blur-3xl" />
-        </motion.article>
+        </m.article>
 
         {/* Inquire CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
+        <m.div
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
           className="mt-10 text-center"
         >
           <p className="mb-4 text-[14px] font-medium text-[#64748b]">
@@ -342,11 +348,14 @@ export function ProgramsSection() {
           <Link
             href="/inquire"
             id="programs-inquire-btn"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#0033A0] to-[#0047df] px-8 py-3.5 text-[15px] font-extrabold text-white shadow-[0_10px_28px_rgba(0,51,160,0.25)] hover:shadow-[0_14px_36px_rgba(0,51,160,0.35)] transition-all hover:-translate-y-1"
+            className="group inline-flex items-center gap-4 rounded-[1.25rem] bg-[#0033A0] px-8 py-4 text-[17px] font-bold text-white shadow-[0_12px_24px_rgba(0,51,160,0.2)] transition-all duration-300 hover:bg-[#002f76] hover:shadow-[0_16px_32px_rgba(0,51,160,0.3)] hover:-translate-y-1"
           >
-            Register Now →
+            Register Now
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-1">
+              <ArrowRightIcon className="h-4 w-4" />
+            </div>
           </Link>
-        </motion.div>
+        </m.div>
 
       </div>
     </section>
