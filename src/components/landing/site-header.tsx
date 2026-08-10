@@ -27,7 +27,7 @@ export function SiteHeader() {
   return (
     // The outer header is the fixed full-width container.
     // It uses padding to create the "floating" gap from the screen edges.
-    // pointer-events-none lets clicks pass through the gaps.
+    // pointer-events-none lets clicks pass through the gaps. update
     <m.header
       initial={{ y: -100 }}
       animate={{ y: 0 }}
