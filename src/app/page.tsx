@@ -21,12 +21,12 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-[#fdfdfd] relative flex flex-col">
-      {/* ── Dreamy Background Orbs (Global Landing Background) ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div aria-hidden className="absolute -top-40 -left-40 w-[800px] h-[800px] bg-[#0033A0] rounded-full filter blur-[80px] opacity-20 md:opacity-[0.05] md:mix-blend-multiply md:blur-[150px]"></div>
-        <div aria-hidden className="absolute top-1/4 -right-20 w-[600px] h-[600px] bg-[#FFC107] rounded-full filter blur-[80px] opacity-30 md:opacity-[0.08] md:mix-blend-multiply md:blur-[150px]"></div>
-        <div aria-hidden className="absolute top-2/3 left-1/4 w-[900px] h-[900px] bg-[#0050d5] rounded-full filter blur-[80px] opacity-20 md:opacity-[0.04] md:mix-blend-multiply md:blur-[150px]"></div>
-        <div aria-hidden className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-[#FFC107] rounded-full filter blur-[80px] opacity-20 md:opacity-[0.06] md:mix-blend-multiply md:blur-[150px]"></div>
+      {/* ── Dreamy Background Orbs (desktop only — too heavy on mobile) ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none hidden md:block">
+        <div aria-hidden className="absolute -top-40 -left-40 w-[800px] h-[800px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05]"></div>
+        <div aria-hidden className="absolute top-1/4 -right-20 w-[600px] h-[600px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.08]"></div>
+        <div aria-hidden className="absolute top-2/3 left-1/4 w-[900px] h-[900px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.04]"></div>
+        <div aria-hidden className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.06]"></div>
       </div>
 
       <SiteHeader />
