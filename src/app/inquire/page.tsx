@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence  } from "framer-motion";
 import { NAV_LINKS } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
 
@@ -56,7 +56,7 @@ function AgeDropdown({ value, onChange }: { value: string; onChange: (v: string)
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -77,7 +77,7 @@ function AgeDropdown({ value, onChange }: { value: string; onChange: (v: string)
                 )}
               </button>
             ))}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
@@ -125,7 +125,7 @@ export default function InquirePage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
+    <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
 
       {/* ── Dreamy Background Orbs ── */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -167,7 +167,7 @@ export default function InquirePage() {
 
           {/* Header Text */}
           <div className="text-center mb-12">
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+            <m.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
               <span className="inline-block mb-4">
                 <span className="text-4xl">👋</span>
               </span>
@@ -177,11 +177,11 @@ export default function InquirePage() {
               <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
                 Send us a message below and our friendly admissions team will get back to you within 1–2 business days.
               </p>
-            </motion.div>
+            </m.div>
           </div>
 
           {/* Floating Form Card */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
@@ -189,7 +189,7 @@ export default function InquirePage() {
           >
             <AnimatePresence mode="wait">
               {success ? (
-                <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="flex flex-col items-center text-center py-12">
+                <m.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="flex flex-col items-center text-center py-12">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#22c55e] to-[#4ade80] text-white flex items-center justify-center mb-6 shadow-lg shadow-green-500/30">
                     <CheckIcon />
                   </div>
@@ -205,9 +205,9 @@ export default function InquirePage() {
                       Back to Home
                     </Link>
                   </div>
-                </motion.div>
+                </m.div>
               ) : (
-                <motion.form key="form" onSubmit={handleSubmit} className="space-y-6">
+                <m.form key="form" onSubmit={handleSubmit} className="space-y-6">
 
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div>
@@ -264,24 +264,24 @@ export default function InquirePage() {
                       )}
                     </button>
                   </div>
-                </motion.form>
+                </m.form>
               )}
             </AnimatePresence>
-          </motion.div>
+          </m.div>
 
           {/* Quick Contact Pills below form */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }} className="mt-12 flex flex-wrap items-center justify-center gap-4 text-[#64748b]">
+          <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }} className="mt-12 flex flex-wrap items-center justify-center gap-4 text-[#64748b]">
             <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full border border-black/5 text-[14px] font-bold">
               <span className="text-xl leading-none">📧</span> Merryexplorerscenter@gmail.com
             </div>
             <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full border border-black/5 text-[14px] font-bold">
               <span className="text-xl leading-none">📞</span> (0947) 782 0606
             </div>
-          </motion.div>
+          </m.div>
 
         </div>
       </main>
       <SiteFooter />
-    </motion.div>
+    </m.div>
   );
 }

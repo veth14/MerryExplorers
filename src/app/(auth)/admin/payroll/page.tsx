@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence  } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
 import { SummaryTable } from "@/components/payroll/summary-table";
 import { OffsetMonitoring } from "@/components/payroll/offset-monitoring";
@@ -27,7 +27,7 @@ export default function PayrollPage() {
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
-            <motion.button
+            <m.button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               whileTap={{ scale: 0.96 }}
@@ -47,7 +47,7 @@ export default function PayrollPage() {
                 {tab.icon}
               </span>
               {tab.label}
-            </motion.button>
+            </m.button>
           );
         })}
       </div>
@@ -55,7 +55,7 @@ export default function PayrollPage() {
       {/* Tab Content */}
       <div className="w-full">
         <AnimatePresence mode="wait">
-          <motion.div
+          <m.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -66,7 +66,7 @@ export default function PayrollPage() {
             {activeTab === "payslip" && <PayslipView />}
             {activeTab === "timekeeping" && <TimekeepingView />}
             {activeTab === "offset" && <OffsetMonitoring />}
-          </motion.div>
+          </m.div>
         </AnimatePresence>
       </div>
 

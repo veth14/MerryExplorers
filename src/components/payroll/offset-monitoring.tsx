@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { m, AnimatePresence, type Variants  } from "framer-motion";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -67,14 +67,14 @@ function RenderedTable({ records }: { records: RenderedSession[] }) {
           <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-right">Total # Of Hours</th>
         </tr>
       </thead>
-      <motion.tbody variants={containerVariants} initial="hidden" animate="visible">
+      <m.tbody variants={containerVariants} initial="hidden" animate="visible">
         {records.map((r) => (
-          <motion.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
+          <m.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
             <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.date}</td>
             <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.timeIn || "—"}</td>
             <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.timeOut || "—"}</td>
             <td className="px-4 py-2.5 text-right font-black text-brand-navy whitespace-nowrap">{formatHours(r.hours)}</td>
-          </motion.tr>
+          </m.tr>
         ))}
         {isEmpty && (
           <tr style={{ height: "44px" }}>
@@ -88,7 +88,7 @@ function RenderedTable({ records }: { records: RenderedSession[] }) {
             <td colSpan={4} />
           </tr>
         ))}
-      </motion.tbody>
+      </m.tbody>
     </table>
   );
 }
@@ -107,14 +107,14 @@ function PendingTable({ records }: { records: PendingGroup[] }) {
           <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-right">Total # Of Hours</th>
         </tr>
       </thead>
-      <motion.tbody variants={containerVariants} initial="hidden" animate="visible">
+      <m.tbody variants={containerVariants} initial="hidden" animate="visible">
         {records.map((r) => (
-          <motion.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
+          <m.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
             <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.holidayDate}</td>
             <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.timeIn || "—"}</td>
             <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.timeOut || "—"}</td>
             <td className="px-4 py-2.5 text-right font-black text-brand-red whitespace-nowrap">{formatHours(r.required)}</td>
-          </motion.tr>
+          </m.tr>
         ))}
         {isEmpty && (
           <tr style={{ height: "44px" }}>
@@ -128,7 +128,7 @@ function PendingTable({ records }: { records: PendingGroup[] }) {
             <td colSpan={4} />
           </tr>
         ))}
-      </motion.tbody>
+      </m.tbody>
     </table>
   );
 }
@@ -220,7 +220,7 @@ export function OffsetMonitoring() {
   const selectedAccount = accounts.find((a) => a.id === selectedEmployeeId);
 
   return (
-    <motion.div
+    <m.div
       className="flex flex-col gap-6 w-full"
       variants={containerVariants}
       initial="hidden"
@@ -247,7 +247,7 @@ export function OffsetMonitoring() {
             </button>
             <AnimatePresence>
               {empOpen && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: -4, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -264,7 +264,7 @@ export function OffsetMonitoring() {
                       </button>
                     ))}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
@@ -273,7 +273,7 @@ export function OffsetMonitoring() {
 
       <AnimatePresence mode="wait">
         {loading ? (
-          <motion.div
+          <m.div
             key="loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -284,9 +284,9 @@ export function OffsetMonitoring() {
               <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand-blue/20 border-t-brand-blue" />
               <p className="text-[13px] font-bold text-brand-navy/60">Loading offsets data…</p>
             </div>
-          </motion.div>
+          </m.div>
         ) : !selectedAccount ? (
-          <motion.div
+          <m.div
             key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -294,9 +294,9 @@ export function OffsetMonitoring() {
             className="rounded-[2rem] bg-white border-2 border-brand-blue shadow-[var(--shadow-card)] flex items-center justify-center py-24 w-full"
           >
             <p className="text-[13px] font-bold text-brand-navy/60">Select an employee to view offsets.</p>
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key="content"
             variants={cardVariants}
             className="rounded-[2rem] bg-white border-2 border-brand-blue shadow-[var(--shadow-card)] overflow-hidden"
@@ -342,9 +342,9 @@ export function OffsetMonitoring() {
                 <PendingTable records={pendingGroups} />
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   );
 }

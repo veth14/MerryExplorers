@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { NAV_LINKS } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
 
@@ -47,7 +47,7 @@ export default function ContactPage() {
       <main className="relative z-10 flex-grow px-5 py-16 sm:py-24">
         <div className="mx-auto w-full max-w-4xl">
           {/* Header */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -60,10 +60,10 @@ export default function ContactPage() {
             <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
               We'd love to hear from you. Reach out through any of the channels below.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Contact Cards */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
@@ -107,10 +107,10 @@ export default function ContactPage() {
                 <p className="text-[13px] text-[#94a3b8] mt-1 font-medium">We reply within 1–2 business days</p>
               </div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* CTA to Inquire */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
@@ -123,7 +123,7 @@ export default function ContactPage() {
             >
               Send an Inquiry →
             </Link>
-          </motion.div>
+          </m.div>
         </div>
       </main>
       <SiteFooter />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { m, AnimatePresence, type Variants  } from "framer-motion";
 import {
   getBreakMinutes,
   BASE_SCHEDULE,
@@ -393,7 +393,7 @@ export function TimekeepingView() {
       : null;
 
   return (
-    <motion.div
+    <m.div
       className="flex flex-col gap-6 w-full"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -421,7 +421,7 @@ export function TimekeepingView() {
             </button>
             <AnimatePresence>
               {empOpen && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: -4, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -438,7 +438,7 @@ export function TimekeepingView() {
                       </button>
                     ))}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
@@ -457,7 +457,7 @@ export function TimekeepingView() {
             </button>
             <AnimatePresence>
               {cutOffOpen && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: -4, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -474,7 +474,7 @@ export function TimekeepingView() {
                       </button>
                     ))}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
@@ -493,7 +493,7 @@ export function TimekeepingView() {
       {/* Timekeeping Card */}
       <AnimatePresence mode="wait">
         {loading ? (
-          <motion.div
+          <m.div
             key="loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -504,9 +504,9 @@ export function TimekeepingView() {
               <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand-blue/20 border-t-brand-blue" />
               <p className="text-[13px] font-bold text-brand-navy/60">Loading timekeeping data…</p>
             </div>
-          </motion.div>
+          </m.div>
         ) : !sheet ? (
-          <motion.div
+          <m.div
             key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -514,9 +514,9 @@ export function TimekeepingView() {
             className="rounded-[2rem] bg-white border-2 border-brand-blue shadow-[var(--shadow-card)] flex items-center justify-center py-24"
           >
             <p className="text-[13px] font-bold text-brand-navy/60">No data found for the selected employee and cut-off period.</p>
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key={`${selectedEmployeeId}-${selectedCutOffValue}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -572,7 +572,7 @@ export function TimekeepingView() {
                     const styles = DAY_TYPE_STYLES[row.type];
                     const isOff = row.type !== "WORK";
                     return (
-                      <motion.tr
+                      <m.tr
                         key={row.id}
                         custom={i}
                         variants={rowVariants}
@@ -642,7 +642,7 @@ export function TimekeepingView() {
                             }`}>{row.remarks}</span>
                           )}
                         </td>
-                      </motion.tr>
+                      </m.tr>
                     );
                   })}
                 </tbody>
@@ -668,9 +668,9 @@ export function TimekeepingView() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   );
 }

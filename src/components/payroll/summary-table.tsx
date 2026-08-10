@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { m, AnimatePresence, type Variants  } from "framer-motion";
 
 function generateCutOffs(): { label: string; value: string; start: Date; end: Date; startStr: string; endStr: string }[] {
   const cutOffs = [];
@@ -118,7 +118,7 @@ export function SummaryTable() {
   }, [selectedCutOff.startStr, selectedCutOff.endStr]);
 
   return (
-    <motion.div
+    <m.div
       className="flex flex-col gap-6 w-full"
       variants={containerVariants}
       initial="hidden"
@@ -161,7 +161,7 @@ export function SummaryTable() {
             </button>
             <AnimatePresence>
               {cutOffOpen && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: -4, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -178,7 +178,7 @@ export function SummaryTable() {
                       </button>
                     ))}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
@@ -187,7 +187,7 @@ export function SummaryTable() {
 
       <AnimatePresence mode="wait">
         {loading ? (
-          <motion.div
+          <m.div
             key="loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -198,9 +198,9 @@ export function SummaryTable() {
               <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand-blue/20 border-t-brand-blue" />
               <p className="text-[13px] font-bold text-brand-navy/60">Computing payroll summary…</p>
             </div>
-          </motion.div>
+          </m.div>
         ) : !data || data.records.length === 0 ? (
-          <motion.div
+          <m.div
             key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -208,9 +208,9 @@ export function SummaryTable() {
             className="rounded-[2rem] bg-white border-2 border-brand-blue shadow-[var(--shadow-card)] flex items-center justify-center py-24 w-full"
           >
             <p className="text-[13px] font-bold text-brand-navy/60">No payroll data found for the selected cut-off period.</p>
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key="content"
             variants={cardVariants}
             initial="hidden"
@@ -279,9 +279,9 @@ export function SummaryTable() {
                     )}
                   </tr>
                 </thead>
-                <motion.tbody variants={containerVariants} initial="hidden" animate="visible">
+                <m.tbody variants={containerVariants} initial="hidden" animate="visible">
                   {data.records.map((r) => (
-                    <motion.tr
+                    <m.tr
                       key={r.id}
                       variants={rowVariants}
                       className="border-b border-brand-sky/40 hover:bg-brand-sky/20 transition-colors group"
@@ -359,14 +359,14 @@ export function SummaryTable() {
                           </td>
                         </>
                       )}
-                    </motion.tr>
+                    </m.tr>
                   ))}
-                </motion.tbody>
+                </m.tbody>
               </table>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   );
 }

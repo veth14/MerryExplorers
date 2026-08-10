@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { NAV_LINKS } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
 
@@ -46,7 +46,7 @@ export default function LocationPage() {
       <main className="relative z-10 flex-grow px-5 py-16 sm:py-20">
         <div className="mx-auto w-full max-w-5xl">
           {/* Header */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -59,10 +59,10 @@ export default function LocationPage() {
             <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
               Come visit us! We're located at Camarin, Caloocan, near Camarin Doctors Hospital.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Map + Info Grid */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
@@ -126,7 +126,7 @@ export default function LocationPage() {
                 🗺️ Open in Google Maps
               </a>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </main>
       <SiteFooter />
