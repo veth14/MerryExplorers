@@ -52,6 +52,16 @@ export async function POST(request: Request) {
 
     const result = await db.collection("inquiries").insertOne(newInquiry);
 
+    // Create a global notification for admins
+    await db.collection("notifications").insertOne({
+      title: "New Inquiry Received",
+      message: `An inquiry from ${parentName} for ${childName || "their child"} has been received.`,
+      type: "info",
+      read: false,
+      time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
+      createdAt: new Date(),
+    });
+
     // Send auto-reply email
     try {
       const transporter = nodemailer.createTransport({
