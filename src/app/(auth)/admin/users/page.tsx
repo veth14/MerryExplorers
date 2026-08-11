@@ -175,7 +175,7 @@ function UserModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const isTeacher = !["admin", "executive partner"].includes((draft.role || "").toLowerCase());
+  const isTeacher = !["admin", "executive partner", "developer"].includes((draft.role || "").toLowerCase());
   const STEPS = isTeacher 
     ? ["Avatar & Role", "Personal Info", "Work Details", "Payroll Details", "Emergency Contacts"]
     : ["Avatar & Role", "Personal Info", "Payroll Details"];
@@ -1005,7 +1005,7 @@ export default function UsersPage() {
 
   const filtered = accounts
     .filter((u) => {
-      if (activeTab === "Admins") return ["admin", "executive partner"].includes((u.role || "").toLowerCase());
+      if (activeTab === "Admins") return ["admin", "executive partner", "developer"].includes((u.role || "").toLowerCase());
       if (activeTab === "Lead Teachers") return u.role === "Lead Teacher";
       if (activeTab === "Assistants") return u.role === "Assistant Teacher";
       if (activeTab === "On Leave") return u.status === "on-leave";
@@ -1147,7 +1147,7 @@ export default function UsersPage() {
   const total = accounts.length;
   const active = accounts.filter((u) => u.status === "active").length;
   const onLeave = accounts.filter((u) => u.status === "on-leave").length;
-  const admins = accounts.filter((u) => ["admin", "executive partner"].includes((u.role || "").toLowerCase())).length;
+  const admins = accounts.filter((u) => ["admin", "executive partner", "developer"].includes((u.role || "").toLowerCase())).length;
   const leads = accounts.filter((u) => u.role === "Lead Teacher").length;
   const assistants = accounts.filter((u) => u.role === "Assistant Teacher").length;
 

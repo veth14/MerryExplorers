@@ -305,7 +305,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
 
-  const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive partner";
+  const isExecPartner = ["executive partner", "developer"].includes((userProfile?.role || "").toLowerCase());
 
   const teacherLinks = [
     { label: "Dashboard", href: "/teacher", icon: <DashboardIcon active={pathname === "/teacher"} /> },

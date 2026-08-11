@@ -148,6 +148,16 @@ export function computeSSS(monthlySalary: number): ContributionSet["sss"] {
  * c.perCutoff.totalEmployeeDeductions  // → 868.75
  */
 export function computeContributions(monthlySalary: number): ContributionSet {
+  if (monthlySalary <= 0) {
+    return {
+      sss: { employeeShare: 0, employerShare: 0, monthlyTotal: 0, regularSSMSC: 0, mpfMSC: 0, employeeRegularSS: 0, employeeMPF: 0, employerRegularSS: 0, employerEC: 0, employerMPF: 0 },
+      philhealth: { employeeShare: 0, employerShare: 0, monthlyTotal: 0 },
+      pagibig: { employeeShare: 0, employerShare: 0, monthlyTotal: 0 },
+      perCutoff: { sss: 0, philhealth: 0, pagibig: 0, totalEmployeeDeductions: 0 },
+      employerPerCutoff: { sss: 0, philhealth: 0, pagibig: 0, totalEmployerCost: 0 },
+    };
+  }
+
   const sss = computeSSS(monthlySalary);
   const philhealth = computePhilHealth(monthlySalary);
   const pagibig = computePagIbig(monthlySalary);

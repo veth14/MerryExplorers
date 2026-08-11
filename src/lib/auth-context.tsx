@@ -75,10 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (role === "admin") {
         document.cookie = `role=admin; path=/; max-age=86400`;
         router.push("/admin");
-      } else if (role === "executive partner") {
-        // Executive Partners are employees first — they clock in like teachers
+      } else if (role === "executive partner" || role === "developer") {
+        // Executive Partners and Developers are employees first — they clock in like teachers
         // but can also access the admin panel.
-        document.cookie = `role=executive partner; path=/; max-age=86400`;
+        document.cookie = `role=${role}; path=/; max-age=86400`;
         router.push("/teacher");
       } else {
         document.cookie = `role=teacher; path=/; max-age=86400`;

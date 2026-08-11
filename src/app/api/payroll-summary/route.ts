@@ -69,8 +69,10 @@ export async function GET(request: Request) {
       const empAttendance = attendanceMap.get(uid) || new Map();
 
       let totalHours = 0;
+      let daysPresent = 0;
       let totalLateDeduction = 0;
       const noTimeLog: boolean = acc.noTimeLog ?? false;
+      const dailyRate = acc.dailyRate ?? 0;
 
       for (const day of days) {
         const dow = day.getDay();
@@ -81,6 +83,7 @@ export async function GET(request: Request) {
         const rec = empAttendance.get(dateStr);
 
         if (isWorkDay && rec && rec.clockInTime) {
+          daysPresent++;
           // Late deduction — separate from credited hours, independent of graceUntil/status
           const lateResult = computeLateDeduction(rec.clockInTime, hourlyRate, noTimeLog);
           totalLateDeduction += lateResult.deduction;
@@ -100,7 +103,11 @@ export async function GET(request: Request) {
         }
       }
 
-      const basicPay = totalHours * hourlyRate;
+      let basicPay = totalHours * hourlyRate;
+      if (hourlyRate === 0 && dailyRate > 0) {
+        basicPay = daysPresent * dailyRate;
+      }
+      
       const comms = acc.communicationAllowance ?? 0;
       const perfectAttendance = 0;
       const birthdayGift = 0;
@@ -132,7 +139,9 @@ export async function GET(request: Request) {
         id: uid,
         name: acc.fullName,
         hours: parseFloat(totalHours.toFixed(2)),
+        daysPresent,
         rate: hourlyRate,
+        dailyRate,
         basic: parseFloat(basicPay.toFixed(2)),
         comms,
         perfectAttendance,

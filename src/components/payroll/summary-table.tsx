@@ -63,7 +63,9 @@ type PayrollRecord = {
   id: string;
   name: string;
   hours: number;
+  daysPresent?: number;
   rate: number;
+  dailyRate?: number;
   basic: number;
   comms: number;
   perfectAttendance: number;
@@ -348,10 +350,18 @@ export function SummaryTable() {
                       {viewMode === "employee" ? (
                         <>
                           <td className="px-4 py-4 text-center">
-                            <span className="text-[13px] font-bold text-brand-blue">{r.hours > 0 ? r.hours.toFixed(2) : "—"}</span>
+                            <span className="text-[13px] font-bold text-brand-blue">
+                              {(r.dailyRate && r.dailyRate > 0 && r.rate === 0) 
+                                ? (r.daysPresent && r.daysPresent > 0 ? `${r.daysPresent} days` : "—") 
+                                : (r.hours > 0 ? r.hours.toFixed(2) : "—")}
+                            </span>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <span className="text-[13px] font-bold text-brand-navy/70">{r.rate > 0 ? fmt(r.rate) : "—"}</span>
+                            <span className="text-[13px] font-bold text-brand-navy/70">
+                              {(r.dailyRate && r.dailyRate > 0 && r.rate === 0)
+                                ? `${fmt(r.dailyRate)}/d`
+                                : (r.rate > 0 ? fmt(r.rate) : "—")}
+                            </span>
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="text-[13px] font-bold text-brand-navy">{fmt(r.basic)}</span>

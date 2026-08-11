@@ -94,7 +94,7 @@ export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
         <div>
           <p className="font-headline text-[17px] font-extrabold text-[#002f76] leading-tight">{user.fullName}</p>
           <p className="text-[12px] font-semibold text-[#5a6e8c] mt-0.5">
-            {["admin", "executive partner"].includes((user.role || "").toLowerCase())
+            {["admin", "executive partner", "developer"].includes((user.role || "").toLowerCase())
               ? user.fullName.includes("Merry Valmonte")
                 ? "Owner"
                 : user.fullName.includes("Ian Angelo Valmores")

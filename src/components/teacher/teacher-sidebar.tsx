@@ -344,7 +344,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
         </div>
 
         {/* Admin View — Executive Partners & Developer only */}
-        {isExecPartner && (
+        {(isExecPartner || isDeveloper) && (
           <div>
             {/* Section separator */}
             <div className="mx-0 mb-4 h-px bg-gradient-to-r from-[#002f76]/12 via-[#ffb800]/25 to-transparent" />
