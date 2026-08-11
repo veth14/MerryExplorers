@@ -104,9 +104,14 @@ export function SummaryTable() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<SummaryResponse | null>(null);
 
+  // New state for Mark as Paid feature
+  const [isPaid, setIsPaid] = useState(false);
+  const [isTogglingPaid, setIsTogglingPaid] = useState(false);
+
   const selectedCutOff = CUT_OFFS.find((c) => c.value === selectedCutOffValue) ?? CUT_OFFS[0];
 
   useEffect(() => {
+    // 1. Fetch Payroll Data
     fetch(`/api/payroll-summary?startDate=${selectedCutOff.startStr}&endDate=${selectedCutOff.endStr}`)
       .then(res => res.json())
       .then(json => {
@@ -115,7 +120,34 @@ export function SummaryTable() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [selectedCutOff.startStr, selectedCutOff.endStr]);
+
+    // 2. Fetch Paid Status
+    fetch(`/api/payroll-status?cutoffValue=${selectedCutOff.value}`)
+      .then(res => res.json())
+      .then(json => {
+        if (json.success) setIsPaid(json.isPaid);
+      })
+      .catch(console.error);
+  }, [selectedCutOff.startStr, selectedCutOff.endStr, selectedCutOff.value]);
+
+  const togglePaidStatus = async () => {
+    setIsTogglingPaid(true);
+    try {
+      const res = await fetch("/api/payroll-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cutoffValue: selectedCutOff.value, isPaid: !isPaid }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setIsPaid(json.isPaid);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTogglingPaid(false);
+    }
+  };
 
   return (
     <m.div
@@ -156,6 +188,11 @@ export function SummaryTable() {
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "15px" }}>calendar_month</span>
                 {selectedCutOff.label}
+                {isPaid && (
+                  <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider border border-green-200">
+                    Paid
+                  </span>
+                )}
               </div>
               <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "16px" }}>expand_more</span>
             </button>
@@ -236,6 +273,20 @@ export function SummaryTable() {
                 </div>
               </div>
               <div className="flex gap-4 text-center items-center">
+                <button
+                  onClick={togglePaidStatus}
+                  disabled={isTogglingPaid}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider transition-all duration-200 border-2 ${
+                    isPaid
+                      ? "bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30"
+                      : "bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  } ${isTogglingPaid ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+                    {isPaid ? "check_circle" : "payments"}
+                  </span>
+                  {isPaid ? "Paid" : "Mark as Paid"}
+                </button>
                 <div className="bg-white/15 rounded-full px-5 py-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-brand-sky/80">Total Gross</p>
                   <p className="text-[16px] font-black text-white">{fmt(data.totalGross)}</p>
