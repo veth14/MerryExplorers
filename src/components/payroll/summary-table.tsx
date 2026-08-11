@@ -73,6 +73,7 @@ type PayrollRecord = {
   birthdayGift: number;
   gross: number;
   lateDeduction?: number;
+  weeklyShortfallDeduction?: number;
   sss: number;
   philhealth: number;
   pagibig: number;
@@ -312,7 +313,7 @@ export function SummaryTable() {
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Days</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Rate</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Basic Pay</th>
-                        <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-red/60 text-center bg-brand-red/5">Late Ded.</th>
+                        <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-red/60 text-center bg-brand-red/5">Deductions</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">Comms</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">Attendance</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">B-day Gift</th>
@@ -364,8 +365,11 @@ export function SummaryTable() {
                             <span className="text-[13px] font-bold text-brand-navy">{fmt(r.basic)}</span>
                           </td>
                           <td className="px-3 py-4 text-center bg-brand-red/5">
-                            {r.lateDeduction != null && r.lateDeduction > 0
-                              ? <span className="text-[12px] font-bold text-brand-red/80">−{fmt(r.lateDeduction)}</span>
+                            {(r.lateDeduction ?? 0) > 0 || (r.weeklyShortfallDeduction ?? 0) > 0
+                              ? <div className="flex flex-col gap-0.5 items-center">
+                                  {(r.lateDeduction ?? 0) > 0 && <span className="text-[11px] font-bold text-brand-red/80">L: −{fmt(r.lateDeduction!)}</span>}
+                                  {(r.weeklyShortfallDeduction ?? 0) > 0 && <span className="text-[11px] font-bold text-brand-red/80">W: −{fmt(r.weeklyShortfallDeduction!)}</span>}
+                                </div>
                               : <span className="text-[11px] text-brand-navy/30">—</span>
                             }
                           </td>

@@ -8,11 +8,12 @@ import {
   type DayAbbr,
   computeLateDeduction,
   computeCreditedHours,
+  type LateDeductionResult,
 } from "@/lib/attendance-rules";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DayType = "WORK" | "DAY-OFF" | "HOLIDAY" | "ABSENT" | "LEAVE" | "FUTURE" | "SUSPENDED";
+type DayType = "WORK" | "DAY-OFF" | "HOLIDAY" | "ABSENT" | "LEAVE" | "FUTURE" | "SUSPENDED" | "FLEXIBLE";
 
 type TimekeepingRow = {
   id: string;
@@ -44,6 +45,7 @@ type TimekeepingSheet = {
   grandTotal: number;
   /** Sum of all per-day late deductions for this cut-off period. */
   totalLateDeduction: number;
+  weeklyHoursTarget?: number;
   rows: TimekeepingRow[];
 };
 
@@ -62,6 +64,7 @@ type Account = {
   perfectAttendanceIncentive?: number;
   birthdayGift?: number;
   workDays?: string[];
+  weeklyHoursTarget?: number;
 };
 
 type AttendanceRecord = {
@@ -198,7 +201,9 @@ function buildSheet(
     } else if (isSuspendedDay) {
       type = "SUSPENDED";
     } else if (!rec || !rec.clockInTime) {
-      type = isFuture ? "FUTURE" : "ABSENT";
+      if (isFuture) type = "FUTURE";
+      else if (account.weeklyHoursTarget) type = "FLEXIBLE"; // Neutral label instead of ABSENT or DAY-OFF
+      else type = "ABSENT";
     } else {
       type = "WORK";
     }
@@ -245,8 +250,11 @@ function buildSheet(
     grandTotal += totalHours;
 
     // Late deduction — uses derived rate (daily/8 or monthly/176), NOT a stored hourlyRate
-    const lateResult = computeLateDeduction(rec!.clockInTime!, rateForLate, noTimeLog);
-    totalLateDeduction += lateResult.deduction;
+    let lateResult: LateDeductionResult = { deduction: 0, method: "none", lateMinutes: 0 };
+    if (!account.weeklyHoursTarget) {
+      lateResult = computeLateDeduction(rec!.clockInTime!, rateForLate, noTimeLog);
+      totalLateDeduction += lateResult.deduction;
+    }
 
     // Build remarks from late method
     const lateRemark =
@@ -281,10 +289,11 @@ function buildSheet(
     position: account.role ?? "–",
     monthlyRate,
     dailyRate,
-    salaryDate,
-    cutOffPeriod: `${fmtDateLabel(cutOff.start).toUpperCase()} – ${fmtDateLabel(cutOff.end).toUpperCase()}`,
+    salaryDate: "TBD",
+    cutOffPeriod: cutOff.label,
     grandTotal: parseFloat(grandTotal.toFixed(2)),
     totalLateDeduction: parseFloat(totalLateDeduction.toFixed(2)),
+    weeklyHoursTarget: account.weeklyHoursTarget,
     rows,
   };
 }
@@ -299,6 +308,7 @@ const DAY_TYPE_STYLES: Record<DayType, { bg: string; text: string; badge: string
   LEAVE: { bg: "bg-pink-50", text: "text-pink-500/70", badge: "bg-pink-100 text-pink-500", badgeText: "LEAVE" },
   FUTURE: { bg: "bg-white/40", text: "text-brand-navy/30", badge: "", badgeText: "" },
   SUSPENDED: { bg: "bg-brand-sky/20", text: "text-brand-navy/60", badge: "bg-brand-sky text-brand-blue", badgeText: "SUSPENDED" },
+  FLEXIBLE: { bg: "bg-white/40", text: "text-brand-navy/40", badge: "bg-slate-100 text-slate-500", badgeText: "NO LOG" },
 };
 
 const fmt2 = (val: number) =>
@@ -476,7 +486,7 @@ export function TimekeepingView() {
 
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {(["DAY-OFF", "HOLIDAY", "ABSENT", "LEAVE"] as DayType[]).map((type) => (
+          {(["DAY-OFF", "HOLIDAY", "ABSENT", "LEAVE", "FLEXIBLE"] as DayType[]).map((type) => (
             <span key={type} className={`text-[10px] font-black px-2.5 py-1 rounded-full ${DAY_TYPE_STYLES[type].badge}`}>
               {DAY_TYPE_STYLES[type].badgeText}
             </span>
@@ -644,8 +654,8 @@ export function TimekeepingView() {
                   </div>
                 )}
                 <div className="text-right">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-brand-blue/60">Hours × Rate</p>
-                  <p className="text-[18px] font-black text-brand-blue">₱ {fmt2(sheet.grandTotal)}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-brand-blue/60">Total Hours</p>
+                  <p className="text-[18px] font-black text-brand-blue">{fmt2(sheet.grandTotal)}</p>
                 </div>
               </div>
             </div>

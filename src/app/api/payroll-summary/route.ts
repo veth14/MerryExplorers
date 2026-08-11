@@ -20,6 +20,10 @@ function eachDayInRange(start: Date, end: Date): Date[] {
   return days;
 }
 
+function formatDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export async function GET(request: Request) {
   const deny = requireInternalAuth(request);
   if (deny) return deny;
@@ -40,9 +44,29 @@ export async function GET(request: Request) {
       role: { $in: ["Lead Teacher", "Assistant Teacher", "Executive Partner", "Executive Assistant"] }
     }).toArray();
 
-    // 2. Fetch Attendance for the period
+    // 3. Determine the required attendance date range.
+    // For normal employees, we only need [startDateStr, endDateStr].
+    // But for weekly evaluations, we must evaluate full Sun-Sat weeks that END within the cutoff.
+    // So we must fetch attendance starting from the Sunday of the earliest Saturday in the cutoff.
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    const days = eachDayInRange(start, end);
+    const saturdaysInCutoff = days.filter(d => d.getDay() === 6);
+
+    let queryStartDateStr = startDateStr;
+    if (saturdaysInCutoff.length > 0) {
+      const firstSaturday = saturdaysInCutoff[0];
+      const sundayBeforeFirstSat = new Date(firstSaturday);
+      sundayBeforeFirstSat.setDate(sundayBeforeFirstSat.getDate() - 6);
+      
+      if (sundayBeforeFirstSat < start) {
+        queryStartDateStr = formatDateStr(sundayBeforeFirstSat);
+      }
+    }
+
+    // 2. Fetch Attendance for the expanded period
     const attendanceRecords = await db.collection("attendance").find({
-      dateStr: { $gte: startDateStr, $lte: endDateStr }
+      dateStr: { $gte: queryStartDateStr, $lte: endDateStr }
     }).toArray();
 
     // Group attendance by teacherUid -> dateStr -> record
@@ -52,11 +76,6 @@ export async function GET(request: Request) {
       if (!attendanceMap.has(uid)) attendanceMap.set(uid, new Map());
       attendanceMap.get(uid)!.set(rec.dateStr, rec);
     }
-
-    // 3. Process each account to compute payroll
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-    const days = eachDayInRange(start, end);
 
     const records = [];
     let totalGross = 0;
@@ -76,6 +95,7 @@ export async function GET(request: Request) {
       let daysPresent = 0;
       let totalScheduledWorkDays = 0; // Work days in the cutoff for this employee
       let totalLateDeduction = 0;
+      let totalWeeklyShortfallDeduction = 0;
       const noTimeLog: boolean = acc.noTimeLog ?? false;
 
       // Fetch daily exemptions for this employee so we can skip late deductions on exempt days
@@ -104,10 +124,12 @@ export async function GET(request: Request) {
         if (isWorkDay && !isSuspended && rec && rec.clockInTime) {
           daysPresent++;
 
-          // Late deduction — only if this day is NOT a flexible/exempt override
-          const isDayExempt = noTimeLog || exemptDates.has(dateStr);
-          const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt);
-          totalLateDeduction += lateResult.deduction;
+          // Late deduction — only if this day is NOT a flexible/exempt override AND they don't have a weekly target
+          if (!acc.weeklyHoursTarget) {
+            const isDayExempt = noTimeLog || exemptDates.has(dateStr);
+            const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt);
+            totalLateDeduction += lateResult.deduction;
+          }
 
           // Credited hours — tracked for reference and offset calculations
           if (rec.clockOutTime && abbr !== "Sun") {
@@ -120,6 +142,42 @@ export async function GET(request: Request) {
               schedule.normalEnd,
               breakMins,
             );
+          }
+        }
+      }
+
+      // If they have a weekly target, evaluate any full weeks that ended in this cutoff
+      if (acc.weeklyHoursTarget) {
+        for (const sat of saturdaysInCutoff) {
+          const sun = new Date(sat);
+          sun.setDate(sun.getDate() - 6);
+          const weekDays = eachDayInRange(sun, sat);
+          
+          let weekTotalHours = 0;
+          for (const wDay of weekDays) {
+            const wDateStr = formatDateStr(wDay);
+            const wRec = empAttendance.get(wDateStr);
+            
+            if (wRec && wRec.clockInTime && wRec.clockOutTime) {
+              const wDow = wDay.getDay();
+              const wAbbr = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[wDow];
+              if (wAbbr !== "Sun") {
+                const schedule = BASE_SCHEDULE[wAbbr];
+                const breakMins = getBreakMinutes(wDow);
+                weekTotalHours += computeCreditedHours(
+                  wRec.clockInTime,
+                  wRec.clockOutTime,
+                  schedule.start,
+                  schedule.normalEnd,
+                  breakMins
+                );
+              }
+            }
+          }
+          
+          if (weekTotalHours < acc.weeklyHoursTarget) {
+            const shortfall = acc.weeklyHoursTarget - weekTotalHours;
+            totalWeeklyShortfallDeduction += shortfall * rateForLate;
           }
         }
       }
@@ -152,7 +210,8 @@ export async function GET(request: Request) {
       const birthdayGift = 0;
       // Late deduction is applied after basic pay is computed and before contributions
       const lateDeduction = parseFloat(totalLateDeduction.toFixed(2));
-      const grossPay = basicPay + comms + perfectAttendance + birthdayGift - lateDeduction;
+      const weeklyShortfallDeduction = parseFloat(totalWeeklyShortfallDeduction.toFixed(2));
+      const grossPay = basicPay + comms + perfectAttendance + birthdayGift - lateDeduction - weeklyShortfallDeduction;
 
       // Use live contribution calculation (SSS table lookup, not stored flat values)
       const monthlySalary = acc.monthlyRate ?? 0;
@@ -188,6 +247,7 @@ export async function GET(request: Request) {
         birthdayGift,
         gross: parseFloat(grossPay.toFixed(2)),
         lateDeduction,
+        weeklyShortfallDeduction,
         // Employee deductions (payslip + net pay)
         sss: empSSS,
         philhealth: empPhilHealth,

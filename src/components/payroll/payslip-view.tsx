@@ -18,6 +18,7 @@ type PayrollRecord = {
   birthdayGift: number;
   gross: number;
   lateDeduction?: number;
+  weeklyShortfallDeduction?: number;
   sss: number;
   philhealth: number;
   pagibig: number;
@@ -182,6 +183,13 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
                 <span className="text-[11px] font-bold text-brand-red/70">{fmt(data.lateDeduction)}</span>
               </div>
             )}
+            {/* Weekly Shortfall Deduction — employee copy only, shown only when > 0 */}
+            {isEmployee && data.weeklyShortfallDeduction != null && data.weeklyShortfallDeduction > 0 && (
+              <div className="flex justify-between">
+                <span className="text-[11px] font-bold text-brand-navy/70">Less: Weekly Hours Shortfall</span>
+                <span className="text-[11px] font-bold text-brand-red/70">{fmt(data.weeklyShortfallDeduction)}</span>
+              </div>
+            )}
             {[
               { label: "SSS Contribution", val: sssVal },
               { label: "Philhealth Contribution", val: philhealthVal },
@@ -196,7 +204,7 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
               <span className="text-[11px] font-black text-brand-navy/60">{isEmployee ? "Total Deduction" : "Total ER Cost"}</span>
               <span className={`text-[11px] font-black ${isEmployee ? "text-brand-red" : "text-brand-orange"}`}>
                 {isEmployee
-                  ? fmt(totalDeductionVal + (data.lateDeduction ?? 0))
+                  ? fmt(totalDeductionVal + (data.lateDeduction ?? 0) + (data.weeklyShortfallDeduction ?? 0))
                   : fmt(totalDeductionVal)
                 }
               </span>
