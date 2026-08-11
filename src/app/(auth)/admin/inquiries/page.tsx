@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
+import EmojiPicker from "emoji-picker-react";
 
 type InquiryStatus = "New" | "Read" | "Replied" | "Awaiting Reply" | "Closed";
 
@@ -121,6 +122,7 @@ export default function InquiriesPage() {
   const [isReplying, setIsReplying] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Log client reply state
   const [isLoggingClient, setIsLoggingClient] = useState(false);
@@ -509,7 +511,7 @@ export default function InquiriesPage() {
       {/* Detail Modal */}
       {selectedInquiry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-[#001a4d]/40 backdrop-blur-sm" onClick={() => { setSelectedInquiry(null); setIsReplying(false); setIsLoggingClient(false); }} />
+          <div className="fixed inset-0 bg-[#001a4d]/40 backdrop-blur-sm" onClick={() => { setSelectedInquiry(null); setIsReplying(false); setIsLoggingClient(false); setShowEmojiPicker(false); }} />
           <div className="relative w-full max-w-lg bg-white rounded-[1.5rem] shadow-2xl border border-[#e8effe] overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="bg-gradient-to-br from-[#002f76] to-[#0050d5] px-6 py-5 flex items-center justify-between shrink-0">
@@ -519,7 +521,7 @@ export default function InquiriesPage() {
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={selectedInquiry.status} />
-                <button onClick={() => { setSelectedInquiry(null); setIsReplying(false); setIsLoggingClient(false); }}
+                <button onClick={() => { setSelectedInquiry(null); setIsReplying(false); setIsLoggingClient(false); setShowEmojiPicker(false); }}
                   className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors ml-2">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
                     <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
@@ -606,12 +608,32 @@ export default function InquiriesPage() {
                 </div>
               ) : isReplying ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-200">
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#005cc8] mb-1.5">Compose Reply</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#005cc8]">Compose Reply</p>
+                    <div className="relative">
+                      <button 
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+                        className="w-7 h-7 rounded-full bg-[#f0f5ff] text-[#005cc8] flex items-center justify-center hover:bg-[#e2e8f0] transition-colors"
+                        title="Insert Emoji"
+                      >
+                        😊
+                      </button>
+                      {showEmojiPicker && (
+                        <div className="absolute right-0 bottom-full mb-2 z-50">
+                          <EmojiPicker 
+                            onEmojiClick={(emojiData) => setReplyMessage((prev) => prev + emojiData.emoji)} 
+                            width={300} 
+                            height={350} 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)}
                     placeholder="Type your reply here..."
                     className="w-full min-h-[100px] p-3 text-[13px] font-semibold text-[#002f76] border border-[#e2e8f0] rounded-xl focus:outline-none focus:border-[#005cc8] bg-[#f8fafc] mb-2 resize-y" />
                   <div className="flex gap-2">
-                    <button onClick={() => { setIsReplying(false); setReplyMessage(""); }} disabled={sendingReply}
+                    <button onClick={() => { setIsReplying(false); setReplyMessage(""); setShowEmojiPicker(false); }} disabled={sendingReply}
                       className="flex-1 py-2 rounded-xl border border-[#e2e8f0] text-[12px] font-bold text-[#002f76] hover:bg-[#f8fafc] transition-colors disabled:opacity-50">
                       Cancel
                     </button>
