@@ -63,9 +63,10 @@ type PayrollRecord = {
   id: string;
   name: string;
   hours: number;
-  daysPresent?: number;
-  rate: number;
-  dailyRate?: number;
+  daysPresent: number;
+  totalScheduledWorkDays?: number;
+  monthlyRate: number;
+  dailyRate: number;
   basic: number;
   comms: number;
   perfectAttendance: number;
@@ -308,8 +309,8 @@ export function SummaryTable() {
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60">Employee</th>
                     {viewMode === "employee" ? (
                       <>
-                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Hours</th>
-                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Hourly Rate</th>
+                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Days</th>
+                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Rate</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Basic Pay</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-red/60 text-center bg-brand-red/5">Late Ded.</th>
                         <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-orange/70 text-center bg-brand-orange/5">Comms</th>
@@ -351,16 +352,12 @@ export function SummaryTable() {
                         <>
                           <td className="px-4 py-4 text-center">
                             <span className="text-[13px] font-bold text-brand-blue">
-                              {(r.dailyRate && r.dailyRate > 0 && r.rate === 0) 
-                                ? (r.daysPresent && r.daysPresent > 0 ? `${r.daysPresent} days` : "—") 
-                                : (r.hours > 0 ? r.hours.toFixed(2) : "—")}
+                              {r.daysPresent > 0 ? `${r.daysPresent} days` : "—"}
                             </span>
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="text-[13px] font-bold text-brand-navy/70">
-                              {(r.dailyRate && r.dailyRate > 0 && r.rate === 0)
-                                ? `${fmt(r.dailyRate)}/d`
-                                : (r.rate > 0 ? fmt(r.rate) : "—")}
+                              {r.monthlyRate > 0 ? `${fmt(r.monthlyRate)}/mo` : r.dailyRate > 0 ? `${fmt(r.dailyRate)}/d` : "—"}
                             </span>
                           </td>
                           <td className="px-4 py-4 text-right">

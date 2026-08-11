@@ -52,7 +52,22 @@ export async function GET(request: Request) {
     const suspendedDays = allSuspendedDocs.map(d => d.dateStr);
 
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
-    return NextResponse.json({ success: true, data: attendanceRecords, isSuspended, suspendReason, suspendedDays }, {
+    
+    // Fetch any daily exemptions for this date
+    let exemptions: string[] = [];
+    if (resolvedDateStr) {
+      const exemptDocs = await db.collection("daily_exemptions").find({ dateStr: resolvedDateStr }).toArray();
+      exemptions = exemptDocs.map(d => d.teacherUid);
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      data: attendanceRecords, 
+      isSuspended, 
+      suspendReason, 
+      suspendedDays,
+      exemptions
+    }, {
       headers: {
         "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30"
       }
@@ -91,7 +106,13 @@ export async function POST(request: Request) {
 
     // Look up the account to get noTimeLog flag for status computation
     const accountDoc = await db.collection("accounts").findOne({ _id: teacherUid as any });
-    const noTimeLog = accountDoc?.noTimeLog ?? false;
+    let noTimeLog = accountDoc?.noTimeLog ?? false;
+
+    // Check if there is a specific daily exemption for this teacher today
+    const dailyExemption = await db.collection("daily_exemptions").findOne({ teacherUid, dateStr });
+    if (dailyExemption) {
+      noTimeLog = true;
+    }
 
     // Compute whether this clock-in is on time or late
     const timeInStatus = computeTimeInStatus(now.toISOString(), noTimeLog);

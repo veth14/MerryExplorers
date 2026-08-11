@@ -48,6 +48,8 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendReason, setSuspendReason] = useState<string | null>(null);
+  const [exemptions, setExemptions] = useState<string[]>([]);
+  const [exemptLoading, setExemptLoading] = useState(false);
 
   // Suspend modal state
   const [showSuspendModal, setShowSuspendModal] = useState(false);
@@ -71,6 +73,7 @@ export default function AttendancePage() {
         setRecords(attendanceJson.data);
         setIsSuspended(attendanceJson.isSuspended ?? false);
         setSuspendReason(attendanceJson.suspendReason ?? null);
+        setExemptions(attendanceJson.exemptions ?? []);
       }
       if (Array.isArray(accountsJson)) {
         setAccounts(accountsJson.filter((a) => (a.role || "").toLowerCase() !== "admin"));
@@ -200,6 +203,24 @@ export default function AttendancePage() {
     recordByUid.set(r.teacherUid, r);
   }
 
+  const handleToggleExempt = async (uid: string, currentlyExempt: boolean) => {
+    setExemptLoading(true);
+    try {
+      const action = currentlyExempt ? "remove" : "exempt";
+      await fetch("/api/attendance/exempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacherUid: uid, dateStr: viewDateStr, action })
+      });
+      invalidateCache(`dashboard:attendance:${viewDateStr}`);
+      await fetchData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setExemptLoading(false);
+    }
+  };
+
   // Compute per-account daily statuses
   type AccountStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended";
   const accountStatuses: { account: AccountDoc; dailyStatus: AccountStatus }[] = accounts.map((acc) => {
@@ -209,7 +230,7 @@ export default function AttendancePage() {
       record,
       {
         workDays: acc.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-        noTimeLog: acc.noTimeLog ?? false,
+        noTimeLog: acc.noTimeLog || exemptions.includes(uid),
         weeklyHoursTarget: acc.weeklyHoursTarget ?? null,
       },
       viewDate,
@@ -259,6 +280,9 @@ export default function AttendancePage() {
     else if (dailyStatus === "Exempt") displayStatus = "On Time";
     else if (dailyStatus === "Absent") displayStatus = "Absent";
 
+    const isExempt = exemptions.includes(uid) || !!account.noTimeLog;
+    if (isExempt && displayStatus === "Absent") displayStatus = "Exempt";
+
     return {
       id: uid,
       name,
@@ -274,6 +298,7 @@ export default function AttendancePage() {
       status: displayStatus,
       clockInPhotoUrl: record?.clockInPhotoUrl,
       clockOutPhotoUrl: record?.clockOutPhotoUrl,
+      isExempt,
     };
   });
 
@@ -368,7 +393,12 @@ export default function AttendancePage() {
             <p className="text-xs">Teachers will appear here based on their work day schedule.</p>
           </div>
         ) : (
-          <AttendanceRoster data={roster} dateStr={viewDateStr} />
+          <AttendanceRoster 
+            data={roster} 
+            dateStr={viewDateStr} 
+            onToggleExempt={handleToggleExempt} 
+            exemptLoading={exemptLoading} 
+          />
         )}
       </section>
 

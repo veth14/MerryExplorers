@@ -8,9 +8,11 @@ import Image from "next/image";
 type PayrollRecord = {
   id: string;
   name: string;
-  rate: number;
   basic: number;
   hours: number;
+  daysPresent: number;
+  monthlyRate: number;
+  dailyRate: number;
   comms: number;
   perfectAttendance: number;
   birthdayGift: number;
@@ -101,8 +103,8 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
           <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
             <span className="text-brand-blue/60 font-bold uppercase tracking-wide">Employee Name:</span>
             <span className="font-black text-brand-navy">{data.name}</span>
-            <span className="text-brand-blue/60 font-bold uppercase tracking-wide">Hourly Rate:</span>
-            <span className="font-bold text-brand-navy">₱ {fmt(data.rate)}</span>
+            <span className="text-brand-blue/60 font-bold uppercase tracking-wide">{data.monthlyRate > 0 ? "Monthly Rate" : "Daily Rate"}:</span>
+            <span className="font-bold text-brand-navy">{data.monthlyRate > 0 ? `₱ ${fmt(data.monthlyRate)}` : `₱ ${fmt(data.dailyRate)}/day`}</span>
           </div>
         </div>
         <div className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border-2 ${isEmployee ? "border-brand-blue/30 text-brand-blue/60 bg-brand-sky/30" : "border-brand-orange/30 text-brand-orange/80 bg-brand-orange/5"
@@ -127,7 +129,11 @@ function PayslipCard({ data, variant, dateLabel, periodLabel }: { data: PayrollR
         <div className="flex justify-between items-center py-2 border-b border-gray-50">
           <div>
             <p className="text-[12px] font-black text-brand-navy">Basic Pay</p>
-            <p className="text-[10px] text-brand-blue/60 font-bold">Number of Hours: {data.hours.toFixed(2)}</p>
+            <p className="text-[10px] text-brand-blue/60 font-bold">
+              {data.monthlyRate > 0
+                ? `Monthly salary (prorated ${data.daysPresent} of ${(data as any).totalScheduledWorkDays ?? "?"} days)`
+                : `${data.daysPresent} day${data.daysPresent !== 1 ? "s" : ""} × ₱${fmt(data.dailyRate)}`}
+            </p>
           </div>
           <span className="text-[13px] font-black text-brand-navy">{fmt(data.basic)}</span>
         </div>

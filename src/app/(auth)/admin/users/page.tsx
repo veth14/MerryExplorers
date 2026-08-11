@@ -113,7 +113,6 @@ function emptyDraft(): Draft {
     joinDate: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
     monthlyRate: 0,
     dailyRate: 0,
-    hourlyRate: 0,
     sssContribution: 0,
     philhealthContribution: 0,
     pagibigContribution: 0,
@@ -146,7 +145,6 @@ function draftFromUser(u: UserAccount): Draft {
     joinDate: u.joinDate || "",
     monthlyRate: u.monthlyRate || 0,
     dailyRate: u.dailyRate || 0,
-    hourlyRate: u.hourlyRate || 0,
     sssContribution: u.sssContribution || 0,
     philhealthContribution: u.philhealthContribution || 0,
     pagibigContribution: u.pagibigContribution || 0,
@@ -259,7 +257,6 @@ function UserModal({
         weeklyHoursTarget: draft.weeklyHoursTarget,
         monthlyRate: draft.monthlyRate,
         dailyRate: draft.dailyRate,
-        hourlyRate: draft.hourlyRate,
         sssContribution: draft.sssContribution,
         philhealthContribution: draft.philhealthContribution,
         pagibigContribution: draft.pagibigContribution,
@@ -742,17 +739,6 @@ function UserModal({
                       type="number"
                       value={draft.dailyRate || ""}
                       onChange={(e) => set("dailyRate", parseFloat(e.target.value) || 0)}
-                      className={`${INPUT_CLS} pl-7`}
-                    />
-                  </div>
-                </Field>
-                <Field label="Hourly Rate">
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-[13px] font-bold text-[#b0bec5]">₱</span>
-                    <input
-                      type="number"
-                      value={draft.hourlyRate || ""}
-                      onChange={(e) => set("hourlyRate", parseFloat(e.target.value) || 0)}
                       className={`${INPUT_CLS} pl-7`}
                     />
                   </div>

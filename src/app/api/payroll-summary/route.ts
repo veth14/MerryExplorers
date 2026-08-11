@@ -64,15 +64,27 @@ export async function GET(request: Request) {
 
     for (const acc of accounts) {
       const uid = acc._id.toString();
-      const hourlyRate = acc.hourlyRate ?? 0;
+      // Derive rate for late-deduction math from daily/monthly rate (no stored hourlyRate)
+      // Assumes 8-hour workday and 22 working days per month.
+      const monthlyRate = acc.monthlyRate ?? 0;
+      const dailyRate = acc.dailyRate ?? 0;
+      const rateForLate = monthlyRate > 0 ? monthlyRate / (22 * 8) : dailyRate / 8;
       const accountWorkDays = new Set(acc.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
       const empAttendance = attendanceMap.get(uid) || new Map();
 
       let totalHours = 0;
       let daysPresent = 0;
+      let totalScheduledWorkDays = 0; // Work days in the cutoff for this employee
       let totalLateDeduction = 0;
       const noTimeLog: boolean = acc.noTimeLog ?? false;
-      const dailyRate = acc.dailyRate ?? 0;
+
+      // Fetch daily exemptions for this employee so we can skip late deductions on exempt days
+      const exemptDocs = await db.collection("daily_exemptions").find({ teacherUid: uid }).toArray();
+      const exemptDates = new Set(exemptDocs.map((d: any) => d.dateStr));
+
+      // Also fetch suspended days to exclude from scheduled work day count
+      const suspendedDocs = await db.collection("suspended_days").find({}).toArray();
+      const suspendedDateSet = new Set(suspendedDocs.map((d: any) => d.dateStr));
 
       for (const day of days) {
         const dow = day.getDay();
@@ -81,14 +93,23 @@ export async function GET(request: Request) {
 
         const isWorkDay = accountWorkDays.has(abbr);
         const rec = empAttendance.get(dateStr);
+        const isSuspended = suspendedDateSet.has(dateStr);
 
-        if (isWorkDay && rec && rec.clockInTime) {
+        // Count scheduled work days (excluding Sundays and suspended days)
+        // A day with a flexible override counts as a scheduled work day even if the employee didn't clock in
+        if (isWorkDay && !isSuspended) {
+          totalScheduledWorkDays++;
+        }
+
+        if (isWorkDay && !isSuspended && rec && rec.clockInTime) {
           daysPresent++;
-          // Late deduction — separate from credited hours, independent of graceUntil/status
-          const lateResult = computeLateDeduction(rec.clockInTime, hourlyRate, noTimeLog);
+
+          // Late deduction — only if this day is NOT a flexible/exempt override
+          const isDayExempt = noTimeLog || exemptDates.has(dateStr);
+          const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt);
           totalLateDeduction += lateResult.deduction;
 
-          // Regular credited hours — clamped to scheduled window (ONLY regular hours)
+          // Credited hours — tracked for reference and offset calculations
           if (rec.clockOutTime && abbr !== "Sun") {
             const schedule = BASE_SCHEDULE[abbr as Exclude<DayAbbr, "Sun">];
             const breakMins = getBreakMinutes(dow);
@@ -103,9 +124,27 @@ export async function GET(request: Request) {
         }
       }
 
-      let basicPay = totalHours * hourlyRate;
-      if (hourlyRate === 0 && dailyRate > 0) {
-        basicPay = daysPresent * dailyRate;
+      // Basic pay — ALL employees are no-work-no-pay
+      //
+      // Monthly salary (e.g. Angel):
+      //   Full cutoff pay = monthlyRate / 2
+      //   Prorate by attendance: (daysPresent / totalScheduledWorkDays) * (monthlyRate / 2)
+      //   If no scheduled work days in range (e.g. empty cutoff), basicPay = 0
+      //
+      // Daily rate (e.g. Kyle, Jasmin):
+      //   basicPay = daysPresent * dailyRate
+      //
+      // hourlyRate is NEVER used for basic pay — only for late-deduction math.
+      let basicPay: number;
+      if (monthlyRate > 0) {
+        if (totalScheduledWorkDays === 0) {
+          basicPay = 0;
+        } else {
+          const fullCutoffPay = monthlyRate / 2;
+          basicPay = parseFloat(((daysPresent / totalScheduledWorkDays) * fullCutoffPay).toFixed(2));
+        }
+      } else {
+        basicPay = parseFloat((daysPresent * dailyRate).toFixed(2));
       }
       
       const comms = acc.communicationAllowance ?? 0;
@@ -140,7 +179,8 @@ export async function GET(request: Request) {
         name: acc.fullName,
         hours: parseFloat(totalHours.toFixed(2)),
         daysPresent,
-        rate: hourlyRate,
+        totalScheduledWorkDays,
+        monthlyRate,
         dailyRate,
         basic: parseFloat(basicPay.toFixed(2)),
         comms,

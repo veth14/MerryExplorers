@@ -51,7 +51,6 @@ export type UserAccount = {
   // Payroll details
   monthlyRate?: number;
   dailyRate?: number;
-  hourlyRate?: number;
   sssContribution?: number;
   philhealthContribution?: number;
   pagibigContribution?: number;

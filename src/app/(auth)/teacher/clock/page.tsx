@@ -67,6 +67,7 @@ export default function ClockPage() {
 
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendReason, setSuspendReason] = useState<string | null>(null);
+  const [isExempt, setIsExempt] = useState(false);
 
   // Auth
   const { user, userProfile } = useAuth();
@@ -83,6 +84,7 @@ export default function ClockPage() {
         if (json.success) {
           setIsSuspended(json.isSuspended || false);
           setSuspendReason(json.suspendReason || null);
+          setIsExempt(json.exemptions?.includes(user!.uid) || userProfile?.noTimeLog || false);
 
           if (json.data.length > 0) {
             const record = json.data[0];
@@ -871,12 +873,12 @@ export default function ClockPage() {
                   Clock Out
                 </button>
               )}
-              {!isActive && isSuspended && (
+              {!isActive && isSuspended && !isExempt && (
                 <div className="w-full rounded-full border border-orange-200 bg-orange-50 py-4 text-center text-[15px] font-extrabold text-orange-600">
                   Classes Suspended
                 </div>
               )}
-              {!isActive && !isSuspended && (
+              {!isActive && (!isSuspended || isExempt) && (
                 <button
                   onClick={handleClockIn}
                   disabled={!cameraReady}

@@ -7,9 +7,11 @@ import { Modal } from "@/components/ui/modal";
 type AttendanceRosterProps = {
   data: StaffAttendance[];
   dateStr?: string;
+  onToggleExempt?: (uid: string, currentlyExempt: boolean) => void;
+  exemptLoading?: boolean;
 };
 
-export function AttendanceRoster({ data, dateStr }: AttendanceRosterProps) {
+export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading }: AttendanceRosterProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<StaffAttendance["status"] | "All">("All");
   
@@ -55,6 +57,13 @@ export function AttendanceRoster({ data, dateStr }: AttendanceRosterProps) {
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
             <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>block</span>
             Suspended
+          </span>
+        );
+      case "Exempt":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#15803d]" />
+            Exempt (Flexible)
           </span>
         );
     }
@@ -216,7 +225,28 @@ export function AttendanceRoster({ data, dateStr }: AttendanceRosterProps) {
                   <p className="text-[13px] font-semibold text-[#5a6e8c] truncate">{selectedStaff.group}</p>
                 </div>
                 <div className="shrink-0">
-                  {getStatusBadge(selectedStaff.status)}
+                  {getStatusBadge(selectedStaff.isExempt ? "Exempt" : selectedStaff.status)}
+                </div>
+              </div>
+
+              {/* Exemption Toggle */}
+              <div className="px-6 py-4 border-b border-[#f1f5f9] bg-[#f8fafc]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-[13px] font-extrabold text-[#002f76]">Flexible Schedule Override</h5>
+                    <p className="text-[11px] font-semibold text-[#5a6e8c] mt-0.5">Prevent this teacher from being marked as late for this day.</p>
+                  </div>
+                  <button 
+                    disabled={exemptLoading}
+                    onClick={() => {
+                      if (onToggleExempt) onToggleExempt(selectedStaff.id, !!selectedStaff.isExempt);
+                      // Optimistically update local modal state
+                      setSelectedStaff(prev => prev ? { ...prev, isExempt: !prev.isExempt } : null);
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedStaff.isExempt ? 'bg-[#15803d]' : 'bg-[#cbd5e1]'} ${exemptLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedStaff.isExempt ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
               </div>
 

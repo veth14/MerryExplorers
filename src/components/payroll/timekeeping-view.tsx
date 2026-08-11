@@ -24,10 +24,8 @@ type TimekeepingRow = {
   /** Raw clock-to-clock elapsed hours before breaks. Informational only — NOT used for pay. */
   numHours: number | null;
   breakHours: number | null;
-  /** Schedule-clamped credited hours. Used for regular payroll calculations. */
+  /** Schedule-clamped credited hours. Used for reference only. */
   totalHours: number | null;
-  hourlyRate: number | null;
-  hoursXRate: number | null;
   /** Late-arrival deduction amount for this day. null when not applicable. */
   lateDeduction: number | null;
   /** Which deduction method was applied. null when not applicable. */
@@ -41,7 +39,6 @@ type TimekeepingSheet = {
   position: string;
   monthlyRate: number;
   dailyRate: number;
-  hourlyRate: number;
   salaryDate: string;
   cutOffPeriod: string;
   grandTotal: number;
@@ -57,7 +54,6 @@ type Account = {
   employeeId?: string;
   monthlyRate?: number;
   dailyRate?: number;
-  hourlyRate?: number;
   noTimeLog?: boolean;
   sssContribution?: number;
   philhealthContribution?: number;
@@ -159,10 +155,14 @@ function buildSheet(
   leaveSet: Set<string>,
   suspendedSet: Set<string>
 ): TimekeepingSheet {
-  const hourlyRate = account.hourlyRate ?? 0;
   const dailyRate = account.dailyRate ?? 0;
   const monthlyRate = account.monthlyRate ?? 0;
   const noTimeLog = account.noTimeLog ?? false;
+
+  // Derive the rate used for late-deduction math only.
+  // hourlyRate is no longer stored — computed from daily or monthly rate.
+  // Assumes 8-hour workday and 22 working days per month.
+  const rateForLate = monthlyRate > 0 ? monthlyRate / (22 * 8) : dailyRate / 8;
 
   // Work days abbreviated (e.g. ["Mon","Tue","Wed","Thu","Fri","Sat"])
   const accountWorkDays = new Set(account.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
@@ -214,8 +214,6 @@ function buildSheet(
         numHours: null,
         breakHours: null,
         totalHours: type === "ABSENT" ? 0 : null,
-        hourlyRate: type === "ABSENT" ? hourlyRate : null,
-        hoursXRate: type === "ABSENT" ? 0 : null,
         lateDeduction: null,
         lateMethod: null,
         remarks: type === "ABSENT" ? "Absent" : type === "LEAVE" ? "On Leave" : type === "FUTURE" ? "" : type === "SUSPENDED" ? "Suspended" : "",
@@ -243,12 +241,11 @@ function buildSheet(
     const totalHours = clockOut && schedule
       ? computeCreditedHours(rec!.clockInTime!, rec!.clockOutTime!, schedule.start, schedule.normalEnd, breakMins)
       : 0;
-    const hoursXRate = parseFloat((totalHours * hourlyRate).toFixed(2));
 
-    grandTotal += hoursXRate;
+    grandTotal += totalHours;
 
-    // Late deduction — independent of attendance status / graceUntil
-    const lateResult = computeLateDeduction(rec!.clockInTime!, hourlyRate, noTimeLog);
+    // Late deduction — uses derived rate (daily/8 or monthly/176), NOT a stored hourlyRate
+    const lateResult = computeLateDeduction(rec!.clockInTime!, rateForLate, noTimeLog);
     totalLateDeduction += lateResult.deduction;
 
     // Build remarks from late method
@@ -269,8 +266,6 @@ function buildSheet(
       numHours: parseFloat(numHours.toFixed(2)),
       breakHours: breakHours > 0 ? breakHours : null,
       totalHours: parseFloat(totalHours.toFixed(2)),
-      hourlyRate,
-      hoursXRate,
       lateDeduction: lateResult.deduction > 0 ? parseFloat(lateResult.deduction.toFixed(2)) : null,
       lateMethod: lateResult.method !== "none" ? lateResult.method : null,
       remarks: lateRemark,
@@ -286,7 +281,6 @@ function buildSheet(
     position: account.role ?? "–",
     monthlyRate,
     dailyRate,
-    hourlyRate,
     salaryDate,
     cutOffPeriod: `${fmtDateLabel(cutOff.start).toUpperCase()} – ${fmtDateLabel(cutOff.end).toUpperCase()}`,
     grandTotal: parseFloat(grandTotal.toFixed(2)),
@@ -538,10 +532,9 @@ export function TimekeepingView() {
               </div>
               <div className="flex gap-3 flex-wrap">
                 {[
-                  { label: "Monthly Rate", val: `₱ ${fmt2(sheet.monthlyRate)}` },
-                  { label: "Daily Rate", val: `₱ ${fmt2(sheet.dailyRate)}` },
-                  { label: "Hourly Rate", val: `₱ ${fmt2(sheet.hourlyRate)}` },
-                ].map(({ label, val }) => (
+                  { label: "Monthly Rate", val: sheet.monthlyRate > 0 ? `₱ ${fmt2(sheet.monthlyRate)}` : null },
+                  { label: "Daily Rate", val: sheet.dailyRate > 0 ? `₱ ${fmt2(sheet.dailyRate)}` : null },
+                ].filter(x => x.val !== null).map(({ label, val }) => (
                   <div key={label} className="bg-white/10 rounded-xl px-4 py-2 text-right">
                     <p className="text-[9px] font-black uppercase tracking-widest text-brand-sky/60">{label}</p>
                     <p className="text-[14px] font-black text-white">{val}</p>
@@ -561,8 +554,6 @@ export function TimekeepingView() {
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center"># of Hours</th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Break</th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-center">Total Hours</th>
-                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Hourly Rate</th>
-                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60 text-right">Hours × Rate</th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-red/60 text-right bg-brand-red/5">Late Ded.</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.12em] text-brand-blue/60">Remarks</th>
                   </tr>
@@ -614,16 +605,6 @@ export function TimekeepingView() {
                             <span className="text-[12px] font-black text-brand-navy">
                               {row.totalHours} hrs
                             </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {row.hourlyRate != null && !isOff && (
-                            <span className="text-[12px] font-bold text-brand-navy/70">{fmt2(row.hourlyRate)}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {row.hoursXRate != null && !isOff && (
-                            <span className="text-[13px] font-black text-brand-blue">{fmt2(row.hoursXRate)}</span>
                           )}
                         </td>
                         <td className="px-4 py-2.5 text-right bg-brand-red/5">

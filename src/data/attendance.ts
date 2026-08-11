@@ -12,6 +12,7 @@ export type StaffAttendance = {
   status: AttendanceStatus;
   clockInPhotoUrl?: string;
   clockOutPhotoUrl?: string;
+  isExempt?: boolean;
 };
 
 export const attendanceMetrics: any[] = [];

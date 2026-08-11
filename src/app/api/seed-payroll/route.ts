@@ -16,13 +16,11 @@ export async function GET() {
         fullName: "Angel Villegas",
         monthlyRate: 20500,
         dailyRate: 942.53,
-        hourlyRate: 117.82,
       },
       {
         fullName: "Ann Kyle Ebuenga",
         monthlyRate: 15290,
         dailyRate: 695.00,
-        hourlyRate: 86.88,
       },
     ];
 
@@ -43,7 +41,6 @@ export async function GET() {
           $set: {
             monthlyRate: teacher.monthlyRate,
             dailyRate: teacher.dailyRate,
-            hourlyRate: teacher.hourlyRate,
           },
         }
       );
