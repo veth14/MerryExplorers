@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
-import EmojiPicker from "emoji-picker-react";
+import dynamic from "next/dynamic";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 type InquiryStatus = "New" | "Read" | "Replied" | "Awaiting Reply" | "Closed";
 
@@ -135,6 +137,8 @@ export default function InquiriesPage() {
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+  const activeThread = useMemo(() => selectedInquiry ? buildThread(selectedInquiry) : [], [selectedInquiry]);
 
   const fetchInquiries = useCallback(async () => {
     try {
@@ -318,19 +322,23 @@ export default function InquiriesPage() {
     URL.revokeObjectURL(url);
   };
 
-  const filtered = inquiries.filter((inq) => {
-    const matchStatus = filterStatus === "All" || inq.status === filterStatus;
-    const q = search.toLowerCase();
-    const matchSearch = !q || inq.parentName.toLowerCase().includes(q) || inq.email.toLowerCase().includes(q) || inq.childName?.toLowerCase().includes(q);
-    return matchStatus && matchSearch;
-  });
+  const filtered = useMemo(() => {
+    return inquiries.filter((inq) => {
+      const matchStatus = filterStatus === "All" || inq.status === filterStatus;
+      const q = search.toLowerCase();
+      const matchSearch = !q || inq.parentName.toLowerCase().includes(q) || inq.email.toLowerCase().includes(q) || inq.childName?.toLowerCase().includes(q);
+      return matchStatus && matchSearch;
+    });
+  }, [inquiries, filterStatus, search]);
 
-  const metrics = {
-    total: inquiries.length,
-    newToday: inquiries.filter((i) => new Date(i.createdAt).toDateString() === new Date().toDateString()).length,
-    newCount: inquiries.filter((i) => i.status === "New").length,
-    awaitingCount: inquiries.filter((i) => i.status === "Awaiting Reply").length,
-  };
+  const metrics = useMemo(() => {
+    return {
+      total: inquiries.length,
+      newToday: inquiries.filter((i) => new Date(i.createdAt).toDateString() === new Date().toDateString()).length,
+      newCount: inquiries.filter((i) => i.status === "New").length,
+      awaitingCount: inquiries.filter((i) => i.status === "Awaiting Reply").length,
+    };
+  }, [inquiries]);
 
   return (
     <AppShell title="Inquiries" description="Manage playgroup inquiries from parents and guardians.">
@@ -550,7 +558,7 @@ export default function InquiriesPage() {
 
             {/* Conversation Thread */}
             <div className="overflow-y-auto flex-1 px-5 py-5 space-y-3 bg-[#f8fafc]">
-              {buildThread(selectedInquiry).map((msg, idx) => {
+              {activeThread.map((msg, idx) => {
                 const isSchool = msg.from === "school";
                 return (
                   <div key={idx} className={`flex flex-col gap-1 ${isSchool ? "items-end" : "items-start"}`}>
