@@ -188,7 +188,7 @@ export default function SupportPage() {
                 </span>
               </h1>
               <p className="mt-4 max-w-xs text-[14px] font-medium leading-relaxed text-white/65">
-                We're here to help you resolve any issues quickly and easily. Reports are reviewed immediately.
+                We&apos;re here to help you resolve any issues quickly and easily. Reports are reviewed immediately.
               </p>
 
               {/* Stats */}

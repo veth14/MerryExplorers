@@ -58,7 +58,7 @@ export default function ContactPage() {
               Contact Us
             </h1>
             <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
-              We'd love to hear from you. Reach out through any of the channels below.
+              We&apos;d love to hear from you. Reach out through any of the channels below.
             </p>
           </m.div>
 

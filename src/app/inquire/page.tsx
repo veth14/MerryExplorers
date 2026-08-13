@@ -172,7 +172,7 @@ export default function InquirePage() {
                 <span className="text-4xl">👋</span>
               </span>
               <h1 className="font-headline text-[40px] sm:text-[56px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-5">
-                We'd love to <br className="sm:hidden" /> hear from you.
+                We&apos;d love to <br className="sm:hidden" /> hear from you.
               </h1>
               <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
                 Send us a message below and our friendly admissions team will get back to you within 1–2 business days.

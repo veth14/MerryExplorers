@@ -195,7 +195,7 @@ export default function AnnouncementsPage() {
             <span className="material-symbols-outlined text-[#a1b0c9] text-3xl">campaign</span>
           </div>
           <h3 className="text-[16px] font-bold text-[#002f76] mb-1">No Announcements</h3>
-          <p className="text-[13px] text-[#5a6e8c] max-w-sm mb-6">You haven't posted any announcements yet. Create one to keep your team informed.</p>
+          <p className="text-[13px] text-[#5a6e8c] max-w-sm mb-6">You haven&apos;t posted any announcements yet. Create one to keep your team informed.</p>
           <button
             onClick={openCreateModal}
             className="text-[#005cc8] font-bold text-[14px] hover:underline"

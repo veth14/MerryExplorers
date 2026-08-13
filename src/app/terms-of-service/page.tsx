@@ -77,7 +77,7 @@ export default function TermsOfServicePage() {
             className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
           >
             <Section title="1. Acceptance of Terms">
-              <p>By registering your child at Merry Explorers Playgroup & Learning Center ("the Center") or by using our website and online systems, you agree to be bound by these Terms of Service. If you do not agree with these terms, please do not proceed with registration or use our services.</p>
+              <p>By registering your child at Merry Explorers Playgroup & Learning Center (&quot;the Center&quot;) or by using our website and online systems, you agree to be bound by these Terms of Service. If you do not agree with these terms, please do not proceed with registration or use our services.</p>
             </Section>
 
             <Section title="2. Registration & Fees">
@@ -102,7 +102,7 @@ export default function TermsOfServicePage() {
                 <li>Treat all Center staff and other families with courtesy and respect.</li>
                 <li>Adhere to Center policies and guidelines as communicated in the Center handbook.</li>
                 <li>Ensure their child is fit for playgroup on days of attendance.</li>
-                <li>Communicate openly with teachers regarding their child's needs and concerns.</li>
+                <li>Communicate openly with teachers regarding their child&apos;s needs and concerns.</li>
               </ul>
             </Section>
 
@@ -120,7 +120,7 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section title="7. Termination of Registration">
-              <p>The playgroup reserves the right to terminate a student's registration under exceptional circumstances, including but not limited to non-payment or behavioral concerns.</p>
+              <p>The playgroup reserves the right to terminate a student&apos;s registration under exceptional circumstances, including but not limited to non-payment or behavioral concerns.</p>
             </Section>
 
             <Section title="8. Changes to Terms">
