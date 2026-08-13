@@ -8,50 +8,103 @@ import { sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthentica
 import { Modal } from "@/components/ui/modal";
 import { uploadAvatar } from "@/lib/supabase";
 
-const initialTeacherData = {
+type TeacherFormData = {
   personalInfo: {
-    fullName: "Iya Abeleda",
-    dateOfBirth: "May 1, 2002",
-    email: "iya.a@merryexplorers.edu",
-    phone: "(555) 123-4567",
-    homeAddress: "123 Maple Street, Apt 4B, Springfield, IL 62704",
+    fullName: string;
+    dateOfBirth: string;
+    email: string;
+    phone: string;
+    homeAddress: string;
+  };
+  workDetails: {
+    role: string;
+    assignedRoom: string;
+    employeeId: string;
+    employmentType: string;
+    weeklyHoursTarget: number | null;
+  };
+  profileCard: {
+    firstName: string;
+    lastName: string;
+    title: string;
+    tags: string[];
+    joined: string;
+    status: string;
+    avatarUrl: string;
+    avatarColor: string;
+    initials: string;
+  };
+  emergencyContacts: {
+    name: string;
+    relationship: string;
+    phone: string;
+  }[];
+};
+
+const emptyTeacherData: TeacherFormData = {
+  personalInfo: {
+    fullName: "",
+    dateOfBirth: "",
+    email: "",
+    phone: "",
+    homeAddress: "",
   },
   workDetails: {
-    role: "Lead Teacher",
-    assignedRoom: "Sunshine Room (Toddlers)",
-    employeeId: "ME-2021-042",
+    role: "",
+    assignedRoom: "",
+    employeeId: "",
     employmentType: "full-time",
-    weeklyHoursTarget: null as number | null,
+    weeklyHoursTarget: null,
   },
   profileCard: {
-    firstName: "Iya",
-    lastName: "Abeleda",
-    title: "Lead Teacher - Toddlers",
-    tags: ["Early Childhood Ed", "CPR Certified"],
-    joined: "Aug 2026",
+    firstName: "",
+    lastName: "",
+    title: "",
+    tags: [],
+    joined: "",
     status: "Active",
     avatarUrl: "",
     avatarColor: "#ffb800",
-    initials: "IA",
+    initials: "",
   },
-  emergencyContacts: [
-    {
-      name: "David Jenkins",
-      relationship: "Spouse",
-      phone: "(555) 987-6543",
-    },
-    {
-      name: "Martha Jenkins",
-      relationship: "Mother",
-      phone: "(555) 456-7890",
-    },
-  ],
+  emergencyContacts: [],
 };
+
+function buildFormDataFromProfile(userProfile: any): TeacherFormData {
+  return {
+    personalInfo: {
+      fullName: userProfile.fullName || "",
+      dateOfBirth: userProfile.dateOfBirth || "",
+      email: userProfile.email || "",
+      phone: userProfile.phone || "",
+      homeAddress: userProfile.homeAddress || "",
+    },
+    workDetails: {
+      role: userProfile.role || "",
+      assignedRoom: userProfile.assignedRoom || "",
+      employeeId: userProfile.employeeId || "",
+      employmentType: userProfile.employmentType || "full-time",
+      weeklyHoursTarget: userProfile.weeklyHoursTarget ?? null,
+    },
+    profileCard: {
+      firstName: userProfile.fullName?.split(" ")[0] || "",
+      lastName: userProfile.fullName?.split(" ").slice(1).join(" ") || "",
+      title: `${userProfile.role} - ${userProfile.assignedRoom}`,
+      tags: userProfile.tags || [],
+      joined: userProfile.joinDate || "",
+      status: userProfile.status || "Active",
+      avatarUrl: userProfile.avatarUrl || "",
+      avatarColor: userProfile.avatarColor || "#ffb800",
+      initials: userProfile.initials || "T",
+    },
+    emergencyContacts: userProfile.emergencyContacts || [],
+  };
+}
 
 export default function TeacherProfilePage() {
   const { user, userProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(initialTeacherData);
+  const [formData, setFormData] = useState<TeacherFormData>(emptyTeacherData);
   const [saving, setSaving] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
@@ -67,34 +120,7 @@ export default function TeacherProfilePage() {
 
   useEffect(() => {
     if (userProfile) {
-      setFormData({
-        personalInfo: {
-          fullName: userProfile.fullName || "",
-          dateOfBirth: userProfile.dateOfBirth || "",
-          email: userProfile.email || "",
-          phone: userProfile.phone || "",
-          homeAddress: userProfile.homeAddress || "",
-        },
-        workDetails: {
-          role: userProfile.role || "",
-          assignedRoom: userProfile.assignedRoom || "",
-          employeeId: userProfile.employeeId || "",
-          employmentType: userProfile.employmentType || "full-time",
-          weeklyHoursTarget: userProfile.weeklyHoursTarget ?? null,
-        },
-        profileCard: {
-          firstName: userProfile.fullName?.split(" ")[0] || "",
-          lastName: userProfile.fullName?.split(" ").slice(1).join(" ") || "",
-          title: `${userProfile.role} - ${userProfile.assignedRoom}`,
-          tags: userProfile.tags || [],
-          joined: userProfile.joinDate || "",
-          status: userProfile.status || "Active",
-          avatarUrl: userProfile.avatarUrl || "",
-          avatarColor: userProfile.avatarColor || "#ffb800",
-          initials: userProfile.initials || "T",
-        },
-        emergencyContacts: userProfile.emergencyContacts || [],
-      });
+      setFormData(buildFormDataFromProfile(userProfile));
     }
   }, [userProfile]);
 
@@ -139,36 +165,7 @@ export default function TeacherProfilePage() {
   };
 
   const handleCancel = () => {
-    if (userProfile) {
-      setFormData({
-        personalInfo: {
-          fullName: userProfile.fullName || "",
-          dateOfBirth: userProfile.dateOfBirth || "",
-          email: userProfile.email || "",
-          phone: userProfile.phone || "",
-          homeAddress: userProfile.homeAddress || "",
-        },
-        workDetails: {
-          role: userProfile.role || "",
-          assignedRoom: userProfile.assignedRoom || "",
-          employeeId: userProfile.employeeId || "",
-          employmentType: userProfile.employmentType || "full-time",
-          weeklyHoursTarget: userProfile.weeklyHoursTarget ?? null,
-        },
-        profileCard: {
-          firstName: userProfile.fullName?.split(" ")[0] || "",
-          lastName: userProfile.fullName?.split(" ").slice(1).join(" ") || "",
-          title: `${userProfile.role} - ${userProfile.assignedRoom}`,
-          tags: userProfile.tags || [],
-          joined: userProfile.joinDate || "",
-          status: userProfile.status || "Active",
-          avatarUrl: userProfile.avatarUrl || "",
-          avatarColor: userProfile.avatarColor || "#ffb800",
-          initials: userProfile.initials || "T",
-        },
-        emergencyContacts: userProfile.emergencyContacts || [],
-      });
-    }
+    setFormData(userProfile ? buildFormDataFromProfile(userProfile) : emptyTeacherData);
     setIsEditing(false);
   };
 
@@ -200,7 +197,7 @@ export default function TeacherProfilePage() {
 
       // Update password
       await updatePassword(user, passwordForm.newPassword);
-      
+
       setIsPasswordModalOpen(false);
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setSuccessModal("Password changed successfully.");
@@ -211,6 +208,18 @@ export default function TeacherProfilePage() {
       setIsChangingPassword(false);
     }
   };
+
+  // Wait for the profile to load before rendering real fields, so we never
+  // flash empty/stale data or (previously) leaked hardcoded placeholder data.
+  if (!userProfile) {
+    return (
+      <TeacherShell title="Teacher Profile">
+        <div className="flex items-center justify-center h-64">
+          <span className="w-6 h-6 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
+        </div>
+      </TeacherShell>
+    );
+  }
 
   return (
     <>
@@ -604,7 +613,7 @@ export default function TeacherProfilePage() {
                                 const newContacts = [
                                   ...formData.emergencyContacts,
                                 ];
-                                newContacts[index].name = e.target.value;
+                                newContacts[index] = { ...newContacts[index], name: e.target.value };
                                 setFormData({
                                   ...formData,
                                   emergencyContacts: newContacts,
@@ -619,8 +628,7 @@ export default function TeacherProfilePage() {
                                 const newContacts = [
                                   ...formData.emergencyContacts,
                                 ];
-                                newContacts[index].relationship =
-                                  e.target.value;
+                                newContacts[index] = { ...newContacts[index], relationship: e.target.value };
                                 setFormData({
                                   ...formData,
                                   emergencyContacts: newContacts,
@@ -652,7 +660,7 @@ export default function TeacherProfilePage() {
                             const newContacts = [
                               ...formData.emergencyContacts,
                             ];
-                            newContacts[index].phone = e.target.value;
+                            newContacts[index] = { ...newContacts[index], phone: e.target.value };
                             setFormData({
                               ...formData,
                               emergencyContacts: newContacts,
@@ -793,7 +801,7 @@ export default function TeacherProfilePage() {
               {passwordError}
             </div>
           )}
-          
+
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-bold text-brand-navy uppercase tracking-wider ml-1">
               Current Password
