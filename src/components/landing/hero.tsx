@@ -103,7 +103,7 @@ export function HeroSection() {
               sizes="(max-width: 640px) 360px, 460px"
               className="object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.06)] p-8"
               priority
-              // @ts-ignore
+              // @ts-expect
               fetchPriority="high"
             />
           </m.div>

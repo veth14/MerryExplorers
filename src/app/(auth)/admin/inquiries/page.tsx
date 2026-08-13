@@ -322,14 +322,12 @@ export default function InquiriesPage() {
     URL.revokeObjectURL(url);
   };
 
-  const filtered = useMemo(() => {
-    return inquiries.filter((inq) => {
-      const matchStatus = filterStatus === "All" || inq.status === filterStatus;
-      const q = search.toLowerCase();
-      const matchSearch = !q || inq.parentName.toLowerCase().includes(q) || inq.email.toLowerCase().includes(q) || inq.childName?.toLowerCase().includes(q);
-      return matchStatus && matchSearch;
-    });
-  }, [inquiries, filterStatus, search]);
+  const filtered = inquiries.filter((inq) => {
+    const matchStatus = filterStatus === "All" || inq.status === filterStatus;
+    const q = search.toLowerCase();
+    const matchSearch = !q || inq.parentName.toLowerCase().includes(q) || inq.email.toLowerCase().includes(q) || inq.childName?.toLowerCase().includes(q);
+    return matchStatus && matchSearch;
+  });
 
   const metrics = useMemo(() => {
     return {
@@ -599,7 +597,7 @@ export default function InquiriesPage() {
               {/* Log Client Reply */}
               {isLoggingClient ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-200">
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#d97706] mb-1.5">Paste Client's Reply</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#d97706] mb-1.5">Paste Client&apos;s Reply</p>
                   <textarea value={clientMessage} onChange={(e) => setClientMessage(e.target.value)}
                     placeholder="Paste the client's email reply here..."
                     className="w-full min-h-[90px] p-3 text-[13px] font-semibold text-[#002f76] border border-[#fde68a] rounded-xl focus:outline-none focus:border-[#f59e0b] bg-[#fffbeb] mb-2 resize-y" />

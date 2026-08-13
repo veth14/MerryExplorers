@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     }
 
     // Look for existing record for this cutoff
-    let record = await db.collection("payroll_deductions").findOne({
+    const record = await db.collection("payroll_deductions").findOne({
       employeeId,
       cutoffStartDate: cutoffStart,
       cutoffEndDate: cutoffEnd,

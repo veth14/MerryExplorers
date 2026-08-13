@@ -80,7 +80,7 @@ export default function PrivacyPolicyPage() {
               <p>We collect personal information that you voluntarily provide when you fill out our inquiry forms, register your child, or contact us. This may include:</p>
               <ul className="list-disc pl-5 space-y-1 mt-2">
                 <li>Parent or guardian full name, email address, and phone number</li>
-                <li>Child's name, age, and relevant health information</li>
+                <li>Child&apos;s name, age, and relevant health information</li>
                 <li>Payment and billing information for registration fees</li>
               </ul>
             </Section>

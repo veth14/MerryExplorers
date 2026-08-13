@@ -57,7 +57,7 @@ export default function LocationPage() {
               Our Location
             </h1>
             <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
-              Come visit us! We're located at Camarin, Caloocan, near Camarin Doctors Hospital.
+              Come visit us! We&apos;re located at Camarin, Caloocan, near Camarin Doctors Hospital.
             </p>
           </m.div>
 
