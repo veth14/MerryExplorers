@@ -66,7 +66,7 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
                   }`}
                 >
                   {member.isLogo ? (
-                    <Image src="/LOGO.jpg" alt={member.name} fill className="object-contain" />
+                    <Image src="/LOGO.jpg" alt={member.name} fill sizes="56px" className="object-contain" />
                   ) : isNotStarted ? (
                     <div className="w-full h-full flex items-center justify-center bg-[#333]">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-8 h-8 opacity-70">
@@ -74,7 +74,7 @@ export function DailyTeamOverview({ members, activeCount }: DailyTeamOverviewPro
                       </svg>
                     </div>
                   ) : member.avatar ? (
-                    <Image src={member.avatar} alt={member.name} fill className="object-cover" />
+                    <Image src={member.avatar} alt={member.name} fill sizes="56px" className="object-cover" />
                   ) : (
                     <div
                       className="w-full h-full flex items-center justify-center text-[15px] font-extrabold"

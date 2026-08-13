@@ -162,7 +162,7 @@ export default function SupportPage() {
             {/* Logo */}
             <div className="relative" style={{ animation: "fadeUp .5s ease .05s both", opacity: 0 }}>
               <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_28px_rgba(0,0,0,0.25)] ring-4 ring-white/20">
-                <Image src="/LOGO-noBG.png" alt="Merry Explorers logo" fill className="object-contain p-1.5" />
+                <Image src="/LOGO-noBG.png" alt="Merry Explorers logo" fill sizes="72px" className="object-contain p-1.5" />
               </div>
               {/* Online badge */}
               <div className="mt-3 flex items-center gap-2">

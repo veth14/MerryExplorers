@@ -32,7 +32,7 @@ export function ReportsFooterBanner() {
         {/* Decorative logo mark */}
         <div className="hidden sm:flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 shadow-inner">
           <div className="relative h-9 w-9 overflow-hidden rounded-lg">
-            <Image src="/LOGO.jpg" alt="Merry Explorers" fill className="object-contain opacity-80" />
+            <Image src="/LOGO.jpg" alt="Merry Explorers" fill sizes="36px" className="object-contain opacity-80" />
           </div>
         </div>
       </div>
