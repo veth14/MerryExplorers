@@ -305,7 +305,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
 
-  const isExecPartner = ["executive partner", "developer"].includes((userProfile?.role || "").toLowerCase());
+  const isExecPartner = ["executive assistant", "developer"].includes((userProfile?.role || "").toLowerCase());
 
   const teacherLinks = [
     { label: "Dashboard", href: "/teacher", icon: <DashboardIcon active={pathname === "/teacher"} /> },
@@ -343,7 +343,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       {/* ── Nav ── */}
       <nav className="flex-1 px-3 pb-3 flex flex-col gap-5 overflow-y-auto">
 
-        {/* Executive Partner — My Teacher View */}
+        {/* Executive Assistant — My Teacher View */}
         {isExecPartner && (
           <div>
             <SectionLabel>My Teacher View</SectionLabel>

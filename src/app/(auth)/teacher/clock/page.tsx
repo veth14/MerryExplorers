@@ -68,6 +68,7 @@ export default function ClockPage() {
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendReason, setSuspendReason] = useState<string | null>(null);
   const [isExempt, setIsExempt] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Auth
   const { user, userProfile } = useAuth();
@@ -506,26 +507,9 @@ export default function ClockPage() {
   }
 
   async function handleClockIn() {
-    const d = new Date();
-    clockInAt.current = d;
-    accumulatedWorkMs.current = 0;
-    setBreaks([]);
-    setElapsed(0);
-
-    const t = formatTime(d);
-    setActivities((prev) => [
-      ...prev,
-      {
-        id: `act-${Date.now()}`,
-        time: `${t.time} ${t.ampm}`,
-        action: "clock-in",
-        label: "Clocked In",
-      },
-    ]);
-    setState("clocked-in");
-
-    // Capture & upload face snapshot, then persist to MongoDB
+    setIsProcessing(true);
     try {
+      const d = new Date();
       let clockInPhotoUrl: string | null = null;
       const blob = await captureSnapshot();
       if (blob && user?.uid) {
@@ -552,83 +536,110 @@ export default function ClockPage() {
       if (json.success && json.data?._id) {
         setAttendanceId(String(json.data._id));
         console.log("attendanceId set to:", json.data._id);
+        
+        // Update UI only after successful save
+        clockInAt.current = d;
+        accumulatedWorkMs.current = 0;
+        setBreaks([]);
+        setElapsed(0);
+
+        const t = formatTime(d);
+        setActivities((prev) => [
+          ...prev,
+          {
+            id: `act-${Date.now()}`,
+            time: `${t.time} ${t.ampm}`,
+            action: "clock-in",
+            label: "Clocked In",
+          },
+        ]);
+        setState("clocked-in");
       } else if (json.error === "Already clocked in today" && json.data?._id) {
-        // Resume existing session
         setAttendanceId(String(json.data._id));
         console.log("Resuming existing session:", json.data._id);
+      } else {
+        alert("Failed to clock in. Please try again.");
       }
     } catch (err) {
       console.error("Failed to save clock-in:", err);
+      alert("Failed to clock in. Please check your internet connection and try again.");
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   async function handleClockOut() {
-    const out = new Date();
-    const workMs =
-      out.getTime() - clockInAt.current!.getTime() - totalBreakMs(breaks);
-    const workSec = Math.max(0, Math.floor(workMs / 1000));
-    const t = formatTime(out);
-
-    setUndoInfo({
-      clockInAt: new Date(clockInAt.current!),
-      accumulatedWorkMs: accumulatedWorkMs.current,
-      breaks: [...breaks],
-      activities: [...activities],
-    });
-
-    setActivities((prev) => {
-      const newActivities = [...prev];
-      for (let i = newActivities.length - 1; i >= 0; i--) {
-        if (
-          newActivities[i].action === "clock-in" &&
-          !newActivities[i].duration
-        ) {
-          newActivities[i] = {
-            ...newActivities[i],
-            duration: formatElapsed(workSec),
-          };
-          break;
+    if (!attendanceId) return;
+    setIsProcessing(true);
+    try {
+      let photoUrl: string | null = null;
+      const blob = await captureSnapshot();
+      if (blob && user?.uid) {
+        try {
+          photoUrl = await uploadAttendanceLog(blob, user.uid, "clock-out");
+          console.log("Clock-out photo uploaded:", photoUrl);
+        } catch (uploadErr) {
+          console.warn("Clock-out photo upload failed:", uploadErr);
         }
       }
-      return [
-        ...newActivities,
-        {
-          id: `act-${Date.now()}`,
-          time: `${t.time} ${t.ampm}`,
-          action: "clock-out",
-          label: "Clocked Out",
-        },
-      ];
-    });
 
-    setElapsed(0);
-    clockInAt.current = null;
-    accumulatedWorkMs.current = 0;
-    setState("ready");
-
-    // Capture snapshot + persist clock-out to MongoDB
-    if (attendanceId) {
-      try {
-        let photoUrl: string | null = null;
-        const blob = await captureSnapshot();
-        if (blob && user?.uid) {
-          try {
-            photoUrl = await uploadAttendanceLog(blob, user.uid, "clock-out");
-            console.log("Clock-out photo uploaded:", photoUrl);
-          } catch (uploadErr) {
-            console.warn("Clock-out photo upload failed:", uploadErr);
-          }
-        }
-
-        await fetch("/api/attendance", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: attendanceId, action: "clock-out", photoUrl }),
-        });
+      const res = await fetch("/api/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: attendanceId, action: "clock-out", photoUrl }),
+      });
+      const json = await res.json();
+      
+      if (json.success) {
         setAttendanceId(null);
-      } catch (err) {
-        console.error("Failed to save clock-out:", err);
+        
+        // Update UI only after successful save
+        const out = new Date();
+        const workMs = out.getTime() - clockInAt.current!.getTime() - totalBreakMs(breaks);
+        const workSec = Math.max(0, Math.floor(workMs / 1000));
+        const t = formatTime(out);
+
+        setUndoInfo({
+          clockInAt: new Date(clockInAt.current!),
+          accumulatedWorkMs: accumulatedWorkMs.current,
+          breaks: [...breaks],
+          activities: [...activities],
+        });
+
+        setActivities((prev) => {
+          const newActivities = [...prev];
+          for (let i = newActivities.length - 1; i >= 0; i--) {
+            if (newActivities[i].action === "clock-in" && !newActivities[i].duration) {
+              newActivities[i] = {
+                ...newActivities[i],
+                duration: formatElapsed(workSec),
+              };
+              break;
+            }
+          }
+          return [
+            ...newActivities,
+            {
+              id: `act-${Date.now()}`,
+              time: `${t.time} ${t.ampm}`,
+              action: "clock-out",
+              label: "Clocked Out",
+            },
+          ];
+        });
+
+        setElapsed(0);
+        clockInAt.current = null;
+        accumulatedWorkMs.current = 0;
+        setState("ready");
+      } else {
+        alert("Failed to clock out. Please try again.");
       }
+    } catch (err) {
+      console.error("Failed to save clock-out:", err);
+      alert("Failed to clock out. Please check your internet connection and try again.");
+    } finally {
+      setIsProcessing(false);
     }
   }
 
@@ -652,92 +663,142 @@ export default function ClockPage() {
   }
 
   async function handleTakeBreak() {
-    const d = new Date();
-    currentBreakStart.current = d;
-
-    if (clockInAt.current) {
-      accumulatedWorkMs.current =
-        d.getTime() - clockInAt.current.getTime() - totalBreakMs(breaks);
-    }
-
-    const t = formatTime(d);
-    setActivities((prev) => [
-      ...prev,
-      {
-        id: `act-${Date.now()}`,
-        time: `${t.time} ${t.ampm}`,
-        action: "break-start",
-        label: "Started Break",
-      },
-    ]);
-    setState("on-break");
-
-    // Capture snapshot + persist break-start to MongoDB
-    if (attendanceId) {
-      try {
-        let photoUrl: string | null = null;
-        const blob = await captureSnapshot();
-        if (blob && user?.uid) {
-          try {
-            photoUrl = await uploadAttendanceLog(blob, user.uid, "break-start");
-          } catch (uploadErr) {
-            console.warn("Break-start photo upload failed:", uploadErr);
-          }
+    if (!attendanceId) return;
+    setIsProcessing(true);
+    try {
+      let photoUrl: string | null = null;
+      const blob = await captureSnapshot();
+      if (blob && user?.uid) {
+        try {
+          photoUrl = await uploadAttendanceLog(blob, user.uid, "break-start");
+        } catch (uploadErr) {
+          console.warn("Break-start photo upload failed:", uploadErr);
         }
-        await fetch("/api/attendance", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: attendanceId, action: "start-break", photoUrl }),
-        });
-      } catch (err) {
-        console.error("Failed to save break start:", err);
       }
+      const res = await fetch("/api/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: attendanceId, action: "start-break", photoUrl }),
+      });
+      const json = await res.json();
+      
+      if (json.success) {
+        const d = new Date();
+        currentBreakStart.current = d;
+
+        if (clockInAt.current) {
+          accumulatedWorkMs.current =
+            d.getTime() - clockInAt.current.getTime() - totalBreakMs(breaks);
+        }
+
+        const t = formatTime(d);
+        setActivities((prev) => [
+          ...prev,
+          {
+            id: `act-${Date.now()}`,
+            time: `${t.time} ${t.ampm}`,
+            action: "break-start",
+            label: "Started Break",
+          },
+        ]);
+        setState("on-break");
+      } else {
+        alert("Failed to start break. Please try again.");
+      }
+    } catch (err) {
+      console.error("Failed to save break start:", err);
+      alert("Failed to start break. Please check your internet connection.");
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   async function handleEndBreak() {
-    const d = new Date();
-    const breakStart = currentBreakStart.current || new Date();
+    if (!attendanceId) return;
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: attendanceId, action: "end-break" }),
+      });
+      const json = await res.json();
+      
+      if (json.success) {
+        const d = new Date();
+        const breakStart = currentBreakStart.current || new Date();
 
-    const breakEntry: BreakEntry = { start: breakStart, end: d };
-    setBreaks((prev) => [...prev, breakEntry]);
-    currentBreakStart.current = null;
+        const breakEntry: BreakEntry = { start: breakStart, end: d };
+        setBreaks((prev) => [...prev, breakEntry]);
+        currentBreakStart.current = null;
 
-    const breakSec = Math.floor((d.getTime() - breakStart.getTime()) / 1000);
-    const t = formatTime(d);
-    setActivities((prev) => [
-      ...prev,
-      {
-        id: `act-${Date.now()}`,
-        time: `${t.time} ${t.ampm}`,
-        action: "break-end",
-        label: "Ended Break",
-        duration: formatElapsed(breakSec),
-      },
-    ]);
+        const breakSec = Math.floor((d.getTime() - breakStart.getTime()) / 1000);
+        const t = formatTime(d);
+        setActivities((prev) => [
+          ...prev,
+          {
+            id: `act-${Date.now()}`,
+            time: `${t.time} ${t.ampm}`,
+            action: "break-end",
+            label: "Ended Break",
+            duration: formatElapsed(breakSec),
+          },
+        ]);
 
-    if (clockInAt.current) {
-      const workMs =
-        d.getTime() -
-        clockInAt.current.getTime() -
-        totalBreakMs([...breaks, breakEntry]);
-      accumulatedWorkMs.current = workMs;
-      setElapsed(Math.max(0, Math.floor(workMs / 1000)));
-    }
+        if (clockInAt.current) {
+          const workMs =
+            d.getTime() -
+            clockInAt.current.getTime() -
+            totalBreakMs([...breaks, breakEntry]);
+          accumulatedWorkMs.current = workMs;
+          setElapsed(Math.max(0, Math.floor(workMs / 1000)));
+        }
 
-    setState("clocked-in");
-
-    // Persist to MongoDB
-    if (attendanceId) {
-      try {
-        await fetch("/api/attendance", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: attendanceId, action: "end-break" }),
-        });
-      } catch (err) {
-        console.error("Failed to save break end:", err);
+        setState("clocked-in");
+      } else {
+        alert("Failed to end break. Please try again.");
       }
+    } catch (err) {
+      console.error("Failed to save break end:", err);
+      alert("Failed to end break. Please check your internet connection.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  async function toggleFlexTime() {
+    if (!user?.uid) return;
+    setIsProcessing(true);
+    const action = isExempt ? "remove" : "exempt";
+    try {
+      const d = new Date();
+      const manilaStr = d.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+      const manilaDate = new Date(manilaStr);
+      const yyyy = manilaDate.getFullYear();
+      const mm = String(manilaDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(manilaDate.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+
+      const res = await fetch("/api/attendance/exempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacherUid: user.uid,
+          dateStr,
+          action
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setIsExempt(!isExempt);
+      } else {
+        alert("Failed to toggle flex time. " + (json.error || ""));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Network error. Could not toggle flex time.");
+    } finally {
+      setIsProcessing(false);
     }
   }
 
@@ -864,13 +925,14 @@ export default function ClockPage() {
               {isActive && (
                 <button
                   onClick={openClockOutModal}
-                  disabled={!cameraReady}
-                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all ${cameraReady
+                  disabled={!cameraReady || isProcessing}
+                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all flex items-center justify-center gap-2 ${cameraReady && !isProcessing
                     ? "bg-[#ffb800] text-[#002f76] shadow-[0_6px_18px_-4px_rgba(255,184,0,0.5)] hover:bg-[#ffb800]/90 active:translate-y-px"
                     : "bg-[#f0f4f9] text-[#9aa3b2] cursor-not-allowed border border-[#e2e8f0]"
                     }`}
                 >
-                  Clock Out
+                  {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9aa3b2] border-t-transparent" />}
+                  {isProcessing ? "Processing..." : "Clock Out"}
                 </button>
               )}
               {!isActive && isSuspended && !isExempt && (
@@ -881,13 +943,25 @@ export default function ClockPage() {
               {!isActive && (!isSuspended || isExempt) && (
                 <button
                   onClick={handleClockIn}
-                  disabled={!cameraReady}
-                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all ${cameraReady
+                  disabled={!cameraReady || isProcessing}
+                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all flex items-center justify-center gap-2 ${cameraReady && !isProcessing
                     ? "bg-[#0050d5] text-white shadow-[0_6px_18px_-4px_rgba(0,80,213,0.5)] hover:bg-[#0046b8] active:translate-y-px"
                     : "bg-[#f0f4f9] text-[#9aa3b2] cursor-not-allowed border border-[#e2e8f0]"
                     }`}
                 >
-                  Clock In
+                  {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9aa3b2] border-t-transparent" />}
+                  {isProcessing ? "Processing..." : "Clock In"}
+                </button>
+              )}
+              
+              {userProfile?.role?.toLowerCase() === "executive assistant" && (
+                <button
+                  onClick={toggleFlexTime}
+                  disabled={isProcessing}
+                  className={`mt-1 w-full rounded-full py-3 text-[13px] font-bold transition-all flex items-center justify-center gap-2 ${isExempt ? "bg-[#e8f9f0] text-[#2da05b] border border-[#2da05b]/30" : "bg-white text-[#5a6e8c] border border-[#e2e8f0] hover:bg-[#f0f4f9]"}`}
+                >
+                  {isProcessing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+                  {isExempt ? "Flex Time is Active" : "Turn On Flex Time"}
                 </button>
               )}
 

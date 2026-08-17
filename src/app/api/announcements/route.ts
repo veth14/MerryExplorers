@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     let totalTeachers = 0;
     if (adminView) {
       totalTeachers = await db.collection("accounts").countDocuments({
-        role: { $in: ["Lead Teacher", "Assistant Teacher", "executive partner"] },
+        role: { $in: ["Lead Teacher", "Assistant Teacher", "executive assistant"] },
       });
     }
 

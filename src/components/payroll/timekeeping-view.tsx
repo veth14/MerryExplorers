@@ -350,7 +350,7 @@ export function TimekeepingView() {
       .then((data: Account[]) => {
         if (Array.isArray(data)) {
           const eligibleAccounts = data.filter((a) =>
-            ["Lead Teacher", "Assistant Teacher", "Executive Partner", "Executive Assistant"].includes(a.role as string)
+            ["Lead Teacher", "Assistant Teacher", "Executive Assistant", "Executive Assistant"].includes(a.role as string)
           );
           setAccounts(eligibleAccounts);
           if (eligibleAccounts.length > 0) setSelectedEmployeeId(eligibleAccounts[0].id);

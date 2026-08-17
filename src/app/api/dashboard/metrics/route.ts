@@ -9,9 +9,9 @@ export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
 
-    // 1. Total staff = Lead Teacher + Assistant Teacher + executive partner
+    // 1. Total staff = Lead Teacher + Assistant Teacher + executive assistant
     const totalTeachers = await db.collection("accounts").countDocuments({
-      role: { $in: ["Lead Teacher", "Assistant Teacher", "executive partner"] },
+      role: { $in: ["Lead Teacher", "Assistant Teacher", "executive assistant"] },
     });
 
     // 2. Today's date in Manila timezone (avoids UTC off-by-one)

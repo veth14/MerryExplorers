@@ -251,13 +251,13 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>("HR & People");
 
-  const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive partner";
+  const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive assistant";
   const isDeveloper = (userProfile?.role || "").toLowerCase() === "developer";
 
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
 
-  // Admin groups for executive partner & developer view
+  // Admin groups for executive assistant & developer view
   const adminGroups = useMemo(() => [
     {
       title: "HR & People",
@@ -343,7 +343,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
           </div>
         </div>
 
-        {/* Admin View — Executive Partners & Developer only */}
+        {/* Admin View — Executive Assistants & Developer only */}
         {(isExecPartner || isDeveloper) && (
           <div>
             {/* Section separator */}

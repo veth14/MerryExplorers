@@ -95,11 +95,11 @@ export default function Home() {
       };
     });
 
-  // Build teamMembers from ALL teacher + executive partner accounts
+  // Build teamMembers from ALL teacher + executive assistant accounts
   const teamMembers = accounts
     .filter((acc) => {
       const role = (acc.role || "").toLowerCase();
-      return role.includes("teacher") || role === "executive partner";
+      return role.includes("teacher") || role === "executive assistant";
     })
     .map((acc) => {
       const r = todayAttendance.find((att) => att.teacherUid === acc.id);

@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     // 1. Fetch Accounts (Teachers & Executives)
     const accounts = await db.collection("accounts").find({
-      role: { $in: ["Lead Teacher", "Assistant Teacher", "Executive Partner", "Executive Assistant"] }
+      role: { $in: ["Lead Teacher", "Assistant Teacher", "Executive Assistant", "Executive Assistant"] }
     }).toArray();
 
     // 3. Determine the required attendance date range.
