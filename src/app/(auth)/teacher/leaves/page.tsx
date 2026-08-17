@@ -146,7 +146,7 @@ export default function TeacherLeavesPage() {
       ) : leaves.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 gap-2 text-[#9aa3b2] bg-white rounded-[2rem] shadow-sm border border-[#e2e8f0]">
           <span className="text-4xl">🗂️</span>
-          <p className="font-bold text-sm">You haven't filed any leave requests yet.</p>
+          <p className="font-bold text-sm">You haven&apos;t filed any leave requests yet.</p>
         </div>
       ) : (
         <div className="bg-white rounded-[2rem] border border-[#e8effe] shadow-lg overflow-hidden">
@@ -384,7 +384,7 @@ export default function TeacherLeavesPage() {
           <div>
             <p className="font-extrabold text-[14px] text-[#002f76]">Leave Filed Successfully!</p>
             <p className="text-[13px] font-semibold text-[#5a6e8c] mt-1">
-              Your leave request has been submitted and is pending admin approval. You will be notified once it's reviewed.
+              Your leave request has been submitted and is pending admin approval. You will be notified once it&apos;s reviewed.
             </p>
           </div>
         </div>

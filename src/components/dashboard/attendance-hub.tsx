@@ -29,7 +29,7 @@ function MemberAvatar({ name, avatar, isCompleted }: { name: string; avatar?: st
   return (
     <div className={`w-9 h-9 rounded-full border-[2px] flex items-center justify-center overflow-hidden relative bg-white flex-shrink-0 ${isCompleted ? 'border-[#0050d5]' : 'border-[#2da05b]'}`}>
       {avatar ? (
-        <Image src={avatar} alt={name} fill className="object-cover" />
+        <Image src={avatar} alt={name} fill sizes="36px" className="object-cover" />
       ) : (
         <div
           className="w-full h-full flex items-center justify-center text-[13px] font-extrabold text-[#0050d5]"

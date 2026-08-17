@@ -31,7 +31,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${plusJakartaSans.variable} ${manrope.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      className={`${plusJakartaSans.variable} ${manrope.variable} h-full antialiased`}
+    >
       <head>
         {/* ── Preconnects: only origins used by the landing page ── */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

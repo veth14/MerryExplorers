@@ -420,7 +420,7 @@ export default function AttendancePage() {
 
             <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Suspend Classes</h2>
             <p className="text-[12px] font-medium text-[#5a6e8c] text-center mb-5">
-              All staff will be marked <span className="font-bold text-orange-600">"Suspended"</span> for the selected date. No one will be penalized as Late or Absent.
+              All staff will be marked <span className="font-bold text-orange-600">&quot;Suspended&quot;</span> for the selected date. No one will be penalized as Late or Absent.
             </p>
 
             {/* Target Date Input */}

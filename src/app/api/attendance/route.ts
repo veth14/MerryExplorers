@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const { db } = await connectToDatabase();
 
     let resolvedDateStr: string | null = null;
-    let query: any = {};
+    const query: any = {};
     if (dateStr) {
       if (dateStr === "today") {
         const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
@@ -156,7 +156,7 @@ export async function PUT(request: Request) {
     if (!record) return NextResponse.json({ error: "Record not found" }, { status: 404 });
 
     const now = new Date();
-    let updateDoc: any = { $set: { updatedAt: now } };
+    const updateDoc: any = { $set: { updatedAt: now } };
 
     if (action === "clock-out") {
       updateDoc.$set.clockOutTime = now.toISOString();
@@ -195,7 +195,7 @@ export async function PUT(request: Request) {
           });
         }
 
-        let rawWorkedHours = Math.max(0, (clockOutMs - clockInMs - breakMs) / 3600000);
+        const rawWorkedHours = Math.max(0, (clockOutMs - clockInMs - breakMs) / 3600000);
         if (rawWorkedHours > 0) {
           // Find pending offsets for this teacher
           const pendingOffsets = await db.collection("offsets")

@@ -15,6 +15,7 @@ declare global {
   var _mongoClient: MongoClient | undefined;
   var _mongoDb: Db | undefined;
   var _mongoIndexesCreated: boolean | undefined;
+  var _mongoConnecting: Promise<{ client: MongoClient; db: Db }> | undefined;
 }
 
 /**
@@ -57,19 +58,20 @@ async function ensureTTLIndexes(db: Db): Promise<void> {
   globalThis._mongoIndexesCreated = true;
 }
 
-export async function connectToDatabase() {
-  // Always use the cached connection to avoid reconnect delays
-  if (globalThis._mongoClient && globalThis._mongoDb) {
-    return { client: globalThis._mongoClient, db: globalThis._mongoDb };
-  }
-
+async function createConnection(): Promise<{ client: MongoClient; db: Db }> {
   const client = await MongoClient.connect(uri, {
     // M0 free tier allows max 500 connections shared across ALL apps.
     // Keep our pool small to avoid hitting that ceiling.
     maxPoolSize: 3,
     minPoolSize: 1,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 10000,
+    // Atlas M0 clusters auto-pause and need up to 30s to elect a new primary
+    // on wake-up. 15s gives them enough time without hanging forever.
+    serverSelectionTimeoutMS: 15_000,
+    socketTimeoutMS: 20_000,
+    connectTimeoutMS: 15_000,
+    // Automatically retry reads/writes once on transient network errors.
+    retryWrites: true,
+    retryReads: true,
   });
   const db = client.db(dbName);
 
@@ -82,4 +84,64 @@ export async function connectToDatabase() {
   );
 
   return { client, db };
+}
+
+/**
+ * Returns true if the cached MongoClient still has a live topology.
+ * Evicts the stale client if not, so the next call does a fresh connect.
+ */
+function isCachedConnectionAlive(): boolean {
+  const client = globalThis._mongoClient;
+  if (!client) return false;
+
+  // The driver exposes topology state. If there is no known primary
+  // (e.g. Atlas M0 paused and came back) we should reconnect.
+  try {
+    const topology = (client as unknown as { topology?: { description?: { type?: string; servers?: Map<string, unknown> } } }).topology;
+    if (!topology || !topology.description) return false;
+    const desc = topology.description;
+    // "ReplicaSetNoPrimary" or "Unknown" means no writable server
+    if (desc.type === "ReplicaSetNoPrimary" || desc.type === "Unknown") {
+      return false;
+    }
+    // If all servers are Unknown, treat as stale
+    if (desc.servers) {
+      const allUnknown = [...desc.servers.values()].every(
+        (s: unknown) => (s as { type?: string }).type === "Unknown"
+      );
+      if (allUnknown) return false;
+    }
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+function evictStaleConnection() {
+  try { globalThis._mongoClient?.close(true); } catch { /* ignore */ }
+  globalThis._mongoClient = undefined;
+  globalThis._mongoDb = undefined;
+}
+
+export async function connectToDatabase() {
+  // Return cached live connection immediately — but only if topology is healthy
+  if (globalThis._mongoClient && globalThis._mongoDb) {
+    if (isCachedConnectionAlive()) {
+      return { client: globalThis._mongoClient, db: globalThis._mongoDb };
+    }
+    // Stale — Atlas likely paused and resumed; evict and reconnect
+    console.warn("[MongoDB] Cached connection is stale — reconnecting...");
+    evictStaleConnection();
+  }
+
+  // Deduplicate concurrent cold-start calls — only one real connect() at a time
+  if (globalThis._mongoConnecting) {
+    return globalThis._mongoConnecting;
+  }
+
+  globalThis._mongoConnecting = createConnection().finally(() => {
+    globalThis._mongoConnecting = undefined;
+  });
+
+  return globalThis._mongoConnecting;
 }

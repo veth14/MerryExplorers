@@ -329,7 +329,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </svg>
         </button>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden bg-white shadow-[0_2px_8px_rgba(0,47,118,0.12)] ring-1 ring-[#002f76]/8 relative">
-          <Image src="/LOGO.jpg" alt="Merry Explorers Logo" fill className="object-contain" />
+          <Image src="/LOGO.jpg" alt="Merry Explorers Logo" fill sizes="40px" className="object-contain" />
         </div>
         <div className="leading-[1.2]">
           <p className="font-headline text-[16.5px] font-extrabold text-[#002f76] tracking-tight">Merry</p>
