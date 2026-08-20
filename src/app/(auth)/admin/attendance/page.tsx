@@ -330,7 +330,7 @@ export default function AttendancePage() {
     if (dailyStatus === "Suspended") displayStatus = "Suspended";
     else if (dailyStatus === "On Time") displayStatus = "On Time";
     else if (dailyStatus === "Late") displayStatus = "Late";
-    else if (dailyStatus === "Exempt") displayStatus = "On Time";
+    else if (dailyStatus === "Exempt") displayStatus = "Exempt";
     else if (dailyStatus === "Absent") displayStatus = "Absent";
 
     const isExempt = exemptions.includes(uid) || !!account.noTimeLog;
