@@ -162,6 +162,23 @@ export async function PUT(request: Request) {
       updateDoc.$set.clockOutTime = now.toISOString();
       updateDoc.$set.status = "Completed";
       if (photoUrl) updateDoc.$set.clockOutPhotoUrl = photoUrl;
+    } else if (action === "patch-photo") {
+      // Backfill clock-in photo URL after the record was already saved.
+      if (photoUrl) updateDoc.$set.clockInPhotoUrl = photoUrl;
+    } else if (action === "patch-clockout-photo") {
+      // Backfill clock-out photo URL after the record was already saved.
+      if (photoUrl) updateDoc.$set.clockOutPhotoUrl = photoUrl;
+    } else if (action === "correct-times") {
+      // Admin manual override: fix clock-in and/or clock-out times.
+      // Expects { clockInTime?: ISO string, clockOutTime?: ISO string } in data.
+      const { clockInTime, clockOutTime } = data;
+      if (clockInTime) updateDoc.$set.clockInTime = clockInTime;
+      if (clockOutTime) {
+        updateDoc.$set.clockOutTime = clockOutTime;
+        updateDoc.$set.status = "Completed";
+      }
+      updateDoc.$set.correctedAt = now.toISOString();
+      updateDoc.$set.correctedBy = data.correctedBy || "admin";
     } else if (action === "start-break") {
       const breakEntry: any = { start: now.toISOString(), end: null };
       if (photoUrl) breakEntry.photoUrl = photoUrl;

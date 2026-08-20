@@ -3,20 +3,29 @@
 import { useState } from "react";
 import { StaffAttendance } from "@/data/attendance";
 import { Modal } from "@/components/ui/modal";
+import { CustomTimePicker } from "@/components/ui/custom-time-picker";
 
 type AttendanceRosterProps = {
   data: StaffAttendance[];
   dateStr?: string;
   onToggleExempt?: (uid: string, currentlyExempt: boolean) => void;
   exemptLoading?: boolean;
+  onCorrectTimes?: (recordId: string, teacherName: string, clockInTime: string | null, clockOutTime: string | null) => Promise<void>;
 };
 
-export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading }: AttendanceRosterProps) {
+export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading, onCorrectTimes }: AttendanceRosterProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<StaffAttendance["status"] | "All">("All");
   
   // Modal state
   const [selectedStaff, setSelectedStaff] = useState<StaffAttendance | null>(null);
+
+  // Edit times state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTimeIn, setEditTimeIn] = useState("");
+  const [editTimeOut, setEditTimeOut] = useState("");
+  const [isSavingTimes, setIsSavingTimes] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const filteredData = data.filter(staff => filterStatus === "All" || staff.status === filterStatus);
 
@@ -179,15 +188,13 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading 
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Attendance Details Modal */}
+      </div>      {/* Attendance Details Modal */}
       {selectedStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-[#001a4d]/40 backdrop-blur-sm"
-            onClick={() => setSelectedStaff(null)}
+            onClick={() => { setSelectedStaff(null); setIsEditing(false); setSaveSuccess(false); }}
           />
 
           {/* Modal Panel */}
@@ -200,7 +207,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading 
                 <p className="text-white/60 text-[12px] font-semibold mt-0.5">Daily check-in record</p>
               </div>
               <button
-                onClick={() => setSelectedStaff(null)}
+                onClick={() => { setSelectedStaff(null); setIsEditing(false); setSaveSuccess(false); }}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -250,16 +257,143 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading 
                 </div>
               </div>
 
-              {/* Time Info */}
-              <div className="px-6 py-4 grid grid-cols-2 gap-4 border-b border-[#f1f5f9]">
-                <div className="bg-[#f8fafc] rounded-xl p-4">
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock In</p>
-                  <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeIn}</p>
+              {/* Time Info + Edit */}
+              <div className="px-6 py-4 border-b border-[#f1f5f9]">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c]">Clock Times</p>
+                  {selectedStaff.recordId && onCorrectTimes && !isEditing && (
+                    <button
+                      onClick={() => {
+                        // Pre-fill with current times stripped to HH:MM
+                        const toHHMM = (t: string) => {
+                          if (!t || t === "—") return "";
+                          // t is already "9:00 AM" format — convert to 24h for the input
+                          const d = new Date(`1970-01-01 ${t}`);
+                          if (isNaN(d.getTime())) return "";
+                          return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                        };
+                        setEditTimeIn(toHHMM(selectedStaff.timeIn));
+                        setEditTimeOut(toHHMM(selectedStaff.timeOut));
+                        setIsEditing(true);
+                        setSaveSuccess(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f0f5ff] text-[#005cc8] text-[12px] font-bold hover:bg-[#dbeafe] transition-colors"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>edit</span>
+                      Edit Times
+                    </button>
+                  )}
                 </div>
-                <div className="bg-[#f8fafc] rounded-xl p-4">
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock Out</p>
-                  <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeOut}</p>
-                </div>
+
+                {!isEditing ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-[#f8fafc] rounded-xl p-4">
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock In</p>
+                      <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeIn}</p>
+                    </div>
+                    <div className="bg-[#f8fafc] rounded-xl p-4">
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock Out</p>
+                      <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeOut}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="material-symbols-outlined text-amber-600" style={{ fontSize: "16px" }}>warning</span>
+                      <p className="text-[12.5px] font-bold text-amber-700">Manual override — enter correct times (24-hour format)</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock In</label>
+                        <CustomTimePicker
+                          value={editTimeIn}
+                          onChange={(v) => setEditTimeIn(v)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock Out</label>
+                        <CustomTimePicker
+                          value={editTimeOut}
+                          onChange={(v) => setEditTimeOut(v)}
+                        />
+                      </div>
+                    </div>
+
+                    {saveSuccess && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
+                        <span className="material-symbols-outlined text-green-600" style={{ fontSize: "16px" }}>check_circle</span>
+                        <p className="text-[12px] font-bold text-green-700">Times updated successfully!</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => { setIsEditing(false); setSaveSuccess(false); }}
+                        disabled={isSavingTimes}
+                        className="flex-1 rounded-full border border-[#e2e8f0] py-2 text-[13px] font-bold text-[#5a6e8c] hover:bg-[#f0f4f9] hover:border-[#cbd5e1] transition-all disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={isSavingTimes || (!editTimeIn && !editTimeOut)}
+                        onClick={async () => {
+                          if (!selectedStaff.recordId || !onCorrectTimes) return;
+                          setIsSavingTimes(true);
+                          setSaveSuccess(false);
+                          try {
+                            // Convert local HH:MM on the selected dateStr → ISO (Manila TZ)
+                            const toISO = (hhmm: string) => {
+                              if (!hhmm || !dateStr) return null;
+                              // Build a Manila-local date string and force-interpret it as Manila time
+                              const localStr = `${dateStr}T${hhmm}:00`;
+                              // Manila is UTC+8
+                              const [yyyy, mm, dd] = dateStr.split("-").map(Number);
+                              const [hh, min] = hhmm.split(":").map(Number);
+                              const utcMs = Date.UTC(yyyy, mm - 1, dd, hh - 8, min, 0);
+                              return new Date(utcMs).toISOString();
+                            };
+                            await onCorrectTimes(
+                              selectedStaff.recordId,
+                              selectedStaff.name,
+                              editTimeIn ? toISO(editTimeIn) : null,
+                              editTimeOut ? toISO(editTimeOut) : null,
+                            );
+                            setSaveSuccess(true);
+                            setIsEditing(false);
+                            // Refresh the displayed times in the modal
+                            const fmt = (hhmm: string) => {
+                              if (!hhmm) return "—";
+                              const [h, m] = hhmm.split(":").map(Number);
+                              const ampm = h >= 12 ? "PM" : "AM";
+                              const h12 = h % 12 || 12;
+                              return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+                            };
+                            setSelectedStaff(prev => prev ? {
+                              ...prev,
+                              timeIn: editTimeIn ? fmt(editTimeIn) : prev.timeIn,
+                              timeOut: editTimeOut ? fmt(editTimeOut) : prev.timeOut,
+                            } : null);
+                          } catch (e) {
+                            console.error(e);
+                          } finally {
+                            setIsSavingTimes(false);
+                          }
+                        }}
+                        className="flex-1 rounded-full bg-[#005cc8] py-2 text-[13px] font-bold text-white hover:bg-[#004bb0] shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSavingTimes ? (
+                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                            <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>save</span>
+                        )}
+                        {isSavingTimes ? "Saving…" : "Save Times"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Photos */}
@@ -308,4 +442,6 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading 
     </div>
   );
 }
+
+
 

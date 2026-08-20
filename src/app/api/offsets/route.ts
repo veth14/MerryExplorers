@@ -38,24 +38,52 @@ export async function GET(request: Request) {
       .sort({ "sourceHoliday.dateStr": -1 })
       .toArray();
 
-    const formatted = offsetGroups.map((g) => ({
+    // Extract all unique attendance IDs
+    const attendanceIds = Array.from(new Set(
+      offsetGroups.flatMap((g: any) => 
+        (g.renderedSessions ?? []).map((s: any) => s.attendanceId).filter(Boolean)
+      )
+    ));
+
+    const attendanceMap = new Map();
+    if (attendanceIds.length > 0) {
+      const attendanceRecords = await db.collection("attendance").find({
+        _id: { $in: attendanceIds.map((id: string) => new ObjectId(id)) }
+      }).toArray();
+
+      attendanceRecords.forEach((r: any) => {
+        let tIn = null, tOut = null;
+        if (r.clockInTime) {
+          tIn = new Date(r.clockInTime).toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit", hour12: true });
+        }
+        if (r.clockOutTime) {
+          tOut = new Date(r.clockOutTime).toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit", hour12: true });
+        }
+        attendanceMap.set(r._id.toString(), { timeIn: tIn, timeOut: tOut });
+      });
+    }
+
+    const formatted = offsetGroups.map((g: any) => ({
       id: g._id.toString(),
       employeeId: g.employeeId,
       sourceHoliday: g.sourceHoliday ?? null,       // { dateStr, name }
       timeIn: g.timeIn ?? null,
       timeOut: g.timeOut ?? null,
       requiredHours: g.requiredHours ?? 0,
-      renderedSessions: (g.renderedSessions ?? []).map((s: any) => ({
-        attendanceDateStr: s.attendanceDateStr,
-        timeIn: s.timeIn ?? null,
-        timeOut: s.timeOut ?? null,
-        hours: s.hours,
-        attendanceId: s.attendanceId ?? null,
-        type: s.type,  // "saturday" | "weekday_ot"
-        notes: s.notes ?? null,
-        recordedAt: s.recordedAt ?? null,
-        recordedBy: s.recordedBy ?? null,
-      })),
+      renderedSessions: (g.renderedSessions ?? []).map((s: any) => {
+        const att = s.attendanceId ? attendanceMap.get(s.attendanceId) : null;
+        return {
+          attendanceDateStr: s.attendanceDateStr,
+          timeIn: s.timeIn ?? att?.timeIn ?? null,
+          timeOut: s.timeOut ?? att?.timeOut ?? null,
+          hours: s.hours,
+          attendanceId: s.attendanceId ?? null,
+          type: s.type,  // "saturday" | "weekday_ot"
+          notes: s.notes ?? null,
+          recordedAt: s.recordedAt ?? null,
+          recordedBy: s.recordedBy ?? null,
+        };
+      }),
       renderedTotal: g.renderedTotal ?? 0,
       remainingHours: g.remainingHours ?? g.requiredHours ?? 0,
       status: g.status ?? "pending",   // "pending" | "partial" | "completed"

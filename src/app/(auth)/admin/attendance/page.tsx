@@ -203,6 +203,59 @@ export default function AttendancePage() {
     recordByUid.set(r.teacherUid, r);
   }
 
+  const handleCorrectTimes = async (
+    recordId: string,
+    teacherName: string,
+    clockInTime: string | null,
+    clockOutTime: string | null
+  ) => {
+    try {
+      await fetch("/api/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: recordId,
+          action: "correct-times",
+          clockInTime,
+          clockOutTime,
+          correctedBy: userProfile?.fullName || user?.email || "admin",
+        }),
+      });
+
+      // Audit log — non-fatal
+      try {
+        const parts: string[] = [];
+        if (clockInTime) {
+          const t = new Date(clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" });
+          parts.push(`Clock-in set to ${t}`);
+        }
+        if (clockOutTime) {
+          const t = new Date(clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" });
+          parts.push(`Clock-out set to ${t}`);
+        }
+        await fetch("/api/audit-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actorUid: user?.uid || null,
+            actorName: userProfile?.fullName || user?.email || "Unknown",
+            actorRole: userProfile?.role || "admin",
+            action: "EDIT",
+            category: "attendance",
+            targetId: recordId,
+            targetTitle: teacherName,
+            details: `Manual time correction for ${teacherName} on ${viewDateStr}: ${parts.join(", ")}`,
+          }),
+        });
+      } catch { /* non-fatal */ }
+
+      invalidateCache(`dashboard:attendance:${viewDateStr}`);
+      await fetchData();
+    } catch (e) {
+      console.error("Failed to correct times:", e);
+    }
+  };
+
   const handleToggleExempt = async (uid: string, currentlyExempt: boolean) => {
     setExemptLoading(true);
     try {
@@ -285,6 +338,7 @@ export default function AttendancePage() {
 
     return {
       id: uid,
+      recordId: record?._id,
       name,
       avatarInitials: name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
       avatarColor: account.avatarColor || COLORS[colorIndex],
@@ -397,7 +451,8 @@ export default function AttendancePage() {
             data={roster} 
             dateStr={viewDateStr} 
             onToggleExempt={handleToggleExempt} 
-            exemptLoading={exemptLoading} 
+            exemptLoading={exemptLoading}
+            onCorrectTimes={handleCorrectTimes}
           />
         )}
       </section>

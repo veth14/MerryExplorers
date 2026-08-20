@@ -2,6 +2,8 @@ export type AttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "Compl
 
 export type StaffAttendance = {
   id: string;
+  /** MongoDB _id of the attendance record (present when the teacher has clocked in) */
+  recordId?: string;
   name: string;
   avatarInitials?: string;
   avatarColor?: string;

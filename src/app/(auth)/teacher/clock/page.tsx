@@ -507,37 +507,39 @@ export default function ClockPage() {
   }
 
   async function handleClockIn() {
+    // Guard: never clock in if auth has not loaded yet — prevents ghost records with teacherUid "unknown"
+    if (!user?.uid) {
+      alert("Your account is still loading. Please wait a moment and try again.");
+      return;
+    }
     setIsProcessing(true);
     try {
       const d = new Date();
-      let clockInPhotoUrl: string | null = null;
-      const blob = await captureSnapshot();
-      if (blob && user?.uid) {
-        try {
-          clockInPhotoUrl = await uploadAttendanceLog(blob, user.uid, "clock-in");
-          console.log("Clock-in photo uploaded:", clockInPhotoUrl);
-        } catch (uploadErr) {
-          console.warn("Photo upload failed (continuing without photo):", uploadErr);
-        }
-      }
+
+      // ── Fire the attendance record IMMEDIATELY so it is saved even if the
+      // teacher navigates away before the photo upload finishes.
+      // The photo upload runs in parallel and patches the record once done.
+      const snapshotPromise = captureSnapshot();
 
       const res = await fetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          teacherUid: user?.uid ?? "unknown",
-          name: userProfile?.fullName ?? user?.email ?? "Teacher",
+          teacherUid: user.uid,
+          name: userProfile?.fullName ?? user.email ?? "Unknown",
           group: userProfile?.assignedRoom ?? "Unassigned",
-          clockInPhotoUrl,
+          clockInPhotoUrl: null, // will be patched below once upload finishes
         }),
       });
       const json = await res.json();
       console.log("Clock-in response:", json);
+
       if (json.success && json.data?._id) {
-        setAttendanceId(String(json.data._id));
-        console.log("attendanceId set to:", json.data._id);
-        
-        // Update UI only after successful save
+        const savedId = String(json.data._id);
+        setAttendanceId(savedId);
+        console.log("attendanceId set to:", savedId);
+
+        // Update UI immediately — record is already saved
         clockInAt.current = d;
         accumulatedWorkMs.current = 0;
         setBreaks([]);
@@ -554,6 +556,26 @@ export default function ClockPage() {
           },
         ]);
         setState("clocked-in");
+
+        // ── Photo upload (background) — patch the record when done ────────
+        snapshotPromise
+          .then(async (blob) => {
+            if (!blob) return;
+            try {
+              const clockInPhotoUrl = await uploadAttendanceLog(blob, user!.uid, "clock-in");
+              console.log("Clock-in photo uploaded, patching record:", clockInPhotoUrl);
+              // Patch the already-saved record with the photo URL
+              await fetch("/api/attendance", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: savedId, action: "patch-photo", photoUrl: clockInPhotoUrl }),
+              });
+            } catch (uploadErr) {
+              console.warn("Photo upload failed (record already saved):", uploadErr);
+            }
+          })
+          .catch((err) => console.warn("Snapshot capture failed:", err));
+
       } else if (json.error === "Already clocked in today" && json.data?._id) {
         setAttendanceId(String(json.data._id));
         console.log("Resuming existing session:", json.data._id);
@@ -572,29 +594,24 @@ export default function ClockPage() {
     if (!attendanceId) return;
     setIsProcessing(true);
     try {
-      let photoUrl: string | null = null;
-      const blob = await captureSnapshot();
-      if (blob && user?.uid) {
-        try {
-          photoUrl = await uploadAttendanceLog(blob, user.uid, "clock-out");
-          console.log("Clock-out photo uploaded:", photoUrl);
-        } catch (uploadErr) {
-          console.warn("Clock-out photo upload failed:", uploadErr);
-        }
-      }
+      const out = new Date();
+      const savedId = attendanceId;
+
+      // ── Fire the clock-out IMMEDIATELY so it is saved even if the
+      // teacher navigates away before the photo upload finishes.
+      const snapshotPromise = captureSnapshot();
 
       const res = await fetch("/api/attendance", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: attendanceId, action: "clock-out", photoUrl }),
+        body: JSON.stringify({ id: savedId, action: "clock-out", photoUrl: null }),
       });
       const json = await res.json();
       
       if (json.success) {
         setAttendanceId(null);
         
-        // Update UI only after successful save
-        const out = new Date();
+        // Update UI immediately — record is already saved
         const workMs = out.getTime() - clockInAt.current!.getTime() - totalBreakMs(breaks);
         const workSec = Math.max(0, Math.floor(workMs / 1000));
         const t = formatTime(out);
@@ -632,6 +649,26 @@ export default function ClockPage() {
         clockInAt.current = null;
         accumulatedWorkMs.current = 0;
         setState("ready");
+
+        // ── Photo upload (background) — patch the record when done ────────
+        if (user?.uid) {
+          snapshotPromise
+            .then(async (blob) => {
+              if (!blob) return;
+              try {
+                const photoUrl = await uploadAttendanceLog(blob, user!.uid, "clock-out");
+                console.log("Clock-out photo uploaded, patching record:", photoUrl);
+                await fetch("/api/attendance", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: savedId, action: "patch-clockout-photo", photoUrl }),
+                });
+              } catch (uploadErr) {
+                console.warn("Clock-out photo upload failed (record already saved):", uploadErr);
+              }
+            })
+            .catch((err) => console.warn("Snapshot capture failed:", err));
+        }
       } else {
         alert("Failed to clock out. Please try again.");
       }
@@ -642,6 +679,7 @@ export default function ClockPage() {
       setIsProcessing(false);
     }
   }
+
 
   function handleUndoClockOut() {
     if (!undoInfo) return;
@@ -1383,15 +1421,15 @@ export default function ClockPage() {
 
       {/* ─── Undo Toast ─── */}
       {undoInfo && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-[slideUp_0.3s_ease-out]">
-          <div className="flex items-center gap-4 rounded-full bg-[#002f76] px-5 py-3 shadow-lg">
-            <p className="text-[13px] font-bold text-white">
+        <div className="fixed bottom-6 left-1/2 z-50 w-[92vw] sm:w-auto -translate-x-1/2 animate-[slideUp_0.3s_ease-out]">
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#002f76] p-4 shadow-xl sm:rounded-full sm:px-5 sm:py-3 sm:justify-start">
+            <p className="text-[13px] font-bold leading-tight text-white">
               You clocked out {lastClockOutTime ? `at ${lastClockOutTime.split(", ").pop()}` : "just now"}.{" "}
-              <span className="text-[#9aa3b2]">Auto-dismisses in 10s</span>
+              <span className="block text-[#9aa3b2] mt-0.5 sm:inline sm:mt-0">Auto-dismisses in 10s</span>
             </p>
             <button
               onClick={handleUndoClockOut}
-              className="rounded-full bg-[#ffb800] px-4 py-1.5 text-[12px] font-extrabold text-[#002f76] transition-colors hover:bg-[#ffb800]/90"
+              className="shrink-0 rounded-full bg-[#ffb800] px-4 py-2 sm:py-1.5 text-[12px] font-extrabold text-[#002f76] transition-colors hover:bg-[#ffb800]/90"
             >
               Undo
             </button>
