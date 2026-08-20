@@ -233,6 +233,10 @@ function buildSheet(
     const timeIn = fmtTime12(rec!.clockInTime!);
     const timeOut = clockOut ? fmtTime12(rec!.clockOutTime!) : "–";
 
+    // Flexible-schedule override: if admin marked this day as Exempt,
+    // skip the late deduction entirely regardless of clock-in time.
+    const isExempt = rec?.timeInStatus === "Exempt";
+
     // # of Hours — raw clock-to-clock elapsed time. Informational only, NOT used for pay.
     const rawMs = clockOut ? clockOut.getTime() - clockIn.getTime() : 0;
     const numHours = rawMs > 0 ? parseFloat((rawMs / 3600000).toFixed(2)) : 0;
@@ -249,20 +253,23 @@ function buildSheet(
 
     grandTotal += totalHours;
 
-    // Late deduction — uses derived rate (daily/8 or monthly/176), NOT a stored hourlyRate
+    // Late deduction — skipped when:
+    //   1. Employee has a weeklyHoursTarget (Jasmin's flexible arrangement), OR
+    //   2. This specific day was marked Exempt via the Flexible Schedule Override.
     let lateResult: LateDeductionResult = { deduction: 0, method: "none", lateMinutes: 0 };
-    if (!account.weeklyHoursTarget) {
+    if (!account.weeklyHoursTarget && !isExempt) {
       lateResult = computeLateDeduction(rec!.clockInTime!, rateForLate, noTimeLog);
       totalLateDeduction += lateResult.deduction;
     }
 
-    // Build remarks from late method
-    const lateRemark =
-      lateResult.method === "threshold"
-        ? "Late (threshold)"
-        : lateResult.method === "per-minute"
-        ? `Late (${lateResult.lateMinutes} min)`
-        : "";
+    // Build remarks
+    const lateRemark = isExempt
+      ? "Flexible Schedule"
+      : lateResult.method === "threshold"
+      ? "Late (threshold)"
+      : lateResult.method === "per-minute"
+      ? `Late (${lateResult.lateMinutes} min)`
+      : "";
 
     rows.push({
       id: dateStr,
