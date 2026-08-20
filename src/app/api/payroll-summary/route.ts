@@ -51,18 +51,8 @@ export async function GET(request: Request) {
     const start = new Date(startDateStr);
     const end = new Date(endDateStr);
     const days = eachDayInRange(start, end);
-    const saturdaysInCutoff = days.filter(d => d.getDay() === 6);
 
-    let queryStartDateStr = startDateStr;
-    if (saturdaysInCutoff.length > 0) {
-      const firstSaturday = saturdaysInCutoff[0];
-      const sundayBeforeFirstSat = new Date(firstSaturday);
-      sundayBeforeFirstSat.setDate(sundayBeforeFirstSat.getDate() - 6);
-      
-      if (sundayBeforeFirstSat < start) {
-        queryStartDateStr = formatDateStr(sundayBeforeFirstSat);
-      }
-    }
+    const queryStartDateStr = startDateStr;
 
     // 2. Fetch Attendance for the expanded period
     const attendanceRecords = await db.collection("attendance").find({
@@ -95,7 +85,6 @@ export async function GET(request: Request) {
       let daysPresent = 0;
       let totalScheduledWorkDays = 0; // Work days in the cutoff for this employee
       let totalLateDeduction = 0;
-      let totalWeeklyShortfallDeduction = 0;
       const noTimeLog: boolean = acc.noTimeLog ?? false;
 
       // Fetch daily exemptions for this employee so we can skip late deductions on exempt days
@@ -146,42 +135,6 @@ export async function GET(request: Request) {
         }
       }
 
-      // If they have a weekly target, evaluate any full weeks that ended in this cutoff
-      if (acc.weeklyHoursTarget) {
-        for (const sat of saturdaysInCutoff) {
-          const sun = new Date(sat);
-          sun.setDate(sun.getDate() - 6);
-          const weekDays = eachDayInRange(sun, sat);
-          
-          let weekTotalHours = 0;
-          for (const wDay of weekDays) {
-            const wDateStr = formatDateStr(wDay);
-            const wRec = empAttendance.get(wDateStr);
-            
-            if (wRec && wRec.clockInTime && wRec.clockOutTime) {
-              const wDow = wDay.getDay();
-              const wAbbr = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[wDow];
-              if (wAbbr !== "Sun") {
-                const schedule = BASE_SCHEDULE[wAbbr];
-                const breakMins = getBreakMinutes(wDow);
-                weekTotalHours += computeCreditedHours(
-                  wRec.clockInTime,
-                  wRec.clockOutTime,
-                  schedule.start,
-                  schedule.normalEnd,
-                  breakMins
-                );
-              }
-            }
-          }
-          
-          if (weekTotalHours < acc.weeklyHoursTarget) {
-            const shortfall = acc.weeklyHoursTarget - weekTotalHours;
-            totalWeeklyShortfallDeduction += shortfall * rateForLate;
-          }
-        }
-      }
-
       // Basic pay — ALL employees are no-work-no-pay
       //
       // Monthly salary (e.g. Angel):
@@ -210,8 +163,7 @@ export async function GET(request: Request) {
       const birthdayGift = 0;
       // Late deduction is applied after basic pay is computed and before contributions
       const lateDeduction = parseFloat(totalLateDeduction.toFixed(2));
-      const weeklyShortfallDeduction = parseFloat(totalWeeklyShortfallDeduction.toFixed(2));
-      const grossPay = basicPay + comms + perfectAttendance + birthdayGift - lateDeduction - weeklyShortfallDeduction;
+      const grossPay = basicPay + comms + perfectAttendance + birthdayGift - lateDeduction;
 
       // Use live contribution calculation (SSS table lookup, not stored flat values)
       const monthlySalary = acc.monthlyRate ?? 0;
@@ -247,7 +199,7 @@ export async function GET(request: Request) {
         birthdayGift,
         gross: parseFloat(grossPay.toFixed(2)),
         lateDeduction,
-        weeklyShortfallDeduction,
+        weeklyShortfallDeduction: 0,
         // Employee deductions (payslip + net pay)
         sss: empSSS,
         philhealth: empPhilHealth,
