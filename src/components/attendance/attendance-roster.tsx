@@ -68,6 +68,13 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
             Suspended
           </span>
         );
+      case "Holiday":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>celebration</span>
+            Holiday
+          </span>
+        );
       case "Exempt":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]">
@@ -125,7 +132,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
             </button>
             {filterOpen && (
               <div className="absolute right-0 mt-2 w-40 rounded-xl bg-white shadow-lg border border-[#e2e8f0] py-1 z-20">
-                {(["All", "On Time", "Late", "Absent", "Completed", "Suspended"] as const).map((status) => (
+                {(["All", "On Time", "Late", "Absent", "Completed", "Suspended", "Holiday"] as const).map((status) => (
                   <button
                     key={status}
                     onClick={() => {

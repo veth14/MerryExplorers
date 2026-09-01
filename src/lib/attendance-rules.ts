@@ -73,7 +73,7 @@ export function getBreakMinutes(dayOfWeek: number): number {
 
 // ── Status types ─────────────────────────────────────────────────────────────────
 export type TimeInStatus = "On Time" | "Late" | "Exempt";
-export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended";
+export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended" | "Holiday";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -160,6 +160,7 @@ export function computeTimeInStatus(
  * @param account        The employee account doc
  * @param date           The date being evaluated (defaults to now)
  * @param isSuspended    Whether the school declared this date suspended/no-class
+ * @param dayOffType     When isSuspended is true, the type of day-off ("suspension" | "holiday")
  */
 export function computeDailyStatus(
   record: { timeInStatus?: string; clockInTime?: string } | null,
@@ -169,16 +170,16 @@ export function computeDailyStatus(
     weeklyHoursTarget?: number | null;
   },
   date: Date = new Date(),
-  isSuspended: boolean = false
+  isSuspended: boolean = false,
+  dayOffType: "suspension" | "holiday" = "suspension"
 ): DailyAttendanceStatus {
   // Not scheduled today
   if (!isWorkDay(account.workDays, date)) return "No Work Day";
 
   // If the school declared this a suspended/no-class day:
-  // — Teachers who came in still get "Suspended" (no penalty, but record is kept)
-  // — Teachers who didn't come in also get "Suspended" (not "Absent" — it's a school closure,
-  //   no work no pay but not a disciplinary absence)
-  if (isSuspended) return "Suspended";
+  // — Teachers who came in still get the day-off status (no penalty)
+  // — Teachers who didn't come in also get the day-off status (not "Absent")
+  if (isSuspended) return dayOffType === "holiday" ? "Holiday" : "Suspended";
 
   // OJT/intern tracked by weekly hours — exempt from daily absent check
   if (account.weeklyHoursTarget != null) return "Exempt";

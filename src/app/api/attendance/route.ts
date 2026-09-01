@@ -5,7 +5,10 @@ import { requireInternalAuth } from "@/lib/auth-guard";
 import { computeTimeInStatus } from "@/lib/attendance-rules";
 
 // GET /api/attendance
-// Can pass ?date=YYYY-MM-DD or ?uid=teacher_firebase_uid
+// Params:
+//   ?date=YYYY-MM-DD  — single day (admin daily view)
+//   ?uid=UID          — all records for a teacher (timekeeping)
+//   ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD  — date range (multi-date export)
 export async function GET(request: Request) {
   const deny = requireInternalAuth(request);
   if (deny) return deny;
@@ -13,12 +16,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');
     const uid = searchParams.get('uid');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     const { db } = await connectToDatabase();
 
     let resolvedDateStr: string | null = null;
     const query: any = {};
-    if (dateStr) {
+
+    if (startDate && endDate) {
+      // Range query for multi-date export
+      query.dateStr = { $gte: startDate, $lte: endDate };
+    } else if (dateStr) {
       if (dateStr === "today") {
         const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
         const today = new Date(todayStr);
@@ -36,20 +45,26 @@ export async function GET(request: Request) {
       query.teacherUid = uid;
     }
 
-    // Check if this date is marked as suspended
+    // Check if this date is marked as suspended or holiday
     let isSuspended = false;
     let suspendReason: string | null = null;
+    let suspendType: "suspension" | "holiday" | null = null;
     if (resolvedDateStr) {
       const suspendDoc = await db.collection("suspended_days").findOne({ dateStr: resolvedDateStr });
       if (suspendDoc) {
         isSuspended = true;
         suspendReason = suspendDoc.reason || null;
+        suspendType = suspendDoc.type === "holiday" ? "holiday" : "suspension";
       }
     }
 
-    // Also fetch all suspended days for bulk queries
+    // Also fetch all suspended/holiday days for bulk queries (timekeeping etc.)
     const allSuspendedDocs = await db.collection("suspended_days").find({}).toArray();
-    const suspendedDays = allSuspendedDocs.map(d => d.dateStr);
+    // Return as typed objects so consumers can distinguish holiday vs suspension
+    const suspendedDays = allSuspendedDocs.map(d => ({
+      dateStr: d.dateStr as string,
+      type: (d.type === "holiday" ? "holiday" : "suspension") as "suspension" | "holiday",
+    }));
 
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
     
@@ -65,6 +80,7 @@ export async function GET(request: Request) {
       data: attendanceRecords, 
       isSuspended, 
       suspendReason, 
+      suspendType,
       suspendedDays,
       exemptions
     }, {

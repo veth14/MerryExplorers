@@ -91,9 +91,12 @@ export async function GET(request: Request) {
       const exemptDocs = await db.collection("daily_exemptions").find({ teacherUid: uid }).toArray();
       const exemptDates = new Set(exemptDocs.map((d: any) => d.dateStr));
 
-      // Also fetch suspended days to exclude from scheduled work day count
+      // Fetch suspended/holiday days — keyed by dateStr with their type
       const suspendedDocs = await db.collection("suspended_days").find({}).toArray();
-      const suspendedDateSet = new Set(suspendedDocs.map((d: any) => d.dateStr));
+      const suspendedDayMap = new Map<string, "suspension" | "holiday">();
+      for (const d of suspendedDocs) {
+        suspendedDayMap.set(d.dateStr, d.type === "holiday" ? "holiday" : "suspension");
+      }
 
       for (const day of days) {
         const dow = day.getDay();
@@ -102,15 +105,24 @@ export async function GET(request: Request) {
 
         const isWorkDay = accountWorkDays.has(abbr);
         const rec = empAttendance.get(dateStr);
-        const isSuspended = suspendedDateSet.has(dateStr);
+        const dayType = suspendedDayMap.get(dateStr); // "suspension" | "holiday" | undefined
+        const isHoliday = dayType === "holiday";
+        const isSuspension = dayType === "suspension";
 
-        // Count scheduled work days (excluding Sundays and suspended days)
-        // A day with a flexible override counts as a scheduled work day even if the employee didn't clock in
-        if (isWorkDay && !isSuspended) {
+        // Holiday pay rule:
+        //   Monthly employees (Angel): holidays are PAID — the day still counts as a
+        //   scheduled work day so her proration ratio is unaffected.
+        //   Daily employees (Kyle, Jasmin): holidays are UNPAID — same as suspension.
+        const isOffForPayroll = monthlyRate > 0
+          ? isSuspension                  // monthly: only suspension removes the day
+          : (isSuspension || isHoliday);  // daily: both suspension and holiday remove the day
+
+        // Count scheduled work days
+        if (isWorkDay && !isOffForPayroll) {
           totalScheduledWorkDays++;
         }
 
-        if (isWorkDay && !isSuspended && rec && rec.clockInTime) {
+        if (isWorkDay && !isOffForPayroll && rec && rec.clockInTime) {
           daysPresent++;
 
           // Late deduction — only if this day is NOT a flexible/exempt override AND they don't have a weekly target

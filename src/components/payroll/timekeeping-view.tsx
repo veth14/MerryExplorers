@@ -15,6 +15,9 @@ import {
 
 type DayType = "WORK" | "DAY-OFF" | "HOLIDAY" | "ABSENT" | "LEAVE" | "FUTURE" | "SUSPENDED" | "FLEXIBLE";
 
+/** Typed suspended-day entry returned from the API */
+type SuspendedDayEntry = { dateStr: string; type: "suspension" | "holiday" };
+
 type TimekeepingRow = {
   id: string;
   date: string;
@@ -156,7 +159,8 @@ function buildSheet(
   attendanceMap: Map<string, AttendanceRecord>,
   cutOff: { label: string; value: string; start: Date; end: Date },
   leaveSet: Set<string>,
-  suspendedSet: Set<string>
+  /** Map from dateStr → "suspension" | "holiday" */
+  suspendedMap: Map<string, "suspension" | "holiday">
 ): TimekeepingSheet {
   const dailyRate = account.dailyRate ?? 0;
   const monthlyRate = account.monthlyRate ?? 0;
@@ -191,7 +195,8 @@ function buildSheet(
     dayDate.setHours(0, 0, 0, 0);
     const isFuture = dayDate > today;
 
-    const isSuspendedDay = suspendedSet.has(dateStr);
+    const isSuspendedDay = suspendedMap.has(dateStr);
+    const dayOffKind = suspendedMap.get(dateStr); // "suspension" | "holiday" | undefined
 
     let type: DayType;
     if (!isWorkDay) {
@@ -199,10 +204,10 @@ function buildSheet(
     } else if (isOnLeave) {
       type = "LEAVE";
     } else if (isSuspendedDay) {
-      type = "SUSPENDED";
+      type = dayOffKind === "holiday" ? "HOLIDAY" : "SUSPENDED";
     } else if (!rec || !rec.clockInTime) {
       if (isFuture) type = "FUTURE";
-      else if (account.weeklyHoursTarget) type = "FLEXIBLE"; // Neutral label instead of ABSENT or DAY-OFF
+      else if (account.weeklyHoursTarget) type = "FLEXIBLE";
       else type = "ABSENT";
     } else {
       type = "WORK";
@@ -221,7 +226,12 @@ function buildSheet(
         totalHours: type === "ABSENT" ? 0 : null,
         lateDeduction: null,
         lateMethod: null,
-        remarks: type === "ABSENT" ? "Absent" : type === "LEAVE" ? "On Leave" : type === "FUTURE" ? "" : type === "SUSPENDED" ? "Suspended" : "",
+        remarks:
+          type === "ABSENT" ? "Absent" :
+          type === "LEAVE" ? "On Leave" :
+          type === "HOLIDAY" ? "Holiday" :
+          type === "SUSPENDED" ? "Suspended" :
+          type === "FUTURE" ? "" : "",
       });
       continue;
     }
@@ -336,7 +346,7 @@ export function TimekeepingView() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [suspended, setSuspended] = useState<string[]>([]);
+  const [suspended, setSuspended] = useState<SuspendedDayEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [empOpen, setEmpOpen] = useState(false);
   const [cutOffOpen, setCutOffOpen] = useState(false);
@@ -376,6 +386,7 @@ export function TimekeepingView() {
         if (json.success && Array.isArray(json.data)) {
           setAttendance(json.data);
           if (Array.isArray(json.suspendedDays)) {
+            // suspendedDays is now typed: { dateStr, type }[]
             setSuspended(json.suspendedDays);
           }
         }
@@ -396,11 +407,15 @@ export function TimekeepingView() {
 
   // TODO: integrate approved leaves; for now empty
   const leaveSet = new Set<string>();
-  const suspendedSet = new Set<string>(suspended);
+  // Build suspended/holiday map: dateStr → type
+  const suspendedMap = new Map<string, "suspension" | "holiday">();
+  for (const s of suspended) {
+    suspendedMap.set(s.dateStr, s.type);
+  }
 
   const sheet: TimekeepingSheet | null =
     selectedAccount
-      ? buildSheet(selectedAccount, attendanceMap, selectedCutOff, leaveSet, suspendedSet)
+      ? buildSheet(selectedAccount, attendanceMap, selectedCutOff, leaveSet, suspendedMap)
       : null;
 
   return (
@@ -410,8 +425,8 @@ export function TimekeepingView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      {/* Filter Bar */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky gap-4 w-full">
+      {/* Filter Bar — hidden when printing */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky gap-4 w-full print:hidden">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2.5 shrink-0">
             <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "20px" }}>tune</span>
@@ -491,13 +506,20 @@ export function TimekeepingView() {
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {/* Legend + Print button */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0 print:hidden">
           {(["DAY-OFF", "HOLIDAY", "ABSENT", "LEAVE", "FLEXIBLE"] as DayType[]).map((type) => (
             <span key={type} className={`text-[10px] font-black px-2.5 py-1 rounded-full ${DAY_TYPE_STYLES[type].badge}`}>
               {DAY_TYPE_STYLES[type].badgeText}
             </span>
           ))}
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 ml-2 rounded-full border border-brand-sky bg-white px-4 py-2 text-[12px] font-bold text-brand-navy hover:bg-brand-sky/20 transition-colors"
+          >
+            <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "15px" }}>print</span>
+            Print
+          </button>
         </div>
       </div>
 

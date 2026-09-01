@@ -66,6 +66,7 @@ export default function ClockPage() {
   const [attendanceId, setAttendanceId] = useState<string | null>(null);
 
   const [isSuspended, setIsSuspended] = useState(false);
+  const [suspendType, setSuspendType] = useState<"suspension" | "holiday" | null>(null);
   const [suspendReason, setSuspendReason] = useState<string | null>(null);
   const [isExempt, setIsExempt] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -84,6 +85,7 @@ export default function ClockPage() {
         
         if (json.success) {
           setIsSuspended(json.isSuspended || false);
+          setSuspendType(json.suspendType ?? null);
           setSuspendReason(json.suspendReason || null);
           setIsExempt(json.exemptions?.includes(user!.uid) || userProfile?.noTimeLog || false);
 
@@ -974,8 +976,12 @@ export default function ClockPage() {
                 </button>
               )}
               {!isActive && isSuspended && !isExempt && (
-                <div className="w-full rounded-full border border-orange-200 bg-orange-50 py-4 text-center text-[15px] font-extrabold text-orange-600">
-                  Classes Suspended
+                <div className={`w-full rounded-full border py-4 text-center text-[15px] font-extrabold ${
+                  suspendType === "holiday"
+                    ? "border-amber-200 bg-amber-50 text-amber-600"
+                    : "border-orange-200 bg-orange-50 text-orange-600"
+                }`}>
+                  {suspendType === "holiday" ? "🎉 Public Holiday" : "Classes Suspended"}
                 </div>
               )}
               {!isActive && (!isSuspended || isExempt) && (
