@@ -73,7 +73,7 @@ export function getBreakMinutes(dayOfWeek: number): number {
 
 // ── Status types ─────────────────────────────────────────────────────────────────
 export type TimeInStatus = "On Time" | "Late" | "Exempt";
-export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended" | "Holiday";
+export type DailyAttendanceStatus = "On Time" | "Late" | "Absent" | "Exempt" | "No Work Day" | "Suspended" | "Holiday" | "Future";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -187,8 +187,16 @@ export function computeDailyStatus(
   // No-time-log employees are always exempt
   if (account.noTimeLog) return "Exempt";
 
-  // No record → absent
-  if (!record || !record.clockInTime) return "Absent";
+  // No record → absent (but check if it's a future date)
+  if (!record || !record.clockInTime) {
+    const nowManilaStr = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Manila" });
+    const dateManilaStr = date.toLocaleDateString("en-US", { timeZone: "Asia/Manila" });
+    const nowManila = new Date(nowManilaStr);
+    const dateManila = new Date(dateManilaStr);
+    
+    if (dateManila > nowManila) return "Future";
+    return "Absent";
+  }
 
   // Use stored status if available, otherwise recompute
   const status = (record.timeInStatus as TimeInStatus | undefined) ??

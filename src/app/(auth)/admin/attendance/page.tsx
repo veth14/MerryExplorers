@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AttendanceMetricCard } from "@/components/attendance/attendance-metric-card";
 import { AttendanceRoster } from "@/components/attendance/attendance-roster";
@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { computeDailyStatus } from "@/lib/attendance-rules";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { useAuth } from "@/lib/auth-context";
+import { WeeklyView } from "@/components/attendance/weekly-view";
+import { MonthlyView } from "@/components/attendance/monthly-view";
 
 type AttendanceRecord = {
   _id: string;
@@ -58,17 +60,34 @@ export default function AttendancePage() {
   const [suspendInput, setSuspendInput] = useState("");
   const [suspendLoading, setSuspendLoading] = useState(false);
 
-  // PH Holiday loader state
-  const [showHolidayModal, setShowHolidayModal] = useState(false);
-  const [holidayYear, setHolidayYear] = useState(new Date().getFullYear().toString());
-  const [holidayLoading, setHolidayLoading] = useState(false);
-  const [holidayResult, setHolidayResult] = useState<{ seeded: number } | null>(null);
+
 
   // Multi-date export state
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
+  const [exportGroupBy, setExportGroupBy] = useState<"date" | "teacher" | "group">("date");
   const [exportLoading, setExportLoading] = useState(false);
+
+  const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [printHtml, setPrintHtml] = useState<string | null>(null);
+
+  // Weekly navigation — start of current week (Monday)
+  const [weekStart, setWeekStart] = useState(() => {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(now);
+    mon.setDate(now.getDate() + diff);
+    mon.setHours(0, 0, 0, 0);
+    return mon;
+  });
+
+  // Monthly navigation
+  const [monthRef, setMonthRef] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
 
   const [viewDateStr, setViewDateStr] = useState(() => {
     const manilaStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
@@ -214,89 +233,240 @@ export default function AttendancePage() {
     }
   };
 
-  const handleLoadPHHolidays = async () => {
-    setHolidayLoading(true);
-    setHolidayResult(null);
-    try {
-      const res = await fetch(`/api/holidays?year=${holidayYear}`, { method: "POST" });
-      const json = await res.json();
-      if (json.success) {
-        setHolidayResult({ seeded: json.seeded });
-        invalidateCache(`dashboard:attendance:${viewDateStr}`);
-        await fetchData();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setHolidayLoading(false);
-    }
-  };
-
-  // Multi-date range export
+  // Multi-date range export — opens branded print-to-PDF window
   const handleRangeExport = async () => {
     if (!exportStartDate || !exportEndDate) return;
     setExportLoading(true);
     try {
-      // Fetch all attendance records for the range
       const res = await fetch(`/api/attendance?startDate=${exportStartDate}&endDate=${exportEndDate}`);
       const json = await res.json();
       if (!json.success) throw new Error("Failed to fetch");
 
-      const rows: string[][] = [];
-      const headers = ["Date", "Teacher Name", "Group", "Time In", "Time Out", "Status"];
-      rows.push(headers);
-
-      // Build a set of suspended dates with types for CSV labeling
-      const suspMap = new Map<string, "suspension" | "holiday">();
+      // Build suspended days map
+      const suspMap = new Map<string, { type: "suspension" | "holiday"; reason?: string }>();
       if (Array.isArray(json.suspendedDays)) {
         for (const sd of json.suspendedDays) {
-          suspMap.set(sd.dateStr, sd.type);
+          suspMap.set(sd.dateStr, { type: sd.type, reason: sd.reason });
         }
       }
 
-      // Generate every date in range
-      const start = new Date(`${exportStartDate}T00:00:00`);
-      const end = new Date(`${exportEndDate}T00:00:00`);
+      // Build records map: dateStr → records[]
       const recMap = new Map<string, AttendanceRecord[]>();
       for (const r of json.data as AttendanceRecord[]) {
         if (!recMap.has(r.dateStr)) recMap.set(r.dateStr, []);
         recMap.get(r.dateStr)!.push(r);
       }
 
-      const cur = new Date(start);
+      // ── Build HTML rows ────────────────────────────────────────────────────
+      type RowData = {
+        dateLabel: string;
+        name: string;
+        group: string;
+        timeIn: string;
+        timeOut: string;
+        status: string;
+        rowType: "normal" | "suspension" | "holiday" | "norecord";
+        dateStr?: string;
+      };
+
+      const tableRows: RowData[] = [];
+      const start = new Date(`${exportStartDate}T00:00:00`);
+      const end   = new Date(`${exportEndDate}T00:00:00`);
+      const cur   = new Date(start);
+
       while (cur <= end) {
         const dStr = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
         const dateLabel = cur.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+        const susp = suspMap.get(dStr);
         const dayRecs = recMap.get(dStr) || [];
-        const suspType = suspMap.get(dStr);
 
-        if (suspType) {
-          rows.push([`"${dateLabel}"`, `"—"`, `"—"`, `"—"`, `"—"`, `"${suspType === "holiday" ? "Holiday" : "Suspended"}"`]);
+        if (susp) {
+          tableRows.push({ dateLabel, name: "—", group: "—", timeIn: "—", timeOut: "—",
+            status: susp.type === "holiday" ? "Holiday" : "Suspended",
+            rowType: susp.type === "holiday" ? "holiday" : "suspension",
+            dateStr: dStr
+          });
         } else if (dayRecs.length === 0) {
-          rows.push([`"${dateLabel}"`, `"(No records)"`, `""`, `""`, `""`, `""`]);
+          tableRows.push({ dateLabel, name: "(No records)", group: "", timeIn: "", timeOut: "", status: "", rowType: "norecord", dateStr: dStr });
         } else {
           for (const r of dayRecs) {
-            const timeIn = r.clockInTime
-              ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" })
-              : "—";
-            const timeOut = r.clockOutTime
-              ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" })
-              : "—";
-            rows.push([`"${dateLabel}"`, `"${r.name}"`, `"${r.group}"`, `"${timeIn}"`, `"${timeOut}"`, `"${r.status}"`]);
+            const timeIn  = r.clockInTime  ? new Date(r.clockInTime).toLocaleTimeString("en-US",  { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
+            const timeOut = r.clockOutTime ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
+            tableRows.push({ dateLabel, name: r.name, group: r.group, timeIn, timeOut, status: r.status, rowType: "normal", dateStr: dStr });
           }
         }
         cur.setDate(cur.getDate() + 1);
       }
 
-      const csv = rows.map(r => r.join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `attendance_${exportStartDate}_to_${exportEndDate}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Grouping logic
+      const groupedRows = new Map<string, RowData[]>();
+      
+      if (exportGroupBy === "date") {
+        groupedRows.set("Chronological", tableRows);
+      } else if (exportGroupBy === "teacher") {
+        for (const r of tableRows) {
+          const key = r.rowType === "normal" ? r.name : "System/Holidays";
+          if (!groupedRows.has(key)) groupedRows.set(key, []);
+          groupedRows.get(key)!.push(r);
+        }
+      } else if (exportGroupBy === "group") {
+        for (const r of tableRows) {
+          const key = r.rowType === "normal" ? r.group : "System/Holidays";
+          if (!groupedRows.has(key)) groupedRows.set(key, []);
+          groupedRows.get(key)!.push(r);
+        }
+      }
+
+      // ── Generate row HTML ─────────────────────────────────────────────────
+      const statusBadge = (status: string) => {
+        const map: Record<string, string> = {
+          "On Time":   "background:#e8f4fd;color:#005cc8;border:1px solid #bfdbfe;",
+          "Late":      "background:#fffbeb;color:#d97706;border:1px solid #fde68a;",
+          "Absent":    "background:#fef2f2;color:#dc2626;border:1px solid #fecaca;",
+          "Completed": "background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;",
+          "Suspended": "background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;",
+          "Holiday":   "background:#fffbeb;color:#92400e;border:1px solid #fde68a;",
+          "Exempt (Flexible)": "background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;",
+        };
+        const style = map[status] || "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
+        return status
+          ? `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;${style}">${status}</span>`
+          : "";
+      };
+
+      const rowBg = (r: RowData, i: number) => {
+        if (r.rowType === "holiday")    return "#fffbeb";
+        if (r.rowType === "suspension") return "#fff7ed";
+        if (r.rowType === "norecord")   return "#f8fafc";
+        return i % 2 === 0 ? "#ffffff" : "#f8faff";
+      };
+
+      let tablesHtml = "";
+      for (const [groupName, rows] of groupedRows.entries()) {
+        const rowsHtml = rows.map((r, i) => `
+          <tr style="background:${rowBg(r, i)};">
+            <td>${r.dateLabel}</td>
+            <td style="font-weight:${r.rowType === "normal" ? "600" : "400"};color:${r.rowType === "norecord" ? "#94a3b8" : "#002f76"};">${r.name}</td>
+            <td style="color:#005cc8;font-weight:600;">${r.group}</td>
+            <td>${r.timeIn}</td>
+            <td>${r.timeOut}</td>
+            <td>${statusBadge(r.status)}</td>
+          </tr>`).join("");
+
+        tablesHtml += `
+          ${exportGroupBy !== "date" ? `<div class="group-title">${groupName}</div>` : ""}
+          <table>
+            <thead>
+              <tr>
+                <th style="width:15%">Date</th>
+                <th style="width:22%">Teacher Name</th>
+                <th style="width:18%">Group</th>
+                <th style="width:12%">Time In</th>
+                <th style="width:12%">Time Out</th>
+                <th style="width:21%">Status</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <br/>
+        `;
+      }
+
+      const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      const generatedAt = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+      const logoSrc = `${window.location.origin}/LOGO-noBG.png`;
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Attendance Report — ${fmtDate(exportStartDate)} to ${fmtDate(exportEndDate)}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;color:#1e293b;background:#fff;font-size:11px;}
+    @page{size:A4 landscape;margin:12mm 14mm;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+
+    /* ── Header ── */
+    .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:3px solid #002f76;margin-bottom:12px;}
+    .logo-wrap{display:flex;align-items:center;gap:10px;}
+    .logo{width:48px;height:48px;object-fit:contain;}
+    .school-name{font-size:18px;font-weight:900;color:#002f76;letter-spacing:-0.5px;line-height:1.15;}
+    .school-sub{font-size:9px;font-weight:600;color:#5a6e8c;text-transform:uppercase;letter-spacing:1px;}
+    .report-meta{text-align:right;}
+    .report-title{font-size:13px;font-weight:800;color:#002f76;}
+    .report-range{font-size:10px;color:#5a6e8c;font-weight:600;margin-top:2px;}
+    .accent-bar{width:36px;height:3px;background:#ffb800;border-radius:4px;margin:4px 0 0 auto;}
+
+    /* ── Summary badges ── */
+    .summary{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+    .badge{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:9px;font-weight:700;border:1px solid;}
+    .b-total{background:#f0f5ff;color:#002f76;border-color:#bfdbfe;}
+    .b-on-time{background:#f0fdf4;color:#15803d;border-color:#bbf7d0;}
+    .b-late{background:#fffbeb;color:#d97706;border-color:#fde68a;}
+    .b-absent{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
+    .b-holiday{background:#fffbeb;color:#92400e;border-color:#fde68a;}
+    .b-susp{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
+
+    /* ── Table ── */
+    .group-title{font-size:14px;font-weight:900;color:#002f76;margin:15px 0 8px;padding-left:4px;border-left:4px solid #ffb800;}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+    thead tr{background:linear-gradient(135deg,#002f76 0%,#0050d5 100%);}
+    th{color:#fff;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;text-align:left;}
+    td{padding:5px 8px;font-size:10px;color:#334155;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+
+    /* ── Footer ── */
+    .footer{margin-top:12px;display:flex;justify-content:space-between;align-items:flex-end;border-top:1.5px solid #e2e8f0;padding-top:8px;page-break-inside:avoid;}
+    .footer-left{font-size:8.5px;color:#94a3b8;font-weight:500;}
+    .footer-right{font-size:8.5px;color:#94a3b8;font-weight:500;text-align:right;}
+    .sig-line{width:140px;border-top:1.5px solid #334155;padding-top:3px;margin-top:20px;font-size:8px;color:#5a6e8c;font-weight:600;text-align:center;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-wrap">
+      <img class="logo" src="${logoSrc}" alt="Merry Explorers Logo"/>
+      <div>
+        <div class="school-name">Merry Explorers</div>
+        <div class="school-sub">Learning Center</div>
+      </div>
+    </div>
+    <div class="report-meta">
+      <div class="report-title">Attendance Report</div>
+      <div class="report-range">${fmtDate(exportStartDate)} &mdash; ${fmtDate(exportEndDate)}</div>
+      <div class="accent-bar"></div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <span class="badge b-total">📋 ${tableRows.filter(r => r.rowType === "normal").length} Records</span>
+    <span class="badge b-on-time">✓ ${tableRows.filter(r => r.status === "On Time").length} On Time</span>
+    <span class="badge b-late">⚠ ${tableRows.filter(r => r.status === "Late").length} Late</span>
+    <span class="badge b-absent">✗ ${tableRows.filter(r => r.status === "Absent").length} Absent</span>
+    <span class="badge b-holiday">🎉 ${tableRows.filter(r => r.rowType === "holiday").length} Holidays</span>
+    <span class="badge b-susp">⛔ ${tableRows.filter(r => r.rowType === "suspension").length} Suspensions</span>
+  </div>
+
+  ${tablesHtml}
+
+  <div class="footer">
+    <div class="footer-left">
+      Generated: ${generatedAt} (Philippine Time)<br/>
+      Merry Explorers Attendance Management System
+    </div>
+    <div class="footer-right">
+      <div class="sig-line">Authorized Signature &amp; Date</div>
+    </div>
+  </div>
+
+  <\/div>
+
+<\/body>
+<\/html>`;
+
+      setPrintHtml(html);
       setShowExportModal(false);
     } catch (e) {
       console.error("Export failed:", e);
@@ -467,6 +637,26 @@ export default function AttendancePage() {
     };
   });
 
+  if (printHtml) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-white">
+        <iframe
+          srcDoc={printHtml}
+          className="w-full h-full border-none"
+          title="Print Preview"
+        />
+        <div className="absolute top-4 right-4 flex gap-3">
+          <button
+            onClick={() => setPrintHtml(null)}
+            className="rounded-xl border-2 border-[#e2e8f0] bg-white px-5 py-2.5 text-[13px] font-bold text-[#5a6e8c] hover:bg-[#f8fafc] shadow-sm transition-all"
+          >
+            Close Preview
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AppShell title="Attendance" description="Track daily check-ins and monitor staff availability.">
       {/* Header Row */}
@@ -500,14 +690,7 @@ export default function AttendancePage() {
             Export Range
           </button>
 
-          {/* PH Holiday Loader */}
-          <button
-            onClick={() => { setShowHolidayModal(true); setHolidayResult(null); }}
-            className="flex items-center gap-2 rounded-xl border-2 border-[#fef08a] bg-[#fefce8] px-4 py-2 text-[12px] font-bold text-[#854d0e] hover:bg-[#fef9c3] transition-all"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>calendar_today</span>
-            PH Holidays
-          </button>
+
 
           {/* Mark Day Off / Undo Button */}
           {isSuspended ? (
@@ -531,7 +714,44 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Day-Off Banner */}
+      {/* View Tabs */}
+      <div className="flex bg-[#f1f5f9] rounded-2xl p-1.5 w-fit">
+        {(["daily", "weekly", "monthly"] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            className={`px-6 py-2 rounded-xl text-[13px] font-bold capitalize transition-all ${viewMode === mode ? "bg-white text-[#002f76] shadow-sm" : "text-[#5a6e8c] hover:text-[#002f76]"}`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === "weekly" && (
+        <WeeklyView
+          weekStart={weekStart}
+          onWeekChange={(delta) => {
+            const next = new Date(weekStart);
+            next.setDate(next.getDate() + delta * 7);
+            setWeekStart(next);
+          }}
+        />
+      )}
+
+      {viewMode === "monthly" && (
+        <MonthlyView
+          year={monthRef.year}
+          month={monthRef.month}
+          onMonthChange={(delta) => {
+            const next = new Date(monthRef.year, monthRef.month + delta, 1);
+            setMonthRef({ year: next.getFullYear(), month: next.getMonth() });
+          }}
+        />
+      )}
+
+      {viewMode === "daily" && (
+        <>
+          {/* Day-Off Banner */}
       {isSuspended && (
         isHolidayDay ? (
           /* Holiday Banner — gold/green */
@@ -610,6 +830,8 @@ export default function AttendancePage() {
           />
         )}
       </section>
+      </>
+      )}
 
       {/* ── Mark Day Off Modal ── */}
       {showMarkDayOffModal && (
@@ -720,67 +942,7 @@ export default function AttendancePage() {
             </div>
           </div>
         </div>
-      )}
 
-      {/* ── PH Holiday Loader Modal ── */}
-      {showHolidayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => !holidayLoading && setShowHolidayModal(false)}
-          />
-          <div className="relative bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm mx-4 z-10">
-            <div className="w-14 h-14 rounded-2xl bg-yellow-50 flex items-center justify-center mb-4 mx-auto">
-              <span className="material-symbols-outlined text-yellow-500" style={{ fontSize: "30px" }}>calendar_today</span>
-            </div>
-            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Load PH Holidays</h2>
-            <p className="text-[12px] font-medium text-[#5a6e8c] text-center mb-5">
-              Automatically import Philippine public holidays from the official calendar via Nager.Date.
-            </p>
-
-            <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Year</label>
-            <input
-              type="number"
-              value={holidayYear}
-              onChange={(e) => setHolidayYear(e.target.value)}
-              className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all mb-4"
-            />
-
-            {holidayResult && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl mb-4">
-                <span className="material-symbols-outlined text-green-600" style={{ fontSize: "16px" }}>check_circle</span>
-                <p className="text-[12px] font-bold text-green-700">
-                  Loaded {holidayResult.seeded} holidays for {holidayYear}!
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowHolidayModal(false)}
-                disabled={holidayLoading}
-                className="flex-1 rounded-xl border-2 border-[#e2e8f0] py-2.5 text-[13px] font-bold text-[#5a6e8c] hover:bg-[#f0f4f9] transition-all disabled:opacity-50"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleLoadPHHolidays}
-                disabled={holidayLoading}
-                className="flex-1 rounded-xl bg-yellow-500 hover:bg-yellow-600 py-2.5 text-[13px] font-bold text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {holidayLoading ? (
-                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
-                    <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>download</span>
-                )}
-                {holidayLoading ? "Loading..." : `Load ${holidayYear} Holidays`}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* ── Multi-date Export Modal ── */}
@@ -792,14 +954,14 @@ export default function AttendancePage() {
           />
           <div className="relative bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4 z-10">
             <div className="w-14 h-14 rounded-2xl bg-[#f0f5ff] flex items-center justify-center mb-4 mx-auto">
-              <span className="material-symbols-outlined text-[#005cc8]" style={{ fontSize: "30px" }}>table_chart</span>
+              <span className="material-symbols-outlined text-[#005cc8]" style={{ fontSize: "30px" }}>picture_as_pdf</span>
             </div>
-            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Export Attendance Range</h2>
+            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Export Attendance as PDF</h2>
             <p className="text-[12px] font-medium text-[#5a6e8c] text-center mb-5">
-              Download a CSV with all attendance records between the selected dates.
+              Opens a branded PDF preview with all attendance records between the selected dates. Print or save it as a file.
             </p>
 
-            <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Start Date</label>
                 <CustomDatePicker
@@ -816,6 +978,20 @@ export default function AttendancePage() {
                   triggerClassName="w-full flex items-center justify-between gap-2 rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-3 py-2 text-[12px] font-bold text-[#002f76] transition-all hover:bg-white"
                 />
               </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Group Records By</label>
+              <select
+                value={exportGroupBy}
+                onChange={(e) => setExportGroupBy(e.target.value as any)}
+                className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all appearance-none"
+                style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23002f76%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem top 50%', backgroundSize: '0.65rem auto' }}
+              >
+                <option value="date">Date (Chronological)</option>
+                <option value="teacher">Teacher Name</option>
+                <option value="group">Class / Group</option>
+              </select>
             </div>
 
             <div className="flex gap-3">
@@ -837,9 +1013,9 @@ export default function AttendancePage() {
                     <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                 ) : (
-                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>download</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>picture_as_pdf</span>
                 )}
-                {exportLoading ? "Exporting..." : "Download CSV"}
+                {exportLoading ? "Generating..." : "Generate PDF"}
               </button>
             </div>
           </div>
