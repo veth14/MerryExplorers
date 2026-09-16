@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" fill="none">
+  <!-- Shield shape -->
+  <path d="M28 10 L48 10 L54 14 L54 40 C54 54 40 62 38 63 C36 62 22 54 22 40 L22 14 Z" fill="#C8A832"/>
+  <!-- Shield inner -->
+  <path d="M31 14 L45 14 L50 17 L50 40 C50 51 39 58 38 59 C37 58 26 51 26 40 L26 17 Z" fill="#C8A832" stroke="white" stroke-width="1.5"/>
+  <!-- Tower left -->
+  <rect x="29" y="32" width="7" height="14" rx="1" fill="white"/>
+  <rect x="29" y="28" width="3" height="6" rx="0.5" fill="white"/>
+  <rect x="33" y="28" width="3" height="6" rx="0.5" fill="white"/>
+  <!-- Crown top -->
+  <path d="M28 8 L32 4 L36 8 L40 4 L44 8 L48 4 L52 8" stroke="#C8A832" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- BPI text -->
+  <text x="64" y="52" font-family="Arial,sans-serif" font-size="38" font-weight="900" fill="#B22222">BPI</text>
+</svg>

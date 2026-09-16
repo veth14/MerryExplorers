@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
+    "@types/react-signature-canvas": "^1.0.7",
     "browser-image-compression": "^2.0.2",
     "cloudinary": "^2.11.0",
     "emoji-picker-react": "^4.19.1",
@@ -21,7 +22,9 @@
     "next": "^16.2.9",
     "nodemailer": "^9.0.3",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-signature-canvas": "^1.1.0-alpha.2",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

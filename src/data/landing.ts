@@ -124,7 +124,7 @@ export const MISSION_VISION_PURPOSE = [
 ] as const;
 
 export const UNIFORM = {
-  image: "/uniform.png",
+  image: "/uniform_updated.jpg",
   items: [
     "Polo Shirt with Logo",
     "Blue Jogging Pants",
@@ -137,10 +137,134 @@ export const UNIFORM = {
 export const BALLET = {
   name: "Ballet",
   emoji: "🩰",
-  day: "Every Saturday",
-  time: "9:00 AM – 10:00 AM",
-  sessions: 10,
-  feature: "Ends with a Mini-Performance 🎭",
   accent: "#C2185B",
   accentSoft: "#FCE4EC",
+  classes: [
+    {
+      name: "Baby Ballet",
+      time: "12:30 PM – 1:30 PM",
+      ageRange: "Ages 2.5 to 4.11",
+      description: "A fun and gentle introduction to ballet through movement, music and imagination!",
+    },
+    {
+      name: "Basic Ballet",
+      time: "1:45 PM – 2:45 PM",
+      ageRange: "Ages 5+",
+      description: "Builds strong foundations in technique, coordination and creativity.",
+    },
+  ],
+  schedule: "Every Saturday until November 21",
+  rate: {
+    perSession: "₱550 per session",
+    downpayment: "₱2,750",
+    downpaymentNote: "To confirm a slot, only 5 prepaid sessions (₱2,750) are required.",
+    paymentMethods: "Non-refundable via Bank Transfer, Mari Bank, BPI, or GCash.",
+  },
+  recital: {
+    title: "2026 Ballet Recital on November 28",
+    kitPrice: "₱1,500",
+    kitDetails: "Recital kit preorder starts on October 3. Inclusive of 2 guest passes, 1 mini bouquet, and 1 set of costume.",
+    note: "Recital kit is required to participate in the group themed performance.",
+  },
 } as const;
+
+export const PROGRAM_SLOTS = {
+  "curious-explorer": {
+    id: "curious-explorer",
+    name: "Discovery Club: Curious Explorer",
+    ageRange: "Ages 1.5 – 4.11",
+    schedule: "Monday & Wednesday",
+    sessions: 8,
+    totalSlots: 8,
+    rate: 4395,
+    downpayment: 2637,
+    balance: 1758,
+    accent: "#FFC107",
+    accentSoft: "#FFF3CD",
+    icon: "🧱",
+    prerequisite: null,
+    classes: [
+      { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 4 },
+      { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 4 },
+    ],
+  },
+  "creative-explorer": {
+    id: "creative-explorer",
+    name: "Discovery Club: Creative Explorer",
+    ageRange: "Ages 2.6 – 4.11",
+    schedule: "Tuesday, Thursday & Friday",
+    sessions: 12,
+    totalSlots: 18,
+    rate: 4985,
+    downpayment: 2991,
+    balance: 1994,
+    accent: "#0033A0",
+    accentSoft: "#E1ECFF",
+    icon: "🚀",
+    prerequisite: "Child must be able to stay independently with Teacher during sessions without a guardian.",
+    classes: [
+      { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 6 },
+      { name: "Mid-Day Class", time: "11:15 AM – 12:30 PM", maxSlots: 6 },
+      { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 6 },
+    ],
+  },
+  "brave-explorer": {
+    id: "brave-explorer",
+    name: "Trailblazer: Brave Explorer",
+    ageRange: "Ages 3 – 4.11",
+    schedule: "Monday – Friday",
+    sessions: 18,
+    totalSlots: 6,
+    rate: 6900,
+    downpayment: 4140,
+    balance: 2760,
+    accent: "#1a2e6b",
+    accentSoft: "#e8ecf8",
+    icon: "🏆",
+    prerequisite: null,
+    classes: [
+      { name: "Afternoon Class", time: "3:00 PM – 4:15 PM", maxSlots: 6 },
+    ],
+  },
+  "ballet": {
+    id: "ballet",
+    name: "Ballet",
+    ageRange: "Ages 3 – 12",
+    schedule: "Saturday",
+    sessions: 8,
+    totalSlots: 15,
+    rate: 3500,
+    downpayment: 2100,
+    balance: 1400,
+    accent: "#E91E8C",
+    accentSoft: "#FCE4F5",
+    icon: "🩰",
+    prerequisite: null,
+    classes: [
+      { name: "Morning Class", time: "9:00 AM – 10:00 AM", maxSlots: 8 },
+      { name: "Late Morning Class", time: "10:15 AM – 11:15 AM", maxSlots: 7 },
+    ],
+  },
+} as const;
+
+export const PAYMENT_TERMS = {
+  downpaymentPct: 60,
+  balancePct: 40,
+  balanceDue: "6th session",
+  interestRate: "4% per week (every Monday)",
+  methods: ["Mari Bank", "BPI", "GCash"],
+  nonRefundable: true,
+} as const;
+
+export const UNIFORM_KIT = {
+  welcomeKitPrice: 750,    // Welcome Kit = Uniform Set + Lanyard & Name Tag (required for new families)
+  price: 550,              // Uniform Set only (polo + jogging pants), for returning families
+  lanyardPrice: 200,       // Lanyard & Name Tag only, optional
+  welcomeKitItems: ["Polo Shirt with Logo", "Blue Jogging Pants", "Merry Explorers Lanyard", "Name Tag"],
+  items: ["Polo Shirt with Logo", "Blue Jogging Pants"],
+  lanyardItems: ["Merry Explorers Lanyard", "Name Tag"],
+  note: "New families are required to get the Welcome Kit. Returning families may purchase add-ons optionally.",
+  uniformDays: "Wednesday & Friday",
+  otherDaysNote: "On all other days, children may wear anything comfortable, safe, and appropriate for active play and learning.",
+} as const;
+

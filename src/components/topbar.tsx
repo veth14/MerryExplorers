@@ -5,7 +5,7 @@ import { notifications as initialNotifications, notificationMeta, AppNotificatio
 
 type TopbarProps = {
   title: string;
-  description: string;
+  description?: string;
   onMenuClick?: () => void;
 };
 

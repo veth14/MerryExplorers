@@ -6,11 +6,11 @@ import { Topbar } from "@/components/topbar";
 
 type AppShellProps = {
   title: string;
-  description: string;
+  description?: string;
   children: React.ReactNode;
 };
 
-export function AppShell({ title, description, children }: AppShellProps) {
+export function AppShell({ title, description = "", children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (

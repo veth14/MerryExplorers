@@ -299,64 +299,127 @@ export function ProgramsSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-          className="relative mb-10 overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(194,24,91,0.12)] transition-all duration-300 hover:-translate-y-2"
+          className="relative mb-10 overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(194,24,91,0.12)] transition-all duration-300"
         >
           {/* Top bar */}
           <div className="h-2 w-full" style={{ backgroundColor: BALLET.accent }} />
 
-          <div className="flex flex-col gap-6 p-7 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-8 p-7 sm:p-10">
 
-            {/* Left: Title */}
-            <div className="flex items-center gap-4">
-              <m.span
-                animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                className="text-5xl"
-              >
-                {BALLET.emoji}
-              </m.span>
-              <div>
-                <span className="mb-1 inline-block rounded-full px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest"
-                  style={{ backgroundColor: BALLET.accentSoft, color: BALLET.accent }}>
-                  Special Program
-                </span>
-                <h3 className="font-headline text-[26px] font-extrabold tracking-tight" style={{ color: BALLET.accent }}>
-                  Ballet
-                </h3>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#FCE4EC] pb-6">
+              <div className="flex items-center gap-4">
+                <m.span
+                  animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                  className="text-6xl"
+                >
+                  {BALLET.emoji}
+                </m.span>
+                <div>
+                  <span className="mb-1 inline-block rounded-full px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest"
+                    style={{ backgroundColor: BALLET.accentSoft, color: BALLET.accent }}>
+                    Special Program
+                  </span>
+                  <h3 className="font-headline text-[32px] font-extrabold tracking-tight" style={{ color: BALLET.accent }}>
+                    {BALLET.name}
+                  </h3>
+                  <p className="mt-1 text-[14px] font-bold text-[#880E4F]">
+                    {BALLET.schedule}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Rate Highlight */}
+              <div className="flex flex-col items-center justify-center rounded-3xl bg-[#FFF3CD] px-6 py-4 shadow-sm border border-[#FFE082]">
+                <span className="text-[12px] font-bold uppercase tracking-widest text-[#B78103]">Rate</span>
+                <span className="text-[28px] font-extrabold text-[#795548] leading-none mt-1">₱550</span>
+                <span className="text-[13px] font-bold text-[#B78103] mt-1">per session</span>
               </div>
             </div>
 
-            {/* Center: Schedule details */}
-            <div className="flex flex-wrap gap-3 sm:justify-center">
-              <div className="flex items-center gap-2 rounded-2xl bg-[#FCE4EC]/60 px-4 py-3 border border-[#C2185B]/10">
-                <span className="text-xl">📅</span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#94a3b8]">Day</p>
-                  <p className="text-[14px] font-extrabold text-[#C2185B]">{BALLET.day}</p>
+            <div className="grid gap-8 lg:grid-cols-2">
+              {/* Left Column: Classes & Rates */}
+              <div className="flex flex-col gap-6">
+                
+                {/* Classes */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {BALLET.classes.map((c, i) => (
+                    <div key={i} className="flex flex-col rounded-2xl bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-[#F06292]" />
+                      <h4 className="font-headline text-[18px] font-extrabold text-[#C2185B]">{c.name}</h4>
+                      <span className="mt-1 inline-flex w-fit items-center rounded-md bg-[#FCE4EC] px-2 py-0.5 text-[11px] font-bold text-[#880E4F]">
+                        {c.ageRange}
+                      </span>
+                      <p className="mt-2 text-[13px] text-[#64748b] leading-relaxed">{c.description}</p>
+                      <div className="mt-4 flex items-center gap-2 text-[14px] font-bold text-[#0033A0]">
+                        <span className="text-lg">⏰</span> {c.time}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div className="flex items-center gap-2 rounded-2xl bg-[#FCE4EC]/60 px-4 py-3 border border-[#C2185B]/10">
-                <span className="text-xl">⏰</span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#94a3b8]">Time</p>
-                  <p className="text-[14px] font-extrabold text-[#C2185B]">{BALLET.time}</p>
+
+                {/* To Confirm Slot */}
+                <div className="rounded-2xl bg-slate-50 p-5 border border-slate-100">
+                  <h4 className="flex items-center gap-2 font-headline text-[16px] font-bold text-[#334155]">
+                    <span className="text-xl">💌</span> To Confirm a Slot
+                  </h4>
+                  <ul className="mt-3 space-y-2 text-[14px] text-[#475569]">
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#C2185B] mt-0.5">•</span>
+                      <span>{BALLET.rate.downpaymentNote}</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#C2185B] mt-0.5">•</span>
+                      <span>{BALLET.rate.paymentMethods}</span>
+                    </li>
+                  </ul>
                 </div>
+
               </div>
-              <div className="flex items-center gap-2 rounded-2xl bg-[#FCE4EC]/60 px-4 py-3 border border-[#C2185B]/10">
-                <span className="text-xl">🏅</span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#94a3b8]">Sessions</p>
-                  <p className="text-[14px] font-extrabold text-[#C2185B]">{BALLET.sessions} Sessions</p>
+
+              {/* Right Column: Recital */}
+              <div className="flex flex-col">
+                <div className="flex-1 rounded-3xl bg-gradient-to-br from-[#FCE4EC] to-white p-6 sm:p-8 border border-[#F8BBD0] shadow-sm relative overflow-hidden">
+                  {/* Decorative ribbon */}
+                  <div className="absolute -right-6 -top-6 text-[100px] opacity-10 rotate-12 pointer-events-none">🎀</div>
+                  
+                  <span className="inline-block rounded-full bg-[#E91E63] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm mb-3">
+                    For Recital Participants
+                  </span>
+                  
+                  <h4 className="font-headline text-[22px] font-extrabold text-[#880E4F] leading-tight">
+                    {BALLET.recital.title}
+                  </h4>
+                  <p className="mt-2 text-[14px] font-medium text-[#C2185B]">
+                    {BALLET.recital.note}
+                  </p>
+
+                  <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm border border-[#FCE4EC]">
+                    <div className="flex items-end justify-between border-b border-slate-100 pb-3 mb-3">
+                      <span className="font-headline text-[18px] font-bold text-[#334155]">Recital Kit</span>
+                      <span className="text-[20px] font-extrabold text-[#E91E63]">{BALLET.recital.kitPrice}</span>
+                    </div>
+                    <p className="text-[13px] font-medium text-[#64748b] leading-relaxed">
+                      {BALLET.recital.kitDetails}
+                    </p>
+                    
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
+                        🎫 2 Guest Passes
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
+                        💐 1 Mini Bouquet
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
+                        👗 1 Set of Costume
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Feature */}
-            <div className="flex items-center gap-3 rounded-2xl border border-[#C2185B]/15 bg-[#FCE4EC]/40 px-5 py-4 sm:max-w-[220px]">
-              <p className="text-[13px] font-bold leading-snug text-[#880E4F]">
-                {BALLET.feature}
-              </p>
-            </div>
           </div>
 
           {/* Corner glow */}
@@ -372,11 +435,11 @@ export function ProgramsSection() {
           className="mt-4 text-center"
         >
           <p className="mb-4 text-[14px] font-medium text-[#64748b]">
-            Message us on Facebook to check available slots! 💛
+            Secure your slot and enroll online today! 🎒
           </p>
           <Link
-            href="/inquire"
-            id="programs-inquire-btn"
+            href="/register"
+            id="programs-register-btn"
             className="group inline-flex items-center gap-4 rounded-[1.25rem] bg-[#0033A0] px-8 py-4 text-[17px] font-bold text-white shadow-[0_12px_24px_rgba(0,51,160,0.2)] transition-all duration-300 hover:bg-[#002f76] hover:shadow-[0_16px_32px_rgba(0,51,160,0.3)] hover:-translate-y-1"
           >
             Register Now

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" fill="none">
+  <!-- G icon circle outer -->
+  <circle cx="36" cy="40" r="30" stroke="#00AEEF" stroke-width="6" fill="none"/>
+  <!-- G icon inner circle -->
+  <circle cx="36" cy="40" r="20" stroke="#00AEEF" stroke-width="4" fill="none"/>
+  <!-- G letter -->
+  <path d="M44 38 H36 V44 H44" stroke="#0033CC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M44 32 A10 10 0 1 0 44 48" stroke="#0033CC" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- wifi dots -->
+  <circle cx="60" cy="34" r="3" fill="#00AEEF"/>
+  <circle cx="60" cy="44" r="3" fill="#00AEEF"/>
+  <!-- GCash text -->
+  <text x="72" y="52" font-family="Arial,sans-serif" font-size="30" font-weight="bold" fill="#0033CC">GCash</text>
+</svg>
