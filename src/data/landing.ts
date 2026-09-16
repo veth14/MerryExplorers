@@ -10,28 +10,28 @@ export const NAV_LINKS = [
 
 export const HIGHLIGHTS = [
   {
-    title: "Smart Storytelling",
+    title: "Small Group Learning",
     description:
-      "Interactive tales that spark imagination and build early language skills.",
+      "Intimate class sizes so every child gets the focused attention they deserve.",
     icon: "book",
   },
   {
     title: "Caring Teachers",
     description:
-      "Warm, certified educators who nurture every child's potential.",
+      "Dedicated, warm educators who nurture every child's potential with heart.",
     icon: "heart",
   },
   {
-    title: "Age-Appropriate Learning Activities",
+    title: "Safe & Nurturing Environment",
     description:
-      "Play-based learning designed to delight curious little minds.",
-    icon: "puzzle",
+      "A secure, child-friendly space where little ones explore with full confidence.",
+    icon: "shield",
   },
   {
-    title: "Safe Environment",
+    title: "Purposeful Play",
     description:
-      "Secure, child-proofed spaces where kids explore with confidence.",
-    icon: "shield",
+      "Age-appropriate activities designed to spark curiosity and build real skills.",
+    icon: "puzzle",
   },
 ] as const;
 
@@ -44,23 +44,33 @@ export const STATS = [
 
 export const PROGRAMS = [
   {
-    name: "Tiny Explorers",
-    ageRange: "Ages 2 – 3",
+    name: "Discovery Club: Curious Explorer",
+    ageRange: "Ages 1.5 – 4.11",
     summary:
-      "A gentle first step into school life — sensory play, songs, and cozy routines that help toddlers feel secure and curious.",
-    highlights: ["Sensory & motor play", "Music & movement", "Social beginnings"],
+      "A gentle, guided class for little ones who are new to learning, still need a guardian, and are slowly transitioning to a learning environment.",
+    highlights: ["Small group setting", "Guardian-assisted", "Transitional learning"],
     accent: "#FFC107",
     accentSoft: "#FFF3CD",
     icon: "blocks",
   },
   {
-    name: "Little Explorers",
-    ageRange: "Ages 4 – 5",
+    name: "Discovery Club: Creative Explorer",
+    ageRange: "Ages 2.6 – 4.11",
     summary:
-      "Where curiosity blooms into confidence — phonics, numbers, and creative projects that prepare children for big-kid school.",
-    highlights: ["Early literacy & math", "STEM discovery", "Confidence building"],
+      "Hands-on, engaging activities that spark curiosity and build foundational skills through play, exploration and discovery.",
+    highlights: ["Play-based learning", "Creative exploration", "Skill building"],
     accent: "#0033A0",
     accentSoft: "#E1ECFF",
+    icon: "rocket",
+  },
+  {
+    name: "Trailblazer: Brave Explorer",
+    ageRange: "Ages 3 – 4.11",
+    summary:
+      "A longer, richer experience designed to build confidence, independence and a love for learning, with a more structured approach and daily routines.",
+    highlights: ["School readiness", "Daily structure", "Explorer journal"],
+    accent: "#1a2e6b",
+    accentSoft: "#e8ecf8",
     icon: "rocket",
   },
 ] as const;
@@ -115,10 +125,13 @@ export const MISSION_VISION_PURPOSE = [
 
 export const UNIFORM = {
   image: "/uniform.png",
-  price: "₱550",
-  unit: "/ set",
-  items: ["Polo Shirt", "Jogging Pants"],
-  note: "Optional",
+  items: [
+    "Polo Shirt with Logo",
+    "Blue Jogging Pants",
+    "Name Tag with Lanyard (ID)",
+  ],
+  uniformDays: "Wednesday & Friday",
+  sameUniformNote: "If your child already has a uniform from a previous adventure, you are not required to purchase a new set for Adventure 1.",
 } as const;
 
 export const BALLET = {
@@ -131,4 +144,3 @@ export const BALLET = {
   accent: "#C2185B",
   accentSoft: "#FCE4EC",
 } as const;
-

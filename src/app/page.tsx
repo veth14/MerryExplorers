@@ -13,9 +13,9 @@ const ParentPortalCTA = dynamic(() => import("@/components/landing/parent-portal
 const SiteFooter = dynamic(() => import("@/components/landing/site-footer").then(mod => mod.SiteFooter));
 
 export const metadata: Metadata = {
-  title: "Merry Explorers — Joyful Hearts, Inspiring Minds",
+  title: "Merry Explorers — The Next Merry Adventure is Here!",
   description:
-    "Nurturing joyful hearts, inspiring young minds through play, storytelling, and caring guidance. A safe, creative, and fun environment for little explorers.",
+    "Adventure 1 begins September 28, 2026! New programs, updated policies, and schedules. Dream. Discover. Explore. — Merry Explorers Playgroup & Learning Center, North Caloocan.",
 };
 
 export default function LandingPage() {

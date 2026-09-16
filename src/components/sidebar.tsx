@@ -16,6 +16,7 @@ const navItems = [
   { label: "Inquiries", href: "/admin/inquiries" },
   { label: "Reports", href: "/admin/reports" },
   { label: "Announcements", href: "/admin/announcements" },
+  { label: "Gallery", href: "/admin/gallery" },
   { label: "Payroll", href: "/admin/payroll" },
   { label: "Audit Log", href: "/admin/audit-log" },
 ] as const;
@@ -96,6 +97,15 @@ function AnnouncementsIcon() {
     </svg>
   );
 }
+function GalleryIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  );
+}
 function PayrollIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
@@ -158,6 +168,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Inquiries: InquiriesIcon,
   Reports: ReportsIcon,
   Announcements: AnnouncementsIcon,
+  Gallery: GalleryIcon,
   Payroll: PayrollIcon,
   "Audit Log": AuditIcon,
 };
@@ -297,7 +308,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = useMemo(() => [
     { title: "HR & People", items: ["Teachers", "Accounts", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Operations", items: ["Inquiries", "Reports", "Announcements", "Audit Log"] },
+    { title: "Operations", items: ["Inquiries", "Reports", "Announcements", "Gallery", "Audit Log"] },
   ].map((g) => ({
     ...g,
     items: g.items

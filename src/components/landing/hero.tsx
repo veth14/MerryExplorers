@@ -5,8 +5,19 @@ import Image from "next/image";
 import { m, useReducedMotion } from "framer-motion";
 import { ArrowRightIcon } from "./icons";
 
+const ADVENTURE_START = new Date("2026-09-28T00:00:00+08:00");
+
+function useAdventureBadge() {
+  const now = new Date();
+  const hasStarted = now >= ADVENTURE_START;
+  return hasStarted
+    ? { label: "Adventure 1 · Now Ongoing 🎉", pulse: "#22c55e" }
+    : { label: "Adventure 1 · Beginning September 28, 2026", pulse: "#FFC107" };
+}
+
 export function HeroSection() {
   const reduce = useReducedMotion();
+  const badge = useAdventureBadge();
 
   return (
     <section id="home" className="relative flex flex-col justify-center overflow-hidden pt-28 pb-16 lg:pt-36 lg:pb-24 lg:min-h-[90vh]">
@@ -21,19 +32,34 @@ export function HeroSection() {
 
         {/* ── Left: Copy ── */}
         <div className="flex flex-col items-start relative z-20">
+
+          {/* Adventure badge */}
+          <m.div
+            initial={reduce ? false : { opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="mb-6 inline-flex items-center gap-2 rounded-full bg-[#FFF8E1] px-4 py-2 text-[13px] font-bold text-[#B8860B] ring-1 ring-[#FFC107]/30 shadow-sm mobile-no-animate"
+          >
+            <span
+              className="inline-block h-2 w-2 rounded-full animate-pulse"
+              style={{ backgroundColor: badge.pulse }}
+            />
+            {badge.label}
+          </m.div>
+
           <m.h1
             initial={reduce ? false : { opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="font-headline text-[48px] font-extrabold leading-[1.1] tracking-tight text-[#0b1a3d] sm:text-[60px] lg:text-[72px] mobile-no-animate"
+            className="font-headline text-[44px] font-extrabold leading-[1.1] tracking-tight text-[#0b1a3d] sm:text-[56px] lg:text-[68px] mobile-no-animate"
           >
-            Nurturing
+            The Next Merry
             <br />
             <span className="relative inline-block mt-2 mb-1">
-              <span className="relative z-10 text-[#0033A0]">Joyful Hearts,</span>
-              <svg aria-hidden="true" viewBox="0 0 400 40" className="absolute -bottom-3 left-0 w-full h-auto" preserveAspectRatio="none">
+              <span className="relative z-10 text-[#0033A0]">Adventure</span>
+              <svg aria-hidden="true" viewBox="0 0 300 40" className="absolute -bottom-3 left-0 w-full h-auto" preserveAspectRatio="none">
                 <m.path
-                  d="M 10 25 Q 100 10 200 20 T 390 15"
+                  d="M 10 25 Q 75 10 150 20 T 290 15"
                   stroke="#FFC107"
                   strokeWidth="14"
                   strokeLinecap="round"
@@ -45,26 +71,34 @@ export function HeroSection() {
               </svg>
             </span>
             <br />
-            Inspiring Young
-            <br />
-            Minds.
+            is Here!
           </m.h1>
+
+          {/* Motto */}
+          <m.p
+            initial={reduce ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+            className="mt-5 text-[17px] font-bold tracking-wide text-[#0033A0] mobile-no-animate"
+          >
+            Dream. Discover. Explore. 💛
+          </m.p>
 
           <m.p
             initial={reduce ? false : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
-            className="mt-8 max-w-lg text-[18px] font-medium leading-[1.7] text-[#4a5f82] mobile-no-animate"
+            transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+            className="mt-4 max-w-lg text-[17px] font-medium leading-[1.7] text-[#4a5f82] mobile-no-animate"
           >
-            A safe, creative, and fun environment where your little explorers
-            can dream, discover, and grow, nurturing joyful hearts and inspiring young minds.
+            New programs, updated policies, and schedules — a safe, creative, and
+            fun environment where your little explorers can dream, discover, and grow.
           </m.p>
 
           <m.div
             initial={reduce ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-            className="mt-10 mobile-no-animate"
+            transition={{ duration: 0.6, delay: 0.45, ease: "easeOut" }}
+            className="mt-10 flex flex-wrap items-center gap-4 mobile-no-animate"
           >
             <Link
               href="/inquire"
@@ -76,6 +110,12 @@ export function HeroSection() {
                 <ArrowRightIcon className="h-4 w-4" />
               </div>
             </Link>
+
+            {/* Same Merry Heart callout */}
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/80 border border-[#e2e8f4] px-4 py-2 text-[13px] font-semibold text-[#4a5f82] shadow-sm">
+              <span className="text-base">💛</span>
+              Same Merry Heart. New Adventures!
+            </span>
           </m.div>
         </div>
 
@@ -106,6 +146,20 @@ export function HeroSection() {
               // @ts-expect
               fetchPriority="high"
             />
+          </m.div>
+
+          {/* Floating "Different Explorers" callout */}
+          <m.div
+            initial={reduce ? false : { opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.8, ease: "easeOut" }}
+            className="absolute -bottom-4 -right-2 sm:bottom-6 sm:-right-8 max-w-[160px] rounded-[1.25rem] bg-[#0033A0] p-4 text-white shadow-[0_16px_40px_rgba(0,51,160,0.25)] hidden sm:block mobile-no-animate"
+          >
+            <p className="text-[12px] font-bold leading-snug">
+              Different Explorers.<br />
+              Different Paths.<br />
+              <span className="text-[#FFC107]">A Brighter Tomorrow. 💛</span>
+            </p>
           </m.div>
         </m.div>
       </div>

@@ -11,13 +11,6 @@ const ICON_CONFIG: Record<string, { color: string; bg: string }> = {
   shield: { color: "#FFC107", bg: "#FFF5CC" },
 };
 
-const DISPLAY_TITLES: Record<string, string> = {
-  book:   "Small Group Setting",
-  heart:  "Caring Teachers",
-  puzzle: "Fun Activities",
-  shield: "Safe Environment",
-};
-
 export function HighlightsSection() {
   const reduce = useReducedMotion();
 
@@ -46,9 +39,12 @@ export function HighlightsSection() {
                 >
                   <HighlightIcon name={item.icon} className="h-8 w-8" />
                 </div>
-                <h3 className="font-headline text-[16px] font-bold text-[#0033A0]">
-                  {DISPLAY_TITLES[item.icon] ?? item.title}
+                <h3 className="font-headline text-[15px] font-bold text-[#0033A0] leading-snug">
+                  {item.title}
                 </h3>
+                <p className="text-[13px] font-medium leading-relaxed text-[#64748b]">
+                  {item.description}
+                </p>
               </m.div>
             );
           })}

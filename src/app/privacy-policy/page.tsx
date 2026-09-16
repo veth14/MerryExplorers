@@ -66,7 +66,7 @@ export default function PrivacyPolicyPage() {
             <h1 className="font-headline text-[40px] sm:text-[56px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-5">
               Privacy Policy
             </h1>
-            <p className="text-[15px] font-medium text-[#94a3b8]">Last updated: July 2025</p>
+            <p className="text-[15px] font-medium text-[#94a3b8]">Last updated: September 2026</p>
           </m.div>
 
           {/* Content Card */}
@@ -120,8 +120,9 @@ export default function PrivacyPolicyPage() {
             <Section title="7. Contact">
               <p>For any privacy-related concerns, please contact us at:</p>
               <p className="mt-2">
-                <strong className="text-[#0033A0]">Merry Explorers Playgroup & Learning Center</strong><br />
-                Unit C, 2nd Floor, Starla 88 Bldg, Camarin Rd., Caloocan<br />
+                <strong className="text-[#0033A0]">Merry Explorers Playgroup &amp; Learning Center</strong><br />
+                2nd Floor, Starla 88 Bldg., Camarin Road, North Caloocan<br />
+                Near Camarin Doctors Hospital<br />
                 Email: <a href="mailto:Merryexplorerscenter@gmail.com" className="text-[#0066CC] hover:text-[#FFC107] transition-colors">Merryexplorerscenter@gmail.com</a>
               </p>
             </Section>

@@ -10,9 +10,12 @@ const CheckIcon = () => (
   </svg>
 );
 
-const SparkleIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-[#FFB800]">
-    <path d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z" fill="currentColor" />
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="3" y1="9" x2="21" y2="9" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="16" y1="2" x2="16" y2="6" />
   </svg>
 );
 
@@ -56,17 +59,19 @@ export function UniformSection() {
           {/* Left Content */}
           <div className="relative flex flex-1 flex-col justify-between p-10 sm:p-14 lg:p-16 z-20">
             <div>
+
+              {/* Same Uniform Note */}
               <m.div
                 initial={reduce ? false : { opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-                className="mb-8 inline-flex items-center gap-2 rounded-full bg-[#FFF8E1] px-4 py-1.5 text-[12px] font-bold uppercase tracking-[0.15em] text-[#B8860B] shadow-sm ring-1 ring-[#FFB800]/20"
+                className="mb-8 rounded-2xl bg-[#FFF8E1] border border-[#FFC107]/30 px-5 py-4 text-[13px] font-medium leading-relaxed text-[#92400e]"
               >
-                <SparkleIcon />
-                <span>{UNIFORM.note}</span>
+                💡 <span className="font-bold">Good news!</span> {UNIFORM.sameUniformNote}
               </m.div>
 
+              {/* Uniform Kit label */}
               <m.div
                 initial={reduce ? false : { opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -75,38 +80,32 @@ export function UniformSection() {
                 className="mb-10"
               >
                 <h3 className="mb-2 text-[12px] font-extrabold uppercase tracking-widest text-[#94a3b8]">
-                  Price per Set
-                </h3>
-                <div className="flex items-start">
-                  <span className="mt-1.5 text-[28px] font-bold text-[#0066CC]">₱</span>
-                  <span className="font-headline text-[64px] font-black leading-none tracking-tight text-[#0033A0]">
-                    {UNIFORM.price.replace("₱", "")}
-                  </span>
-                  <span className="ml-2 mt-auto pb-2 text-[18px] font-bold text-[#64748b]">
-                    {UNIFORM.unit}
-                  </span>
-                </div>
-              </m.div>
-
-              <m.div
-                initial={reduce ? false : { opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}
-              >
-                <h3 className="mb-5 text-[12px] font-extrabold uppercase tracking-widest text-[#94a3b8]">
-                  Includes
+                  Uniform Kit Includes
                 </h3>
                 <ul className="flex flex-col gap-4">
                   {UNIFORM.items.map((item) => (
                     <li key={item} className="flex items-center gap-4 text-[16px] font-bold text-[#0a1835]">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0066CC] text-white shadow-md shadow-[#0066CC]/20">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#0066CC] text-white shadow-md shadow-[#0066CC]/20">
                         <CheckIcon />
                       </div>
                       {item}
                     </li>
                   ))}
                 </ul>
+              </m.div>
+
+              {/* Uniform Days */}
+              <m.div
+                initial={reduce ? false : { opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.32, ease: "easeOut" }}
+                className="inline-flex items-center gap-3 rounded-full bg-[#0033A0] px-5 py-2.5 text-white shadow-[0_8px_20px_rgba(0,51,160,0.2)]"
+              >
+                <CalendarIcon />
+                <span className="text-[14px] font-bold">
+                  Uniform Days: <span className="text-[#FFC107]">{UNIFORM.uniformDays}</span>
+                </span>
               </m.div>
             </div>
 

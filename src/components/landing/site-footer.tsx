@@ -29,8 +29,10 @@ const NAV_COLS = [
   {
     label: "Programs",
     links: [
-      { label: "Tiny Explorers", href: "/#programs" },
-      { label: "Little Explorers", href: "/#programs" },
+      { label: "Curious Explorer", href: "/#programs" },
+      { label: "Creative Explorer", href: "/#programs" },
+      { label: "Trailblazer: Brave Explorer", href: "/#programs" },
+      { label: "Ballet", href: "/#programs" },
     ],
   },
 ];
@@ -67,9 +69,9 @@ export function SiteFooter() {
             </p>
 
             <address className="not-italic text-[13px] text-[#6b7d9c] leading-[1.9] mb-7">
-              Unit C, 2nd Floor, B13 L33<br />
-              Camarin Rd., North, Caloocan<br />
-              1421 Metro Manila
+              2nd Floor, Starla 88 Bldg.<br />
+              Camarin Road, North Caloocan<br />
+              Near Camarin Doctors Hospital
             </address>
 
             <Link
