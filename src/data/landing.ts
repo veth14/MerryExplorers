@@ -73,6 +73,26 @@ export const PROGRAMS = [
     accentSoft: "#e8ecf8",
     icon: "rocket",
   },
+  {
+    name: "Saturday Playdate",
+    ageRange: "Little Explorers",
+    summary:
+      "A fun and engaging play experience for little explorers on their weekend adventure! Play, explore, and make friends.",
+    highlights: ["Creative Play", "Hands-on Activities", "New Discoveries"],
+    accent: "#0ea5e9",
+    accentSoft: "#e0f2fe",
+    icon: "puzzle",
+  },
+  {
+    name: "Ballet",
+    ageRange: "Ages 3 – 12",
+    summary:
+      "A graceful and fun program that builds strong foundations in technique, coordination, and creativity.",
+    highlights: ["Technique", "Coordination", "Creativity"],
+    accent: "#E91E8C",
+    accentSoft: "#FCE4F5",
+    icon: "heart",
+  },
 ] as const;
 
 export const MOMENTS = [
@@ -176,9 +196,9 @@ export const PROGRAM_SLOTS = {
     schedule: "Monday & Wednesday",
     sessions: 8,
     totalSlots: 8,
-    rate: 4395,
-    downpayment: 2637,
-    balance: 1758,
+    rate: 4295,
+    downpayment: 2577,
+    balance: 1718,
     accent: "#FFC107",
     accentSoft: "#FFF3CD",
     icon: "🧱",
@@ -195,9 +215,9 @@ export const PROGRAM_SLOTS = {
     schedule: "Tuesday, Thursday & Friday",
     sessions: 12,
     totalSlots: 18,
-    rate: 4985,
-    downpayment: 2991,
-    balance: 1994,
+    rate: 4820,
+    downpayment: 2892,
+    balance: 1928,
     accent: "#0033A0",
     accentSoft: "#E1ECFF",
     icon: "🚀",
@@ -230,19 +250,37 @@ export const PROGRAM_SLOTS = {
     id: "ballet",
     name: "Ballet",
     ageRange: "Ages 3 – 12",
-    schedule: "Saturday",
+    schedule: "Every Saturday until Nov 21",
     sessions: 8,
     totalSlots: 15,
-    rate: 3500,
-    downpayment: 2100,
-    balance: 1400,
+    rate: 4400,
+    downpayment: 2750,
+    balance: 1650,
     accent: "#E91E8C",
     accentSoft: "#FCE4F5",
     icon: "🩰",
     prerequisite: null,
     classes: [
-      { name: "Morning Class", time: "9:00 AM – 10:00 AM", maxSlots: 8 },
-      { name: "Late Morning Class", time: "10:15 AM – 11:15 AM", maxSlots: 7 },
+      { name: "Baby Ballet", time: "12:30 PM – 1:30 PM", maxSlots: 7 },
+      { name: "Basic Ballet", time: "1:45 PM – 2:45 PM", maxSlots: 8 },
+    ],
+  },
+  "saturday-playdate": {
+    id: "saturday-playdate",
+    name: "Saturday Playdate",
+    ageRange: "Little Explorers",
+    schedule: "Saturdays",
+    sessions: 5,
+    totalSlots: 10,
+    rate: 2190,
+    downpayment: 1314,
+    balance: 876,
+    accent: "#0ea5e9",
+    accentSoft: "#e0f2fe",
+    icon: "🧩",
+    prerequisite: null,
+    classes: [
+      { name: "Morning Class", time: "10:30 AM – 11:45 AM", maxSlots: 10 },
     ],
   },
 } as const;
@@ -258,7 +296,7 @@ export const PAYMENT_TERMS = {
 
 export const UNIFORM_KIT = {
   welcomeKitPrice: 750,    // Welcome Kit = Uniform Set + Lanyard & Name Tag (required for new families)
-  price: 550,              // Uniform Set only (polo + jogging pants), for returning families
+  price: 550,              // Uniform Set only (polo + jogging pants), NO lanyard — for returning families
   lanyardPrice: 200,       // Lanyard & Name Tag only, optional
   welcomeKitItems: ["Polo Shirt with Logo", "Blue Jogging Pants", "Merry Explorers Lanyard", "Name Tag"],
   items: ["Polo Shirt with Logo", "Blue Jogging Pants"],

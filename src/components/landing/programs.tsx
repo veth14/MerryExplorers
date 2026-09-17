@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { m, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { BALLET } from "@/data/landing";
 import { ArrowRightIcon } from "./icons";
 
@@ -68,6 +69,26 @@ const BRAVE_EXPLORER = {
   schedule: { days: "Monday – Friday", time: "3:00 PM – 4:15 PM" },
   journalNote: "Every explorer must present their explorer journal at the end of the adventure to receive a certificate of completion.",
   prerequisite: "Must be able to grip, can stay independently with teachers, and can sit still for at least 3 minutes in a classroom set up.",
+};
+
+const SATURDAY_PLAYDATE = {
+  club: "Weekend Adventures",
+  name: "Saturday Playdate",
+  tagline: "Play. Explore. Make Friends.",
+  ageLabel: "Little Explorers",
+  maxChildren: 10,
+  bgTop: "#0ea5e9",
+  titleColor: "white",
+  subtitleColor: "rgba(255,255,255,0.9)",
+  pillBg: "#FFC107",
+  pillText: "#0033A0",
+  iconLeft: "🧩",
+  iconRight: "💙",
+  keywords: ["Creative Play", "Hands-on Activities", "Make Friends"],
+  description: "A fun and engaging play experience for little explorers on their weekend adventure! Same merry heart, new adventures.",
+  schedules: [
+    { label: "Morning Class", days: "Saturdays", time: "10:30 AM – 11:45 AM" },
+  ],
 };
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -158,8 +179,11 @@ function ProgramCard({
 
 // ─── Main Section ─────────────────────────────────────────────────────────────
 
+type TabCategory = "discovery" | "weekend" | "trailblazer";
+
 export function ProgramsSection() {
   const reduce = useReducedMotion();
+  const [activeTab, setActiveTab] = useState<TabCategory>("discovery");
 
   return (
     <section id="programs" className="relative py-16 sm:py-24">
@@ -196,26 +220,64 @@ export function ProgramsSection() {
           </p>
         </m.div>
 
-        {/* Which explorer banner */}
-        <m.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-          className="mb-10 mx-auto max-w-2xl rounded-[1.5rem] bg-gradient-to-r from-[#0033A0] to-[#0066CC] px-6 py-4 text-center text-white shadow-[0_12px_32px_rgba(0,51,160,0.2)]"
-        >
-          <p className="text-[16px] font-extrabold">Which kind of explorer is your little one?</p>
-          <p className="mt-1 text-[13px] font-medium text-white/80">
-            Different playgroup programs — all in one merry adventure. 💛
-          </p>
-        </m.div>
-
-        {/* ── Discovery Club Cards (2-col) ── */}
-        <div className="grid gap-8 lg:grid-cols-2 mb-8">
-          <ProgramCard data={CURIOUS_EXPLORER} delay={0} animateFrom="left" />
-          <ProgramCard data={CREATIVE_EXPLORER} delay={0.1} animateFrom="right" />
+        {/* Tab Navigation */}
+        <div className="mb-10 flex flex-wrap justify-center gap-3">
+          {[
+            { id: "discovery", label: "Discovery Club" },
+            { id: "trailblazer", label: "Trailblazer" },
+            { id: "weekend", label: "Weekend Adventures" },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabCategory)}
+                className={`relative overflow-hidden rounded-full px-6 py-3 text-[14px] font-bold transition-all duration-300 ${
+                  isActive 
+                    ? "text-white shadow-md shadow-[#0033A0]/20" 
+                    : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0] hover:shadow-md hover:-translate-y-0.5"
+                }`}
+              >
+                {isActive && (
+                  <m.div
+                    layoutId="activeTabIndicator"
+                    className="absolute inset-0 bg-[#0033A0]"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  {tab.label}
+                  {!isActive && <span className="text-[10px] opacity-60">👆</span>}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
+        <AnimatePresence mode="wait">
+          {activeTab === "discovery" && (
+            <m.div
+              key="discovery"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="grid gap-8 lg:grid-cols-2 mb-8"
+            >
+              <ProgramCard data={CURIOUS_EXPLORER} delay={0} animateFrom="left" />
+              <ProgramCard data={CREATIVE_EXPLORER} delay={0.1} animateFrom="right" />
+            </m.div>
+          )}
+
+          {activeTab === "trailblazer" && (
+            <m.div
+              key="trailblazer"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="mb-8"
+            >
         {/* ── Trailblazer: Brave Explorer (full-width) ── */}
         <m.article
           initial={reduce ? false : { opacity: 0, y: 40 }}
@@ -292,7 +354,19 @@ export function ProgramsSection() {
             </div>
           </div>
         </m.article>
+            </m.div>
+          )}
 
+          {activeTab === "weekend" && (
+            <m.div
+              key="weekend"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col gap-8 mb-8"
+            >
+              <ProgramCard data={SATURDAY_PLAYDATE} delay={0} animateFrom="bottom" />
         {/* ── Ballet Card (full-width) ── */}
         <m.article
           initial={reduce ? false : { opacity: 0, y: 40 }}
@@ -425,6 +499,9 @@ export function ProgramsSection() {
           {/* Corner glow */}
           <div aria-hidden className="pointer-events-none absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-[#C2185B] opacity-10 blur-3xl" />
         </m.article>
+            </m.div>
+          )}
+        </AnimatePresence>
 
         {/* Inquire CTA */}
         <m.div

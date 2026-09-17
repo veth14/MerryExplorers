@@ -14,7 +14,7 @@ import SignatureCanvas from "react-signature-canvas";
 type ProgramId = keyof typeof PROGRAM_SLOTS;
 type SlotData = Record<string, Record<string, { maxSlots: number; taken: number; available: number }>>;
 
-const STEPS = ["Program", "Details", "Consents", "Payment", "Review", "Done"];
+const STEPS = ["Program", "Details", "Consents", "Review"];
 
 const inputCls =
   "w-full bg-[#f8fafc] border-2 border-transparent rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-[#002f76] placeholder:text-[#94a3b8] placeholder:font-medium focus:outline-none focus:border-[#0033A0]/30 focus:bg-white transition-all";
@@ -52,6 +52,9 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 function SlotPill({ available, max }: { available: number; max: number }) {
+  if (max >= 900) {
+    return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-green-100 text-green-700">Available</span>;
+  }
   const pct = available / max;
   const color = pct === 0 ? "bg-red-100 text-red-600" : pct <= 0.3 ? "bg-orange-100 text-orange-600" : "bg-green-100 text-green-700";
   return (
@@ -157,8 +160,8 @@ export default function RegisterPage() {
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
 
   // ── Computed payment amounts ──
-  // New families: Welcome Kit (₱750) is mandatory
-  // Returning families: optional Uniform Kit (₱550), Welcome Kit (₱750), Lanyard (₱200)
+  // New families: Welcome Kit (₱750) is mandatory — includes polo, pants, lanyard & name tag
+  // Returning families: optional Uniform Set (₱550, no lanyard), or Lanyard & Name Tag only (₱200)
   const addonCost = isNewFamily
     ? UNIFORM_KIT.welcomeKitPrice
     : (welcomeKitOrdered ? UNIFORM_KIT.welcomeKitPrice : 0) +
@@ -229,7 +232,6 @@ export default function RegisterPage() {
     childInfo.firstName && childInfo.lastName && childInfo.dateOfBirth && childInfo.gender &&
     parentInfo.name && parentInfo.email && parentInfo.phone && parentInfo.relationship &&
     emergencyContact.name && emergencyContact.phone && emergencyContact.relationship;
-  const canProceedStep3 = paymentMethod !== "" && receiptBase64 !== "" && amountPaid !== "" && amountShort === 0;
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -246,24 +248,12 @@ export default function RegisterPage() {
           emergencyContact,
           photoConsent,
           signatureBase64,
-          paymentMethod,
-          receiptBase64,
-          uniformOrdered,
-          lanyardOrdered,
-          welcomeKitOrdered,
-          isNewFamily,
-          paymentType,
-          amountDue,
-          amountPaid: parsedAmountPaid,
-          creditBalance,
-          referenceNumber,
         }),
       });
       const data = await res.json();
       if (data.success) {
         clearDraft(); // ✅ wipe saved progress after successful submit
-        setRegistrationId(data.data.id);
-        setStep(5);
+        window.location.href = `/register/payment/${data.data.id}`;
       } else {
         setError(data.error || "Submission failed. Please try again.");
       }
@@ -376,9 +366,9 @@ export default function RegisterPage() {
                 <p className="font-extrabold text-[#002f76]">6. MERRY EXPLORERS UNIFORM</p>
                 <p>The Merry Explorers uniform is the <strong>SAME uniform</strong>. If your child already has a Merry Explorers uniform from the previous chapter, you are <strong>NOT required</strong> to purchase a new set for Adventure 1.</p>
                 <p><strong>Uniform Days:</strong> Wednesday & Friday. On all other class days, children may wear anything comfortable, safe, and appropriate for active play and learning.</p>
-                <p><strong>Uniform Kit — ₱650</strong> includes: 1 Merry Explorers polo shirt with logo, 1 pair of jogging pants, 1 name tag with Merry Explorers lanyard.</p>
-                <p><strong>Lanyard & Name Tag — ₱100</strong> — May also be purchased separately.</p>
-                <p>If you just need the uniform, you may still purchase the polo and jogging pants with the Merry Explorers logo priced at ₱550/set.</p>
+                <p><strong>Welcome Kit — ₱{UNIFORM_KIT.welcomeKitPrice}</strong> includes: 1 Merry Explorers polo shirt with logo, 1 pair of jogging pants, 1 name tag with Merry Explorers lanyard. Required for all new families.</p>
+                <p><strong>Lanyard &amp; Name Tag — ₱{UNIFORM_KIT.lanyardPrice}</strong> — May also be purchased separately.</p>
+                <p>Uniform Set only (polo shirt and jogging pants, <em>no lanyard</em>) — ₱{UNIFORM_KIT.price}/set. For returning families who already have a lanyard.</p>
               </div>
 
               <div className="rounded-2xl bg-[#f8fafc] border border-slate-200 p-5 space-y-2">
@@ -490,10 +480,10 @@ export default function RegisterPage() {
                 </m.div>
               )}
               <div className="flex items-center justify-between px-2">
-                {STEPS.slice(0, 5).map((label, i) => (
-                  <div key={label} className={`flex items-center ${i < 4 ? "flex-1" : ""}`}>
+                {STEPS.map((label, i) => (
+                  <div key={label} className={`flex items-center ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
                     <StepDot label={label} index={i} current={step} />
-                    {i < 4 && <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-500 ${i < step ? "bg-green-400" : "bg-slate-200"}`} />}
+                    {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-500 ${i < step ? "bg-green-400" : "bg-slate-200"}`} />}
                   </div>
                 ))}
               </div>
@@ -809,376 +799,17 @@ export default function RegisterPage() {
                       onClick={() => setStep(3)}
                       className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Continue <span>→</span>
-                    </button>
-                  </div>
-                </m.div>
-              )}
-
-
-              {/* ── STEP 3: Payment ── */}
-              {step === 3 && prog && (
-                <m.div key="step3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Payment</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Choose your payment option, scan the QR code, and upload your receipt to confirm your slot.</p>
-
-                  {/* Payment Type Toggle */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                    <h3 className="mb-3 font-headline text-[16px] font-extrabold text-[#0033A0]">Payment Option</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setPaymentType("downpayment")}
-                        className={[
-                          "flex flex-col items-center gap-2 rounded-2xl border-2 p-5 transition-all duration-200",
-                          paymentType === "downpayment"
-                            ? "border-[#0033A0] bg-[#0033A0]/5 shadow-md"
-                            : "border-slate-200 hover:border-slate-300 bg-white",
-                        ].join(" ")}
-                      >
-                        <span className="text-2xl">💳</span>
-                        <p className="text-[14px] font-extrabold text-[#002f76]">60% Downpayment</p>
-                        <p className="text-[18px] font-extrabold text-[#0033A0]">₱{(prog.downpayment + (uniformOrdered ? UNIFORM_KIT.price : 0)).toLocaleString()}</p>
-                        <p className="text-[11px] text-[#64748b] text-center">40% balance (₱{prog.balance.toLocaleString()}) due on 6th session</p>
-                        {paymentType === "downpayment" && (
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#0033A0] px-3 py-0.5 text-[10px] font-bold text-white">✓ Selected</span>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setPaymentType("full")}
-                        className={[
-                          "flex flex-col items-center gap-2 rounded-2xl border-2 p-5 transition-all duration-200",
-                          paymentType === "full"
-                            ? "border-green-500 bg-green-50 shadow-md"
-                            : "border-slate-200 hover:border-slate-300 bg-white",
-                        ].join(" ")}
-                      >
-                        <span className="text-2xl">🏆</span>
-                        <p className="text-[14px] font-extrabold text-[#002f76]">Full Payment</p>
-                        <p className="text-[18px] font-extrabold text-green-600">₱{(prog.rate + (uniformOrdered ? UNIFORM_KIT.price : 0)).toLocaleString()}</p>
-                        <p className="text-[11px] text-[#64748b] text-center">₱0 balance remaining — fully settled</p>
-                        {paymentType === "full" && (
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-green-500 px-3 py-0.5 text-[10px] font-bold text-white">✓ Selected</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Amount card */}
-                  <div className={`mb-6 rounded-3xl p-6 text-white shadow-xl ${paymentType === "full"
-                    ? "bg-gradient-to-br from-green-600 to-green-500 shadow-green-500/20"
-                    : "bg-gradient-to-br from-[#0033A0] to-[#0066CC] shadow-[#0033A0]/20"
-                    }`}>
-                    <p className="text-[12px] font-bold uppercase tracking-widest opacity-70">Amount Due Today</p>
-                    <p className="mt-1 text-[40px] font-extrabold leading-none">₱{amountDue.toLocaleString()}</p>
-
-                    {/* Cost Breakdown */}
-                    <div className="mt-4 space-y-1.5 bg-white/10 rounded-2xl px-4 py-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-2">Cost Breakdown</p>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="opacity-80">{paymentType === "full" ? "Program Rate (Full)" : "Downpayment (60%)"}</span>
-                        <span className="font-bold">₱{(paymentType === "full" ? prog.rate : prog.downpayment).toLocaleString()}</span>
-                      </div>
-                      {isNewFamily && (
-                        <div className="flex justify-between text-[13px]">
-                          <span className="opacity-80">Welcome Kit (Required)</span>
-                          <span className="font-bold">₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</span>
-                        </div>
-                      )}
-                      {!isNewFamily && welcomeKitOrdered && (
-                        <div className="flex justify-between text-[13px]">
-                          <span className="opacity-80">Welcome Kit</span>
-                          <span className="font-bold">₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</span>
-                        </div>
-                      )}
-                      {!isNewFamily && uniformOrdered && (
-                        <div className="flex justify-between text-[13px]">
-                          <span className="opacity-80">Uniform Set</span>
-                          <span className="font-bold">₱{UNIFORM_KIT.price.toLocaleString()}</span>
-                        </div>
-                      )}
-                      {!isNewFamily && lanyardOrdered && (
-                        <div className="flex justify-between text-[13px]">
-                          <span className="opacity-80">Lanyard &amp; Name Tag</span>
-                          <span className="font-bold">₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-[13px] border-t border-white/20 pt-2 mt-1">
-                        <span className="font-bold">Total Due Now</span>
-                        <span className="font-extrabold">₱{amountDue.toLocaleString()}</span>
-                      </div>
-                      {paymentType === "downpayment" && (
-                        <div className="flex justify-between text-[12px] opacity-70">
-                          <span>Remaining balance (40%)</span>
-                          <span>₱{prog.balance.toLocaleString()}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <p className="mt-3 text-[11px] bg-white/10 rounded-xl px-3 py-2">
-                      ⚠️ Downpayment is non-refundable. 4% weekly interest applies to overdue balances (every Monday).
-                    </p>
-                  </div>
-
-                  {/* Payment method */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                    <h3 className="mb-4 font-headline text-[16px] font-extrabold text-[#0033A0]">Select Payment Method</h3>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {[
-                        { id: "gcash", label: "GCash", logo: "/gcash-logo.svg", qr: "/GCASHQRONLY.png" },
-                        { id: "bpi", label: "BPI", logo: "/bpi-logo.svg", qr: "/BPIQRONLY.png" },
-                        { id: "mari-bank", label: "Mari Bank", logo: "/maribank-logo.svg", qr: "/MARIBANKQRONLY.png" },
-                      ].map((method) => (
-                        <button
-                          key={method.id}
-                          onClick={() => setPaymentMethod(method.id)}
-                          className={[
-                            "flex flex-col items-center justify-center gap-3 rounded-2xl border-2 py-5 px-3 transition-all duration-150",
-                            paymentMethod === method.id
-                              ? "border-[#0033A0] bg-[#0033A0]/5 shadow-sm"
-                              : "border-slate-200 hover:border-slate-300",
-                          ].join(" ")}
-                        >
-                          <div className="relative h-8 w-24">
-                            <Image src={method.logo} alt={method.label} fill className="object-contain" sizes="96px" />
-                          </div>
-                          <span className="text-[13px] font-bold text-[#002f76]">{method.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {paymentMethod && (
-                      <div className="mt-5">
-                        {[
-                          { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
-                          { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
-                          { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
-                        ].filter(m => m.id === paymentMethod).map(m => (
-                          <div key={m.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center text-center gap-5">
-                            <div className="relative w-full max-w-[320px] aspect-square shrink-0 overflow-hidden rounded-2xl border-2 border-slate-200 bg-white shadow-md">
-                              <Image src={m.qr} alt={`${m.label} QR Code`} fill className="object-contain p-4" sizes="320px" priority />
-                            </div>
-                            <div className="max-w-sm">
-                              <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {m.label}</p>
-                              <a href={m.qr} download={`${m.label.replace(/\s+/g, "")}QR.png`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0033A0]/10 px-4 py-2 text-[12px] font-bold text-[#0033A0] hover:bg-[#0033A0]/20 transition-colors mb-3">
-                                ⬇️ Download QR Code
-                              </a>
-                              <p className="text-[12px] text-[#64748b] leading-relaxed">
-                                Scan the QR code using your {m.label} app to send <strong>₱{amountDue.toLocaleString()}</strong>. After paying, take a screenshot of the confirmation and upload it below.
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Receipt upload */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                    <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">Upload Payment Receipt *</h3>
-                    <p className="mb-4 text-[13px] text-[#64748b]">Upload a screenshot or photo of your payment confirmation.</p>
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-                    {receiptPreview ? (
-                      <div className="relative">
-                        <div className="relative aspect-[4/3] w-full max-w-sm mx-auto overflow-hidden rounded-2xl border border-slate-200">
-                          <Image src={receiptPreview} alt="Receipt preview" fill className="object-contain" sizes="400px" />
-                        </div>
-                        <button onClick={() => { setReceiptPreview(""); setReceiptBase64(""); setReferenceNumber(""); setOcrDone(false); }} className="mt-3 text-[13px] font-semibold text-red-500 hover:underline">
-                          Remove and re-upload
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 px-6 text-center hover:border-[#0033A0]/30 hover:bg-[#f0f5ff] transition-colors"
-                      >
-                        <span className="text-4xl">📸</span>
-                        <div>
-                          <p className="text-[14px] font-bold text-[#002f76]">Click to upload receipt</p>
-                          <p className="text-[12px] text-[#94a3b8]">JPG, PNG, or screenshot</p>
-                        </div>
-                      </button>
-                    )}
-
-                    {/* Reference number field — appears after receipt upload */}
-                    {receiptBase64 && (
-                      <div className="mt-5 border-t border-slate-100 pt-5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className={labelCls}>Reference / Transaction Number</label>
-                          {ocrLoading && (
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0033A0] animate-pulse">
-                              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                              </svg>
-                              Extracting from receipt...
-                            </span>
-                          )}
-                          {ocrDone && !ocrLoading && referenceNumber && (
-                            <span className="text-[11px] font-bold text-green-600">✓ Auto-filled from receipt</span>
-                          )}
-                          {ocrDone && !ocrLoading && !referenceNumber && (
-                            <span className="text-[11px] font-semibold text-amber-500">Couldn&apos;t extract — please type manually</span>
-                          )}
-                        </div>
-                        <input
-                          className={inputCls}
-                          value={referenceNumber}
-                          onChange={e => setReferenceNumber(e.target.value)}
-                          placeholder="e.g. 1234567890123"
-                          type="text"
-                          inputMode="numeric"
-                        />
-                        <p className="mt-1.5 text-[11px] text-[#94a3b8]">Found on your GCash/BPI/Mari Bank payment confirmation screen.</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Amount Paid */}
-                  {receiptBase64 && (
-                    <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                      <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">Amount You Sent *</h3>
-                      <p className="mb-4 text-[13px] text-[#64748b]">Enter the exact amount shown on your receipt.</p>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] font-extrabold text-[#0033A0]">₱</span>
-                        <input
-                          className={`${inputCls} pl-8`}
-                          value={amountPaid}
-                          onChange={e => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))}
-                          placeholder={amountDue.toLocaleString()}
-                          type="text"
-                          inputMode="decimal"
-                        />
-                      </div>
-                      {/* Live feedback */}
-                      {parsedAmountPaid > 0 && (
-                        <div className={`mt-3 flex items-start gap-3 rounded-2xl px-4 py-3 text-[13px] font-semibold ${amountExact ? "bg-green-50 border border-green-200 text-green-700"
-                          : creditBalance > 0 ? "bg-blue-50 border border-blue-200 text-blue-700"
-                            : "bg-red-50 border border-red-200 text-red-700"
-                          }`}>
-                          <span className="text-[18px] leading-none shrink-0">
-                            {amountExact ? "✅" : creditBalance > 0 ? "💚" : "❌"}
-                          </span>
-                          <div>
-                            {amountExact && <p>Amount matches exactly — good to go!</p>}
-                            {creditBalance > 0 && (
-                              <>
-                                <p className="font-extrabold">Overpaid by ₱{creditBalance.toLocaleString()}</p>
-                                <p className="text-[12px] opacity-80 mt-0.5">This ₱{creditBalance.toLocaleString()} credit will be noted and applied to your remaining balance.</p>
-                              </>
-                            )}
-                            {amountShort > 0 && (
-                              <>
-                                <p className="font-extrabold">Short by ₱{amountShort.toLocaleString()}</p>
-                                <p className="text-[12px] opacity-80 mt-0.5">Required: ₱{amountDue.toLocaleString()} — please send the missing amount before submitting.</p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Uniform & Add-ons */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                    <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">👕 Uniform &amp; Add-ons</h3>
-                    <p className="mb-4 text-[13px] text-[#64748b]">{UNIFORM_KIT.note}</p>
-
-                    {/* New / Returning Family toggle */}
-                    <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 mb-4 transition-all ${isNewFamily ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"}`}>
-                      <input
-                        type="checkbox"
-                        checked={isNewFamily}
-                        onChange={e => {
-                          setIsNewFamily(e.target.checked);
-                          if (e.target.checked) {
-                            setUniformOrdered(false);
-                            setLanyardOrdered(false);
-                            setWelcomeKitOrdered(false);
-                          }
-                        }}
-                        className="mt-0.5 h-4 w-4 rounded accent-[#0033A0]"
-                      />
-                      <div>
-                        <p className="text-[14px] font-bold text-[#002f76]">We are a <span className="text-[#0033A0]">New Family</span> at Merry Explorers (First time to register).</p>
-                        <p className="text-[12px] text-[#64748b] mt-0.5">Welcome Kit (₱750) is required and will be automatically included for first-time families.</p>
-                      </div>
-                    </label>
-
-                    {isNewFamily ? (
-                      <div className="flex items-start gap-3 rounded-2xl border-2 border-green-400 bg-green-50 p-4">
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-500">
-                          <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-[14px] font-bold text-green-800">Welcome Kit — ₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</p>
-                            <span className="rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-extrabold text-white">AUTO-ADDED</span>
-                          </div>
-                          <p className="text-[12px] text-green-700 mt-0.5">{UNIFORM_KIT.welcomeKitItems.join(" • ")}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#94a3b8]">Optional Add-ons for Returning Families</p>
-
-                        <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition-all ${welcomeKitOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"}`}>
-                          <input type="checkbox" checked={welcomeKitOrdered} onChange={e => setWelcomeKitOrdered(e.target.checked)} className="mt-1 h-4 w-4 rounded accent-[#0033A0]" />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-[14px] font-bold text-[#002f76]">Welcome Kit — ₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</p>
-                            </div>
-                            <p className="text-[12px] text-[#64748b] mt-0.5">{UNIFORM_KIT.welcomeKitItems.join(" • ")}</p>
-                          </div>
-                        </label>
-
-                        <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition-all ${uniformOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"}`}>
-                          <input type="checkbox" checked={uniformOrdered} onChange={e => setUniformOrdered(e.target.checked)} className="mt-1 h-4 w-4 rounded accent-[#0033A0]" />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-[14px] font-bold text-[#002f76]">Uniform Set only — ₱{UNIFORM_KIT.price.toLocaleString()}</p>
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">NO LANYARD</span>
-                            </div>
-                            <p className="text-[12px] text-[#64748b] mt-0.5">{UNIFORM_KIT.items.join(" • ")}</p>
-                          </div>
-                        </label>
-
-                        <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition-all ${lanyardOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"}`}>
-                          <input type="checkbox" checked={lanyardOrdered} onChange={e => setLanyardOrdered(e.target.checked)} className="mt-1 h-4 w-4 rounded accent-[#0033A0]" />
-                          <div className="flex-1">
-                            <p className="text-[14px] font-bold text-[#002f76]">Lanyard &amp; Name Tag — ₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</p>
-                            <p className="text-[12px] text-[#64748b] mt-0.5">{UNIFORM_KIT.lanyardItems.join(" • ")}</p>
-                          </div>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Cannot proceed notice if short */}
-                  {amountShort > 0 && (
-                    <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-[13px] font-medium text-red-700">
-                      ❌ You cannot proceed until the amount paid matches or exceeds the amount due (₱{amountDue.toLocaleString()}).
-                    </div>
-                  )}
-
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(2)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
-                      ← Back
-                    </button>
-                    <button
-                      disabled={!canProceedStep3}
-                      onClick={() => setStep(4)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
                       Review →
                     </button>
                   </div>
                 </m.div>
               )}
 
-              {/* ── STEP 4: Review ── */}
-              {step === 4 && prog && (
-                <m.div key="step4" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+              {/* ── STEP 3: Review & Confirm ── */}
+              {step === 3 && prog && (
+                <m.div key="step3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
                   <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Review & Confirm</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Please double-check all details before submitting.</p>
+                  <p className="mb-6 text-[14px] text-[#64748b]">Please double-check all details before reserving your slot. You will complete payment on the next page.</p>
 
                   {[
                     {
@@ -1202,12 +833,6 @@ export default function RegisterPage() {
                       ],
                     },
                     {
-                      title: "Consents", emoji: "📝", rows: [
-                        ["Photo/Video Consent", photoConsent === "yes" ? "Yes" : "No"],
-                        ["Program Waiver", "Digitally Signed"],
-                      ],
-                    },
-                    {
                       title: "Parent / Guardian", emoji: "👨‍👩‍👧", rows: [
                         ["Name", parentInfo.name],
                         ["Relationship", parentInfo.relationship],
@@ -1223,15 +848,9 @@ export default function RegisterPage() {
                       ],
                     },
                     {
-                      title: "Payment", emoji: "💳", rows: [
-                        ["Payment Type", paymentType === "full" ? "Full Payment ✓" : "60% Downpayment"],
-                        ["Method", paymentMethod.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())],
-                        ["Receipt", "Uploaded ✓"],
-                        ["Uniform Kit", uniformOrdered ? `Yes (+₱${UNIFORM_KIT.price})` : "No"],
-                        ["Amount Due", `₱${amountDue.toLocaleString()}`],
-                        ["Amount Paid", `₱${parsedAmountPaid.toLocaleString()}`],
-                        ...(creditBalance > 0 ? [["Credit Balance", `+₱${creditBalance.toLocaleString()} (applied to balance)`]] : []),
-                        ["Ref. / Txn No.", referenceNumber || "—"],
+                      title: "Consents", emoji: "📝", rows: [
+                        ["Photo/Video Consent", photoConsent === "yes" ? "Yes" : "No"],
+                        ["Program Waiver", "Digitally Signed"],
                       ],
                     },
                   ].map((section) => (
@@ -1250,6 +869,10 @@ export default function RegisterPage() {
                     </div>
                   ))}
 
+                  <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-[13px] text-blue-800">
+                    <p>⏱️ <strong>1-Hour Payment Window:</strong> Once you reserve your slot, you will have <strong>1 hour</strong> to complete your payment on the next page. Unpaid reservations are automatically released.</p>
+                  </div>
+
                   {error && (
                     <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-[13px] font-medium text-red-700">
                       ❌ {error}
@@ -1261,7 +884,7 @@ export default function RegisterPage() {
                   </div>
 
                   <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(3)} disabled={submitting} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors disabled:opacity-50">
+                    <button onClick={() => setStep(2)} disabled={submitting} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors disabled:opacity-50">
                       ← Back
                     </button>
                     <button
@@ -1269,46 +892,8 @@ export default function RegisterPage() {
                       onClick={handleSubmit}
                       className="inline-flex items-center gap-2 rounded-2xl bg-green-500 px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:bg-green-600 disabled:opacity-60"
                     >
-                      {submitting ? "Submitting..." : "Submit Registration 🎉"}
+                      {submitting ? "Reserving..." : "Reserve Slot & Pay 🎉"}
                     </button>
-                  </div>
-                </m.div>
-              )}
-
-              {/* ── STEP 5: Success ── */}
-              {step === 5 && (
-                <m.div key="step5" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="text-center py-8">
-                  <m.div
-                    initial={{ scale: 0 }} animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.1 }}
-                    className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-5xl shadow-xl shadow-green-500/20"
-                  >
-                    🎒
-                  </m.div>
-                  <h2 className="font-headline text-[30px] font-extrabold text-[#002f76]">Application Submitted!</h2>
-                  {registrationId && (
-                    <div className="mt-3 inline-block rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-2 text-[13px] font-semibold text-[#0033A0]">
-                      Registration Reference: <span className="font-mono font-bold">{registrationId}</span>
-                    </div>
-                  )}
-                  <p className="mt-3 text-[16px] font-medium text-[#64748b] max-w-md mx-auto leading-relaxed">
-                    Thank you for registering! We&apos;ve received your application and payment receipt. Our team will review and verify your payment within 1–2 business days.
-                  </p>
-                  <div className="mt-6 mx-auto max-w-sm rounded-3xl bg-white border border-slate-100 p-6 shadow-sm text-left">
-                    <p className="text-[12px] font-bold uppercase tracking-widest text-[#94a3b8] mb-3">What Happens Next</p>
-                    <ol className="space-y-3 text-[14px]">
-                      {["Our team reviews your payment receipt.", "Once approved, you'll get a confirmation email with full enrollment details.", "Your explorer's slot is officially secured! 🌟"].map((text, i) => (
-                        <li key={i} className="flex items-start gap-3">
-                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0033A0] text-[10px] font-bold text-white">{i + 1}</span>
-                          <span className="text-[#334155] font-medium">{text}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <Link href="/" className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
-                      ← Back to Home
-                    </Link>
                   </div>
                 </m.div>
               )}
