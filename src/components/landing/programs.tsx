@@ -76,7 +76,7 @@ const SATURDAY_PLAYDATE = {
   name: "Saturday Playdate",
   tagline: "Play. Explore. Make Friends.",
   ageLabel: "Little Explorers",
-  maxChildren: 10,
+  maxChildren: 6,
   bgTop: "#0ea5e9",
   titleColor: "white",
   subtitleColor: "rgba(255,255,255,0.9)",
