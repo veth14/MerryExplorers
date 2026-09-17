@@ -45,8 +45,8 @@ const CREATIVE_EXPLORER = {
   keywords: ["Create", "Explore", "Build", "Grow", "Belong"],
   description: "Hands-on, engaging activities that spark curiosity and build foundational skills through play, exploration and discovery.",
   schedules: [
-    { label: "Morning Class",   days: "Tuesday, Thursday & Friday", time: "9:45 AM – 11:00 AM" },
-    { label: "Mid-Day Class",   days: "Tuesday, Thursday & Friday", time: "11:15 AM – 12:30 PM" },
+    { label: "Morning Class", days: "Tuesday, Thursday & Friday", time: "9:45 AM – 11:00 AM" },
+    { label: "Mid-Day Class", days: "Tuesday, Thursday & Friday", time: "11:15 AM – 12:30 PM" },
     { label: "Afternoon Class", days: "Tuesday, Thursday & Friday", time: "1:30 PM – 2:45 PM" },
   ],
 };
@@ -108,8 +108,8 @@ function ProgramCard({
     animateFrom === "left"
       ? { opacity: 0, x: -40 }
       : animateFrom === "right"
-      ? { opacity: 0, x: 40 }
-      : { opacity: 0, y: 40 };
+        ? { opacity: 0, x: 40 }
+        : { opacity: 0, y: 40 };
 
   return (
     <m.article
@@ -232,11 +232,10 @@ export function ProgramsSection() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabCategory)}
-                className={`relative overflow-hidden rounded-full px-6 py-3 text-[14px] font-bold transition-all duration-300 ${
-                  isActive 
-                    ? "text-white shadow-md shadow-[#0033A0]/20" 
-                    : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0] hover:shadow-md hover:-translate-y-0.5"
-                }`}
+                className={`relative overflow-hidden rounded-full px-6 py-3 text-[14px] font-bold transition-all duration-300 ${isActive
+                  ? "text-white shadow-md shadow-[#0033A0]/20"
+                  : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0] hover:shadow-md hover:-translate-y-0.5"
+                  }`}
               >
                 {isActive && (
                   <m.div
@@ -278,82 +277,82 @@ export function ProgramsSection() {
               transition={{ duration: 0.4 }}
               className="mb-8"
             >
-        {/* ── Trailblazer: Brave Explorer (full-width) ── */}
-        <m.article
-          initial={reduce ? false : { opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
-          className="relative mb-8 flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(26,46,107,0.12)] transition-all duration-300 hover:-translate-y-2"
-        >
-          {/* Header */}
-          <div className="relative px-6 pb-7 pt-8 text-center" style={{ backgroundColor: BRAVE_EXPLORER.bgTop }}>
-            <span className="absolute left-6 top-6 text-2xl">{BRAVE_EXPLORER.iconLeft}</span>
-            <span className="absolute right-6 top-6 text-2xl">{BRAVE_EXPLORER.iconRight}</span>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em]" style={{ color: BRAVE_EXPLORER.subtitleColor }}>
-              {BRAVE_EXPLORER.club}
-            </p>
-            <h3 className="font-headline text-[22px] font-extrabold uppercase tracking-wider mt-0.5" style={{ color: BRAVE_EXPLORER.titleColor }}>
-              {BRAVE_EXPLORER.name}
-            </h3>
-            <p className="mt-1 text-[12px] font-semibold italic" style={{ color: BRAVE_EXPLORER.subtitleColor }}>
-              {BRAVE_EXPLORER.tagline}
-            </p>
-            {/* Keyword tags */}
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              {BRAVE_EXPLORER.keywords.map((kw) => (
-                <span key={kw} className="rounded-full bg-white/15 px-3 py-0.5 text-[11px] font-bold text-white">
-                  {kw}
-                </span>
-              ))}
-            </div>
-          </div>
+              {/* ── Trailblazer: Brave Explorer (full-width) ── */}
+              <m.article
+                initial={reduce ? false : { opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
+                className="relative mb-8 flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(26,46,107,0.12)] transition-all duration-300 hover:-translate-y-2"
+              >
+                {/* Header */}
+                <div className="relative px-6 pb-7 pt-8 text-center" style={{ backgroundColor: BRAVE_EXPLORER.bgTop }}>
+                  <span className="absolute left-6 top-6 text-2xl">{BRAVE_EXPLORER.iconLeft}</span>
+                  <span className="absolute right-6 top-6 text-2xl">{BRAVE_EXPLORER.iconRight}</span>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em]" style={{ color: BRAVE_EXPLORER.subtitleColor }}>
+                    {BRAVE_EXPLORER.club}
+                  </p>
+                  <h3 className="font-headline text-[22px] font-extrabold uppercase tracking-wider mt-0.5" style={{ color: BRAVE_EXPLORER.titleColor }}>
+                    {BRAVE_EXPLORER.name}
+                  </h3>
+                  <p className="mt-1 text-[12px] font-semibold italic" style={{ color: BRAVE_EXPLORER.subtitleColor }}>
+                    {BRAVE_EXPLORER.tagline}
+                  </p>
+                  {/* Keyword tags */}
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {BRAVE_EXPLORER.keywords.map((kw) => (
+                      <span key={kw} className="rounded-full bg-white/15 px-3 py-0.5 text-[11px] font-bold text-white">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
 
-          {/* Age pill */}
-          <div className="relative z-10 -mt-3.5 flex justify-center">
-            <span
-              className="whitespace-nowrap rounded-full px-5 py-1.5 text-[11px] font-bold uppercase tracking-wider shadow-sm"
-              style={{ backgroundColor: BRAVE_EXPLORER.pillBg, color: BRAVE_EXPLORER.pillText }}
-            >
-              {BRAVE_EXPLORER.ageLabel}
-            </span>
-          </div>
+                {/* Age pill */}
+                <div className="relative z-10 -mt-3.5 flex justify-center">
+                  <span
+                    className="whitespace-nowrap rounded-full px-5 py-1.5 text-[11px] font-bold uppercase tracking-wider shadow-sm"
+                    style={{ backgroundColor: BRAVE_EXPLORER.pillBg, color: BRAVE_EXPLORER.pillText }}
+                  >
+                    {BRAVE_EXPLORER.ageLabel}
+                  </span>
+                </div>
 
-          {/* Body — 3-column on desktop */}
-          <div className="grid gap-5 p-6 sm:grid-cols-3">
-            {/* Description + max */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-[12px] font-semibold text-[#64748b]">
-                <span>👨‍👩‍👧</span>
-                <span>Max <strong className="text-[#1a2e6b]">{BRAVE_EXPLORER.maxChildren} children</strong> / session</span>
-              </div>
-              <p className="text-[13px] font-medium leading-relaxed text-[#475569]">
-                {BRAVE_EXPLORER.description}
-              </p>
-            </div>
+                {/* Body — 3-column on desktop */}
+                <div className="grid gap-5 p-6 sm:grid-cols-3">
+                  {/* Description + max */}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold text-[#64748b]">
+                      <span>👨‍👩‍👧</span>
+                      <span>Max <strong className="text-[#1a2e6b]">{BRAVE_EXPLORER.maxChildren} children</strong> / session</span>
+                    </div>
+                    <p className="text-[13px] font-medium leading-relaxed text-[#475569]">
+                      {BRAVE_EXPLORER.description}
+                    </p>
+                  </div>
 
-            {/* Schedule */}
-            <div className="rounded-2xl border border-[#1a2e6b]/10 bg-[#f0f2f8] p-4">
-              <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-[#1a2e6b]">
-                📅 Schedule
-              </p>
-              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-black/5">
-                <p className="text-[13px] font-bold text-[#1a2e6b]">{BRAVE_EXPLORER.schedule.days}</p>
-                <p className="text-[15px] font-extrabold text-[#334155]">{BRAVE_EXPLORER.schedule.time}</p>
-              </div>
-            </div>
+                  {/* Schedule */}
+                  <div className="rounded-2xl border border-[#1a2e6b]/10 bg-[#f0f2f8] p-4">
+                    <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-[#1a2e6b]">
+                      📅 Schedule
+                    </p>
+                    <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-black/5">
+                      <p className="text-[13px] font-bold text-[#1a2e6b]">{BRAVE_EXPLORER.schedule.days}</p>
+                      <p className="text-[15px] font-extrabold text-[#334155]">{BRAVE_EXPLORER.schedule.time}</p>
+                    </div>
+                  </div>
 
-            {/* Journal + Prerequisite */}
-            <div className="flex flex-col gap-3">
-              <div className="rounded-2xl bg-[#FFF8E1] border border-[#FFC107]/20 p-3 text-[12px] font-medium leading-relaxed text-[#92400e]">
-                📖 <span className="font-bold">Explorer Journal:</span> {BRAVE_EXPLORER.journalNote}
-              </div>
-              <div className="rounded-2xl bg-[#f0f2f8] border border-[#1a2e6b]/10 p-3 text-[12px] font-medium leading-relaxed text-[#475569]">
-                ✅ <span className="font-bold text-[#1a2e6b]">Prerequisite:</span> {BRAVE_EXPLORER.prerequisite}
-              </div>
-            </div>
-          </div>
-        </m.article>
+                  {/* Journal + Prerequisite */}
+                  <div className="flex flex-col gap-3">
+                    <div className="rounded-2xl bg-[#FFF8E1] border border-[#FFC107]/20 p-3 text-[12px] font-medium leading-relaxed text-[#92400e]">
+                      📖 <span className="font-bold">Explorer Journal:</span> {BRAVE_EXPLORER.journalNote}
+                    </div>
+                    <div className="rounded-2xl bg-[#f0f2f8] border border-[#1a2e6b]/10 p-3 text-[12px] font-medium leading-relaxed text-[#475569]">
+                      ✅ <span className="font-bold text-[#1a2e6b]">Prerequisite:</span> {BRAVE_EXPLORER.prerequisite}
+                    </div>
+                  </div>
+                </div>
+              </m.article>
             </m.div>
           )}
 
@@ -367,138 +366,138 @@ export function ProgramsSection() {
               className="flex flex-col gap-8 mb-8"
             >
               <ProgramCard data={SATURDAY_PLAYDATE} delay={0} animateFrom="bottom" />
-        {/* ── Ballet Card (full-width) ── */}
-        <m.article
-          initial={reduce ? false : { opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-          className="relative mb-10 overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(194,24,91,0.12)] transition-all duration-300"
-        >
-          {/* Top bar */}
-          <div className="h-2 w-full" style={{ backgroundColor: BALLET.accent }} />
+              {/* ── Ballet Card (full-width) ── */}
+              <m.article
+                initial={reduce ? false : { opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+                className="relative mb-10 overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(194,24,91,0.12)] transition-all duration-300"
+              >
+                {/* Top bar */}
+                <div className="h-2 w-full" style={{ backgroundColor: BALLET.accent }} />
 
-          <div className="flex flex-col gap-8 p-7 sm:p-10">
+                <div className="flex flex-col gap-8 p-7 sm:p-10">
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#FCE4EC] pb-6">
-              <div className="flex items-center gap-4">
-                <m.span
-                  animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="text-6xl"
-                >
-                  {BALLET.emoji}
-                </m.span>
-                <div>
-                  <span className="mb-1 inline-block rounded-full px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest"
-                    style={{ backgroundColor: BALLET.accentSoft, color: BALLET.accent }}>
-                    Special Program
-                  </span>
-                  <h3 className="font-headline text-[32px] font-extrabold tracking-tight" style={{ color: BALLET.accent }}>
-                    {BALLET.name}
-                  </h3>
-                  <p className="mt-1 text-[14px] font-bold text-[#880E4F]">
-                    {BALLET.schedule}
-                  </p>
-                </div>
-              </div>
-              
-              {/* Rate Highlight */}
-              <div className="flex flex-col items-center justify-center rounded-3xl bg-[#FFF3CD] px-6 py-4 shadow-sm border border-[#FFE082]">
-                <span className="text-[12px] font-bold uppercase tracking-widest text-[#B78103]">Rate</span>
-                <span className="text-[28px] font-extrabold text-[#795548] leading-none mt-1">₱550</span>
-                <span className="text-[13px] font-bold text-[#B78103] mt-1">per session</span>
-              </div>
-            </div>
-
-            <div className="grid gap-8 lg:grid-cols-2">
-              {/* Left Column: Classes & Rates */}
-              <div className="flex flex-col gap-6">
-                
-                {/* Classes */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {BALLET.classes.map((c, i) => (
-                    <div key={i} className="flex flex-col rounded-2xl bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-[#F06292]" />
-                      <h4 className="font-headline text-[18px] font-extrabold text-[#C2185B]">{c.name}</h4>
-                      <span className="mt-1 inline-flex w-fit items-center rounded-md bg-[#FCE4EC] px-2 py-0.5 text-[11px] font-bold text-[#880E4F]">
-                        {c.ageRange}
-                      </span>
-                      <p className="mt-2 text-[13px] text-[#64748b] leading-relaxed">{c.description}</p>
-                      <div className="mt-4 flex items-center gap-2 text-[14px] font-bold text-[#0033A0]">
-                        <span className="text-lg">⏰</span> {c.time}
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#FCE4EC] pb-6">
+                    <div className="flex items-center gap-4">
+                      <m.span
+                        animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="text-6xl"
+                      >
+                        {BALLET.emoji}
+                      </m.span>
+                      <div>
+                        <span className="mb-1 inline-block rounded-full px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-widest"
+                          style={{ backgroundColor: BALLET.accentSoft, color: BALLET.accent }}>
+                          Special Program
+                        </span>
+                        <h3 className="font-headline text-[32px] font-extrabold tracking-tight" style={{ color: BALLET.accent }}>
+                          {BALLET.name}
+                        </h3>
+                        <p className="mt-1 text-[14px] font-bold text-[#880E4F]">
+                          {BALLET.schedule}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
 
-                {/* To Confirm Slot */}
-                <div className="rounded-2xl bg-slate-50 p-5 border border-slate-100">
-                  <h4 className="flex items-center gap-2 font-headline text-[16px] font-bold text-[#334155]">
-                    <span className="text-xl">💌</span> To Confirm a Slot
-                  </h4>
-                  <ul className="mt-3 space-y-2 text-[14px] text-[#475569]">
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#C2185B] mt-0.5">•</span>
-                      <span>{BALLET.rate.downpaymentNote}</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#C2185B] mt-0.5">•</span>
-                      <span>{BALLET.rate.paymentMethods}</span>
-                    </li>
-                  </ul>
-                </div>
-
-              </div>
-
-              {/* Right Column: Recital */}
-              <div className="flex flex-col">
-                <div className="flex-1 rounded-3xl bg-gradient-to-br from-[#FCE4EC] to-white p-6 sm:p-8 border border-[#F8BBD0] shadow-sm relative overflow-hidden">
-                  {/* Decorative ribbon */}
-                  <div className="absolute -right-6 -top-6 text-[100px] opacity-10 rotate-12 pointer-events-none">🎀</div>
-                  
-                  <span className="inline-block rounded-full bg-[#E91E63] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm mb-3">
-                    For Recital Participants
-                  </span>
-                  
-                  <h4 className="font-headline text-[22px] font-extrabold text-[#880E4F] leading-tight">
-                    {BALLET.recital.title}
-                  </h4>
-                  <p className="mt-2 text-[14px] font-medium text-[#C2185B]">
-                    {BALLET.recital.note}
-                  </p>
-
-                  <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm border border-[#FCE4EC]">
-                    <div className="flex items-end justify-between border-b border-slate-100 pb-3 mb-3">
-                      <span className="font-headline text-[18px] font-bold text-[#334155]">Recital Kit</span>
-                      <span className="text-[20px] font-extrabold text-[#E91E63]">{BALLET.recital.kitPrice}</span>
-                    </div>
-                    <p className="text-[13px] font-medium text-[#64748b] leading-relaxed">
-                      {BALLET.recital.kitDetails}
-                    </p>
-                    
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
-                        🎫 2 Guest Passes
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
-                        💐 1 Mini Bouquet
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
-                        👗 1 Set of Costume
-                      </span>
+                    {/* Rate Highlight */}
+                    <div className="flex flex-col items-center justify-center rounded-3xl bg-[#FFF3CD] px-6 py-4 shadow-sm border border-[#FFE082]">
+                      <span className="text-[12px] font-bold uppercase tracking-widest text-[#B78103]">Rate</span>
+                      <span className="text-[28px] font-extrabold text-[#795548] leading-none mt-1">₱550</span>
+                      <span className="text-[13px] font-bold text-[#B78103] mt-1">per session</span>
                     </div>
                   </div>
+
+                  <div className="grid gap-8 lg:grid-cols-2">
+                    {/* Left Column: Classes & Rates */}
+                    <div className="flex flex-col gap-6">
+
+                      {/* Classes */}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {BALLET.classes.map((c, i) => (
+                          <div key={i} className="flex flex-col rounded-2xl bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-[#F06292]" />
+                            <h4 className="font-headline text-[18px] font-extrabold text-[#C2185B]">{c.name}</h4>
+                            <span className="mt-1 inline-flex w-fit items-center rounded-md bg-[#FCE4EC] px-2 py-0.5 text-[11px] font-bold text-[#880E4F]">
+                              {c.ageRange}
+                            </span>
+                            <p className="mt-2 text-[13px] text-[#64748b] leading-relaxed">{c.description}</p>
+                            <div className="mt-4 flex items-center gap-2 text-[14px] font-bold text-[#0033A0]">
+                              <span className="text-lg">⏰</span> {c.time}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* To Confirm Slot */}
+                      <div className="rounded-2xl bg-slate-50 p-5 border border-slate-100">
+                        <h4 className="flex items-center gap-2 font-headline text-[16px] font-bold text-[#334155]">
+                          <span className="text-xl">💌</span> To Confirm a Slot
+                        </h4>
+                        <ul className="mt-3 space-y-2 text-[14px] text-[#475569]">
+                          <li className="flex items-start gap-2">
+                            <span className="text-[#C2185B] mt-0.5">•</span>
+                            <span>{BALLET.rate.downpaymentNote}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-[#C2185B] mt-0.5">•</span>
+                            <span>{BALLET.rate.paymentMethods}</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                    </div>
+
+                    {/* Right Column: Recital */}
+                    <div className="flex flex-col">
+                      <div className="flex-1 rounded-3xl bg-gradient-to-br from-[#FCE4EC] to-white p-6 sm:p-8 border border-[#F8BBD0] shadow-sm relative overflow-hidden">
+                        {/* Decorative ribbon */}
+                        <div className="absolute -right-6 -top-6 text-[100px] opacity-10 rotate-12 pointer-events-none">🎀</div>
+
+                        <span className="inline-block rounded-full bg-[#E91E63] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm mb-3">
+                          For Recital Participants
+                        </span>
+
+                        <h4 className="font-headline text-[22px] font-extrabold text-[#880E4F] leading-tight">
+                          {BALLET.recital.title}
+                        </h4>
+                        <p className="mt-2 text-[14px] font-medium text-[#C2185B]">
+                          {BALLET.recital.note}
+                        </p>
+
+                        <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm border border-[#FCE4EC]">
+                          <div className="flex items-end justify-between border-b border-slate-100 pb-3 mb-3">
+                            <span className="font-headline text-[18px] font-bold text-[#334155]">Recital Kit</span>
+                            <span className="text-[20px] font-extrabold text-[#E91E63]">{BALLET.recital.kitPrice}</span>
+                          </div>
+                          <p className="text-[13px] font-medium text-[#64748b] leading-relaxed">
+                            {BALLET.recital.kitDetails}
+                          </p>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
+                              🎫 2 Guest Passes
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
+                              💐 1 Mini Bouquet
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[12px] font-semibold text-[#475569] border border-slate-200">
+                              👗 1 Set of Costume
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
-              </div>
-            </div>
 
-          </div>
-
-          {/* Corner glow */}
-          <div aria-hidden className="pointer-events-none absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-[#C2185B] opacity-10 blur-3xl" />
-        </m.article>
+                {/* Corner glow */}
+                <div aria-hidden className="pointer-events-none absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-[#C2185B] opacity-10 blur-3xl" />
+              </m.article>
             </m.div>
           )}
         </AnimatePresence>
@@ -515,7 +514,7 @@ export function ProgramsSection() {
             Secure your slot and enroll online today! 🎒
           </p>
           <Link
-            href="/register"
+            href="/inquire"
             id="programs-register-btn"
             className="group inline-flex items-center gap-4 rounded-[1.25rem] bg-[#0033A0] px-8 py-4 text-[17px] font-bold text-white shadow-[0_12px_24px_rgba(0,51,160,0.2)] transition-all duration-300 hover:bg-[#002f76] hover:shadow-[0_16px_32px_rgba(0,51,160,0.3)] hover:-translate-y-1"
           >
