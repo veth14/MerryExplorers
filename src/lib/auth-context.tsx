@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User as FirebaseUser, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from "firebase/auth";
+import { User as FirebaseUser, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 
@@ -11,7 +11,7 @@ type AuthContextType = {
   user: FirebaseUser | null;
   userProfile: UserAccount | null;
   loading: boolean;
-  signIn: (email: string, pass: string) => Promise<void>;
+  signIn: (email: string, pass: string, remember?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -46,7 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Update session cookie for middleware
       if (currUser) {
-        document.cookie = `session=active; path=/; max-age=86400`; // simple session marker
+        const isRemembered = localStorage.getItem("rememberMe") === "true";
+        const maxAge = isRemembered ? 2592000 : 86400; // 30 days or 1 day
+        document.cookie = `session=active; path=/; max-age=${maxAge}`; // simple session marker
         // Role cookie is set during signIn, but we shouldn't wipe it on auth state change
         // unless there is no user
       } else {
@@ -58,11 +60,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signIn = async (email: string, pass: string) => {
+  const signIn = async (email: string, pass: string, remember: boolean = false) => {
     setLoading(true);
     try {
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await signInWithEmailAndPassword(auth, email, pass);
-      document.cookie = `session=active; path=/; max-age=86400`;
+      
+      if (remember) {
+        localStorage.setItem("rememberMe", "true");
+      } else {
+        localStorage.removeItem("rememberMe");
+      }
+      
+      const maxAge = remember ? 2592000 : 86400;
+      document.cookie = `session=active; path=/; max-age=${maxAge}`;
       
       // Fetch role and redirect
       const roleRes = await fetch(`/api/auth/role?uid=${cred.user.uid}`);
@@ -73,15 +84,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (role === "admin") {
-        document.cookie = `role=admin; path=/; max-age=86400`;
+        document.cookie = `role=admin; path=/; max-age=${maxAge}`;
         router.push("/admin");
       } else if (role === "executive assistant" || role === "developer") {
         // Executive Assistants and Developers are employees first — they clock in like teachers
         // but can also access the admin panel.
-        document.cookie = `role=${role}; path=/; max-age=86400`;
+        document.cookie = `role=${role}; path=/; max-age=${maxAge}`;
         router.push("/teacher");
       } else {
-        document.cookie = `role=teacher; path=/; max-age=86400`;
+        document.cookie = `role=teacher; path=/; max-age=${maxAge}`;
         router.push("/teacher");
       }
     } finally {

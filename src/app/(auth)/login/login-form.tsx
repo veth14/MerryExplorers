@@ -125,7 +125,7 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      await signIn(email.trim(), password);
+      await signIn(email.trim(), password, remember);
     } catch (err: any) {
       console.error(err);
       setError("Invalid email or password.");
