@@ -39,9 +39,9 @@ export async function GET(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // 1. Fetch Accounts (Teachers & Executives)
+    // 1. Fetch Accounts (Teachers, Executives, Developers, etc. - exclude Admin/Owner)
     const accounts = await db.collection("accounts").find({
-      role: { $in: ["Lead Teacher", "Assistant Teacher", "Executive Assistant", "Executive Assistant"] }
+      role: { $nin: ["admin", "owner"] }
     }).toArray();
 
     // 3. Determine the required attendance date range.
@@ -193,6 +193,17 @@ export async function GET(request: Request) {
       const erPhilHealth = contributions.employerPerCutoff.philhealth;
       const erPagIbig    = contributions.employerPerCutoff.pagibig;
       const totalEmployerCost = contributions.employerPerCutoff.totalEmployerCost;
+
+      // Check if employee should be excluded from payroll
+      // Rule: Inactive employees are removed unless they have at least 1 working day in this period
+      if (acc.status === "inactive" && daysPresent === 0) {
+        continue;
+      }
+      
+      // Rule: Exclude Merry as she is the owner
+      if (acc.fullName && acc.fullName.toLowerCase().includes("merry")) {
+        continue;
+      }
 
       totalGross += grossPay;
       totalNet += netPay;

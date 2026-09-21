@@ -147,7 +147,9 @@ export function OffsetMonitoring() {
       .then((data: Account[]) => {
         if (Array.isArray(data)) {
           const eligibleAccounts = data.filter((a) =>
-            ["Lead Teacher", "Assistant Teacher", "Executive Assistant", "Executive Assistant"].includes(a.role as string)
+            a.role !== "admin" &&
+            a.role !== "owner" &&
+            !(a.fullName && a.fullName.toLowerCase().includes("merry"))
           );
           setAccounts(eligibleAccounts);
           if (eligibleAccounts.length > 0) setSelectedEmployeeId(eligibleAccounts[0].id);
