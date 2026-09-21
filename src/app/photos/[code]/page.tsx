@@ -166,8 +166,8 @@ export default function PublicPhotoAlbumPage({
             initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-full px-4 py-1.5 mb-5 shadow-md border border-white"
           >
-            <div className="w-6 h-6 rounded-full overflow-hidden shrink-0">
-              <Image src="/LOGO.jpg" alt="Logo" width={24} height={24} className="object-contain" />
+            <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center">
+              <Image src="/logo-nobg.png" alt="Logo" width={24} height={24} className="object-contain" />
             </div>
             <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#0033A0]">Merry Explorers</span>
           </m.div>
@@ -261,14 +261,44 @@ export default function PublicPhotoAlbumPage({
           </m.div>
         )}
 
-        {/* Photo Gallery */}
-        <div>
-          <div className="text-center mb-8">
-            <h2 className="text-[26px] sm:text-[30px] font-extrabold text-[#0033A0] mb-1">📸 Photo Gallery</h2>
-            <p className="text-[14px] text-[#64748b]">Tap to view full size • Hover and click ⬇ to save individually</p>
+        {/* Photo Gallery with Adventurous Animations */}
+        <div className="relative pt-4 pb-12">
+          {/* Animated Background Elements */}
+          <m.div 
+            animate={{ x: ["0%", "20%", "0%"], y: [0, -10, 0] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-10 left-[-20px] text-6xl opacity-40 z-0 pointer-events-none hidden sm:block"
+          >
+            ☁️
+          </m.div>
+          <m.div 
+            animate={{ x: ["0%", "-30%", "0%"], y: [0, 15, 0] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute top-40 right-[-30px] text-7xl opacity-30 z-0 pointer-events-none hidden sm:block"
+          >
+            ☁️
+          </m.div>
+          <m.div 
+            animate={{ y: [0, -20, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute bottom-20 left-10 text-5xl opacity-80 z-0 pointer-events-none drop-shadow-md"
+          >
+            🎈
+          </m.div>
+          <m.div 
+            animate={{ y: [0, -15, 0], x: [0, 10, 0] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute top-0 right-10 text-6xl opacity-90 z-0 pointer-events-none drop-shadow-lg"
+          >
+            🪁
+          </m.div>
+
+          <div className="relative z-10 text-center mb-10">
+            <h2 className="text-[26px] sm:text-[32px] font-extrabold text-[#0033A0] mb-2 drop-shadow-sm">📸 Photo Gallery</h2>
+            <p className="text-[14px] sm:text-[15px] font-medium text-[#64748b]">Tap to view full size • Hover and click ⬇ to save individually</p>
           </div>
           
-          <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 sm:gap-5 space-y-4 sm:space-y-5">
+          <div className="relative z-10 columns-1 sm:columns-2 lg:columns-3 gap-4 sm:gap-5 space-y-4 sm:space-y-5">
             {data.photos.map((photo, i) => (
               <m.div
                 key={i}
@@ -414,10 +444,10 @@ export default function PublicPhotoAlbumPage({
 
       {/* ── Footer ── */}
       <div className="text-center mt-12 px-6 pb-8">
-        <div className="w-14 h-14 rounded-2xl bg-white shadow-xl mx-auto flex items-center justify-center overflow-hidden mb-3 border-2 border-[#FFC107]/30">
-          <Image src="/LOGO.jpg" alt="Logo" width={40} height={40} className="object-contain" />
+        <div className="w-16 h-16 mx-auto flex items-center justify-center mb-2">
+          <Image src="/logo-nobg.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
         </div>
-        <p className="text-[13px] font-extrabold text-[#0033A0] uppercase tracking-widest mb-1">Merry Explorers Playgroup</p>
+        <p className="text-[13px] font-extrabold text-[#0033A0] uppercase tracking-widest mb-1 mt-2">Merry Explorers Playgroup</p>
         <p className="text-[12px] font-medium text-[#94a3b8]">Dream. Discover. Explore. 🌟</p>
       </div>
     </div>
