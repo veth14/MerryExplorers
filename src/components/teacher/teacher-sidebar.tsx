@@ -313,6 +313,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
         { label: "Registrations", href: "/admin/registrations", icon: <RegistrationsIcon /> },
         { label: "Students", href: "/admin/students", icon: <StudentsIcon /> },
         { label: "Gallery", href: "/admin/gallery", icon: <GalleryIcon /> },
+        { label: "Photo Albums", href: "/admin/photo-albums", icon: <GalleryIcon /> },
         { label: "Audit Log", href: "/admin/audit-log", icon: <AuditIcon /> },
       ],
     },
