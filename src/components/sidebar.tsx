@@ -19,6 +19,7 @@ const navItems = [
   { label: "Registrations", href: "/admin/registrations" },
   { label: "Students", href: "/admin/students" },
   { label: "Gallery", href: "/admin/gallery" },
+  { label: "Photo Albums", href: "/admin/photo-albums" },
   { label: "Payroll", href: "/admin/payroll" },
   { label: "Audit Log", href: "/admin/audit-log" },
 ] as const;
@@ -195,6 +196,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Registrations: RegistrationsIcon,
   Students: StudentsIcon,
   Gallery: GalleryIcon,
+  "Photo Albums": GalleryIcon,
   Payroll: PayrollIcon,
   "Audit Log": AuditIcon,
 };
@@ -334,7 +336,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = useMemo(() => [
     { title: "HR & People", items: ["Teachers", "Accounts", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Operations", items: ["Inquiries", "Reports", "Announcements", "Registrations", "Students", "Gallery", "Audit Log"] },
+    { title: "Operations", items: ["Inquiries", "Reports", "Announcements", "Registrations", "Students", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
     ...g,
     items: g.items

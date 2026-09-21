@@ -53,6 +53,11 @@ async function ensureTTLIndexes(db: Db): Promise<void> {
       { createdAt: 1 },
       { expireAfterSeconds: 1095 * DAY, background: true, name: "ttl_leaves_3yr" }
     ),
+    // Student photo albums auto-expire after 3 days
+    db.collection("student_photo_albums").createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0, background: true, name: "ttl_photo_albums_3d" }
+    ),
   ]);
 
   globalThis._mongoIndexesCreated = true;
