@@ -21,6 +21,7 @@ interface AlbumData {
   photos: Photo[];
   expiresAt: string;
   createdAt: string;
+  requiresPin?: boolean;
 }
 
 function timeUntilExpiry(expiresAt: string): { label: string; hoursLeft: number } {
@@ -46,19 +47,48 @@ export default function PublicPhotoAlbumPage({
   const [downloading, setDownloading] = useState(false);
   const [downloadedSingle, setDownloadedSingle] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetch(`/api/photo-albums/${code}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success) {
-          setData(res.data);
-        } else {
-          setError(res.error || "Failed to load album");
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [checkingPin, setCheckingPin] = useState(false);
+
+  const fetchAlbum = useCallback(async (pinToTry?: string) => {
+    try {
+      setCheckingPin(true);
+      const savedPin = typeof window !== "undefined" ? sessionStorage.getItem(`album-pin-${code}`) : null;
+      const activePin = pinToTry || savedPin;
+      const url = `/api/photo-albums/${code}${activePin ? `?pin=${activePin}` : ""}`;
+      
+      const r = await fetch(url);
+      const res = await r.json();
+      
+      if (res.success) {
+        setData(res.data);
+        if (!res.data.requiresPin && activePin) {
+          sessionStorage.setItem(`album-pin-${code}`, activePin);
+          setPinError("");
+        } else if (pinToTry && res.data.requiresPin) {
+          setPinError("Incorrect PIN. Please try again.");
         }
-      })
-      .catch(() => setError("Network error"))
-      .finally(() => setLoading(false));
+      } else {
+        setError(res.error || "Failed to load album");
+      }
+    } catch (e) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+      setCheckingPin(false);
+    }
   }, [code]);
+
+  useEffect(() => {
+    fetchAlbum();
+  }, [fetchAlbum]);
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput.length !== 4) return;
+    fetchAlbum(pinInput);
+  };
 
   // Lock body scroll when lightbox is open
   useEffect(() => {
@@ -146,6 +176,57 @@ export default function PublicPhotoAlbumPage({
   const displayName = data.childNickname || data.childFirstName;
   const expiry = timeUntilExpiry(data.expiresAt);
   const shortProgram = data.programName.includes(":") ? data.programName.split(":")[1].trim() : data.programName;
+
+  if (data.requiresPin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "linear-gradient(180deg, #FFF9C4 0%, #E0F4FF 60%, #fff 100%)" }}>
+        <m.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white rounded-[2rem] p-8 text-center shadow-2xl border-4 border-[#FFC107]/30 relative overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 right-0 h-3 bg-gradient-to-r from-[#FFC107] to-[#FFD600]" />
+          <div className="w-16 h-16 rounded-full bg-[#f0f6ff] mx-auto flex items-center justify-center text-3xl mb-4 shadow-inner">
+            🔒
+          </div>
+          <h1 className="text-[24px] font-extrabold text-[#0033A0] mb-2 drop-shadow-sm">Secure Album</h1>
+          <p className="text-[14px] text-[#64748b] mb-8 font-medium">
+            Please enter the 4-digit PIN sent to your email to view {displayName}'s photos.
+          </p>
+
+          <form onSubmit={handlePinSubmit} className="space-y-6">
+            <div>
+              <input
+                type="text"
+                maxLength={4}
+                value={pinInput}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  setPinInput(val);
+                  setPinError("");
+                }}
+                className="w-full text-center text-4xl font-black tracking-[0.5em] text-[#0f172a] bg-slate-50 border-2 border-slate-200 rounded-2xl py-4 focus:border-[#FFC107] focus:ring-4 focus:ring-[#FFC107]/20 outline-none transition-all placeholder:text-slate-300"
+                placeholder="••••"
+                autoFocus
+              />
+              {pinError && <p className="text-red-500 text-[13px] font-bold mt-3 animate-pulse">{pinError}</p>}
+            </div>
+
+            <button
+              type="submit"
+              disabled={checkingPin || pinInput.length !== 4}
+              className="w-full flex items-center justify-center gap-2 bg-[#0033A0] text-white px-6 py-4 rounded-2xl font-extrabold text-[16px] shadow-xl hover:bg-[#002580] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {checkingPin ? (
+                <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />Verifying…</>
+              ) : (
+                <>Unlock Photos ✨</>
+              )}
+            </button>
+          </form>
+        </m.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen font-sans pb-24" style={{ background: "linear-gradient(180deg, #FFF8C0 0%, #C8E8FF 35%, #EEF6FF 70%, #F8FAFE 100%)" }}>

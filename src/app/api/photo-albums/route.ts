@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       caption: p.caption || "",
     }));
 
-    // Generate a unique access code
+    // Generate a unique access code and a 4-digit PIN
     const { db } = await connectToDatabase();
     let accessCode = generateAccessCode();
     // Ensure uniqueness (extremely unlikely collision, but check anyway)
@@ -94,6 +94,8 @@ export async function POST(request: Request) {
       accessCode = generateAccessCode();
       existing = await db.collection("student_photo_albums").findOne({ accessCode });
     }
+
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + TTL_DAYS * 24 * 60 * 60 * 1000);
@@ -113,6 +115,7 @@ export async function POST(request: Request) {
       sessionDate,
       note: note?.trim() || "",
       photos: uploadedPhotos,
+      pin,
       emailSent: false,
       emailSentAt: null,
       expiresAt,

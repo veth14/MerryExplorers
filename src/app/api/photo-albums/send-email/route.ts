@@ -12,6 +12,7 @@ function buildEmailHtml({
   sessionLabel,
   note,
   accessCode,
+  pin,
   expiresAt,
   photoCount,
   appUrl,
@@ -22,6 +23,7 @@ function buildEmailHtml({
   sessionLabel: string;
   note: string;
   accessCode: string;
+  pin?: string;
   expiresAt: Date;
   photoCount: number;
   appUrl: string;
@@ -75,6 +77,14 @@ function buildEmailHtml({
         <div style="background:#f0f6ff;border-left:4px solid #0033A0;border-radius:0 12px 12px 0;padding:14px 18px;margin-bottom:24px;">
           <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:0.1em;color:#0033A0;text-transform:uppercase;">Note from your teacher</p>
           <p style="margin:0;font-size:14px;color:#334155;line-height:1.6;">${note}</p>
+        </div>` : ""}
+
+        ${pin ? `
+        <!-- Secure PIN -->
+        <div style="background:#fff3cd;border:1.5px solid #ffecb5;border-radius:12px;padding:16px 20px;text-align:center;margin-bottom:24px;">
+          <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#664d03;">🔒 Secure PIN Required</p>
+          <p style="margin:0;font-size:24px;font-weight:900;letter-spacing:0.25em;color:#000000;">${pin}</p>
+          <p style="margin:8px 0 0;font-size:12px;color:#664d03;">Please enter this code when prompted to view the photos.</p>
         </div>` : ""}
 
         <!-- CTA Button -->
@@ -164,6 +174,7 @@ export async function POST(request: Request) {
         sessionLabel: album.sessionLabel,
         note: album.note,
         accessCode: album.accessCode,
+        pin: album.pin,
         expiresAt: album.expiresAt,
         photoCount: album.photos.length,
         appUrl,

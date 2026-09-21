@@ -31,6 +31,12 @@ export async function GET(
       return NextResponse.json({ error: "This link has expired." }, { status: 410 });
     }
 
+    // Check for PIN
+    const { searchParams } = new URL(request.url);
+    const providedPin = searchParams.get("pin");
+    const hasPin = Boolean(album.pin);
+    const isUnlocked = !hasPin || album.pin === providedPin;
+
     // Return only safe fields — never expose parentEmail, studentRegistrationId etc.
     const safeAlbum = {
       accessCode: album.accessCode,
@@ -41,9 +47,10 @@ export async function GET(
       sessionLabel: album.sessionLabel,
       sessionDate: album.sessionDate,
       note: album.note,
-      photos: album.photos.map((p: any) => ({ url: p.url, caption: p.caption })),
+      photos: isUnlocked ? album.photos.map((p: any) => ({ url: p.url, caption: p.caption })) : [],
       expiresAt: album.expiresAt,
       createdAt: album.createdAt,
+      requiresPin: hasPin && !isUnlocked,
     };
 
     return NextResponse.json({ success: true, data: safeAlbum });
