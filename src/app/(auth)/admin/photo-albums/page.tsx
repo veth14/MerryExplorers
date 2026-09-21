@@ -390,7 +390,10 @@ function CreatePanel({
     for (const preview of newPreviews) {
       try {
         const compressed = await imageCompression(preview.file, {
-          maxSizeMB: 0.4, maxWidthOrHeight: 1600, useWebWorker: true,
+          maxSizeMB: 0.2, // Compress down to max ~200KB
+          maxWidthOrHeight: 1080, // Cap dimensions at 1080p
+          useWebWorker: true,
+          initialQuality: 0.8, // Start with high compression
         });
         const previewUrl = URL.createObjectURL(compressed);
         setPhotos((prev) =>
@@ -418,12 +421,26 @@ function CreatePanel({
     setError("");
     try {
       const prog = PROGRAMS.find((p) => p.id === selectedStudent.program);
-      const photoPayload = await Promise.all(
-        photos.filter((p) => p.status === "ready").map(async (p) => ({
-          base64: await toBase64(p.file),
+      const readyPhotos = photos.filter((p) => p.status === "ready");
+      const uploadedPhotos = [];
+
+      for (const p of readyPhotos) {
+        const base64 = await toBase64(p.file);
+        const upRes = await fetch("/api/upload-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64 }),
+        });
+        const upData = await upRes.json();
+        if (!upData.success) {
+          throw new Error("Failed to upload one or more photos");
+        }
+        uploadedPhotos.push({
+          url: upData.url,
+          cloudinaryPublicId: upData.cloudinaryPublicId,
           caption: p.caption,
-        }))
-      );
+        });
+      }
 
       const res = await fetch("/api/photo-albums", {
         method: "POST",
@@ -438,7 +455,7 @@ function CreatePanel({
           classTime: selectedStudent.classTime,
           sessionDate,
           note,
-          photos: photoPayload,
+          photos: uploadedPhotos,
           actorUid,
           actorName,
         }),

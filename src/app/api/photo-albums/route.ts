@@ -78,20 +78,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upload all photos to Cloudinary
-    const uploadedPhotos: { url: string; cloudinaryPublicId: string; caption: string }[] = [];
-    for (const photo of photos) {
-      if (!photo.base64) continue;
-      const result = await cloudinary.uploader.upload(photo.base64, {
-        folder: "merry_explorers_student_albums",
-        transformation: [{ width: 1200, crop: "limit", quality: "auto:good" }],
-      });
-      uploadedPhotos.push({
-        url: result.secure_url,
-        cloudinaryPublicId: result.public_id,
-        caption: photo.caption || "",
-      });
-    }
+    // Photos are now pre-uploaded individually by the client
+    const uploadedPhotos: { url: string; cloudinaryPublicId: string; caption: string }[] = photos.map((p: any) => ({
+      url: p.url,
+      cloudinaryPublicId: p.cloudinaryPublicId,
+      caption: p.caption || "",
+    }));
 
     // Generate a unique access code
     const { db } = await connectToDatabase();
