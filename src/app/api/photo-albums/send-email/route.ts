@@ -14,6 +14,7 @@ function buildEmailHtml({
   accessCode,
   expiresAt,
   photoCount,
+  appUrl,
 }: {
   childFirstName: string;
   childNickname: string;
@@ -23,9 +24,10 @@ function buildEmailHtml({
   accessCode: string;
   expiresAt: Date;
   photoCount: number;
+  appUrl: string;
 }): string {
   const displayName = childNickname || childFirstName;
-  const viewUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://merryexplorers.vercel.app"}/photos/${accessCode}`;
+  const viewUrl = `${appUrl}/photos/${accessCode}`;
   const expiryStr = new Date(expiresAt).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -148,6 +150,7 @@ export async function POST(request: Request) {
       },
     });
 
+    const appUrl = new URL(request.url).origin;
     const displayName = album.childNickname || album.childFirstName;
 
     await transporter.sendMail({
@@ -163,6 +166,7 @@ export async function POST(request: Request) {
         accessCode: album.accessCode,
         expiresAt: album.expiresAt,
         photoCount: album.photos.length,
+        appUrl,
       }),
     });
 

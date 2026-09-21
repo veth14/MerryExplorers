@@ -117,7 +117,8 @@ function AlbumCard({
   onView?: (album: PhotoAlbum) => void;
 }) {
   const expiry = timeUntilExpiry(album.expiresAt);
-  const photoUrl = `${process.env.NEXT_PUBLIC_SITE_URL || ""}/photos/${album.accessCode}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || "");
+  const photoUrl = `${origin}/photos/${album.accessCode}`;
 
   const programDef = PROGRAMS.find((p) => p.name === album.programName);
   const accent = programDef?.accent || "#0033A0";
