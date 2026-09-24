@@ -14,6 +14,7 @@ const navItems = [
   { label: "Attendance", href: "/admin/attendance" },
   { label: "Leave Requests", href: "/admin/leaves" },
   { label: "Inquiries", href: "/admin/inquiries" },
+  { label: "Discovery Day", href: "/admin/discovery-day" },
   { label: "Reports", href: "/admin/reports" },
   { label: "Announcements", href: "/admin/announcements" },
   { label: "Registrations", href: "/admin/registrations" },
@@ -183,6 +184,15 @@ function RegistrationsIcon() {
   );
 }
 
+function DiscoveryDayIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  );
+}
+
 const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   Teachers: TeachersIcon,
@@ -191,6 +201,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Attendance: AttendanceIcon,
   "Leave Requests": LeaveIcon,
   Inquiries: InquiriesIcon,
+  "Discovery Day": DiscoveryDayIcon,
   Reports: ReportsIcon,
   Announcements: AnnouncementsIcon,
   Registrations: RegistrationsIcon,
@@ -336,7 +347,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = useMemo(() => [
     { title: "HR & People", items: ["Teachers", "Accounts", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Operations", items: ["Inquiries", "Reports", "Announcements", "Registrations", "Students", "Gallery", "Photo Albums", "Audit Log"] },
+    { title: "Operations", items: ["Inquiries", "Discovery Day", "Reports", "Announcements", "Registrations", "Students", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
     ...g,
     items: g.items

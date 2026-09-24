@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { m, AnimatePresence  } from "framer-motion";
@@ -85,6 +86,7 @@ function AgeDropdown({ value, onChange }: { value: string; onChange: (v: string)
 }
 
 export default function InquirePage() {
+  const searchParams = useSearchParams();
   const [parentName, setParentName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -94,6 +96,16 @@ export default function InquirePage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  // Pre-fill from Discovery Day quiz params
+  useEffect(() => {
+    const program = searchParams.get("program");
+    const child = searchParams.get("child");
+    if (child) setChildName(child);
+    if (program) {
+      setMessage(`Hi! We just completed the Discovery Day fit quiz and ${child ? child + "'s" : "our child's"} recommended program is ${program}. We'd love to book a Discovery Day slot!`);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

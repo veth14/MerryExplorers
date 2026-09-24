@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { parentName, email, scores, finalProgram, attempted } = data;
+    const { parentName, email, childName, childAge, scores, finalProgram, attempted } = data;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     const newResult = {
       parentName: parentName || "Parent",
       email,
+      childName: childName || "",
+      childAge: childAge || "",
       scores,
       finalProgram,
       attempted,
@@ -85,5 +87,34 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Error saving discovery day result:", error);
     return NextResponse.json({ error: "Failed to save results" }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  try {
+    const { db } = await connectToDatabase();
+    const results = await db
+      .collection("discovery_day_results")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const serialized = results.map((r) => ({
+      id: r._id.toString(),
+      parentName: r.parentName,
+      email: r.email,
+      childName: r.childName || "",
+      childAge: r.childAge || "",
+      scores: r.scores,
+      finalProgram: r.finalProgram,
+      attempted: r.attempted,
+      status: r.status || "New",
+      createdAt: r.createdAt,
+    }));
+
+    return NextResponse.json({ success: true, data: serialized });
+  } catch (error: any) {
+    console.error("Error fetching discovery day results:", error);
+    return NextResponse.json({ error: "Failed to fetch results" }, { status: 500 });
   }
 }

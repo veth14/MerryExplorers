@@ -477,7 +477,7 @@ function ResultScreen({
       {/* CTAs */}
       <div className="flex flex-col gap-3 mt-2">
         <Link
-          href="/inquire"
+          href={`/inquire?program=${encodeURIComponent(meta.title)}&child=${encodeURIComponent(childName || "")}`}
           className="flex items-center justify-center w-full rounded-2xl bg-[#0F006E] px-6 py-4 text-base font-extrabold text-white shadow-lg transition-all hover:bg-[#1a0080] hover:-translate-y-0.5"
         >
           Book Discovery Day &#8594;
