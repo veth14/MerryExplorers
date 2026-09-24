@@ -61,6 +61,24 @@ function ProgramBadge({ program }: { program: string }) {
   );
 }
 
+function MetricCard({
+  label, value, borderColor, textColor, metaIcon, metaText, metaColor, svgDecoration
+}: {
+  label: string; value: number | string; borderColor: string; textColor: string;
+  metaIcon: string; metaText: string; metaColor: string; svgDecoration: React.ReactNode;
+}) {
+  return (
+    <article className={`relative overflow-hidden rounded-[1.25rem] bg-white px-5 pb-5 pt-5 border-b-[4px] ${borderColor} shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)]`}>
+      <div className="absolute right-2 top-2 w-[72px] h-[54px] opacity-70 pointer-events-none">{svgDecoration}</div>
+      <p className={`text-[11.5px] font-extrabold uppercase tracking-widest ${textColor}`}>{label}</p>
+      <p className="font-headline text-[42px] font-extrabold leading-none tracking-tight text-[#002f76] mt-2">{value}</p>
+      <p className={`mt-2.5 text-[13px] font-bold ${metaColor} flex items-center gap-1.5`}>
+        <span>{metaIcon}</span> {metaText}
+      </p>
+    </article>
+  );
+}
+
 export default function DiscoveryDayAdminPage() {
   const [results, setResults] = useState<DiscoveryResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,129 +144,156 @@ export default function DiscoveryDayAdminPage() {
   }, [results]);
 
   return (
-    <AppShell>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto space-y-6">
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-headline text-2xl font-extrabold text-[#002f76]">
-              Discovery Day Results
-            </h1>
-            <p className="text-sm text-[#64748b] mt-0.5">
-              Quiz submissions from the Merry Explorers Fit Score
-            </p>
-          </div>
-          <button
-            onClick={fetchResults}
-            className="self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0033A0] text-white text-sm font-bold hover:bg-[#002080] transition-colors"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-            </svg>
-            Refresh
-          </button>
+    <AppShell title="Discovery Day Results" description="Manage quiz submissions from the Merry Explorers Fit Score.">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-[3px] bg-[#ffb800]" />
+          <h1 className="text-[14px] font-black uppercase tracking-[0.1em] text-[#002f76]">Results Overview</h1>
         </div>
+        <button
+          onClick={fetchResults}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 text-[12px] font-bold text-white bg-[#002f76] rounded-full hover:bg-[#00256a] transition-colors disabled:opacity-60"
+        >
+          {loading ? (
+            <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M21 12a9 9 0 1 1-9-9" /><path d="M21 3v5h-5" />
+            </svg>
+          )}
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
 
         {/* Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="rounded-2xl bg-white border border-[#e2e8f0] px-5 py-4 shadow-sm">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Total Submissions</p>
-            <p className="font-headline text-4xl font-extrabold text-[#002f76] mt-1">{loading ? "—" : total}</p>
-          </div>
-          <div className="rounded-2xl bg-white border border-[#e2e8f0] px-5 py-4 shadow-sm">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-600">Needs Follow-up</p>
-            <p className="font-headline text-4xl font-extrabold text-amber-600 mt-1">{loading ? "—" : newCount}</p>
-          </div>
-          {Object.entries(programCounts).slice(0, 2).map(([prog, count]) => (
-            <div key={prog} className="rounded-2xl bg-white border border-[#e2e8f0] px-5 py-4 shadow-sm">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748b] truncate">{prog}</p>
-              <p className="font-headline text-4xl font-extrabold text-[#002f76] mt-1">{count}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
-            className="flex-1 min-w-[200px] rounded-xl border border-[#e2e8f0] bg-white px-4 py-2.5 text-sm font-medium text-[#334155] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40"
+        <section className="grid gap-4 grid-cols-1 md:grid-cols-3">
+          <MetricCard 
+            label="Total Submissions" value={loading ? "—" : total} 
+            borderColor="border-[#005cc8]" textColor="text-[#005cc8]" 
+            metaIcon="📋" metaText="All quiz completions" metaColor="text-[#005cc8]"
+            svgDecoration={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full"><rect x="24" y="20" width="32" height="24" rx="4" fill="#dbe8ff" stroke="#005cc8" strokeWidth="2" /><line x1="32" y1="28" x2="48" y2="28" stroke="#005cc8" strokeWidth="2" strokeLinecap="round" /><line x1="32" y1="36" x2="40" y2="36" stroke="#005cc8" strokeWidth="2" strokeLinecap="round" /></svg>}
           />
-          <select
-            value={filterProgram}
-            onChange={(e) => setFilterProgram(e.target.value)}
-            className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-2.5 text-sm font-bold text-[#334155] focus:outline-none focus:border-[#0033A0]/40"
-          >
-            {programs.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-2.5 text-sm font-bold text-[#334155] focus:outline-none focus:border-[#0033A0]/40"
-          >
-            <option value="All">All Statuses</option>
-            {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+          <MetricCard 
+            label="Needs Follow-up" value={loading ? "—" : newCount} 
+            borderColor="border-[#ffb800]" textColor="text-[#ffb800]" 
+            metaIcon="⏳" metaText="Awaiting contact" metaColor="text-[#ffb800]"
+            svgDecoration={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full"><circle cx="40" cy="28" r="22" fill="#fff9e6" stroke="#ffb800" strokeWidth="2" /><line x1="40" y1="12" x2="40" y2="28" stroke="#ffb800" strokeWidth="3" strokeLinecap="round" /><line x1="40" y1="28" x2="52" y2="36" stroke="#002f76" strokeWidth="3" strokeLinecap="round" /><circle cx="40" cy="28" r="3" fill="#002f76" /></svg>}
+          />
+          <MetricCard 
+            label="Trailblazers" value={loading ? "—" : (programCounts["Trailblazer"] || 0)} 
+            borderColor="border-[#9333ea]" textColor="text-[#9333ea]" 
+            metaIcon="🚀" metaText="Top recommendation" metaColor="text-[#9333ea]"
+            svgDecoration={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" className="w-full h-full"><circle cx="40" cy="28" r="22" fill="#faf5ff" stroke="#9333ea" strokeWidth="2" /><path d="M40 14 C36 14 30 18 30 24 V34 L26 38 H54 L50 34 V24 C50 18 44 14 40 14 Z" fill="none" stroke="#9333ea" strokeWidth="3" strokeLinejoin="round" /></svg>}
+          />
+        </section>
 
         <div className="flex gap-4 relative items-start">
-          {/* Table */}
-          <div className="flex-1 overflow-x-auto rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
+          {/* Table Container matching Inquiries */}
+          <div className="flex-1 overflow-x-auto bg-white rounded-[1.5rem] p-6 shadow-sm border border-[#e4e2e1]/50">
+            
+            {/* Filters Row inside the table card */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+              <h2 className="text-[20px] font-extrabold text-[#002f76]">All Results</h2>
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a0aec0]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                  </svg>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search name or email..."
+                    className="pl-9 pr-4 py-2 text-[13px] font-semibold border border-[#e2e8f0] rounded-full focus:outline-none focus:border-[#005cc8] bg-[#f8fafc] w-52"
+                  />
+                </div>
+                <select
+                  value={filterProgram}
+                  onChange={(e) => setFilterProgram(e.target.value)}
+                  className="px-4 py-2 text-[13px] font-bold border border-[#e2e8f0] rounded-full bg-white hover:bg-[#f8fafc] transition-colors focus:outline-none focus:border-[#005cc8] appearance-none"
+                  style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" viewBox="0 0 24 24" stroke="%23334155" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundSize: "12px", paddingRight: "30px" }}
+                >
+                  {programs.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-4 py-2 text-[13px] font-bold border border-[#e2e8f0] rounded-full bg-white hover:bg-[#f8fafc] transition-colors focus:outline-none focus:border-[#005cc8] appearance-none"
+                  style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" viewBox="0 0 24 24" stroke="%23334155" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundSize: "12px", paddingRight: "30px" }}
+                >
+                  <option value="All">All Statuses</option>
+                  {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
             {loading ? (
-              <div className="p-8 text-center text-sm font-bold text-[#94a3b8]">Loading results…</div>
+              <div className="p-12 text-center text-[14px] font-bold text-[#94a3b8]">Loading results…</div>
             ) : filtered.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="text-4xl mb-3">🔍</div>
-                <p className="text-sm font-bold text-[#64748b]">No results found</p>
+              <div className="py-16 text-center">
+                <div className="w-14 h-14 bg-[#f0f5ff] rounded-full mx-auto flex items-center justify-center mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#005cc8" strokeWidth={2} className="w-6 h-6"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <p className="text-[14px] font-bold text-[#002f76]">No results found</p>
+                <p className="text-[13px] text-[#5a6e8c] mt-1">Try adjusting your search or filters.</p>
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-[#e2e8f0] bg-[#f8fafc]">
-                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Child</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Parent / Email</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Best Fit</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Scores</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Status</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Submitted</th>
+                  <tr className="border-b border-[#f1f5f9]">
+                    <th className="pb-3 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8]">Child</th>
+                    <th className="pb-3 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8]">Parent / Email</th>
+                    <th className="pb-3 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8]">Best Fit</th>
+                    <th className="pb-3 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8]">Scores</th>
+                    <th className="pb-3 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8]">Status</th>
+                    <th className="pb-3 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8]">Submitted</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filtered.map((r, i) => (
+                <tbody className="divide-y divide-[#f1f5f9]">
+                  {filtered.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => setSelected(r)}
-                      className={`border-b border-[#f1f5f9] cursor-pointer transition-colors hover:bg-[#f8faff] ${selected?.id === r.id ? "bg-[#f0f5ff]" : i % 2 === 0 ? "bg-white" : "bg-[#fafbff]"}`}
+                      className={`group cursor-pointer hover:bg-[#f8fafc] transition-colors ${selected?.id === r.id ? "bg-[#f0f5ff]" : ""} ${r.status === "New" ? "font-extrabold" : ""}`}
                     >
-                      <td className="px-5 py-4">
-                        <p className="font-extrabold text-[#002f76]">{r.childName || "—"}</p>
-                        <p className="text-[12px] text-[#94a3b8] font-medium">{r.childAge || "Age not provided"}</p>
+                      <td className="py-4 pr-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-extrabold shrink-0 ${r.status === "New" ? "bg-[#fff8e1] text-[#a07000] ring-2 ring-[#ffb800]/40" : "bg-[#f0f5ff] text-[#005cc8]"}`}>
+                            {r.childName ? r.childName.slice(0, 2).toUpperCase() : "??"}
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-extrabold text-[#002f76]">{r.childName || "—"}</p>
+                            <p className="text-[11.5px] text-[#5a6e8c] font-medium">{r.childAge || "Age not provided"}</p>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <p className="font-bold text-[#334155]">{r.parentName}</p>
-                        <p className="text-[12px] text-[#94a3b8]">{r.email}</p>
+                      <td className="py-4 pr-4">
+                        <p className="text-[13px] font-bold text-[#334155]">{r.parentName}</p>
+                        <p className="text-[11.5px] text-[#5a6e8c]">{r.email}</p>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="py-4 pr-4">
                         <ProgramBadge program={r.finalProgram} />
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="py-4 pr-4">
                         <div className="flex flex-col gap-0.5">
                           {(r.attempted || []).map((sec) => (
-                            <span key={sec} className="text-[12px] font-medium text-[#64748b]">
+                            <span key={sec} className="text-[11.5px] font-medium text-[#5a6e8c]">
                               <span className="font-bold capitalize">{sec}:</span> {r.scores?.[sec] ?? 0}/10
                             </span>
                           ))}
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="py-4 pr-4">
                         <StatusBadge status={r.status as ResultStatus} />
                       </td>
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <p className="text-[12px] font-bold text-[#334155]">{formatDate(r.createdAt)}</p>
-                        <p className="text-[11px] text-[#94a3b8]">{formatTime(r.createdAt)}</p>
+                      <td className="py-4 whitespace-nowrap">
+                        <p className="text-[12.5px] font-bold text-[#334155]">{formatDate(r.createdAt)}</p>
+                        <p className="text-[11px] text-[#a0aec0] font-medium">{formatTime(r.createdAt)}</p>
                       </td>
                     </tr>
                   ))}
@@ -259,7 +304,7 @@ export default function DiscoveryDayAdminPage() {
 
           {/* Detail Panel */}
           {selected && (
-            <div className="w-[300px] shrink-0 rounded-2xl border border-[#e2e8f0] bg-white shadow-sm p-5 space-y-4 sticky top-4">
+            <div className="w-[320px] shrink-0 rounded-[1.5rem] bg-white p-6 shadow-sm border border-[#e4e2e1]/50 space-y-5 sticky top-4">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-headline text-base font-extrabold text-[#002f76] leading-tight">
                   {selected.childName ? `${selected.childName}'s` : "Child's"} Results
@@ -351,7 +396,6 @@ export default function DiscoveryDayAdminPage() {
             </div>
           )}
         </div>
-      </div>
     </AppShell>
   );
 }
