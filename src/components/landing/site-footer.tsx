@@ -30,6 +30,7 @@ const NAV_COLS = [
     label: "Programs",
     links: [
       { label: "Curious Explorer", href: "/#programs" },
+      { label: "Everyday Curious", href: "/#programs" },
       { label: "Creative Explorer", href: "/#programs" },
       { label: "Trailblazer: Brave Explorer", href: "/#programs" },
       { label: "Ballet", href: "/#programs" },

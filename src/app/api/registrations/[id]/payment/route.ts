@@ -130,6 +130,7 @@ export async function POST(
 
       const programNames: Record<string, string> = {
         "curious-explorer": "Discovery Club: Curious Explorer",
+        "everyday-curious": "Discovery Club: Everyday Curious",
         "creative-explorer": "Discovery Club: Creative Explorer",
         "brave-explorer": "Trailblazer: Brave Explorer",
       };

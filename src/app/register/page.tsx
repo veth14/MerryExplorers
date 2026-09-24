@@ -89,6 +89,7 @@ export default function RegisterPage() {
   const draft = loadDraft();
 
   const [step, setStep] = useState<number>(draft?.step ?? 0);
+  const [activeTab, setActiveTab] = useState<string>("discovery");
   const [slots, setSlots] = useState<SlotData>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -311,6 +312,7 @@ export default function RegisterPage() {
                 <p className="font-semibold text-[#334155]">Discovery Club — Discover Through Play</p>
                 <p>🔎 <strong>Discovery Club: Curious Explorer</strong> — Ages 1.5–4.11 | ₱4,295 | 8 sessions | 1 hr/session</p>
                 <p>🎨 <strong>Discovery Club: Creative Explorer</strong> — Ages 2.6–4.11 | ₱4,820 | 12 sessions | 1 hr 15 mins/session</p>
+                <p>🌟 <strong>Discovery Club: Everyday Curious</strong> — Ages 1.5–4.11 | ₱7,518 | 14 sessions | 1 hr/session | Mon–Fri 4:25–5:25 PM</p>
                 <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building. It may also be a suitable starting point for children who are not yet using verbal communication.</p>
                 <p>💡 <strong>Trailblazer: Brave Explorer</strong> — Prepare for What&apos;s Next</p>
                 <p>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</p>
@@ -333,6 +335,7 @@ export default function RegisterPage() {
                 <p className="font-extrabold text-[#002f76]">4. ATTENDANCE & MAKE-UP SESSIONS</p>
                 <p>We know that schedules can sometimes change, so we&apos;ve made each program&apos;s make-up arrangement as simple and predictable as possible.</p>
                 <p>🎨 <strong>Discovery Club: Curious Explorer</strong> — If a class is suspended due to weather, the session will be moved to the next Monday or Wednesday until all required Adventure sessions are completed.</p>
+                <p>🌟 <strong>Discovery Club: Everyday Curious</strong> — If a class is suspended due to weather, the session will be moved to the next available weekday afternoon until all required Adventure sessions are completed.</p>
                 <p>🚀 <strong>Discovery Club: Creative Explorer</strong> — Classes will continue according to the regular schedule, and any weather-related suspended session will automatically be made up on a Saturday. The Saturday make-up arrangement will continue until the required number of Adventure sessions is completed.</p>
                 <p>💡 <strong>Trailblazer: Brave Explorer</strong> — A suspended face-to-face session will shift online.</p>
                 <ul className="list-disc pl-5 space-y-1">
@@ -348,6 +351,7 @@ export default function RegisterPage() {
                 <p>📸 <strong>Photo Highlights — Uploading Schedule:</strong></p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>🎨 Discovery Club: Curious Explorer — Monday</li>
+                  <li>🌟 Discovery Club: Everyday Curious — Tuesday</li>
                   <li>🚀 Discovery Club: Creative Explorer — Tuesday & Thursday</li>
                   <li>💡 Trailblazer: Brave Explorer — Thursday & Friday</li>
                 </ul>
@@ -355,6 +359,7 @@ export default function RegisterPage() {
                 <p>🎥 <strong>Video Highlights — Uploading Schedule:</strong></p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>🎨 Discovery Club: Curious Explorer — Friday</li>
+                  <li>🌟 Discovery Club: Everyday Curious — Friday</li>
                   <li>🚀 Discovery Club: Creative Explorer — Wednesday</li>
                   <li>💡 Trailblazer: Brave Explorer — Monday</li>
                 </ul>
@@ -506,14 +511,56 @@ export default function RegisterPage() {
                   <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose a Program</h2>
                   <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time that works best for your child.</p>
 
-                  <div className="space-y-5">
-                    {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][]).map((p) => {
+                  <div className="mb-8 flex flex-wrap justify-center gap-3">
+                    {[
+                      { id: "discovery", label: "Discovery Club" },
+                      { id: "trailblazer", label: "Trailblazer" },
+                      { id: "weekend", label: "Weekend Adventures" },
+                    ].map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`relative overflow-hidden rounded-full px-5 py-2.5 text-[13px] font-bold transition-all duration-300 ${isActive
+                            ? "text-white shadow-md shadow-[#0033A0]/20"
+                            : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0]"
+                            }`}
+                        >
+                          {isActive && (
+                            <m.div
+                              layoutId="registerActiveTabIndicator"
+                              className="absolute inset-0 bg-[#0033A0]"
+                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                            />
+                          )}
+                          <span className="relative z-10">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <m.div layout className="space-y-5">
+                    <AnimatePresence mode="popLayout">
+                    {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
+                      .filter(p => {
+                        if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
+                        if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
+                        if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
+                        return true;
+                      })
+                      .map((p) => {
                       const programSlots = slots[p.id] || {};
                       const totalAvailable = Object.values(programSlots).reduce((a, c) => a + c.available, 0);
                       const isSelected = selectedProgram === p.id;
 
                       return (
-                        <div
+                        <m.div
+                          layout
+                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                          transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
                           key={p.id}
                           className={`rounded-3xl border-2 overflow-hidden transition-all duration-200 cursor-pointer ${isSelected ? "border-[#0033A0] shadow-lg shadow-[#0033A0]/10" : "border-slate-100 hover:border-slate-200 bg-white"}`}
                           onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
@@ -574,10 +621,11 @@ export default function RegisterPage() {
                               </div>
                             </div>
                           )}
-                        </div>
+                        </m.div>
                       );
                     })}
-                  </div>
+                    </AnimatePresence>
+                  </m.div>
 
                   <div className="mt-8 flex justify-end">
                     <button

@@ -74,6 +74,16 @@ export const PROGRAMS = [
     icon: "rocket",
   },
   {
+    name: "Discovery Club: Everyday Curious",
+    ageRange: "Ages 1.5 – 4.11",
+    summary:
+      "Curious Explorer Program, but make it daily! More play, more learning, more opportunities every day — a different theme each weekday afternoon.",
+    highlights: ["Mon–Fri afternoon", "14 sessions", "Daily themed learning"],
+    accent: "#22c55e",
+    accentSoft: "#dcfce7",
+    icon: "blocks",
+  },
+  {
     name: "Saturday Playdate",
     ageRange: "Little Explorers",
     summary:
@@ -201,11 +211,29 @@ export const PROGRAM_SLOTS = {
     balance: 1718,
     accent: "#FFC107",
     accentSoft: "#FFF3CD",
-    icon: "🧱",
+    icon: "🔎",
     prerequisite: null,
     classes: [
       { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 4 },
       { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 4 },
+    ],
+  },
+  "everyday-curious": {
+    id: "everyday-curious",
+    name: "Discovery Club: Everyday Curious",
+    ageRange: "Ages 1.5 – 4.11",
+    schedule: "Monday – Friday",
+    sessions: 14,
+    totalSlots: 4,
+    rate: 7518,
+    downpayment: 4511,
+    balance: 3007,
+    accent: "#22c55e",
+    accentSoft: "#dcfce7",
+    icon: "🌈",
+    prerequisite: null,
+    classes: [
+      { name: "Afternoon Class", time: "4:25 PM – 5:25 PM", maxSlots: 4 },
     ],
   },
   "creative-explorer": {
@@ -220,7 +248,7 @@ export const PROGRAM_SLOTS = {
     balance: 1928,
     accent: "#0033A0",
     accentSoft: "#E1ECFF",
-    icon: "🚀",
+    icon: "🎨",
     prerequisite: "Child must be able to stay independently with Teacher during sessions without a guardian.",
     classes: [
       { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 6 },
@@ -240,7 +268,7 @@ export const PROGRAM_SLOTS = {
     balance: 2760,
     accent: "#1a2e6b",
     accentSoft: "#e8ecf8",
-    icon: "🏆",
+    icon: "💡",
     prerequisite: null,
     classes: [
       { name: "Afternoon Class", time: "3:00 PM – 4:15 PM", maxSlots: 6 },
@@ -277,7 +305,7 @@ export const PROGRAM_SLOTS = {
     balance: 876,
     accent: "#0ea5e9",
     accentSoft: "#e0f2fe",
-    icon: "🧩",
+    icon: "🛝",
     prerequisite: null,
     classes: [
       { name: "Morning Class", time: "10:30 AM – 11:45 AM", maxSlots: 10 },

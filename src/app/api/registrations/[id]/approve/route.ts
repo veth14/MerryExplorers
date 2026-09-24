@@ -8,18 +8,21 @@ export const dynamic = "force-dynamic";
 
 const PROGRAM_NAMES: Record<string, string> = {
   "curious-explorer": "Discovery Club: Curious Explorer",
+  "everyday-curious": "Discovery Club: Everyday Curious",
   "creative-explorer": "Discovery Club: Creative Explorer",
   "brave-explorer": "Trailblazer: Brave Explorer",
 };
 
 const PROGRAM_SCHEDULES: Record<string, string> = {
   "curious-explorer": "Monday & Wednesday",
+  "everyday-curious": "Monday – Friday",
   "creative-explorer": "Tuesday, Thursday & Friday",
   "brave-explorer": "Monday – Friday",
 };
 
 const PROGRAM_RATES: Record<string, { rate: number; downpayment: number; balance: number; sessions: number }> = {
   "curious-explorer": { rate: 4395, downpayment: 2637, balance: 1758, sessions: 8 },
+  "everyday-curious": { rate: 7518, downpayment: 4511, balance: 3007, sessions: 14 },
   "creative-explorer": { rate: 4985, downpayment: 2991, balance: 1994, sessions: 12 },
   "brave-explorer": { rate: 6900, downpayment: 4140, balance: 2760, sessions: 18 },
 };
@@ -29,6 +32,9 @@ const PROGRAM_CLASS_TIMES: Record<string, Record<string, string>> = {
   "curious-explorer": {
     "Morning Class": "9:45 AM – 11:00 AM",
     "Afternoon Class": "1:30 PM – 2:45 PM",
+  },
+  "everyday-curious": {
+    "Afternoon Class": "4:25 PM – 5:25 PM",
   },
   "creative-explorer": {
     "Morning Class": "9:45 AM – 11:00 AM",

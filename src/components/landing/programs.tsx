@@ -87,6 +87,26 @@ const SATURDAY_PLAYDATE = {
   ],
 };
 
+const EVERYDAY_CURIOUS = {
+  club: "Discovery Club",
+  name: "Everyday Curious",
+  tagline: "Curious Explorer Program, but make it daily! ♥",
+  ageLabel: "Ages 1.5 – 4.11 years old",
+  maxChildren: 4,
+  bgTop: "#16a34a",
+  titleColor: "white",
+  subtitleColor: "rgba(255,255,255,0.85)",
+  pillBg: "#FFC107",
+  pillText: "#14532d",
+  icon: "star",
+  keywords: ["Explore & Learn", "Create & Imagine", "Family & Values", "Music & Movement", "Free Play"],
+  description: "More play. More learning. More opportunities every day! A different theme each weekday afternoon so curious little explorers discover something new every session.",
+  schedules: [
+    { label: "Afternoon Class", days: "Monday – Friday", time: "4:25 PM – 5:25 PM" },
+  ],
+};
+
+
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function ProgramCard({
@@ -107,6 +127,15 @@ function ProgramCard({
         ? { opacity: 0, x: 40 }
         : { opacity: 0, y: 40 };
 
+  // Inline emoji for icon types not covered by the existing SVG icons
+  const renderIcon = (icon: string) => {
+    if (icon === "magnifying_glass") return <EmojiMagnifyingGlass className="h-14 w-14" />;
+    if (icon === "palette") return <EmojiPalette className="h-14 w-14" />;
+    if (icon === "lightbulb") return <EmojiLightbulb className="h-14 w-14" />;
+    if (icon === "rainbow") return <EmojiRainbow className="h-14 w-14" />;
+    if (icon === "star") return <span className="text-5xl leading-none">⭐</span>;
+    return null;
+  };
   return (
     <m.article
       initial={reduce ? false : initial}
@@ -119,10 +148,7 @@ function ProgramCard({
       <div className="relative px-6 pb-7 pt-12 text-center rounded-t-[2.5rem]" style={{ backgroundColor: data.bgTop }}>
         {/* Single Centered Emoji Icon */}
         <div className="absolute left-1/2 -top-7 -translate-x-1/2 flex h-14 w-14 items-center justify-center">
-          {data.icon === "magnifying_glass" && <EmojiMagnifyingGlass className="h-14 w-14" />}
-          {data.icon === "palette" && <EmojiPalette className="h-14 w-14" />}
-          {data.icon === "lightbulb" && <EmojiLightbulb className="h-14 w-14" />}
-          {data.icon === "rainbow" && <EmojiRainbow className="h-14 w-14" />}
+          {renderIcon(data.icon)}
         </div>
         <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] mt-2" style={{ color: data.subtitleColor }}>
           {data.club}
@@ -262,10 +288,14 @@ export function ProgramsSection() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.4 }}
-              className="grid gap-8 lg:grid-cols-2 mb-8"
+              className="flex flex-col gap-8 mb-8"
             >
-              <ProgramCard data={CURIOUS_EXPLORER} delay={0} animateFrom="left" />
-              <ProgramCard data={CREATIVE_EXPLORER} delay={0.1} animateFrom="right" />
+              <div className="grid gap-8 lg:grid-cols-2">
+                <ProgramCard data={CURIOUS_EXPLORER} delay={0} animateFrom="left" />
+                <ProgramCard data={CREATIVE_EXPLORER} delay={0.1} animateFrom="right" />
+              </div>
+              {/* Everyday Curious — full-width below the two cards */}
+              <ProgramCard data={EVERYDAY_CURIOUS} delay={0.2} animateFrom="bottom" />
             </m.div>
           )}
 

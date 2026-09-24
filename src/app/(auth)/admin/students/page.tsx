@@ -49,6 +49,7 @@ export default function AdminStudentsPage() {
         {[
           { id: "all", label: "All Programs" },
           { id: "curious-explorer", label: "Curious Explorer" },
+          { id: "everyday-curious", label: "Everyday Curious" },
           { id: "creative-explorer", label: "Creative Explorer" },
           { id: "brave-explorer", label: "Brave Explorer" },
         ].map(filter => (
