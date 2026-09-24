@@ -366,7 +366,7 @@ export function EmojiMagnifyingGlass({ className }: IconProps) {
 
 export function EmojiLightbulb({ className }: IconProps) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="-4 -4 72 72" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       {/* Glowing rays */}
       <path d="M32,2v7 M17.9,8L21.4,14.1 M9.3,19.3L15.4,22.8 M4.1,34.5h7 M46.1,8L42.6,14.1 M54.7,19.3L48.6,22.8 M59.9,34.5h-7" stroke="#FBBF24" strokeWidth="3" strokeLinecap="round" fill="none"/>
       {/* Bulb body */}
