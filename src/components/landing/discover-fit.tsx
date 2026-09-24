@@ -35,7 +35,7 @@ export function DiscoverFitSection() {
 
             <Link
               href="/under-development"
-              className="inline-flex items-center gap-3 rounded-2xl bg-[#FDE261] px-8 py-4 text-lg font-extrabold text-[#0F006E] shadow-lg transition-all hover:shadow-xl hover:-translate-y-1 active:scale-95"
+              className="inline-flex items-center gap-3 rounded-2xl bg-[#FFC107] px-8 py-4 text-lg font-extrabold text-[#0a1835] shadow-lg transition-all hover:shadow-xl hover:-translate-y-1 active:scale-95"
             >
               <span>Take the Program Fit Quiz</span>
               <span className="text-2xl">&#8594;</span>
