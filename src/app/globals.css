@@ -112,9 +112,9 @@ html.menu-open {
 
 .cloud-bg {
   background-color: #f0f9ff;
-  background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 20%),
-                    radial-gradient(circle at 80% 20%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 25%),
-                    radial-gradient(circle at 50% 80%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 30%);
+  background-image: radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 20%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 25%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 30%);
 }
 
 body {

@@ -7,6 +7,7 @@ import { HeroSection } from "@/components/landing/hero";
 const HighlightsSection = dynamic(() => import("@/components/landing/highlights").then(mod => mod.HighlightsSection));
 const MissionVisionSection = dynamic(() => import("@/components/landing/mission-vision").then(mod => mod.MissionVisionSection));
 const ProgramsSection = dynamic(() => import("@/components/landing/programs").then(mod => mod.ProgramsSection));
+const DiscoverFitSection = dynamic(() => import("@/components/landing/discover-fit").then(mod => mod.DiscoverFitSection));
 const UniformSection = dynamic(() => import("@/components/landing/uniform").then(mod => mod.UniformSection));
 const AboutSection = dynamic(() => import("@/components/landing/about").then(mod => mod.AboutSection));
 const ParentPortalCTA = dynamic(() => import("@/components/landing/parent-portal-cta").then(mod => mod.ParentPortalCTA));
@@ -35,6 +36,7 @@ export default function LandingPage() {
         <HighlightsSection />
         <MissionVisionSection />
         <ProgramsSection />
+        <DiscoverFitSection />
         <UniformSection />
         <AboutSection />
         <ParentPortalCTA />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { BALLET } from "@/data/landing";
-import { ArrowRightIcon } from "./icons";
+import { ArrowRightIcon, EmojiMagnifyingGlass, EmojiPalette, EmojiLightbulb, EmojiRainbow } from "./icons";
 
 // ─── Adventure 1 Program Data ────────────────────────────────────────────────
 
@@ -19,8 +19,7 @@ const CURIOUS_EXPLORER = {
   subtitleColor: "rgba(255,255,255,0.85)",
   pillBg: "#FFC107",
   pillText: "#0033A0",
-  iconLeft: "🔍",
-  iconRight: "⭐",
+  icon: "magnifying_glass",
   keywords: ["Explore", "Create", "Connect", "Together"],
   description: "A gentle, guided class for little ones who are new to learning, still need a guardian, and are slowly transitioning to a learning environment.",
   schedules: [
@@ -40,8 +39,7 @@ const CREATIVE_EXPLORER = {
   subtitleColor: "#0033A0",
   pillBg: "#0066CC",
   pillText: "white",
-  iconLeft: "🎨",
-  iconRight: "✏️",
+  icon: "palette",
   keywords: ["Create", "Explore", "Build", "Grow", "Belong"],
   description: "Hands-on, engaging activities that spark curiosity and build foundational skills through play, exploration and discovery.",
   schedules: [
@@ -62,8 +60,7 @@ const BRAVE_EXPLORER = {
   subtitleColor: "rgba(255,255,255,0.75)",
   pillBg: "#FFC107",
   pillText: "#1a2e6b",
-  iconLeft: "💡",
-  iconRight: "📋",
+  icon: "lightbulb",
   keywords: ["Braver", "Kinder", "More Me"],
   description: "A longer, richer experience designed to build confidence, independence and a love for learning, with a more structured approach and daily routines.",
   schedule: { days: "Monday – Friday", time: "3:00 PM – 4:15 PM" },
@@ -82,8 +79,7 @@ const SATURDAY_PLAYDATE = {
   subtitleColor: "rgba(255,255,255,0.9)",
   pillBg: "#FFC107",
   pillText: "#0033A0",
-  iconLeft: "🧩",
-  iconRight: "💙",
+  icon: "rainbow",
   keywords: ["Creative Play", "Hands-on Activities", "Make Friends"],
   description: "A fun and engaging play experience for little explorers on their weekend adventure! Same merry heart, new adventures.",
   schedules: [
@@ -120,10 +116,15 @@ function ProgramCard({
       className="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.10)] transition-all duration-300 hover:-translate-y-2"
     >
       {/* Header */}
-      <div className="relative px-6 pb-7 pt-8 text-center" style={{ backgroundColor: data.bgTop }}>
-        <span className="absolute left-6 top-6 text-2xl">{data.iconLeft}</span>
-        <span className="absolute right-6 top-6 text-2xl">{data.iconRight}</span>
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em]" style={{ color: data.subtitleColor }}>
+      <div className="relative px-6 pb-7 pt-12 text-center" style={{ backgroundColor: data.bgTop }}>
+        {/* Single Centered Emoji Icon */}
+        <div className="absolute left-1/2 -top-6 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-lg border-2 border-white/80">
+          {data.icon === "magnifying_glass" && <EmojiMagnifyingGlass className="h-9 w-9" />}
+          {data.icon === "palette" && <EmojiPalette className="h-9 w-9" />}
+          {data.icon === "lightbulb" && <EmojiLightbulb className="h-9 w-9" />}
+          {data.icon === "rainbow" && <EmojiRainbow className="h-9 w-9" />}
+        </div>
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] mt-2" style={{ color: data.subtitleColor }}>
           {data.club}
         </p>
         <h3 className="font-headline text-[22px] font-extrabold uppercase tracking-wider mt-0.5" style={{ color: data.titleColor }}>
@@ -286,10 +287,15 @@ export function ProgramsSection() {
                 className="relative mb-8 flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(26,46,107,0.12)] transition-all duration-300 hover:-translate-y-2"
               >
                 {/* Header */}
-                <div className="relative px-6 pb-7 pt-8 text-center" style={{ backgroundColor: BRAVE_EXPLORER.bgTop }}>
-                  <span className="absolute left-6 top-6 text-2xl">{BRAVE_EXPLORER.iconLeft}</span>
-                  <span className="absolute right-6 top-6 text-2xl">{BRAVE_EXPLORER.iconRight}</span>
-                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em]" style={{ color: BRAVE_EXPLORER.subtitleColor }}>
+                <div className="relative px-6 pb-7 pt-12 text-center" style={{ backgroundColor: BRAVE_EXPLORER.bgTop }}>
+                  {/* Single Centered Emoji Icon */}
+                  <div className="absolute left-1/2 -top-6 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-lg border-2 border-white/80">
+                    {BRAVE_EXPLORER.icon === "magnifying_glass" && <EmojiMagnifyingGlass className="h-9 w-9" />}
+                    {BRAVE_EXPLORER.icon === "palette" && <EmojiPalette className="h-9 w-9" />}
+                    {BRAVE_EXPLORER.icon === "lightbulb" && <EmojiLightbulb className="h-9 w-9" />}
+                    {BRAVE_EXPLORER.icon === "rainbow" && <EmojiRainbow className="h-9 w-9" />}
+                  </div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] mt-2" style={{ color: BRAVE_EXPLORER.subtitleColor }}>
                     {BRAVE_EXPLORER.club}
                   </p>
                   <h3 className="font-headline text-[22px] font-extrabold uppercase tracking-wider mt-0.5" style={{ color: BRAVE_EXPLORER.titleColor }}>

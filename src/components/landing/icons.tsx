@@ -325,3 +325,88 @@ export function HighlightIcon({ name, className }: { name: string; className?: s
   const Cmp = ICONS[name as keyof typeof ICONS] ?? StarIcon;
   return <Cmp className={className} />;
 }
+
+// ─── Custom Colorful Flat Emojis ──────────────────────────────────────────
+
+export function EmojiPalette({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      {/* Wooden Base */}
+      <path d="M48.5,12.5C36.9,4.3,19.3,7.6,11.2,19.1C3,30.7,5.5,47.8,17.1,56s30.8,3.9,38.9-7.7
+        C64.1,36.8,60,20.6,48.5,12.5z M23.6,46c-2.8,2-6.5,1.2-8.5-1.6s-1.2-6.5,1.6-8.5s6.5-1.2,8.5,1.6S26.3,44,23.6,46z" fill="#D2935D"/>
+      {/* Thumb hole inner shadow */}
+      <circle cx="19.3" cy="40.1" r="5.5" fill="#B47A4A"/>
+      <circle cx="20.3" cy="39.1" r="5.5" fill="#FFFFFF"/>
+      {/* Paint blobs */}
+      <circle cx="21" cy="22" r="4.5" fill="#EF4444"/>
+      <circle cx="34" cy="16" r="4.5" fill="#FDE047"/>
+      <circle cx="48" cy="24" r="4.5" fill="#22C55E"/>
+      <circle cx="50" cy="40" r="4.5" fill="#3B82F6"/>
+      <circle cx="36" cy="50" r="4.5" fill="#A855F7"/>
+    </svg>
+  );
+}
+
+export function EmojiMagnifyingGlass({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      {/* Handle */}
+      <path d="M37.5,39.5l14.1,14.1c1.9,1.9,1.9,5,0,7l0,0c-1.9,1.9-5,1.9-7,0L30.5,46.5L37.5,39.5z" fill="#4B5563"/>
+      {/* Metal rim */}
+      <circle cx="26" cy="26" r="20" fill="#9CA3AF"/>
+      <circle cx="26" cy="26" r="17" fill="#E5E7EB"/>
+      {/* Glass */}
+      <circle cx="26" cy="26" r="15" fill="#BAE6FD"/>
+      {/* Reflection */}
+      <path d="M15,20c1.7-5.1,6.5-8.8,12.2-8.8c4.3,0,8,2,10.4,5.1C35,16,33.5,16,32,16c-7.7,0-14,6.3-14,14c0,2.1,0.5,4.1,1.3,5.9
+        C16,34,14,30.3,14,26C14,23.9,14.4,21.8,15,20z" fill="#FFFFFF" opacity="0.6"/>
+    </svg>
+  );
+}
+
+export function EmojiLightbulb({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      {/* Glowing rays */}
+      <path d="M32,2v7 M17.9,8L21.4,14.1 M9.3,19.3L15.4,22.8 M4.1,34.5h7 M46.1,8L42.6,14.1 M54.7,19.3L48.6,22.8 M59.9,34.5h-7" stroke="#FBBF24" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      {/* Bulb body */}
+      <path d="M32,14c-9.9,0-18,8.1-18,18c0,5.9,2.8,11.1,7.2,14.4V50c0,1.1,0.9,2,2,2h17.6c1.1,0,2-0.9,2-2v-3.6
+        c4.4-3.3,7.2-8.5,7.2-14.4C50,22.1,41.9,14,32,14z" fill="#FDE047"/>
+      {/* Inner highlight */}
+      <path d="M18,32c0-7.7,6.3-14,14-14c4,0,7.6,1.7,10.1,4.4C39.6,17.4,36,16,32,16c-8.8,0-16,7.2-16,16c0,5,2.3,9.4,5.9,12.3l0.1-2.1
+        C19.6,39.6,18,36,18,32z" fill="#FFFFFF" opacity="0.5"/>
+      {/* Base */}
+      <path d="M23.2,52h17.6c1.1,0,2,0.9,2,2v2c0,1.1-0.9,2-2,2H23.2c-1.1,0-2-0.9-2-2v-2C21.2,52.9,22.1,52,23.2,52z" fill="#D1D5DB"/>
+      <path d="M25.2,58h13.6c1.1,0,2,0.9,2,2s-0.9,2-2,2H25.2c-1.1,0-2-0.9-2-2S24.1,58,25.2,58z" fill="#9CA3AF"/>
+    </svg>
+  );
+}
+
+export function EmojiRainbow({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      {/* Red */}
+      <path d="M7,48c0-13.8,11.2-25,25-25s25,11.2,25,25" fill="none" stroke="#EF4444" strokeWidth="4"/>
+      {/* Orange */}
+      <path d="M11,48c0-11.6,9.4-21,21-21s21,9.4,21,21" fill="none" stroke="#F97316" strokeWidth="4"/>
+      {/* Yellow */}
+      <path d="M15,48c0-9.4,7.6-17,17-17s17,7.6,17,17" fill="none" stroke="#FBBF24" strokeWidth="4"/>
+      {/* Green */}
+      <path d="M19,48c0-7.2,5.8-13,13-13s13,5.8,13,13" fill="none" stroke="#4ADE80" strokeWidth="4"/>
+      {/* Blue */}
+      <path d="M23,48c0-5,4-9,9-9s9,4,9,9" fill="none" stroke="#3B82F6" strokeWidth="4"/>
+      
+      {/* Cloud Left */}
+      <path d="M18,48c0,2.2-1.8,4-4,4H8c-2.2,0-4-1.8-4-4s1.8-4,4-4c0.5,0,1,0.1,1.5,0.3C10.6,42.3,12.6,41,15,41c2.4,0,4.5,1.5,5.3,3.6
+        C21,45,21.5,46,21.5,47c0,1.7-1.3,3-3,3" fill="#FFFFFF"/>
+      <path d="M18,48c0,2.2-1.8,4-4,4H8c-2.2,0-4-1.8-4-4s1.8-4,4-4c0.5,0,1,0.1,1.5,0.3C10.6,42.3,12.6,41,15,41c2.4,0,4.5,1.5,5.3,3.6
+        C21,45,21.5,46,21.5,47c0,1.7-1.3,3-3,3" fill="none" stroke="#E5E7EB" strokeWidth="1.5"/>
+        
+      {/* Cloud Right */}
+      <path d="M56,48c0,2.2-1.8,4-4,4h-6c-2.2,0-4-1.8-4-4s1.8-4,4-4c0.5,0,1,0.1,1.5,0.3c1.1-2,3.1-3.3,5.5-3.3c2.4,0,4.5,1.5,5.3,3.6
+        c0.7,0.4,1.2,1.4,1.2,2.4c0,1.7-1.3,3-3,3" fill="#FFFFFF"/>
+      <path d="M56,48c0,2.2-1.8,4-4,4h-6c-2.2,0-4-1.8-4-4s1.8-4,4-4c0.5,0,1,0.1,1.5,0.3c1.1-2,3.1-3.3,5.5-3.3c2.4,0,4.5,1.5,5.3,3.6
+        c0.7,0.4,1.2,1.4,1.2,2.4c0,1.7-1.3,3-3,3" fill="none" stroke="#E5E7EB" strokeWidth="1.5"/>
+    </svg>
+  );
+}
