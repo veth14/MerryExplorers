@@ -44,8 +44,8 @@ export async function POST(request: Request) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS, // Note: The project uses OAuth in gmail-client, but standard nodemailer uses USER/PASS. I'll stick to what inquiries route might use, or standard nodemailer. Wait, I should check what env vars they have. I'll use standard nodemailer for now.
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
@@ -74,9 +74,9 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       await transporter.sendMail({
-        from: `"Merry Explorers" <${process.env.GMAIL_USER}>`,
+        from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: "Your Child's Discovery Day Fit Score",
         html: htmlContent,

@@ -74,22 +74,93 @@ const getQuestions = (name: string): { section: SectionKey, text: React.ReactNod
   { section: "trailblazer", text: <>Can {name} <Highlight>stay engaged</Highlight> in a teacher-led activity for a short period?</> },
 ];
 
-// ── Answer Options (Dynamic based on question type) ───────────────────────────
-const getOptions = (section: SectionKey) => {
-  if (section === "curious") {
-    // Curious questions ask if the child *needs* support or is new to schooling
-    return [
-      { value: 2, label: "Yes", sublabel: "Often / Very much", emoji: "⭐", activeBorder: "#0F006E", activeBg: "#EEF0FF" },
-      { value: 1, label: "Sometimes", sublabel: "Occasionally", emoji: "🌱", activeBorder: "#C49B00", activeBg: "#FEFCE8" },
-      { value: 0, label: "No", sublabel: "Rarely / Not at all", emoji: "💭", activeBorder: "#94A3B8", activeBg: "#F8FAFC" },
+// ── Answer Options (Tailored to each question) ───────────────────────────
+const getOptions = (qIndex: number) => {
+  const d = { activeBorder: "#0F006E", activeBg: "#EEF0FF" };
+  const m = { activeBorder: "#C49B00", activeBg: "#FEFCE8" };
+  const l = { activeBorder: "#94A3B8", activeBg: "#F8FAFC" };
+
+  switch(qIndex) {
+    // Curious (0 - 4)
+    case 0: return [
+      { value: 2, label: "Yes", sublabel: "This is their first time", emoji: "⭐", ...d },
+      { value: 1, label: "Somewhat", sublabel: "They've had a little exposure", emoji: "🌱", ...m },
+      { value: 0, label: "No", sublabel: "They are used to classrooms", emoji: "💭", ...l },
+    ];
+    case 1: return [
+      { value: 2, label: "Yes", sublabel: "Needs a lot of guidance", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Needs occasional nudges", emoji: "🌱", ...m },
+      { value: 0, label: "No", sublabel: "Usually jumps right in", emoji: "💭", ...l },
+    ];
+    case 2: return [
+      { value: 2, label: "Yes", sublabel: "Stays very close to me", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Checks in occasionally", emoji: "🌱", ...m },
+      { value: 0, label: "No", sublabel: "Explores independently", emoji: "💭", ...l },
+    ];
+    case 3: return [
+      { value: 2, label: "Yes", sublabel: "Takes a while to warm up", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Needs a few minutes", emoji: "🌱", ...m },
+      { value: 0, label: "No", sublabel: "Joins immediately", emoji: "💭", ...l },
+    ];
+    case 4: return [
+      { value: 2, label: "Yes", sublabel: "Learns best 1-on-1", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Benefits from check-ins", emoji: "🌱", ...m },
+      { value: 0, label: "No", sublabel: "Works well independently", emoji: "💭", ...l },
+    ];
+    // Creative (5 - 9)
+    case 5: return [
+      { value: 2, label: "Yes", sublabel: "Explores confidently alone", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "With some reassurance", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Needs me right there", emoji: "💭", ...l },
+    ];
+    case 6: return [
+      { value: 2, label: "Yes", sublabel: "Converses/plays easily", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "With some warming up", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Shies away", emoji: "💭", ...l },
+    ];
+    case 7: return [
+      { value: 2, label: "Yes", sublabel: "Does most things alone", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Needs occasional help", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Needs full assistance", emoji: "💭", ...l },
+    ];
+    case 8: return [
+      { value: 2, label: "Yes", sublabel: "Understands and follows easily", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "With repetition/help", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Struggles to follow", emoji: "💭", ...l },
+    ];
+    case 9: return [
+      { value: 2, label: "Yes", sublabel: "Calms down quickly", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Needs a little help", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Needs significant comforting", emoji: "💭", ...l },
+    ];
+    // Trailblazer (10 - 14)
+    case 10: return [
+      { value: 2, label: "Yes", sublabel: "Sits upright comfortably", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Wiggles or needs support", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Needs to be held", emoji: "💭", ...l },
+    ];
+    case 11: return [
+      { value: 2, label: "Yes", sublabel: "Stays focused and seated", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Gets restless", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Constantly moving", emoji: "💭", ...l },
+    ];
+    case 12: return [
+      { value: 2, label: "Yes", sublabel: "Handles things easily", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Still developing grip", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Struggles to hold", emoji: "💭", ...l },
+    ];
+    case 13: return [
+      { value: 2, label: "Yes", sublabel: "Enjoys the structure", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Can get overwhelmed", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Prefers free play", emoji: "💭", ...l },
+    ];
+    case 14:
+    default: return [
+      { value: 2, label: "Yes", sublabel: "Pays attention easily", emoji: "⭐", ...d },
+      { value: 1, label: "Sometimes", sublabel: "Distracted easily", emoji: "🌱", ...m },
+      { value: 0, label: "Not Yet", sublabel: "Shows little interest", emoji: "💭", ...l },
     ];
   }
-  // Creative and Trailblazer questions ask about the child's *abilities* and independence
-  return [
-    { value: 2, label: "Yes", sublabel: "Does this comfortably", emoji: "⭐", activeBorder: "#0F006E", activeBg: "#EEF0FF" },
-    { value: 1, label: "Sometimes", sublabel: "With some help", emoji: "🌱", activeBorder: "#C49B00", activeBg: "#FEFCE8" },
-    { value: 0, label: "Not Yet", sublabel: "Needs significant support", emoji: "💭", activeBorder: "#94A3B8", activeBg: "#F8FAFC" },
-  ];
 };
 
 // ── Result descriptions ───────────────────────────────────────────────────────
@@ -266,7 +337,7 @@ function QuestionScreen({
   onAnswer: (points: number) => void;
 }) {
   const [chosen, setChosen] = useState<number | null>(null);
-  const options = getOptions(section);
+  const options = getOptions(qIndex);
 
   function pick(val: number) {
     if (chosen !== null) return;
