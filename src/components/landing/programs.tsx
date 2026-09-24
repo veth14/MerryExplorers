@@ -113,16 +113,16 @@ function ProgramCard({
       whileInView={{ opacity: 1, x: 0, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.6, delay, ease: "easeOut" }}
-      className="relative flex flex-col overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.10)] transition-all duration-300 hover:-translate-y-2"
+      className="relative flex flex-col rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_24px_80px_-10px_rgba(0,51,160,0.10)] transition-all duration-300 hover:-translate-y-2"
     >
       {/* Header */}
       <div className="relative px-6 pb-7 pt-12 text-center" style={{ backgroundColor: data.bgTop }}>
         {/* Single Centered Emoji Icon */}
-        <div className="absolute left-1/2 -top-6 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-lg border-2 border-white/80">
-          {data.icon === "magnifying_glass" && <EmojiMagnifyingGlass className="h-9 w-9" />}
-          {data.icon === "palette" && <EmojiPalette className="h-9 w-9" />}
-          {data.icon === "lightbulb" && <EmojiLightbulb className="h-9 w-9" />}
-          {data.icon === "rainbow" && <EmojiRainbow className="h-9 w-9" />}
+        <div className="absolute left-1/2 -top-7 -translate-x-1/2 flex h-14 w-14 items-center justify-center">
+          {data.icon === "magnifying_glass" && <EmojiMagnifyingGlass className="h-14 w-14" />}
+          {data.icon === "palette" && <EmojiPalette className="h-14 w-14" />}
+          {data.icon === "lightbulb" && <EmojiLightbulb className="h-14 w-14" />}
+          {data.icon === "rainbow" && <EmojiRainbow className="h-14 w-14" />}
         </div>
         <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] mt-2" style={{ color: data.subtitleColor }}>
           {data.club}
