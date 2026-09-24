@@ -229,10 +229,22 @@ export default function RegisterPage() {
   }, [runOCR]);
 
   const canProceedStep0 = selectedProgram !== "" && selectedClass !== "";
-  const canProceedStep1 =
-    childInfo.firstName && childInfo.lastName && childInfo.dateOfBirth && childInfo.gender &&
-    parentInfo.name && parentInfo.email && parentInfo.phone && parentInfo.relationship &&
-    emergencyContact.name && emergencyContact.phone && emergencyContact.relationship;
+
+  const missingStep1: string[] = [
+    ...(!childInfo.firstName ? ["Child's First Name"] : []),
+    ...(!childInfo.lastName ? ["Child's Last Name"] : []),
+    ...(!childInfo.dateOfBirth ? ["Date of Birth"] : []),
+    ...(!childInfo.gender ? ["Child's Gender"] : []),
+    ...(!parentInfo.name ? ["Parent/Guardian Full Name"] : []),
+    ...(!parentInfo.relationship ? ["Parent/Guardian Relationship"] : []),
+    ...(!parentInfo.email ? ["Parent/Guardian Email"] : []),
+    ...(!parentInfo.phone ? ["Parent/Guardian Phone"] : []),
+    ...(!emergencyContact.name ? ["Emergency Contact Name"] : []),
+    ...(!emergencyContact.phone ? ["Emergency Contact Phone"] : []),
+    ...(!emergencyContact.relationship ? ["Emergency Contact Relationship"] : []),
+  ];
+
+  const canProceedStep1 = missingStep1.length === 0;
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -726,17 +738,32 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
-                      ← Back
-                    </button>
-                    <button
-                      disabled={!canProceedStep1}
-                      onClick={() => setStep(2)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Continue <span>→</span>
-                    </button>
+                  <div className="mt-8">
+                    {!canProceedStep1 && (
+                      <div className="mb-4 rounded-2xl border border-orange-100 bg-orange-50 px-5 py-4">
+                        <p className="mb-2 text-[12px] font-extrabold uppercase tracking-widest text-orange-500">⚠ Please complete the following</p>
+                        <ul className="space-y-1">
+                          {missingStep1.map((field) => (
+                            <li key={field} className="flex items-center gap-2 text-[13px] font-semibold text-orange-700">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-400" />
+                              {field}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
+                        ← Back
+                      </button>
+                      <button
+                        disabled={!canProceedStep1}
+                        onClick={() => setStep(2)}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Continue <span>→</span>
+                      </button>
+                    </div>
                   </div>
                 </m.div>
               )}

@@ -222,8 +222,15 @@ export async function POST(
           </html>
         `,
       });
-    } catch (emailErr) {
-      console.warn("[payment POST] Failed to send acknowledgment email:", emailErr);
+    } catch (emailErr: any) {
+      console.error("[payment POST] ❌ Failed to send acknowledgment email:", {
+        message: emailErr?.message,
+        code: emailErr?.code,
+        hasClientId: !!process.env.GMAIL_CLIENT_ID,
+        hasEmailUser: !!process.env.EMAIL_USER,
+        hasEmailPass: !!process.env.EMAIL_PASS,
+        hasRefreshToken: !!process.env.GMAIL_REFRESH_TOKEN,
+      });
     }
 
     return NextResponse.json({ success: true });
