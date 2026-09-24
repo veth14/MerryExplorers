@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -85,7 +85,7 @@ function AgeDropdown({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-export default function InquirePage() {
+function InquirePageInner() {
   const searchParams = useSearchParams();
   const [parentName, setParentName] = useState("");
   const [email, setEmail] = useState("");
@@ -295,5 +295,13 @@ export default function InquirePage() {
       </main>
       <SiteFooter />
     </m.div>
+  );
+}
+
+export default function InquirePage() {
+  return (
+    <Suspense fallback={null}>
+      <InquirePageInner />
+    </Suspense>
   );
 }
