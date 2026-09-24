@@ -34,7 +34,7 @@ export function DiscoverFitSection() {
             </p>
 
             <Link
-              href={process.env.NEXT_PUBLIC_APP_ENV === "production" ? "/under-development" : "/discovery-day"}
+              href="/under-development"
               className="inline-flex items-center gap-3 rounded-2xl bg-[#FDE261] px-8 py-4 text-lg font-extrabold text-[#0F006E] shadow-lg transition-all hover:shadow-xl hover:-translate-y-1 active:scale-95"
             >
               <span>Take the Program Fit Quiz</span>
