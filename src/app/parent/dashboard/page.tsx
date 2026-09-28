@@ -801,145 +801,187 @@ export default function ParentDashboardPage() {
 
           {/* ── SESSION TAB ─────────────────────────────────────────────────── */}
           {activeTab === "session" && (
-            <div style={{ display: "grid", gap: "20px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
 
-              {/* Current Program Card */}
-              <div style={{ background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", borderRadius: "20px", padding: "28px", color: "white", boxShadow: "0 8px 32px rgba(0,47,118,0.25)", display: "flex", flexDirection: "column" }}>
-                <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.7, marginBottom: "12px" }}>Current Program</div>
-                <div style={{ fontSize: "22px", fontWeight: "800", marginBottom: "16px", lineHeight: "1.3", flex: 1 }}>
-                  {profile.program || "—"}
-                </div>
-                {profile.schedule && (
-                  <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", marginBottom: "10px" }}>
-                    <div style={{ fontSize: "11px", opacity: 0.7, fontWeight: "600", marginBottom: "2px" }}>SCHEDULE</div>
-                    <div style={{ fontWeight: "700", fontSize: "14px" }}>{profile.schedule}</div>
-                  </div>
-                )}
-                {profile.classTime && (
-                  <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px" }}>
-                    <div style={{ fontSize: "11px", opacity: 0.7, fontWeight: "600", marginBottom: "2px" }}>CLASS TIME</div>
-                    <div style={{ fontWeight: "700", fontSize: "14px" }}>{profile.classTime}</div>
-                  </div>
-                )}
-                
-                {/* Next Session Timer */}
-                {profile.schedule && profile.classTime && (
-                  <div style={{ marginTop: "16px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.7 }}>Next Session Starts In:</div>
-                    <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} />
-                  </div>
-                )}
-              </div>
+              {/* ── Hero Program Banner ── */}
+              <div style={{
+                background: "linear-gradient(135deg,#001a4d 0%,#002f76 45%,#0050d5 100%)",
+                borderRadius: "24px",
+                padding: "36px 40px",
+                color: "white",
+                boxShadow: "0 12px 48px rgba(0,47,118,0.35)",
+                position: "relative",
+                overflow: "hidden",
+              }}>
+                {/* Decorative circles */}
+                <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "200px", height: "200px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", bottom: "-60px", right: "80px", width: "160px", height: "160px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
 
-              {/* Latest Session Card */}
-              <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>📅</div>
-                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#002f76" }}>Latest Session</div>
-                </div>
-
-                {recentAlbum ? (
-                  <div>
-                    <p style={{ fontWeight: "700", color: "#002f76", fontSize: "15px", margin: "0 0 6px" }}>{recentAlbum.sessionLabel}</p>
-                    {recentAlbum.note && (
-                      <p style={{ color: "#64748b", fontSize: "13px", lineHeight: "1.6", background: "#f8faff", borderRadius: "10px", padding: "10px 14px", margin: "0 0 12px" }}>
-                        📝 {recentAlbum.note}
-                      </p>
-                    )}
-                    <div style={{ display: "flex", gap: "10px" }}>
-                      <span style={{ padding: "4px 12px", background: "#f0f5ff", color: "#0050d5", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #c5d6ff" }}>
-                        📸 {recentAlbum.photoCount} photo{recentAlbum.photoCount !== 1 ? "s" : ""}
-                      </span>
-                      {recentAlbum.expiresAt && !isExpired(recentAlbum.expiresAt) && (
-                        <span style={{ padding: "4px 12px", background: "#fff8e1", color: "#b45309", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #fde68a" }}>
-                          ⏰ Expires {fmtDate(recentAlbum.expiresAt)}
-                        </span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "24px", position: "relative" }}>
+                  <div style={{ flex: 1, minWidth: "200px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "2px", opacity: 0.6, marginBottom: "8px" }}>🎓 Current Program</div>
+                    <div style={{ fontSize: "28px", fontWeight: "900", lineHeight: "1.2", marginBottom: "20px", letterSpacing: "-0.5px" }}>
+                      {profile.program || "—"}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                      {profile.schedule && (
+                        <div style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: "12px", padding: "10px 16px", border: "1px solid rgba(255,255,255,0.15)" }}>
+                          <div style={{ fontSize: "10px", opacity: 0.65, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "3px" }}>📅 Schedule</div>
+                          <div style={{ fontWeight: "800", fontSize: "14px" }}>{profile.schedule}</div>
+                        </div>
                       )}
-                      {recentAlbum.expiresAt && isExpired(recentAlbum.expiresAt) && (
-                        <span style={{ padding: "4px 12px", background: "#fff0f0", color: "#ba1a1a", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #ffd5d5" }}>
-                          Expired
-                        </span>
+                      {profile.classTime && (
+                        <div style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: "12px", padding: "10px 16px", border: "1px solid rgba(255,255,255,0.15)" }}>
+                          <div style={{ fontSize: "10px", opacity: 0.65, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "3px" }}>🕐 Class Time</div>
+                          <div style={{ fontWeight: "800", fontSize: "14px" }}>{profile.classTime}</div>
+                        </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => { setActiveTab("photos"); setExpandedAlbum(recentAlbum.id); }}
-                      style={{ marginTop: "16px", padding: "10px 20px", background: "linear-gradient(135deg,#002f76,#0050d5)", color: "white", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer", width: "100%" }}
-                    >
-                      View Photos →
-                    </button>
                   </div>
-                ) : (
-                  <div style={{ textAlign: "center", padding: "20px 0", color: "#94a3b8" }}>
-                    <div style={{ fontSize: "32px", marginBottom: "8px" }}>📷</div>
-                    <p style={{ fontSize: "13px", fontWeight: "600" }}>No sessions recorded yet</p>
-                  </div>
-                )}
+
+                  {/* Countdown */}
+                  {profile.schedule && profile.classTime && (
+                    <div style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(12px)", borderRadius: "16px", padding: "20px 24px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", minWidth: "220px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.65, marginBottom: "10px" }}>⏱ Next Session</div>
+                      <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} />
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Child Info Card */}
-              <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>👦</div>
-                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#002f76" }}>Explorer Profile</div>
-                </div>
-                {profile.studentInfo ? (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", background: "linear-gradient(135deg,#f0f7ff,#e8f0fe)", borderRadius: "12px", marginBottom: "12px" }}>
-                      <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "linear-gradient(135deg,#002f76,#0050d5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", color: "white", fontWeight: "800", flexShrink: 0 }}>
-                        {profile.studentInfo.childInfo.firstName?.[0] || "?"}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: "800", fontSize: "16px", color: "#002f76" }}>
-                          {profile.studentInfo.childInfo.firstName} {profile.studentInfo.childInfo.lastName}
-                        </div>
-                        {profile.studentInfo.childInfo.nickname && (
-                          <div style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>&quot;{profile.studentInfo.childInfo.nickname}&quot;</div>
+              {/* ── Two-column cards row ── */}
+              <div style={{ display: "grid", gap: "20px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+
+                {/* Latest Session Card */}
+                <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                    <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#fef3c7,#fde68a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>📅</div>
+                    <div>
+                      <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Latest Session</div>
+                      <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>Most recent class activity</div>
+                    </div>
+                  </div>
+
+                  {recentAlbum ? (
+                    <div>
+                      <p style={{ fontWeight: "800", color: "#002f76", fontSize: "15px", margin: "0 0 10px" }}>{recentAlbum.sessionLabel}</p>
+                      {recentAlbum.note && (
+                        <p style={{ color: "#64748b", fontSize: "13px", lineHeight: "1.7", background: "#f8faff", borderRadius: "12px", padding: "12px 16px", margin: "0 0 14px", borderLeft: "3px solid #c5d6ff" }}>
+                          📝 {recentAlbum.note}
+                        </p>
+                      )}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+                        <span style={{ padding: "5px 14px", background: "#f0f5ff", color: "#0050d5", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #c5d6ff" }}>
+                          📸 {recentAlbum.photoCount} photo{recentAlbum.photoCount !== 1 ? "s" : ""}
+                        </span>
+                        {recentAlbum.expiresAt && !isExpired(recentAlbum.expiresAt) && (
+                          <span style={{ padding: "5px 14px", background: "#fff8e1", color: "#b45309", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #fde68a" }}>
+                            ⏰ Expires {fmtDate(recentAlbum.expiresAt)}
+                          </span>
+                        )}
+                        {recentAlbum.expiresAt && isExpired(recentAlbum.expiresAt) && (
+                          <span style={{ padding: "5px 14px", background: "#fff0f0", color: "#ba1a1a", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #ffd5d5" }}>
+                            ✗ Expired
+                          </span>
                         )}
                       </div>
+                      <button
+                        onClick={() => { setActiveTab("photos"); setExpandedAlbum(recentAlbum.id); }}
+                        style={{ padding: "12px 20px", background: "linear-gradient(135deg,#002f76,#0050d5)", color: "white", border: "none", borderRadius: "12px", fontWeight: "700", fontSize: "13px", cursor: "pointer", width: "100%", boxShadow: "0 4px 16px rgba(0,47,118,0.25)", transition: "all 0.2s" }}
+                        onMouseOver={e => (e.currentTarget.style.transform = "translateY(-1px)")}
+                        onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}
+                      >
+                        View Session Photos →
+                      </button>
                     </div>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "32px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
+                      <div style={{ fontSize: "40px", marginBottom: "10px", opacity: 0.5 }}>📷</div>
+                      <p style={{ fontSize: "14px", fontWeight: "700", color: "#94a3b8", margin: 0 }}>No sessions recorded yet</p>
+                      <p style={{ fontSize: "12px", color: "#b0bec5", marginTop: "4px" }}>Photos will appear here after your first class</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Explorer Profile Card */}
+                <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                    <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#dcfce7,#bbf7d0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>🧒</div>
+                    <div>
+                      <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Explorer Profile</div>
+                      <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>Your child&apos;s registration details</div>
+                    </div>
+                  </div>
+
+                  {profile.studentInfo ? (
+                    <>
+                      {/* Child avatar row */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", background: "linear-gradient(135deg,#f0f7ff,#e8f0fe)", borderRadius: "16px", marginBottom: "16px", border: "1px solid rgba(0,80,213,0.08)" }}>
+                        <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "linear-gradient(135deg,#002f76,#0050d5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", color: "white", fontWeight: "900", flexShrink: 0, boxShadow: "0 4px 16px rgba(0,47,118,0.3)" }}>
+                          {profile.studentInfo.childInfo.firstName?.[0] || "?"}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: "900", fontSize: "18px", color: "#002f76", letterSpacing: "-0.3px" }}>
+                            {profile.studentInfo.childInfo.firstName} {profile.studentInfo.childInfo.lastName}
+                          </div>
+                          {profile.studentInfo.childInfo.nickname && (
+                            <div style={{ fontSize: "13px", color: "#64748b", fontStyle: "italic", marginTop: "2px" }}>&quot;{profile.studentInfo.childInfo.nickname}&quot;</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Details grid */}
+                      <div style={{ display: "grid", gap: "6px", marginBottom: "14px" }}>
+                        {([
+                          { label: "Program", value: profile.studentInfo.programName || profile.studentInfo.program, icon: "🎓" },
+                          { label: "Schedule", value: profile.studentInfo.schedule || profile.schedule || "—", icon: "📅" },
+                          { label: "Class Time", value: profile.studentInfo.classTime || profile.classTime || "—", icon: "🕐" },
+                          { label: "Date of Birth", value: profile.studentInfo.childInfo.dateOfBirth || "—", icon: "🎂" },
+                          { label: "Gender", value: profile.studentInfo.childInfo.gender || "—", icon: "👤" },
+                          { label: "Health Notes", value: profile.studentInfo.childInfo.healthProfile || "None", icon: "🩺" },
+                          { label: "Enrolled", value: profile.studentInfo.enrolledAt ? new Date(profile.studentInfo.enrolledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—", icon: "📋" },
+                          { label: "Reg. ID", value: profile.studentInfo.registrationId || "—", icon: "🔖" },
+                        ] as const).map(({ label, value, icon }) => (
+                          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 13px", background: "#f8faff", borderRadius: "10px", gap: "8px" }}>
+                            <dt style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }}>
+                              <span>{icon}</span>{label}
+                            </dt>
+                            <dd style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", margin: 0, textAlign: "right", maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</dd>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Favorites */}
+                      {(profile.studentInfo.childInfo.favoriteSong || profile.studentInfo.childInfo.favoriteColor || profile.studentInfo.childInfo.favoriteCharacter) && (
+                        <div style={{ padding: "14px 16px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)", borderRadius: "14px", border: "1px solid #fde68a" }}>
+                          <div style={{ fontSize: "11px", fontWeight: "800", color: "#b45309", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>⭐ Favorites</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                            {profile.studentInfo.childInfo.favoriteSong && <span style={{ padding: "5px 12px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "700", color: "#92400e", border: "1px solid #fde68a", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>🎵 {profile.studentInfo.childInfo.favoriteSong}</span>}
+                            {profile.studentInfo.childInfo.favoriteColor && <span style={{ padding: "5px 12px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "700", color: "#92400e", border: "1px solid #fde68a", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>🎨 {profile.studentInfo.childInfo.favoriteColor}</span>}
+                            {profile.studentInfo.childInfo.favoriteCharacter && <span style={{ padding: "5px 12px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "700", color: "#92400e", border: "1px solid #fde68a", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>⭐ {profile.studentInfo.childInfo.favoriteCharacter}</span>}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <dl style={{ margin: 0, display: "grid", gap: "8px" }}>
-                      {([
-                        { label: "Program", value: profile.studentInfo.programName || profile.studentInfo.program },
-                        { label: "Schedule", value: profile.studentInfo.schedule || profile.schedule || "—" },
-                        { label: "Class Time", value: profile.studentInfo.classTime || profile.classTime || "—" },
-                        { label: "Date of Birth", value: profile.studentInfo.childInfo.dateOfBirth || "—" },
-                        { label: "Gender", value: profile.studentInfo.childInfo.gender || "—" },
-                        { label: "Health Notes", value: profile.studentInfo.childInfo.healthProfile || "None" },
-                        { label: "Enrolled", value: profile.studentInfo.enrolledAt ? new Date(profile.studentInfo.enrolledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—" },
-                        { label: "Registration ID", value: profile.studentInfo.registrationId || "—" },
-                      ] as const).map(({ label, value }) => (
-                        <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f8faff", borderRadius: "8px" }}>
-                          <dt style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</dt>
+                      {[
+                        { label: "Name", value: profile.childName, icon: "👤" },
+                        { label: "Program", value: profile.program, icon: "🎓" },
+                        { label: "Schedule", value: profile.schedule || "—", icon: "📅" },
+                        { label: "Class Time", value: profile.classTime || "—", icon: "🕐" },
+                      ].map(({ label, value, icon }) => (
+                        <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 13px", background: "#f8faff", borderRadius: "10px" }}>
+                          <dt style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                            <span>{icon}</span>{label}
+                          </dt>
                           <dd style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", margin: 0, textAlign: "right", maxWidth: "60%" }}>{value}</dd>
                         </div>
                       ))}
                     </dl>
-                    {(profile.studentInfo.childInfo.favoriteSong || profile.studentInfo.childInfo.favoriteColor || profile.studentInfo.childInfo.favoriteCharacter) && (
-                      <div style={{ marginTop: "12px", padding: "12px", background: "#fff8f0", borderRadius: "10px", border: "1px solid #fed7aa" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#b45309", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "6px" }}>⭐ Favorites</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                          {profile.studentInfo.childInfo.favoriteSong && <span style={{ padding: "3px 10px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "600", color: "#92400e", border: "1px solid #fde68a" }}>🎵 {profile.studentInfo.childInfo.favoriteSong}</span>}
-                          {profile.studentInfo.childInfo.favoriteColor && <span style={{ padding: "3px 10px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "600", color: "#92400e", border: "1px solid #fde68a" }}>🎨 {profile.studentInfo.childInfo.favoriteColor}</span>}
-                          {profile.studentInfo.childInfo.favoriteCharacter && <span style={{ padding: "3px 10px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "600", color: "#92400e", border: "1px solid #fde68a" }}>⭐ {profile.studentInfo.childInfo.favoriteCharacter}</span>}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <dl style={{ margin: 0, display: "grid", gap: "10px" }}>
-                    {[
-                      { label: "Name", value: profile.childName },
-                      { label: "Program", value: profile.program },
-                      { label: "Schedule", value: profile.schedule || "—" },
-                      { label: "Class Time", value: profile.classTime || "—" },
-                    ].map(({ label, value }) => (
-                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f8faff", borderRadius: "8px" }}>
-                        <dt style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</dt>
-                        <dd style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", margin: 0, textAlign: "right", maxWidth: "60%" }}>{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
+                  )}
+                </div>
+
               </div>
             </div>
           )}
