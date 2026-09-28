@@ -66,15 +66,13 @@ export function SiteHeader() {
         {/* ── Desktop Nav ── */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-3">
           {NAV_LINKS.map((link) => {
-            const isCTA = link.label.toLowerCase() === "inquire";
-            if (isCTA) return null;
             return (
               <Link
                 key={link.label}
                 href={link.href}
                 className="relative group px-4 py-2 text-[15px] font-bold text-[#4a5f82] transition-colors hover:text-[#0033A0]"
               >
-                {link.label}
+                {link.label.replace("Now", "").trim()}
                 <span className="absolute bottom-1 left-4 right-4 h-0.5 scale-x-0 rounded-full bg-[#0033A0] transition-transform duration-300 origin-center group-hover:scale-x-100" />
               </Link>
             );
@@ -83,11 +81,11 @@ export function SiteHeader() {
           <div className="w-px h-6 bg-black/5 mx-2" aria-hidden="true" />
 
           <Link
-            href="/inquire"
+            href="/parent/login"
             className="group relative overflow-hidden rounded-full bg-[#FFC107] px-6 py-2.5 text-[15px] font-bold text-[#0a1835] shadow-[0_4px_12px_rgba(255,193,7,0.3)] transition-all duration-300 hover:shadow-[0_8px_20px_rgba(255,193,7,0.4)] hover:-translate-y-0.5 will-change-transform"
           >
             <span className="relative z-10 flex items-center gap-2">
-              Inquire Now
+              Parent Portal
               <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -147,23 +145,37 @@ export function SiteHeader() {
                 <ul className="flex flex-col gap-1">
                   {NAV_LINKS.map((link) => {
                     const isCTA = link.label.toLowerCase() === "inquire";
+                    if (isCTA) return null; // We'll render CTA separately
                     return (
                       <li key={link.label}>
                         <Link
                           href={link.href}
                           onClick={() => setOpen(false)}
-                          className={[
-                            "block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors",
-                            isCTA
-                              ? "bg-[#FFC107] text-[#0a1835] mt-2 text-center shadow-md shadow-[#FFC107]/20"
-                              : "text-[#334e7a] hover:bg-[#eaf0fe] hover:text-[#0033A0]"
-                          ].join(" ")}
+                          className="block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors text-[#334e7a] hover:bg-[#eaf0fe] hover:text-[#0033A0]"
                         >
                           {link.label}
                         </Link>
                       </li>
                     );
                   })}
+                  <li>
+                    <Link
+                      href="/inquire"
+                      onClick={() => setOpen(false)}
+                      className="block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors text-[#0033A0] hover:bg-[#eaf0fe]"
+                    >
+                      Inquire
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/parent/login"
+                      onClick={() => setOpen(false)}
+                      className="block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors bg-[#FFC107] text-[#0a1835] mt-2 text-center shadow-md shadow-[#FFC107]/20"
+                    >
+                      Parent Portal
+                    </Link>
+                  </li>
                 </ul>
               </nav>
             </m.div>

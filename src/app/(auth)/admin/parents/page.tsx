@@ -188,6 +188,147 @@ const INPUT_CLS =
 const SELECT_CLS =
   "w-full rounded-xl border border-[#d0d8e8] bg-[#f8faff] px-4 py-2.5 text-[13.5px] font-semibold text-[#002f76] outline-none focus:border-[#0050d5] focus:ring-2 focus:ring-[#0050d5]/15 transition-all cursor-pointer appearance-none disabled:cursor-not-allowed disabled:opacity-60";
 
+// ─── Waiver Sign Modal ──────────────────────────────────────────────────────
+function WaiverSignModal({
+  draft,
+  onConfirm,
+  onCancel,
+}: {
+  draft: { fullName: string; childName: string; program: string };
+  onConfirm: (signatureDataUrl: string) => void;
+  onCancel: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    ctx.scale(2, 2);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 2.5;
+  }, []);
+
+  const getXY = (e: React.MouseEvent | React.TouchEvent, rect: DOMRect) => {
+    if ("touches" in e) return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d"); if (!ctx) return;
+    setIsDrawing(true); setHasSignature(true);
+    const { x, y } = getXY(e, canvas.getBoundingClientRect());
+    ctx.beginPath(); ctx.moveTo(x, y);
+  };
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d"); if (!ctx) return;
+    const { x, y } = getXY(e, canvas.getBoundingClientRect());
+    ctx.lineTo(x, y); ctx.stroke();
+  };
+  const stopDrawing = () => setIsDrawing(false);
+  const clearSignature = () => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d"); if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSignature(false);
+  };
+  const handleConfirm = () => {
+    if (!hasSignature) return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    onConfirm(canvas.toDataURL("image/png"));
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,15,40,0.7)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "560px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,47,118,0.3)" }}>
+        
+        {/* Header */}
+        <div style={{ background: "linear-gradient(135deg,#002f76,#0050d5)", padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div>
+            <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "11px", fontWeight: "800", letterSpacing: "0.1em", textTransform: "uppercase" }}>Step Required</div>
+            <div style={{ color: "white", fontSize: "18px", fontWeight: "800", marginTop: "2px" }}>Sign the Waiver</div>
+          </div>
+          <button onClick={onCancel} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", width: "32px", height: "32px", borderRadius: "50%", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
+
+        {/* Scrollable waiver content */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}>
+          <p style={{ fontSize: "13px", color: "#475569", lineHeight: 1.6, marginBottom: "16px" }}>
+            Before creating this account, the parent must acknowledge and agree to the following policies.
+          </p>
+
+          <div style={{ background: "#f8faff", borderRadius: "12px", padding: "16px", fontSize: "13px", color: "#334155", lineHeight: 1.7, border: "1px solid #e2e8f0", maxHeight: "260px", overflowY: "auto" }}>
+            <p style={{ fontWeight: "800", color: "#002f76", marginBottom: "8px", fontSize: "14px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
+            <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to all program terms and policies including: Adventure/Cycle structure, programs and fees, registration and payment terms (60% non-refundable reservation, 40% balance on 6th session, 4% weekly interest on overdue balances), attendance and make-up session rules, photo and video highlights schedule and deletion policy, and uniform policy.</p>
+            <p style={{ marginTop: "12px" }}>I confirm that the information I provided about my child is true and complete, and I agree to comply with Merry Explorers' policies and arrangements.</p>
+            <p style={{ marginTop: "12px" }}>By signing below, I voluntarily acknowledge, accept, and agree to be bound by these terms as part of my child's registration with Merry Explorers Playgroup Learning Center.</p>
+          </div>
+
+          <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
+            <div>
+              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Child's Name</div>
+              <div style={{ fontWeight: "800", color: "#002f76" }}>{draft.childName || "—"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Program</div>
+              <div style={{ fontWeight: "800", color: "#002f76" }}>{draft.program || "—"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Parent/Guardian</div>
+              <div style={{ fontWeight: "800", color: "#002f76" }}>{draft.fullName || "—"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Date</div>
+              <div style={{ fontWeight: "800", color: "#002f76" }}>{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <label style={{ fontSize: "13px", fontWeight: "800", color: "#1e293b" }}>Parent/Guardian Signature</label>
+              <button onClick={clearSignature} style={{ fontSize: "12px", color: "#0050d5", fontWeight: "700", background: "none", border: "none", cursor: "pointer" }}>Clear</button>
+            </div>
+            <div style={{ border: "2px dashed #94a3b8", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" }}>
+              <canvas
+                ref={canvasRef}
+                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing}
+                onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
+                style={{ width: "100%", height: "160px", cursor: "crosshair", display: "block", touchAction: "none" }}
+              />
+            </div>
+            {!hasSignature && <p style={{ fontSize: "12px", color: "#ef4444", fontWeight: "700", marginTop: "6px" }}>Please sign above to continue.</p>}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ borderTop: "1px solid #e2e8f0", padding: "16px 24px", display: "flex", gap: "12px", justifyContent: "flex-end", flexShrink: 0, background: "#f8fafc" }}>
+          <button onClick={onCancel} style={{ padding: "10px 20px", borderRadius: "99px", fontWeight: "800", fontSize: "13px", color: "#64748b", background: "rgba(148,163,184,0.1)", border: "none", cursor: "pointer" }}>
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!hasSignature}
+            style={{ padding: "10px 24px", borderRadius: "99px", fontWeight: "800", fontSize: "13px", color: "white", background: hasSignature ? "linear-gradient(135deg,#10b981,#059669)" : "#94a3b8", border: "none", cursor: hasSignature ? "pointer" : "not-allowed", boxShadow: hasSignature ? "0 8px 20px rgba(16,185,129,0.3)" : "none", transition: "all 0.2s" }}
+          >
+            I Agree & Create Account
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal ──────────────────────────────────────────────────────────────────
 function ParentModal({
   mode,
@@ -198,13 +339,15 @@ function ParentModal({
   mode: "add" | "edit";
   initial?: ParentAccount;
   onClose: () => void;
-  onSave: (account: Omit<ParentAccount, "id">, id?: string) => Promise<void>;
+  onSave: (account: Omit<ParentAccount, "id">, id?: string) => Promise<string | undefined>;
 }) {
   const [draft, setDraft] = useState<Draft>(initial ? draftFromUser(initial) : emptyDraft());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [showWaiverModal, setShowWaiverModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"save" | "saveAndSign" | null>(null);
 
   function set<K extends keyof Draft>(key: K, val: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: val }));
@@ -229,17 +372,21 @@ function ParentModal({
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      if (ev.target?.result) set("avatarUrl", ev.target.result as string);
+      if (ev.target?.result) {
+        setDraft((d) => ({ ...d, avatarUrl: ev.target!.result as string }));
+        setError("");
+      }
     };
     reader.readAsDataURL(file);
   }, []);
 
-  async function handleSubmit() {
-    if (!draft.fullName.trim()) { setError("Parent's full name is required."); return; }
-    if (!draft.email.trim()) { setError("Email is required."); return; }
-    if (!draft.childName.trim()) { setError("Child's name is required."); return; }
-    if (!draft.program.trim()) { setError("Please select a Program / Adventure."); return; }
-    if (!draft.classTime.trim()) { setError("Please select a class time."); return; }
+  // Validates, saves, and returns the saved account id (or undefined on failure).
+  async function submit(): Promise<string | undefined> {
+    if (!draft.fullName.trim()) { setError("Parent's full name is required."); return undefined; }
+    if (!draft.email.trim()) { setError("Email is required."); return undefined; }
+    if (!draft.childName.trim()) { setError("Child's name is required."); return undefined; }
+    if (!draft.program.trim()) { setError("Please select a Program / Adventure."); return undefined; }
+    if (!draft.classTime.trim()) { setError("Please select a class time."); return undefined; }
 
     setLoading(true);
     setError("");
@@ -270,12 +417,72 @@ function ParentModal({
         role: "Parent",
       };
 
-      await onSave(account, initial?.id);
+      return await onSave(account, initial?.id);
     } catch (err: any) {
       console.error(err);
-      setError("An error occurred while saving.");
+      setError(err?.message || "An error occurred while saving.");
+      return undefined;
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (mode === "add") {
+      // Validate first before showing waiver
+      if (!draft.fullName.trim()) { setError("Parent's full name is required."); return; }
+      if (!draft.email.trim()) { setError("Email is required."); return; }
+      if (!draft.childName.trim()) { setError("Child's name is required."); return; }
+      if (!draft.program.trim()) { setError("Please select a Program / Adventure."); return; }
+      if (!draft.classTime.trim()) { setError("Please select a class time."); return; }
+      setPendingAction("save");
+      setShowWaiverModal(true);
+      return;
+    }
+    const id = await submit();
+    if (id) onClose();
+  }
+
+  async function handleSaveAndSign() {
+    if (mode === "add") {
+      if (!draft.fullName.trim()) { setError("Parent's full name is required."); return; }
+      if (!draft.email.trim()) { setError("Email is required."); return; }
+      if (!draft.childName.trim()) { setError("Child's name is required."); return; }
+      if (!draft.program.trim()) { setError("Please select a Program / Adventure."); return; }
+      if (!draft.classTime.trim()) { setError("Please select a class time."); return; }
+      setPendingAction("saveAndSign");
+      setShowWaiverModal(true);
+      return;
+    }
+    const win = window.open("", "_blank");
+    const id = await submit();
+    if (id) {
+      const url = `/admin/parents/waiver/${id}`;
+      if (win) win.location.href = url;
+      else window.open(url, "_blank");
+      onClose();
+    } else {
+      win?.close();
+    }
+  }
+
+  async function handleWaiverConfirm(signatureDataUrl: string) {
+    setShowWaiverModal(false);
+    // Inject the signature into the draft before saving
+    const draftWithSig = { ...draft, waiverSigned: true, waiverSignedAt: new Date().toISOString(), waiverSignature: signatureDataUrl } as any;
+    setLoading(true);
+    setError("");
+    try {
+      const savedId = await onSave(draftWithSig as any, initial?.id);
+      if (pendingAction === "saveAndSign" && savedId) {
+        window.open(`/admin/parents/waiver/${savedId}`, "_blank");
+      }
+      if (savedId) onClose();
+    } catch (err: any) {
+      setError(err?.message || "An error occurred while saving.");
+    } finally {
+      setLoading(false);
+      setPendingAction(null);
     }
   }
 
@@ -288,6 +495,7 @@ function ParentModal({
   const isKnownTime = timeOptions.includes(draft.classTime);
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#e2e8f0] overflow-hidden flex flex-col max-h-[90vh]">
@@ -430,16 +638,47 @@ function ParentModal({
           )}
         </div>
 
-        <div className="bg-[#f8fafc] px-6 py-4 flex justify-end gap-3 shrink-0 border-t border-[#e2e8f0]">
-          <button onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#5a6e8c] hover:bg-[#e2e8f0]/50 transition-colors">
-            Cancel
-          </button>
-          <button onClick={handleSubmit} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] bg-[#005cc8] text-white hover:bg-[#004bb0] transition-colors flex items-center gap-2">
-            {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "Save"}
-          </button>
+        <div className="bg-[#f8fafc] px-6 py-4 flex flex-col md:flex-row justify-between gap-3 shrink-0 border-t border-[#e2e8f0]">
+          <div>
+            {mode === "edit" && initial?.id ? (
+              <button
+                type="button"
+                onClick={() => window.open(`/admin/parents/waiver/${initial.id}`, "_blank")}
+                className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#0050d5] bg-[#eaf0fe] hover:bg-[#d4e0fc] transition-colors"
+              >
+                Sign Waiver
+              </button>
+            ) : mode === "add" ? (
+              <button
+                type="button"
+                onClick={handleSaveAndSign}
+                disabled={loading}
+                className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#0050d5] bg-[#eaf0fe] hover:bg-[#d4e0fc] transition-colors flex items-center gap-2 disabled:opacity-60"
+              >
+                {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0050d5]/30 border-t-[#0050d5]" /> : "Save & Sign Waiver"}
+              </button>
+            ) : null}
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#5a6e8c] hover:bg-[#e2e8f0]/50 transition-colors">
+              Cancel
+            </button>
+            <button type="button" onClick={handleSave} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] bg-[#005cc8] text-white hover:bg-[#004bb0] transition-colors flex items-center gap-2 disabled:opacity-60">
+              {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "Save"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
+
+    {showWaiverModal && (
+      <WaiverSignModal
+        draft={{ fullName: draft.fullName, childName: draft.childName, program: draft.program }}
+        onConfirm={handleWaiverConfirm}
+        onCancel={() => { setShowWaiverModal(false); setPendingAction(null); }}
+      />
+    )}
+    </>
   );
 }
 
@@ -474,7 +713,8 @@ export default function AdminParentsPage() {
     }
   }
 
-  async function handleSaveAccount(accountData: Omit<ParentAccount, "id">, id?: string) {
+  async function handleSaveAccount(accountData: Omit<ParentAccount, "id">, id?: string): Promise<string | undefined> {
+    let savedId = id;
     if (id) {
       // Existing account — standard update via /api/accounts/[id]
       const res = await fetch(`/api/accounts/${id}`, {
@@ -497,6 +737,7 @@ export default function AdminParentsPage() {
       }
 
       const result = await res.json();
+      savedId = result.id;
       if (result.warning) {
         // Email failed but account was created — we'll handle this gracefully
         console.warn("[Parent Account] Email warning:", result.warning);
@@ -508,7 +749,7 @@ export default function AdminParentsPage() {
 
     invalidateCache("/api/accounts");
     await loadAccounts();
-    setModalMode(null);
+    return savedId;
   }
 
   const activeCount = data.filter((d) => d.status === "active").length;

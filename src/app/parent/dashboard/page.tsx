@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,60 @@ function fmtDate(str: string) {
 function isExpired(expiresAt: string | null) {
   if (!expiresAt) return false;
   return new Date(expiresAt) < new Date();
+}
+
+function parseScheduleDays(schedule: string): number[] {
+  const days: number[] = [];
+  const s = schedule.toLowerCase();
+  if (s.includes("monday – friday") || s.includes("monday - friday")) {
+    return [1, 2, 3, 4, 5];
+  }
+  if (s.includes("monday")) days.push(1);
+  if (s.includes("tuesday")) days.push(2);
+  if (s.includes("wednesday")) days.push(3);
+  if (s.includes("thursday")) days.push(4);
+  if (s.includes("friday")) days.push(5);
+  if (s.includes("saturday")) days.push(6);
+  if (s.includes("sunday")) days.push(0);
+  return days;
+}
+
+function parseStartTime(classTime: string): { hour: number; minute: number } | null {
+  // e.g. "9:45 AM – 11:00 AM" or "4:25 PM - 5:25 PM"
+  const match = classTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const min = parseInt(match[2], 10);
+  const meridiem = match[3].toUpperCase();
+  if (meridiem === "PM" && hour < 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return { hour, minute: min };
+}
+
+function getNextSessionDate(schedule: string, classTime: string): Date | null {
+  const days = parseScheduleDays(schedule);
+  const time = parseStartTime(classTime);
+  if (days.length === 0 || !time) return null;
+
+  const now = new Date();
+  let candidate = new Date(now);
+  candidate.setHours(time.hour, time.minute, 0, 0);
+
+  // If today is a session day, check if it's already past the start time
+  if (days.includes(now.getDay()) && candidate > now) {
+    return candidate;
+  }
+
+  // Otherwise, find the next day
+  for (let i = 1; i <= 7; i++) {
+    candidate = new Date(now);
+    candidate.setDate(now.getDate() + i);
+    if (days.includes(candidate.getDay())) {
+      candidate.setHours(time.hour, time.minute, 0, 0);
+      return candidate;
+    }
+  }
+  return null;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -128,6 +184,53 @@ function Lightbox({ photos, startIndex, onClose }: { photos: PhotoItem[]; startI
   );
 }
 
+// Countdown Timer
+function NextSessionCountdown({ schedule, classTime }: { schedule: string; classTime: string }) {
+  const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
+
+  useEffect(() => {
+    const nextDate = getNextSessionDate(schedule, classTime);
+    if (!nextDate) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = nextDate.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setTimeLeft({ d: 0, h: 0, m: 0, s: 0 });
+        return;
+      }
+
+      setTimeLeft({
+        d: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        h: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        m: Math.floor((diff / 1000 / 60) % 60),
+        s: Math.floor((diff / 1000) % 60),
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [schedule, classTime]);
+
+  if (!timeLeft) return null;
+
+  return (
+    <div style={{ display: "flex", gap: "8px", marginTop: "12px", background: "rgba(0,0,0,0.15)", padding: "12px", borderRadius: "12px" }}>
+      {[
+        { label: "DAYS", val: timeLeft.d },
+        { label: "HOURS", val: timeLeft.h },
+        { label: "MINS", val: timeLeft.m },
+        { label: "SECS", val: timeLeft.s },
+      ].map(({ label, val }, i) => (
+        <div key={label} style={{ flex: 1, textAlign: "center", background: "rgba(255,255,255,0.1)", borderRadius: "8px", padding: "8px 4px" }}>
+          <div style={{ fontSize: "20px", fontWeight: "800", color: "white", lineHeight: 1 }}>{String(val).padStart(2, "0")}</div>
+          <div style={{ fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.6)", marginTop: "4px" }}>{label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function ParentDashboardPage() {
@@ -139,6 +242,7 @@ export default function ParentDashboardPage() {
   const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history">("session");
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -244,6 +348,23 @@ export default function ParentDashboardPage() {
               Hi, {profile.fullName.split(" ")[0]}!
             </span>
             <button
+              onClick={() => setShowPasswordModal(true)}
+              className="nav-link"
+              style={{
+                padding: "8px 16px",
+                borderRadius: "20px",
+                color: "rgba(255,255,255,0.9)",
+                fontSize: "13px",
+                fontWeight: "700",
+                border: "1.5px solid rgba(255,255,255,0.25)",
+                background: "rgba(255,255,255,0.08)",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              Change Password
+            </button>
+            <button
               id="parent-signout-btn"
               onClick={signOut}
               className="nav-link"
@@ -326,7 +447,21 @@ export default function ParentDashboardPage() {
           {/* Quick stats */}
           <div style={{ display: "flex", gap: "16px", flexShrink: 0 }}>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
-              <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>{profile.albums.length}</div>
+              <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
+                {profile.albums.length}
+                <span style={{ fontSize: "14px", color: "#64748b", fontWeight: "600", marginLeft: "2px" }}>
+                  {(() => {
+                    const programs: Record<string, number> = {
+                      "Discovery Club: Curious Explorer": 8,
+                      "Discovery Club: Creative Explorer": 12,
+                      "Discovery Club: Everyday Curious": 14,
+                      "Trailblazer: Brave Explorer": 18,
+                    };
+                    const total = programs[profile.program];
+                    return total ? `/ ${total}` : "";
+                  })()}
+                </span>
+              </div>
               <div style={{ fontSize: "11px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Sessions</div>
             </div>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
@@ -381,9 +516,9 @@ export default function ParentDashboardPage() {
             <div style={{ display: "grid", gap: "20px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
 
               {/* Current Program Card */}
-              <div style={{ background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", borderRadius: "20px", padding: "28px", color: "white", boxShadow: "0 8px 32px rgba(0,47,118,0.25)" }}>
+              <div style={{ background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", borderRadius: "20px", padding: "28px", color: "white", boxShadow: "0 8px 32px rgba(0,47,118,0.25)", display: "flex", flexDirection: "column" }}>
                 <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.7, marginBottom: "12px" }}>Current Program</div>
-                <div style={{ fontSize: "22px", fontWeight: "800", marginBottom: "16px", lineHeight: "1.3" }}>
+                <div style={{ fontSize: "22px", fontWeight: "800", marginBottom: "16px", lineHeight: "1.3", flex: 1 }}>
                   {profile.program || "—"}
                 </div>
                 {profile.schedule && (
@@ -396,6 +531,14 @@ export default function ParentDashboardPage() {
                   <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px" }}>
                     <div style={{ fontSize: "11px", opacity: 0.7, fontWeight: "600", marginBottom: "2px" }}>CLASS TIME</div>
                     <div style={{ fontWeight: "700", fontSize: "14px" }}>{profile.classTime}</div>
+                  </div>
+                )}
+                
+                {/* Next Session Timer */}
+                {profile.schedule && profile.classTime && (
+                  <div style={{ marginTop: "16px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.7 }}>Next Session Starts In:</div>
+                    <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} />
                   </div>
                 )}
               </div>
@@ -674,6 +817,173 @@ export default function ParentDashboardPage() {
           onClose={() => setLightbox(null)}
         />
       )}
+
+      {/* ── Change Password Modal ─────────────────────────────────────────── */}
+      {showPasswordModal && (
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Modals ───────────────────────────────────────────────────────────────────
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { user } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !user.email) return;
+    setError("");
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError("Please fill out all fields.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Re-authenticate first to ensure session is fresh
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // Update password
+      await updatePassword(user, newPassword);
+      
+      setSuccess(true);
+      setTimeout(() => onClose(), 2000);
+    } catch (err: any) {
+      console.error(err);
+      if (err.message.includes("auth/invalid-credential") || err.message.includes("auth/wrong-password")) {
+        setError("Current password is incorrect.");
+      } else {
+        setError(err.message || "Failed to change password.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,15,40,0.6)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", animation: "fadeUp 0.3s ease" }}>
+      <div style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "420px", overflow: "hidden", boxShadow: "0 32px 100px rgba(0,47,118,0.3)" }}>
+        
+        {/* Header */}
+        <div style={{ background: "linear-gradient(135deg,#f8faff,#f0f4ff)", padding: "24px", borderBottom: "1px solid #e8efff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "800", color: "#002f76", letterSpacing: "-0.2px" }}>Change Password</h2>
+          <button onClick={onClose} style={{ background: "rgba(0,47,118,0.05)", border: "none", fontSize: "16px", color: "#64748b", cursor: "pointer", width: "32px", height: "32px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "rgba(0,47,118,0.1)"} onMouseOut={e => e.currentTarget.style.background = "rgba(0,47,118,0.05)"}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "32px 24px" }}>
+          {success ? (
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: "56px", marginBottom: "16px", animation: "fadeUp 0.5s ease" }}>✅</div>
+              <h3 style={{ margin: "0 0 8px", fontSize: "20px", color: "#15803d", fontWeight: "800" }}>Password Updated</h3>
+              <p style={{ margin: 0, fontSize: "15px", color: "#64748b", lineHeight: 1.5 }}>Your new password has been set securely. You can now use it on your next login.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>Current Password</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPasswords ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    disabled={loading}
+                    placeholder="Enter current password"
+                    style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #dde5f0", borderRadius: "12px", fontSize: "15px", background: "#f8faff", outline: "none", boxSizing: "border-box", transition: "border 0.2s" }}
+                    onFocus={e => e.target.style.borderColor = "#0050d5"}
+                    onBlur={e => e.target.style.borderColor = "#dde5f0"}
+                  />
+                  <button type="button" onClick={() => setShowPasswords(!showPasswords)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", fontSize: "18px", cursor: "pointer", opacity: 0.6 }}>
+                    {showPasswords ? "👁️‍🗨️" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>New Password</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPasswords ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={loading}
+                    placeholder="At least 6 characters"
+                    style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #dde5f0", borderRadius: "12px", fontSize: "15px", background: "#f8faff", outline: "none", boxSizing: "border-box", transition: "border 0.2s" }}
+                    onFocus={e => e.target.style.borderColor = "#0050d5"}
+                    onBlur={e => e.target.style.borderColor = "#dde5f0"}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>Confirm New Password</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPasswords ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={loading}
+                    placeholder="Repeat new password"
+                    style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #dde5f0", borderRadius: "12px", fontSize: "15px", background: "#f8faff", outline: "none", boxSizing: "border-box", transition: "border 0.2s" }}
+                    onFocus={e => e.target.style.borderColor = "#0050d5"}
+                    onBlur={e => e.target.style.borderColor = "#dde5f0"}
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div style={{ background: "#fff0f0", color: "#ba1a1a", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", border: "1px solid #ffd5d5" }}>
+                  {error}
+                </div>
+              )}
+
+              <div style={{ marginTop: "12px", display: "flex", gap: "12px" }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  style={{ flex: 1, padding: "14px", background: "rgba(148,163,184,0.1)", border: "none", color: "#64748b", borderRadius: "12px", fontSize: "14px", fontWeight: "800", cursor: loading ? "not-allowed" : "pointer", transition: "all 0.2s" }}
+                  onMouseOver={e => !loading && (e.currentTarget.style.background = "rgba(148,163,184,0.15)")}
+                  onMouseOut={e => !loading && (e.currentTarget.style.background = "rgba(148,163,184,0.1)")}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg,#002f76,#0050d5)", border: "none", color: "white", borderRadius: "12px", fontSize: "14px", fontWeight: "800", cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 8px 20px rgba(0,47,118,0.25)", transition: "all 0.2s" }}
+                  onMouseOver={e => !loading && (e.currentTarget.style.transform = "translateY(-1px)")}
+                  onMouseOut={e => !loading && (e.currentTarget.style.transform = "translateY(0)")}
+                >
+                  {loading ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+
+            </form>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
