@@ -250,11 +250,11 @@ function WaiverSignModal({
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,15,40,0.7)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "560px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,47,118,0.3)" }}>
-        
+    <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,15,40,0.7)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "1000px", height: "85vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,47,118,0.3)" }}>
+
         {/* Header */}
-        <div style={{ background: "linear-gradient(135deg,#002f76,#0050d5)", padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ background: "linear-gradient(135deg,#002f76,#0050d5)", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
           <div>
             <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "11px", fontWeight: "800", letterSpacing: "0.1em", textTransform: "uppercase" }}>Step Required</div>
             <div style={{ color: "white", fontSize: "18px", fontWeight: "800", marginTop: "2px" }}>Sign the Waiver</div>
@@ -262,68 +262,175 @@ function WaiverSignModal({
           <button onClick={onCancel} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", width: "32px", height: "32px", borderRadius: "50%", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
         </div>
 
-        {/* Scrollable waiver content */}
-        <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}>
-          <p style={{ fontSize: "13px", color: "#475569", lineHeight: 1.6, marginBottom: "16px" }}>
-            Before creating this account, the parent must acknowledge and agree to the following policies.
-          </p>
+        {/* Two Column Layout */}
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          
+          {/* Left: Scrollable Waiver Content */}
+          <div style={{ flex: "1 1 60%", overflowY: "auto", background: "#f8faff", padding: "24px", borderRight: "1px solid #e2e8f0" }}>
+            <div style={{ fontSize: "13px", color: "#334155", lineHeight: 1.7 }}>
+              <p style={{ fontWeight: "800", color: "#002f76", marginBottom: "8px", fontSize: "14px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
+              <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
 
-          <div style={{ background: "#f8faff", borderRadius: "12px", padding: "16px", fontSize: "13px", color: "#334155", lineHeight: 1.7, border: "1px solid #e2e8f0", maxHeight: "260px", overflowY: "auto" }}>
-            <p style={{ fontWeight: "800", color: "#002f76", marginBottom: "8px", fontSize: "14px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
-            <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to all program terms and policies including: Adventure/Cycle structure, programs and fees, registration and payment terms (60% non-refundable reservation, 40% balance on 6th session, 4% weekly interest on overdue balances), attendance and make-up session rules, photo and video highlights schedule and deletion policy, and uniform policy.</p>
-            <p style={{ marginTop: "12px" }}>I confirm that the information I provided about my child is true and complete, and I agree to comply with Merry Explorers' policies and arrangements.</p>
-            <p style={{ marginTop: "12px" }}>By signing below, I voluntarily acknowledge, accept, and agree to be bound by these terms as part of my child's registration with Merry Explorers Playgroup Learning Center.</p>
+              <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>1. ADVENTURE / CYCLE</h3>
+              <p>For Merry Explorers, "Adventure" means "Cycle." Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
+
+              <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>2. PROGRAMS</h3>
+              <p style={{ fontWeight: "700", marginBottom: "4px" }}>Discovery Club — Discover Through Play</p>
+              <ul style={{ margin: 0, paddingLeft: "16px", marginBottom: "8px" }}>
+                <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
+                <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
+                <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
+              </ul>
+              <p style={{ marginBottom: "12px" }}>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building. It may also be a suitable starting point for children who are not yet using verbal communication.</p>
+              <p style={{ fontWeight: "700", marginBottom: "4px" }}>💡 Trailblazer: Brave Explorer — Prepare for What's Next</p>
+              <ul style={{ margin: 0, paddingLeft: "16px", marginBottom: "4px" }}>
+                <li>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</li>
+              </ul>
+              <p><strong>Milestone Checkpoint:</strong> The 18th session includes the Exploration Diary presentation, review of the child's learning and discoveries, and milestone recognition through a Certificate of Recognition/Completion.</p>
+              <p style={{ fontWeight: "700", marginTop: "8px" }}>Little Trailblazer Prerequisites:</p>
+              <p>The child should be able to comfortably grip age-appropriate materials, participate independently with teachers, and sit still independently for at least 3 minutes.</p>
+
+              <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>3. REGISTRATION & PAYMENT</h3>
+              <ul style={{ margin: 0, paddingLeft: "16px" }}>
+                <li>60% reservation payment is required upon registration to secure the child's slot.</li>
+                <li>The 60% reservation payment is non-refundable once the slot is confirmed.</li>
+                <li>The remaining 40% balance is due on the 6th session.</li>
+                <li>A 4% interest charge will apply to overdue outstanding balances. Interest is applied on a weekly basis, with the applicable interest charge taking effect every Monday.</li>
+                <li>We will only accept Bank Transfer and GCash payments.</li>
+                <li>Statement of Account regenerates every Monday.</li>
+              </ul>
+
+              <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>4. ATTENDANCE & MAKE-UP SESSIONS</h3>
+              <p><strong>🔎 Discovery Club: Curious Explorer</strong> - If a class is suspended due to weather, the session will be moved to the next Monday or Wednesday until all required Adventure sessions are completed.</p>
+              <p style={{ marginTop: "8px" }}><strong>🎨 Discovery Club: Creative Explorer</strong> - Classes will continue according to the regular schedule, and any weather-related suspended session will automatically be made up on a Saturday. Families won't need to figure out when to insert the missed session—the Saturday make-up arrangement will continue until the required number of Adventure sessions is completed.</p>
+              <p style={{ marginTop: "8px" }}><strong>💡 Trailblazer: Brave Explorer</strong> - Because Trailblazer follows a progressive and consistent routine, a suspended face-to-face session will shift online.</p>
+              <ul style={{ margin: 0, paddingLeft: "16px", marginTop: "4px" }}>
+                <li>Online session: 45 minutes</li>
+                <li>Practice worksheets will be provided</li>
+                <li>The online shift is considered a consumed session</li>
+              </ul>
+              <p style={{ marginTop: "8px" }}><strong>🌈 Discovery Club: Everyday Curious</strong> - If a class is suspended, the missed session will be moved to the next learning day. Classes will continue from Monday to Friday until all 15 required Adventure sessions are completed. The number of sessions remains the same; only the schedule is adjusted.</p>
+              <p style={{ marginTop: "8px" }}><strong>💛 Complimentary Free Session for All Explorers</strong> - For an excused missed session, such as sickness or other valid reasons, each child receives 1 complimentary session per Adventure. This is only one free session regardless of the number of missed sessions and the schedule will be determined by Merry Explorers.</p>
+
+              <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>5. PHOTO & VIDEO HIGHLIGHTS</h3>
+              <p style={{ fontWeight: "700" }}>📸 Photo Highlights:</p>
+              <ul style={{ margin: 0, paddingLeft: "16px" }}>
+                <li><strong>Photo Sending Schedule:</strong>
+                  <ul style={{ margin: 0, paddingLeft: "16px", marginTop: "4px" }}>
+                    <li>🔎 Discovery Club: Curious Explorer - Monday</li>
+                    <li>🎨 Discovery Club: Creative Explorer - Tuesday & Thursday</li>
+                    <li>💡 Trailblazer: Brave Explorer - Thursday & Friday</li>
+                    <li>🌈 Discovery Club: Everyday Curious - Thursday & Friday</li>
+                  </ul>
+                </li>
+              </ul>
+              <p style={{ fontWeight: "700", marginTop: "12px" }}>🎥 Video Highlights:</p>
+              <ul style={{ margin: 0, paddingLeft: "16px" }}>
+                <li><strong>Video Uploading Schedule:</strong>
+                  <ul style={{ margin: 0, paddingLeft: "16px", marginTop: "4px" }}>
+                    <li>🔎 Discovery Club: Curious Explorer - Wednesday</li>
+                    <li>🎨 Discovery Club: Creative Explorer - Friday</li>
+                    <li>💡 Trailblazer: Brave Explorer - Monday</li>
+                    <li>🌈 Discovery Club: Everyday Curious - Monday</li>
+                  </ul>
+                </li>
+                <li>Video Highlights will be posted on the official Merry Explorers page.</li>
+              </ul>
+              <p style={{ marginTop: "8px" }}><strong>🗑️ Photo Deletion:</strong> All photos in the Google Drive will be deleted every Saturday at 11:59 PM, regardless of whether they have been downloaded. Parents/Guardians are responsible for downloading photos they wish to keep before the deadline.</p>
+
+              <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>6. MERRY EXPLORERS UNIFORM</h3>
+              <p>We would also like to clarify an important part of our uniform policy:</p>
+              <p style={{ fontWeight: "700", color: "#002f76", marginTop: "4px" }}>The Merry Explorers uniform is the SAME uniform.</p>
+              <p>If your child already has a Merry Explorers uniform from the previous chapter, you are NOT required to purchase a new set for Adventure 1. We want families to be able to continue using the uniform they already have.</p>
+              <p style={{ marginTop: "8px" }}><strong>Uniform Days:</strong> Wednesday & Friday</p>
+              <p>On all other class days, children may wear anything comfortable, safe, and appropriate for active play and learning.</p>
+              <p style={{ fontWeight: "700", marginTop: "12px" }}>Welcome Kit — ₱750</p>
+              <p>For families who need a new set or an additional set, the Uniform Kit is available for ₱750 and includes:</p>
+              <ul style={{ margin: 0, paddingLeft: "16px", marginTop: "4px" }}>
+                <li>1 Merry Explorers polo shirt with logo</li>
+                <li>1 pair of jogging pants</li>
+                <li>1 name tag with Merry Explorers lanyard</li>
+              </ul>
+              <p style={{ fontWeight: "700", marginTop: "12px" }}>Lanyard & Name Tag — ₱200</p>
+              <ul style={{ margin: 0, paddingLeft: "16px" }}>
+                <li>A Merry Explorers lanyard with laminated name tag may also be purchased separately for ₱200.</li>
+              </ul>
+              <p style={{ marginTop: "8px" }}>If you just need the uniform, you may still purchase the polo and jogging pants with the Merry Explorers logo priced at ₱550/set.</p>
+
+              <hr style={{ margin: "24px 0", borderColor: "#e2e8f0" }} />
+
+              <h3 style={{ color: "#002f76", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginBottom: "12px" }}>PARENT/GUARDIAN ACKNOWLEDGMENT</h3>
+              <p>I, the undersigned Parent/Guardian, confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement, including those covering program requirements, payments, attendance and make-ups, photos and videos, and uniforms.</p>
+              <p style={{ marginTop: "8px" }}>I confirm that the information I provided about my child is true and complete, and I agree to comply with Merry Explorers' policies and arrangements.</p>
+              <p style={{ marginTop: "8px" }}>By signing below, I voluntarily acknowledge, accept, and agree to be bound by these terms and policies as part of my child's registration with Merry Explorers Playgroup Learning Center.</p>
+            </div>
           </div>
 
-          <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
-            <div>
-              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Child's Name</div>
-              <div style={{ fontWeight: "800", color: "#002f76" }}>{draft.childName || "—"}</div>
-            </div>
-            <div>
-              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Program</div>
-              <div style={{ fontWeight: "800", color: "#002f76" }}>{draft.program || "—"}</div>
-            </div>
-            <div>
-              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Parent/Guardian</div>
-              <div style={{ fontWeight: "800", color: "#002f76" }}>{draft.fullName || "—"}</div>
-            </div>
-            <div>
-              <div style={{ color: "#64748b", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Date</div>
-              <div style={{ fontWeight: "800", color: "#002f76" }}>{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
-            </div>
-          </div>
+          {/* Right: Info and Signature Panel */}
+          <div style={{ flex: "0 0 340px", overflowY: "auto", display: "flex", flexDirection: "column", background: "white" }}>
+            <div style={{ padding: "24px", flex: 1 }}>
+              
+              <div style={{ marginBottom: "24px" }}>
+                <div style={{ color: "#0050d5", fontWeight: "800", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>Registration Details</div>
+                
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ color: "#94a3b8", fontWeight: "800", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Child's Name</div>
+                  <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>{draft.childName || "—"}</div>
+                </div>
+                
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ color: "#94a3b8", fontWeight: "800", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Program</div>
+                  <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>{draft.program || "—"}</div>
+                </div>
 
-          <div style={{ marginTop: "16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-              <label style={{ fontSize: "13px", fontWeight: "800", color: "#1e293b" }}>Parent/Guardian Signature</label>
-              <button onClick={clearSignature} style={{ fontSize: "12px", color: "#0050d5", fontWeight: "700", background: "none", border: "none", cursor: "pointer" }}>Clear</button>
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ color: "#94a3b8", fontWeight: "800", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Parent/Guardian</div>
+                  <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>{draft.fullName || "—"}</div>
+                </div>
+
+                <div>
+                  <div style={{ color: "#94a3b8", fontWeight: "800", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Date</div>
+                  <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.05em" }}>Digital Signature</label>
+                  <button onClick={clearSignature} style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "800", background: "none", border: "none", cursor: "pointer", textTransform: "uppercase" }}>Clear</button>
+                </div>
+                <div style={{ border: "2px dashed #cbd5e1", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" }}>
+                  <canvas
+                    ref={canvasRef}
+                    onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing}
+                    onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
+                    style={{ width: "100%", height: "160px", cursor: "crosshair", display: "block", touchAction: "none" }}
+                  />
+                </div>
+                {!hasSignature ? (
+                  <p style={{ fontSize: "11px", color: "#ef4444", fontWeight: "700", marginTop: "8px" }}>Please sign in the box above to continue.</p>
+                ) : (
+                  <p style={{ fontSize: "11px", color: "#10b981", fontWeight: "700", marginTop: "8px" }}>✓ Signature captured</p>
+                )}
+              </div>
             </div>
-            <div style={{ border: "2px dashed #94a3b8", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" }}>
-              <canvas
-                ref={canvasRef}
-                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing}
-                onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
-                style={{ width: "100%", height: "160px", cursor: "crosshair", display: "block", touchAction: "none" }}
-              />
+
+            {/* Footer with Submit Button */}
+            <div style={{ padding: "16px 24px", borderTop: "1px solid #e2e8f0", background: "white" }}>
+              <button
+                onClick={handleConfirm}
+                disabled={!hasSignature}
+                style={{ width: "100%", padding: "14px 0", borderRadius: "12px", fontWeight: "800", fontSize: "14px", color: "white", background: hasSignature ? "linear-gradient(135deg,#10b981,#059669)" : "#cbd5e1", border: "none", cursor: hasSignature ? "pointer" : "not-allowed", boxShadow: hasSignature ? "0 8px 20px rgba(16,185,129,0.25)" : "none", transition: "all 0.2s" }}
+              >
+                I Agree & Create Account
+              </button>
+              <p style={{ fontSize: "10px", color: "#94a3b8", textAlign: "center", marginTop: "12px", lineHeight: 1.5 }}>
+                By signing, the parent/guardian confirms they have read and agreed to all terms above.
+              </p>
             </div>
-            {!hasSignature && <p style={{ fontSize: "12px", color: "#ef4444", fontWeight: "700", marginTop: "6px" }}>Please sign above to continue.</p>}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ borderTop: "1px solid #e2e8f0", padding: "16px 24px", display: "flex", gap: "12px", justifyContent: "flex-end", flexShrink: 0, background: "#f8fafc" }}>
-          <button onClick={onCancel} style={{ padding: "10px 20px", borderRadius: "99px", fontWeight: "800", fontSize: "13px", color: "#64748b", background: "rgba(148,163,184,0.1)", border: "none", cursor: "pointer" }}>
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!hasSignature}
-            style={{ padding: "10px 24px", borderRadius: "99px", fontWeight: "800", fontSize: "13px", color: "white", background: hasSignature ? "linear-gradient(135deg,#10b981,#059669)" : "#94a3b8", border: "none", cursor: hasSignature ? "pointer" : "not-allowed", boxShadow: hasSignature ? "0 8px 20px rgba(16,185,129,0.3)" : "none", transition: "all 0.2s" }}
-          >
-            I Agree & Create Account
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -496,188 +603,180 @@ function ParentModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#e2e8f0] overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-gradient-to-r from-[#002f76] to-[#0050d5] px-6 py-4 shrink-0">
-          <h2 className="text-[17px] font-extrabold text-white">
-            {mode === "add" ? "Add Parent Account" : "Edit Parent Account"}
-          </h2>
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#e2e8f0] overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-gradient-to-r from-[#002f76] to-[#0050d5] px-6 py-4 shrink-0">
+            <h2 className="text-[17px] font-extrabold text-white">
+              {mode === "add" ? "Add Parent Account" : "Edit Parent Account"}
+            </h2>
+          </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {/* Avatar */}
-          <div className="flex flex-col items-center gap-3">
-            <div
-              className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-white font-extrabold text-[26px] cursor-pointer relative group"
-              style={{ backgroundColor: draft.avatarUrl ? undefined : draft.avatarColor }}
-              onClick={() => fileRef.current?.click()}
-            >
-              {draft.avatarUrl ? (
-                <img src={draft.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                initials
-              )}
-            </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-            <div className="flex gap-2">
-              <button
-                type="button"
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            {/* Avatar */}
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-white font-extrabold text-[26px] cursor-pointer relative group"
+                style={{ backgroundColor: draft.avatarUrl ? undefined : draft.avatarColor }}
                 onClick={() => fileRef.current?.click()}
-                className="rounded-full border border-[#c5d6ff] bg-[#f0f5ff] px-4 py-1.5 text-[12px] font-bold text-[#0050d5] hover:bg-[#dde8ff] transition-colors"
               >
-                Upload Photo
-              </button>
-              {draft.avatarUrl && (
+                {draft.avatarUrl ? (
+                  <img src={draft.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { set("avatarUrl", ""); setSelectedFile(null); }}
-                  className="rounded-full border border-[#ffd5d5] bg-[#fff0f0] px-4 py-1.5 text-[12px] font-bold text-[#e53935] hover:bg-[#ffe0e0] transition-colors"
+                  onClick={() => fileRef.current?.click()}
+                  className="rounded-full border border-[#c5d6ff] bg-[#f0f5ff] px-4 py-1.5 text-[12px] font-bold text-[#0050d5] hover:bg-[#dde8ff] transition-colors"
                 >
-                  Remove
+                  Upload Photo
                 </button>
-              )}
-            </div>
-          </div>
-
-          {/* Parent details */}
-          <SectionHeading>Parent Details</SectionHeading>
-
-          <Field label="Parent's Full Name" required>
-            <input className={INPUT_CLS} placeholder="e.g. Maria Santos" value={draft.fullName} onChange={(e) => set("fullName", e.target.value)} />
-          </Field>
-          <Field label="Email Address" required>
-            <input type="email" className={INPUT_CLS} placeholder="maria@example.com" value={draft.email} onChange={(e) => set("email", e.target.value)} />
-          </Field>
-          <Field label="Phone Number">
-            <input type="tel" className={INPUT_CLS} placeholder="09XX XXX XXXX" value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
-          </Field>
-          <Field label="Relationship to Child">
-            <div className="relative">
-              <select className={SELECT_CLS} value={draft.relationship} onChange={(e) => set("relationship", e.target.value)}>
-                <option value="Mother">Mother</option>
-                <option value="Father">Father</option>
-                <option value="Guardian">Guardian</option>
-                <option value="Grandparent">Grandparent</option>
-                <option value="Other">Other</option>
-              </select>
-              <Chevron />
-            </div>
-          </Field>
-
-          {/* Child details */}
-          <SectionHeading>Child Details</SectionHeading>
-
-          <Field label="Child's Name" required>
-            <input className={INPUT_CLS} placeholder="e.g. Leo Santos" value={draft.childName} onChange={(e) => set("childName", e.target.value)} />
-          </Field>
-
-          <Field label="Program / Adventure" required>
-            <div className="relative">
-              <select className={SELECT_CLS} value={draft.program} onChange={(e) => handleProgramChange(e.target.value)}>
-                <option value="" disabled>Select a program</option>
-                {!isKnownProgram && draft.program && (
-                  <option value={draft.program}>{draft.program}</option>
+                {draft.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => { set("avatarUrl", ""); setSelectedFile(null); }}
+                    className="rounded-full border border-[#ffd5d5] bg-[#fff0f0] px-4 py-1.5 text-[12px] font-bold text-[#e53935] hover:bg-[#ffe0e0] transition-colors"
+                  >
+                    Remove
+                  </button>
                 )}
-                {PROGRAMS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.value}</option>
-                ))}
-              </select>
-              <Chevron />
+              </div>
             </div>
-          </Field>
 
-          {/* Pre-requisite notice (only for programs that have one) */}
-          {selectedProgram?.prerequisite && (
-            <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[12px] font-semibold text-[#b45309]">
-              ⚠️ Pre-requisite: {selectedProgram.prerequisite}
-            </div>
-          )}
+            {/* Parent details */}
+            <SectionHeading>Parent Details</SectionHeading>
 
-          <Field label="Class Time" required>
-            <div className="relative">
-              <select
-                className={SELECT_CLS}
-                value={draft.classTime}
-                onChange={(e) => set("classTime", e.target.value)}
-                disabled={!draft.program}
-              >
-                <option value="" disabled>
-                  {draft.program ? "Select class time" : "Select a program first"}
-                </option>
-                {!isKnownTime && draft.classTime && (
-                  <option value={draft.classTime}>{draft.classTime}</option>
-                )}
-                {selectedProgram?.times.map((t) => (
-                  <option key={t.label} value={classTimeValue(t)}>
-                    {classTimeValue(t)}
+            <Field label="Parent's Full Name" required>
+              <input className={INPUT_CLS} placeholder="e.g. Maria Santos" value={draft.fullName} onChange={(e) => set("fullName", e.target.value)} />
+            </Field>
+            <Field label="Email Address" required>
+              <input type="email" className={INPUT_CLS} placeholder="maria@example.com" value={draft.email} onChange={(e) => set("email", e.target.value)} />
+            </Field>
+            <Field label="Phone Number">
+              <input type="tel" className={INPUT_CLS} placeholder="09XX XXX XXXX" value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
+            </Field>
+            <Field label="Relationship to Child">
+              <div className="relative">
+                <select className={SELECT_CLS} value={draft.relationship} onChange={(e) => set("relationship", e.target.value)}>
+                  <option value="Mother">Mother</option>
+                  <option value="Father">Father</option>
+                  <option value="Guardian">Guardian</option>
+                  <option value="Grandparent">Grandparent</option>
+                  <option value="Other">Other</option>
+                </select>
+                <Chevron />
+              </div>
+            </Field>
+
+            {/* Child details */}
+            <SectionHeading>Child Details</SectionHeading>
+
+            <Field label="Child's Name" required>
+              <input className={INPUT_CLS} placeholder="e.g. Leo Santos" value={draft.childName} onChange={(e) => set("childName", e.target.value)} />
+            </Field>
+
+            <Field label="Program / Adventure" required>
+              <div className="relative">
+                <select className={SELECT_CLS} value={draft.program} onChange={(e) => handleProgramChange(e.target.value)}>
+                  <option value="" disabled>Select a program</option>
+                  {!isKnownProgram && draft.program && (
+                    <option value={draft.program}>{draft.program}</option>
+                  )}
+                  {PROGRAMS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.value}</option>
+                  ))}
+                </select>
+                <Chevron />
+              </div>
+            </Field>
+
+            {/* Pre-requisite notice (only for programs that have one) */}
+            {selectedProgram?.prerequisite && (
+              <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[12px] font-semibold text-[#b45309]">
+                ⚠️ Pre-requisite: {selectedProgram.prerequisite}
+              </div>
+            )}
+
+            <Field label="Class Time" required>
+              <div className="relative">
+                <select
+                  className={SELECT_CLS}
+                  value={draft.classTime}
+                  onChange={(e) => set("classTime", e.target.value)}
+                  disabled={!draft.program}
+                >
+                  <option value="" disabled>
+                    {draft.program ? "Select class time" : "Select a program first"}
                   </option>
-                ))}
-              </select>
-              <Chevron />
-            </div>
-          </Field>
+                  {!isKnownTime && draft.classTime && (
+                    <option value={draft.classTime}>{draft.classTime}</option>
+                  )}
+                  {selectedProgram?.times.map((t) => (
+                    <option key={t.label} value={classTimeValue(t)}>
+                      {classTimeValue(t)}
+                    </option>
+                  ))}
+                </select>
+                <Chevron />
+              </div>
+            </Field>
 
-          {/* Account */}
-          <SectionHeading>Account</SectionHeading>
+            {/* Account */}
+            <SectionHeading>Account</SectionHeading>
 
-          <Field label="Status">
-            <div className="relative">
-              <select className={SELECT_CLS} value={draft.status} onChange={(e) => set("status", e.target.value as "active" | "inactive")}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <Chevron />
-            </div>
-          </Field>
+            <Field label="Status">
+              <div className="relative">
+                <select className={SELECT_CLS} value={draft.status} onChange={(e) => set("status", e.target.value as "active" | "inactive")}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                <Chevron />
+              </div>
+            </Field>
 
-          {error && (
-            <div className="rounded-xl border border-[#ba1a1a]/20 bg-[#ba1a1a]/5 px-4 py-3 text-[13px] font-bold text-[#ba1a1a]">
-              {error}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-[#f8fafc] px-6 py-4 flex flex-col md:flex-row justify-between gap-3 shrink-0 border-t border-[#e2e8f0]">
-          <div>
-            {mode === "edit" && initial?.id ? (
-              <button
-                type="button"
-                onClick={() => window.open(`/admin/parents/waiver/${initial.id}`, "_blank")}
-                className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#0050d5] bg-[#eaf0fe] hover:bg-[#d4e0fc] transition-colors"
-              >
-                Sign Waiver
-              </button>
-            ) : mode === "add" ? (
-              <button
-                type="button"
-                onClick={handleSaveAndSign}
-                disabled={loading}
-                className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#0050d5] bg-[#eaf0fe] hover:bg-[#d4e0fc] transition-colors flex items-center gap-2 disabled:opacity-60"
-              >
-                {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0050d5]/30 border-t-[#0050d5]" /> : "Save & Sign Waiver"}
-              </button>
-            ) : null}
+            {error && (
+              <div className="rounded-xl border border-[#ba1a1a]/20 bg-[#ba1a1a]/5 px-4 py-3 text-[13px] font-bold text-[#ba1a1a]">
+                {error}
+              </div>
+            )}
           </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#5a6e8c] hover:bg-[#e2e8f0]/50 transition-colors">
-              Cancel
-            </button>
-            <button type="button" onClick={handleSave} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] bg-[#005cc8] text-white hover:bg-[#004bb0] transition-colors flex items-center gap-2 disabled:opacity-60">
-              {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "Save"}
-            </button>
+
+          <div className="bg-[#f8fafc] px-6 py-4 flex flex-col md:flex-row justify-between gap-3 shrink-0 border-t border-[#e2e8f0]">
+            <div>
+              {mode === "edit" && initial?.id ? (
+                <button
+                  type="button"
+                  onClick={handleSaveAndSign}
+                  disabled={loading}
+                  className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#0050d5] bg-[#eaf0fe] hover:bg-[#d4e0fc] transition-colors flex items-center gap-2 disabled:opacity-60"
+                >
+                  {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0050d5]/30 border-t-[#0050d5]" /> : "Save & Sign Waiver"}
+                </button>
+              ) : null}
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#5a6e8c] hover:bg-[#e2e8f0]/50 transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={handleSave} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] bg-[#005cc8] text-white hover:bg-[#004bb0] transition-colors flex items-center gap-2 disabled:opacity-60">
+                {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {showWaiverModal && (
-      <WaiverSignModal
-        draft={{ fullName: draft.fullName, childName: draft.childName, program: draft.program }}
-        onConfirm={handleWaiverConfirm}
-        onCancel={() => { setShowWaiverModal(false); setPendingAction(null); }}
-      />
-    )}
+      {showWaiverModal && (
+        <WaiverSignModal
+          draft={{ fullName: draft.fullName, childName: draft.childName, program: draft.program }}
+          onConfirm={handleWaiverConfirm}
+          onCancel={() => { setShowWaiverModal(false); setPendingAction(null); }}
+        />
+      )}
     </>
   );
 }
