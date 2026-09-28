@@ -264,7 +264,7 @@ function WaiverSignModal({
 
         {/* Two Column Layout */}
         <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          
+
           {/* Left: Scrollable Waiver Content */}
           <div style={{ flex: "1 1 60%", overflowY: "auto", background: "#f8faff", padding: "24px", borderRight: "1px solid #e2e8f0" }}>
             <div style={{ fontSize: "13px", color: "#334155", lineHeight: 1.7 }}>
@@ -369,15 +369,15 @@ function WaiverSignModal({
           {/* Right: Info and Signature Panel */}
           <div style={{ flex: "0 0 340px", overflowY: "auto", display: "flex", flexDirection: "column", background: "white" }}>
             <div style={{ padding: "24px", flex: 1 }}>
-              
+
               <div style={{ marginBottom: "24px" }}>
                 <div style={{ color: "#0050d5", fontWeight: "800", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>Registration Details</div>
-                
+
                 <div style={{ marginBottom: "12px" }}>
                   <div style={{ color: "#94a3b8", fontWeight: "800", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Child's Name</div>
                   <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>{draft.childName || "—"}</div>
                 </div>
-                
+
                 <div style={{ marginBottom: "12px" }}>
                   <div style={{ color: "#94a3b8", fontWeight: "800", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Program</div>
                   <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>{draft.program || "—"}</div>
