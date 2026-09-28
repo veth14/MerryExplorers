@@ -86,6 +86,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (role === "admin") {
         document.cookie = `role=admin; path=/; max-age=${maxAge}`;
         router.push("/admin");
+      } else if (role === "parent") {
+        document.cookie = `role=parent; path=/; max-age=${maxAge}`;
+        router.push("/parent/dashboard");
       } else if (role === "executive assistant" || role === "developer") {
         // Executive Assistants and Developers are employees first — they clock in like teachers
         // but can also access the admin panel.

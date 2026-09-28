@@ -10,6 +10,7 @@ const navItems = [
   { label: "Dashboard", href: "/admin" },
   { label: "Teachers", href: "/admin/teachers" },
   { label: "Accounts", href: "/admin/users" },
+  { label: "Parents", href: "/admin/parents" },
   { label: "Calendar", href: "/admin/calendar" },
   { label: "Attendance", href: "/admin/attendance" },
   { label: "Leave Requests", href: "/admin/leaves" },
@@ -197,6 +198,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   Teachers: TeachersIcon,
   Accounts: UsersIcon,
+  Parents: UsersIcon,
   Calendar: CalendarIcon,
   Attendance: AttendanceIcon,
   "Leave Requests": LeaveIcon,
@@ -344,8 +346,8 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     displayName.split(" ").filter(Boolean).slice(0, 2)
       .map((w: string) => w[0].toUpperCase()).join("") || "AU";
 
-  const adminGroups = useMemo(() => [
-    { title: "HR & People", items: ["Teachers", "Accounts", "Payroll"] },
+  const adminGroups = [
+    { title: "HR & People", items: ["Teachers", "Accounts", "Parents", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
     { title: "Operations", items: ["Inquiries", "Discovery Day", "Reports", "Announcements", "Registrations", "Students", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
@@ -353,7 +355,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     items: g.items
       .map((label) => navItems.find((i) => i.label === label))
       .filter(Boolean) as { label: string; href: string }[],
-  })), []);
+  }));
 
   useEffect(() => {
     const activeGroup = adminGroups.find(g => 

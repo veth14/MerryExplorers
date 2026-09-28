@@ -12,9 +12,10 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Only block regular teachers from admin pages
-    if (role === 'teacher') {
-      return NextResponse.redirect(new URL('/teacher', request.url));
+    // Only block regular teachers and parents from admin pages
+    if (role === 'teacher' || role === 'parent') {
+      const dest = role === 'parent' ? '/parent/dashboard' : '/teacher';
+      return NextResponse.redirect(new URL(dest, request.url));
     }
     // executive assistant, developer and admin can both access /admin
   }
@@ -24,24 +25,47 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Only block pure admins from teacher pages (executive assistants and developers are employees too)
+    // Block pure admins and parents from teacher pages
     if (role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url));
+    }
+    if (role === 'parent') {
+      return NextResponse.redirect(new URL('/parent/dashboard', request.url));
     }
     // executive assistant and developer can access /teacher
   }
 
-  // Redirect authenticated users away from the login page
-  if (pathname.startsWith('/login')) {
+  // Protect /parent routes
+  if (pathname.startsWith('/parent/dashboard') || pathname.startsWith('/parent/profile')) {
+    if (!session) {
+      return NextResponse.redirect(new URL('/parent/login', request.url));
+    }
+    if (role !== 'parent') {
+      // Non-parents who somehow hit /parent/* — redirect to their proper home
+      if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
+      return NextResponse.redirect(new URL('/teacher', request.url));
+    }
+  }
+
+  // Redirect authenticated users away from the main login page
+  if (pathname.startsWith('/login') || pathname === '/login') {
     if (session) {
       if (role === 'admin') {
         return NextResponse.redirect(new URL('/admin', request.url));
+      } else if (role === 'parent') {
+        return NextResponse.redirect(new URL('/parent/dashboard', request.url));
       } else if (role === 'executive assistant' || role === 'developer' || role === 'teacher') {
         return NextResponse.redirect(new URL('/teacher', request.url));
       } else {
-        // Fallback for any unknown role cookie
         return NextResponse.redirect(new URL('/teacher', request.url));
       }
+    }
+  }
+
+  // Redirect authenticated parents away from the parent login page
+  if (pathname.startsWith('/parent/login')) {
+    if (session && role === 'parent') {
+      return NextResponse.redirect(new URL('/parent/dashboard', request.url));
     }
   }
 
@@ -49,5 +73,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/teacher/:path*', '/login'],
+  matcher: ['/admin/:path*', '/teacher/:path*', '/parent/:path*', '/login'],
 };
+

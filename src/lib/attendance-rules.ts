@@ -25,9 +25,9 @@ type DaySchedule = {
 };
 
 /**
- * The company-wide base schedule.
- * Mon/Wed: flexible day — can leave from 2:00 PM (even though normal end is 3:00 PM).
- * Sat:     flexible day — can leave from 10:30 AM (even though normal end is 12:00 PM).
+ * The original company-wide base schedule (valid for dates BEFORE 2026-09-28).
+ * Mon/Wed: flexible day — can leave from 2:30 PM.
+ * Sat:     flexible day — can leave from 1:30 PM.
  * Tue/Thu/Fri: standard hours, no flexible floor.
  */
 export const BASE_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, DaySchedule> = {
@@ -38,6 +38,44 @@ export const BASE_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, DaySchedule> = {
   Fri: { start: "08:30", graceUntil: "08:45", normalEnd: "17:30", flexFloor: null },
   Sat: { start: "08:30", graceUntil: "10:00", normalEnd: "15:00", flexFloor: "1:30" },
 };
+
+/**
+ * The date (Manila, YYYY-MM-DD) from which the new 9:30 AM–6:30 PM shift takes effect.
+ * All attendance records for this date and later use NEW_SCHEDULE.
+ * Records before this date continue to use BASE_SCHEDULE unchanged.
+ */
+export const NEW_SCHEDULE_EFFECTIVE_DATE = "2026-09-28";
+
+/**
+ * The updated company-wide schedule effective from NEW_SCHEDULE_EFFECTIVE_DATE.
+ * Start time shifted from 8:30 AM to 9:30 AM; end time from 5:30 PM to 6:30 PM.
+ */
+export const NEW_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, DaySchedule> = {
+  Mon: { start: "09:30", graceUntil: "09:45", normalEnd: "18:30", flexFloor: "15:30" },
+  Tue: { start: "09:30", graceUntil: "09:45", normalEnd: "18:30", flexFloor: null },
+  Wed: { start: "09:30", graceUntil: "09:45", normalEnd: "18:30", flexFloor: "15:30" },
+  Thu: { start: "09:30", graceUntil: "09:45", normalEnd: "18:30", flexFloor: null },
+  Fri: { start: "09:30", graceUntil: "09:45", normalEnd: "18:30", flexFloor: null },
+  Sat: { start: "09:30", graceUntil: "11:00", normalEnd: "16:00", flexFloor: "2:30" },
+};
+
+/**
+ * Returns the correct per-day schedule for a given date.
+ * Dates on or after NEW_SCHEDULE_EFFECTIVE_DATE use NEW_SCHEDULE;
+ * earlier dates use the original BASE_SCHEDULE.
+ *
+ * Always use this function instead of reading BASE_SCHEDULE directly
+ * whenever you have a date context.
+ *
+ * @param date  The calendar date to look up (Manila timezone is used internally)
+ */
+export function getScheduleTableForDate(
+  date: Date
+): Record<Exclude<DayAbbr, "Sun">, DaySchedule> {
+  // Compare YYYY-MM-DD strings in Manila time to avoid UTC offset issues
+  const manilaDateStr = date.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }); // "YYYY-MM-DD"
+  return manilaDateStr >= NEW_SCHEDULE_EFFECTIVE_DATE ? NEW_SCHEDULE : BASE_SCHEDULE;
+}
 
 /**
  * Per-day break schedule (minutes to deduct from raw clock-in/out hours).
@@ -97,7 +135,8 @@ export function getDayAbbr(date: Date): DayAbbr {
 export function getScheduleForDate(date: Date): DaySchedule | null {
   const day = getDayAbbr(date);
   if (day === "Sun") return null;
-  return BASE_SCHEDULE[day as Exclude<DayAbbr, "Sun">];
+  const table = getScheduleTableForDate(date);
+  return table[day as Exclude<DayAbbr, "Sun">];
 }
 
 /**
@@ -135,7 +174,9 @@ export function computeTimeInStatus(
   // Sunday is never a work day — treat as exempt to avoid false positives
   if (day === "Sun") return "Exempt";
 
-  const schedule = BASE_SCHEDULE[day as Exclude<DayAbbr, "Sun">];
+  // Pick the schedule table that was active on the day of this clock-in
+  const scheduleTable = getScheduleTableForDate(clockIn);
+  const schedule = scheduleTable[day as Exclude<DayAbbr, "Sun">];
 
   // Parse grace period end for this day
   const [graceH, graceM] = schedule.graceUntil.split(":").map(Number);
@@ -244,12 +285,35 @@ export function formatEmploymentLabel(
  * The attendance "On Time" / "Late" label does NOT suppress the deduction.
  * Example: clock-in at 8:44 AM → status "On Time", deduction = 14 min × rate.
  */
+/** Original late-deduction config (used for dates before NEW_SCHEDULE_EFFECTIVE_DATE). */
 export const LATE_DEDUCTION_CONFIG = {
   scheduledStart: "08:30" as const, // 24h "HH:MM"
   lateThreshold: "09:00" as const, // 24h "HH:MM"
   beforeThresholdMethod: "per-minute" as const,
   atThresholdMethod: "one-hourly-rate" as const,
 };
+
+/** New late-deduction config effective from NEW_SCHEDULE_EFFECTIVE_DATE. */
+export const NEW_LATE_DEDUCTION_CONFIG = {
+  scheduledStart: "09:30" as const, // 24h "HH:MM"
+  lateThreshold: "10:00" as const, // 24h "HH:MM"
+  beforeThresholdMethod: "per-minute" as const,
+  atThresholdMethod: "one-hourly-rate" as const,
+};
+
+/**
+ * Returns the correct late-deduction config for the given date.
+ * Uses NEW_LATE_DEDUCTION_CONFIG on/after NEW_SCHEDULE_EFFECTIVE_DATE,
+ * and the original LATE_DEDUCTION_CONFIG for all earlier dates.
+ */
+export function getLateDeductionConfigForDate(
+  date: Date
+): typeof LATE_DEDUCTION_CONFIG | typeof NEW_LATE_DEDUCTION_CONFIG {
+  const manilaDateStr = date.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+  return manilaDateStr >= NEW_SCHEDULE_EFFECTIVE_DATE
+    ? NEW_LATE_DEDUCTION_CONFIG
+    : LATE_DEDUCTION_CONFIG;
+}
 
 export type LateDeductionMethod = "none" | "per-minute" | "threshold";
 
@@ -285,7 +349,8 @@ export function computeLateDeduction(
 ): LateDeductionResult {
   if (noTimeLog) return { lateMinutes: 0, deduction: 0, method: "none" };
 
-  const { scheduledStart, lateThreshold } = LATE_DEDUCTION_CONFIG;
+  // Use the config that was active on the day of this clock-in
+  const { scheduledStart, lateThreshold } = getLateDeductionConfigForDate(new Date(clockInISO));
 
   // Work in Manila local time — same pattern as computeTimeInStatus
   const clockIn = new Date(clockInISO);

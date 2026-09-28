@@ -288,12 +288,13 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   function handleNavClick() { onClose?.(); }
 
   // Admin groups for executive assistant & developer view
-  const adminGroups = useMemo(() => [
+  const adminGroups = [
     {
       title: "HR & People",
       items: [
         { label: "Teachers", href: "/admin/teachers", icon: <UsersIcon /> },
         { label: "Accounts", href: "/admin/users", icon: <UsersIcon /> },
+        { label: "Parents", href: "/admin/parents", icon: <UsersIcon /> },
         { label: "Payroll", href: "/admin/payroll", icon: <PayrollIcon /> },
       ],
     },
@@ -317,7 +318,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
         { label: "Audit Log", href: "/admin/audit-log", icon: <AuditIcon /> },
       ],
     },
-  ], []);
+  ];
 
   useEffect(() => {
     const activeGroup = adminGroups.find(g =>

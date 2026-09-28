@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/app-shell";
 import { ReportsTable } from "@/components/reports/reports-table";
-import { BASE_SCHEDULE, getDayAbbr, getBreakMinutes } from "@/lib/attendance-rules";
+import { getScheduleTableForDate, getDayAbbr, getBreakMinutes } from "@/lib/attendance-rules";
 
 const ReportsChart = dynamic(() => import("@/components/reports/reports-chart").then(m => m.ReportsChart), {
   loading: () => <div className="flex items-center justify-center h-48 text-[#5a6e8c] font-bold text-sm">Loading chart…</div>,
@@ -174,7 +174,8 @@ export default function ReportsPage() {
       const [y, mo, d] = r.dateStr.split("-").map(Number);
       const dateObj = new Date(y, mo - 1, d, 12); // noon avoids DST edge cases
       const day = getDayAbbr(dateObj);
-      const sched = day !== "Sun" ? BASE_SCHEDULE[day] : null;
+      const schedTable = getScheduleTableForDate(dateObj);
+      const sched = day !== "Sun" ? schedTable[day] : null;
       if (!sched) return "08:30 AM";
       const [h, m] = sched.start.split(":").map(Number);
       const ampm = h < 12 ? "AM" : "PM";

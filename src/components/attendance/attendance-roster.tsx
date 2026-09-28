@@ -4,6 +4,7 @@ import { useState } from "react";
 import { StaffAttendance } from "@/data/attendance";
 import { Modal } from "@/components/ui/modal";
 import { CustomTimePicker } from "@/components/ui/custom-time-picker";
+import { NEW_SCHEDULE_EFFECTIVE_DATE } from "@/lib/attendance-rules";
 
 type AttendanceRosterProps = {
   data: StaffAttendance[];
@@ -28,6 +29,12 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const filteredData = data.filter(staff => filterStatus === "All" || staff.status === filterStatus);
+
+  // Determine which shift label to show when no clock-in exists
+  const shiftFallbackLabel =
+    dateStr && dateStr >= NEW_SCHEDULE_EFFECTIVE_DATE
+      ? "9:30 AM (Shift)"
+      : "8:30 AM (Shift)";
 
   const getStatusBadge = (status: StaffAttendance["status"]) => {
     switch (status) {
@@ -90,7 +97,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
     const rows = filteredData.map(staff => [
       `"${staff.name}"`,
       `"${staff.group}"`,
-      `"${staff.timeIn === "—" ? "8:30 AM (Shift)" : staff.timeIn}"`,
+      `"${staff.timeIn === "—" ? shiftFallbackLabel : staff.timeIn}"`,
       `"${staff.timeOut}"`,
       `"${staff.status}"`
     ]);
@@ -187,7 +194,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                 </td>
                 <td className="py-4 text-[13.5px] font-semibold text-[#005cc8]">{staff.group}</td>
                 <td className="py-4 text-[13.5px] font-bold text-[#002f76]">
-                  {staff.timeIn !== "—" ? staff.timeIn : <span className="text-[#9aa3b2] font-semibold text-[12px]">8:30 AM (Shift)</span>}
+                  {staff.timeIn !== "—" ? staff.timeIn : <span className="text-[#9aa3b2] font-semibold text-[12px]">{shiftFallbackLabel}</span>}
                 </td>
                 <td className="py-4 text-[13.5px] font-bold text-[#002f76]">{staff.timeOut}</td>
                 <td className="py-4">{getStatusBadge(staff.status)}</td>
