@@ -40,7 +40,7 @@ async function sendWelcomeEmail(
     },
   });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merryexplorers.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merry-explorers.vercel.app";
   const loginUrl = `${appUrl}/parent/login`;
 
   const html = `
