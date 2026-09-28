@@ -272,7 +272,7 @@ function WaiverSignModal({
               <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
 
               <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>1. ADVENTURE / CYCLE</h3>
-              <p>For Merry Explorers, "Adventure" means "Cycle." Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
+              <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
 
               <h3 style={{ color: "#0050d5", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "12px", marginTop: "16px", marginBottom: "4px" }}>2. PROGRAMS</h3>
               <p style={{ fontWeight: "700", marginBottom: "4px" }}>Discovery Club — Discover Through Play</p>
