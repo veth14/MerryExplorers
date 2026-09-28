@@ -299,6 +299,8 @@ export async function GET(request: Request) {
       ...account,
       id: uid,
       _id: undefined,
+      waiverSignature: account.waiverSignature || null,
+      waiverSignedAt: account.waiverSignedAt ? new Date(account.waiverSignedAt).toISOString() : null,
       albums: safeAlbums,
     });
   } catch (error: any) {

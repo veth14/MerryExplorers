@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,8 @@ type ParentProfile = {
   avatarColor: string;
   initials: string;
   albums: Album[];
+  waiverSignature?: string;
+  waiverSignedAt?: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -233,6 +235,257 @@ function NextSessionCountdown({ schedule, classTime }: { schedule: string; class
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
+// ─── Waiver Gate ─────────────────────────────────────────────────────────────
+
+function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplete: (sig: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const [hasSigned, setHasSigned] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function getPos(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function startDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    setIsDrawing(true);
+  }
+
+  function draw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#002f76";
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    setHasSigned(true);
+  }
+
+  function stopDraw() { setIsDrawing(false); }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSigned(false);
+  }
+
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+      setHasScrolled(true);
+    }
+  }
+
+  async function handleSubmit() {
+    if (!hasSigned) { setError("Please sign the waiver before proceeding."); return; }
+    const sig = canvasRef.current!.toDataURL("image/png");
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/parents/waiver", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: profile.id, signature: sig }),
+      });
+      if (!res.ok) throw new Error("Failed to save signature.");
+      onComplete(sig);
+    } catch (e: any) {
+      setError(e.message || "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#f0f7ff 0%,#e8f0fe 40%,#fdf4ff 100%)", fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .waiver-section h3 { color: #0050d5; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; margin: 20px 0 6px; }
+        .waiver-section p { margin: 0 0 10px; }
+        .waiver-section ul { margin: 0 0 10px; padding-left: 20px; }
+        .waiver-section li { margin-bottom: 4px; }
+        .sig-canvas { touch-action: none; cursor: crosshair; }
+      `}</style>
+
+      {/* Header */}
+      <nav style={{ background: "linear-gradient(90deg,#002f76 0%,#0050d5 100%)", padding: "0 24px", boxShadow: "0 2px 20px rgba(0,47,118,0.25)", flexShrink: 0 }}>
+        <div style={{ maxWidth: "900px", margin: "0 auto", display: "flex", alignItems: "center", gap: "12px", height: "64px" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", overflow: "hidden", background: "rgba(255,255,255,0.15)", position: "relative", flexShrink: 0 }}>
+            <Image src="/LOGO-noBG.png" alt="Merry Explorers" fill style={{ objectFit: "contain", padding: "3px" }} />
+          </div>
+          <div>
+            <span style={{ color: "white", fontWeight: "800", fontSize: "16px" }}>Merry Explorers</span>
+            <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "500", marginLeft: "8px" }}>Parent Portal</span>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main content */}
+      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "32px 20px", flex: 1, display: "flex", flexDirection: "column", gap: "24px", animation: "fadeUp 0.4s ease" }}>
+
+        {/* Intro banner */}
+        <div style={{ background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", borderRadius: "20px", padding: "28px 32px", color: "white", boxShadow: "0 8px 32px rgba(0,47,118,0.25)" }}>
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+          <h1 style={{ margin: "0 0 8px", fontSize: "22px", fontWeight: "800", letterSpacing: "-0.3px" }}>Welcome, {profile.fullName.split(" ")[0]}!</h1>
+          <p style={{ margin: 0, fontSize: "15px", opacity: 0.85, lineHeight: 1.6 }}>Before you enter the Parent Portal, please read the full Merry Explorers Parent/Guardian Acknowledgment & Agreement below. Scroll all the way to the bottom, then sign to confirm.</p>
+        </div>
+
+        {/* Waiver text card */}
+        <div style={{ background: "white", borderRadius: "20px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", overflow: "hidden" }}>
+          <div style={{ background: "#f8faff", padding: "16px 24px", borderBottom: "1px solid #e8efff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontWeight: "800", color: "#002f76", fontSize: "14px" }}>📄 Parent/Guardian Acknowledgment &amp; Agreement</span>
+            {!hasScrolled && <span style={{ fontSize: "12px", fontWeight: "600", color: "#f59e0b", background: "#fffbeb", padding: "4px 12px", borderRadius: "20px", border: "1px solid #fde68a" }}>↓ Scroll to read all</span>}
+            {hasScrolled && <span style={{ fontSize: "12px", fontWeight: "600", color: "#15803d", background: "#f0fdf4", padding: "4px 12px", borderRadius: "20px", border: "1px solid #bbf7d0" }}>✅ Read complete</span>}
+          </div>
+
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            style={{ height: "420px", overflowY: "auto", padding: "24px", fontSize: "13px", color: "#334155", lineHeight: 1.75 }}
+          >
+            <div className="waiver-section">
+              <p style={{ fontWeight: "800", color: "#002f76", fontSize: "14px", marginBottom: "12px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT &amp; AGREEMENT</p>
+              <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
+
+              <h3>1. ADVENTURE / CYCLE</h3>
+              <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
+
+              <h3>2. PROGRAMS</h3>
+              <p style={{ fontWeight: "700", marginBottom: "4px" }}>Discovery Club — Discover Through Play</p>
+              <ul>
+                <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
+                <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
+                <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
+              </ul>
+              <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building. It may also be a suitable starting point for children who are not yet using verbal communication.</p>
+              <p style={{ fontWeight: "700" }}>💡 Trailblazer: Brave Explorer — Prepare for What&apos;s Next</p>
+              <ul>
+                <li>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</li>
+              </ul>
+              <p><strong>Milestone Checkpoint:</strong> The 18th session includes the Exploration Diary presentation, review of the child&apos;s learning and discoveries, and milestone recognition through a Certificate of Recognition/Completion.</p>
+              <p style={{ fontWeight: "700" }}>Little Trailblazer Prerequisites:</p>
+              <p>The child should be able to comfortably grip age-appropriate materials, participate independently with teachers, and sit still independently for at least 3 minutes.</p>
+
+              <h3>3. REGISTRATION, PAYMENTS &amp; PENALTIES</h3>
+              <p>Upon registration, 60% of the total program fee is required as a non-refundable reservation fee. The remaining 40% balance is due on or before the 6th session. An interest of 4% per week will be applied to overdue balances starting the week after the due date. Merry Explorers accepts the following payment methods: Cash, GCash, BDO Bank Transfer, and Credit/Debit Card (via GCash QR). Official receipts or proof of payment must be submitted upon payment.</p>
+
+              <h3>4. ATTENDANCE, ABSENCES &amp; MAKE-UP SESSIONS</h3>
+              <p>Each program has a set number of sessions. Attending all sessions within your program is encouraged to maximize your child&apos;s learning. Make-up sessions may be arranged for absences, subject to teacher and slot availability. Make-up sessions must be completed within the current Adventure. Unused make-up sessions do not carry over to the next Adventure. Habitual absences without notice may result in forfeiture of make-up privileges. Merry Explorers reserves the right to reschedule or cancel classes due to unforeseen circumstances (e.g., typhoons, public holidays, or force majeure events). In such cases, a make-up session will be scheduled at no additional charge.</p>
+
+              <h3>5. PHOTO &amp; VIDEO HIGHLIGHTS</h3>
+              <p>Photos and videos taken during sessions are for documentation and sharing within the Merry Explorers community. These are shared via a private portal or class group. Files will be automatically deleted 30 days after sharing. Merry Explorers is not responsible for files once downloaded and shared externally by parents or guardians. If you do not wish your child to be photographed or filmed, please inform us in writing before the first session.</p>
+
+              <h3>6. UNIFORM POLICY</h3>
+              <p>We would also like to clarify an important part of our uniform policy. <strong>The Merry Explorers uniform is the SAME uniform.</strong></p>
+              <p>If your child already has a Merry Explorers uniform from the previous chapter, you are NOT required to purchase a new set for Adventure 1. We want families to be able to continue using the uniform they already have.</p>
+              <p><strong>Uniform Days:</strong> Wednesday &amp; Friday. On all other class days, children may wear anything comfortable, safe, and appropriate for active play and learning.</p>
+              <p><strong>Welcome Kit — ₱750</strong><br />For families who need a new set or an additional set, the Uniform Kit is available for ₱750 and includes: 1 Merry Explorers polo shirt with logo, 1 pair of jogging pants, 1 name tag with Merry Explorers lanyard.</p>
+              <p><strong>Lanyard &amp; Name Tag — ₱200</strong><br />A Merry Explorers lanyard with laminated name tag may also be purchased separately for ₱200.</p>
+              <p>If you just need the uniform, you may still purchase the polo and jogging pants with the Merry Explorers logo priced at ₱550/set.</p>
+
+              <div style={{ background: "#f0f5ff", border: "1.5px solid #c5d6ff", borderRadius: "12px", padding: "18px", marginTop: "20px" }}>
+                <p style={{ fontWeight: "800", color: "#002f76", fontSize: "13px", marginBottom: "8px" }}>PARENT/GUARDIAN ACKNOWLEDGMENT</p>
+                <p>I, the undersigned Parent/Guardian, confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement, including those covering program requirements, payments, attendance and make-ups, photos and videos, and uniforms.</p>
+                <p>I confirm that the information I provided about my child is true and complete, and I agree to comply with Merry Explorers&apos; policies and arrangements.</p>
+                <p style={{ marginBottom: 0 }}>By signing below, I voluntarily acknowledge, accept, and agree to be bound by these terms and policies as part of my child&apos;s registration with Merry Explorers Playgroup Learning Center.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Signature section — unlocked only after scrolling */}
+        <div style={{ background: "white", borderRadius: "20px", padding: "28px 32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", opacity: hasScrolled ? 1 : 0.45, pointerEvents: hasScrolled ? "auto" : "none", transition: "opacity 0.4s" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div>
+              <div style={{ fontWeight: "800", color: "#002f76", fontSize: "16px" }}>✍️ Your Signature</div>
+              <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>Sign in the box below to confirm you have read and agree to the waiver.</div>
+            </div>
+            <button onClick={clearCanvas} style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", padding: "6px 14px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Clear</button>
+          </div>
+
+          <div style={{ border: `2px dashed ${hasSigned ? "#0050d5" : "#c5d6ff"}`, borderRadius: "14px", overflow: "hidden", background: "#f8faff", transition: "border-color 0.2s" }}>
+            <canvas
+              ref={canvasRef}
+              width={800}
+              height={180}
+              className="sig-canvas"
+              style={{ width: "100%", height: "180px", display: "block" }}
+              onMouseDown={startDraw}
+              onMouseMove={draw}
+              onMouseUp={stopDraw}
+              onMouseLeave={stopDraw}
+              onTouchStart={startDraw}
+              onTouchMove={draw}
+              onTouchEnd={stopDraw}
+            />
+          </div>
+          {!hasSigned && hasScrolled && <p style={{ textAlign: "center", fontSize: "12px", color: "#94a3b8", marginTop: "8px", fontWeight: "600" }}>Draw your signature above</p>}
+
+          {/* Signed-by line */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginTop: "20px", padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
+            {[
+              { label: "Name", value: profile.fullName },
+              { label: "Child", value: profile.childName },
+              { label: "Date", value: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>{label}</div>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: "#002f76" }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          {error && <div style={{ background: "#fff0f0", color: "#ba1a1a", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", border: "1px solid #ffd5d5", marginTop: "16px" }}>{error}</div>}
+
+          <button
+            onClick={handleSubmit}
+            disabled={!hasScrolled || !hasSigned || saving}
+            style={{
+              width: "100%",
+              marginTop: "20px",
+              padding: "16px",
+              background: hasScrolled && hasSigned ? "linear-gradient(135deg,#002f76,#0050d5)" : "#cbd5e1",
+              color: "white",
+              border: "none",
+              borderRadius: "12px",
+              fontSize: "16px",
+              fontWeight: "800",
+              cursor: hasScrolled && hasSigned && !saving ? "pointer" : "not-allowed",
+              boxShadow: hasScrolled && hasSigned ? "0 8px 24px rgba(0,47,118,0.3)" : "none",
+              transition: "all 0.3s",
+            }}
+          >
+            {saving ? "Saving..." : (!hasScrolled ? "↓ Please scroll through the full waiver first" : !hasSigned ? "✍️ Please sign above to continue" : "✅ I Agree — Enter the Parent Portal")}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
+
 export default function ParentDashboardPage() {
   const { user, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -290,8 +543,18 @@ export default function ParentDashboardPage() {
 
   if (!profile) return null;
 
+  // Show waiver gate if not yet signed
+  if (!profile.waiverSignature) {
+    return (
+      <WaiverGate
+        profile={profile}
+        onComplete={(sig) => setProfile((p) => p ? { ...p, waiverSignature: sig, waiverSignedAt: new Date().toISOString() } : p)}
+      />
+    );
+  }
+
   const recentAlbum = profile.albums[0] ?? null;
-  const waiverSigned = true; // Will be driven by DB in the future; assume signed on portal creation
+  const waiverSigned = !!profile.waiverSignature;
 
   // ─── Tabs ─────────────────────────────────────────────────────────────────
 
@@ -706,34 +969,82 @@ export default function ParentDashboardPage() {
                   </div>
                   <div style={{ fontSize: "13px", color: waiverSigned ? "#16a34a" : "#92400e", fontWeight: "500" }}>
                     {waiverSigned
-                      ? "Your participation waiver has been received and is on file."
+                      ? profile.waiverSignedAt ? `Signed on ${new Date(profile.waiverSignedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}` : "Your participation waiver has been received and is on file."
                       : "Please contact us to complete your waiver form."}
                   </div>
                 </div>
               </div>
 
-              {/* Waiver contents summary */}
-              <h3 style={{ color: "#002f76", fontWeight: "800", fontSize: "16px", margin: "0 0 16px" }}>What's Covered in Your Waiver</h3>
-              <div style={{ display: "grid", gap: "10px" }}>
-                {[
-                  { icon: "🏃", title: "Physical Activity Consent", desc: "Consent for your child to participate in indoor and outdoor play activities, arts & crafts, and structured movement." },
-                  { icon: "📸", title: "Photo & Video Authorization", desc: "Permission for Merry Explorers to photograph and video your child for internal documentation and parent communications." },
-                  { icon: "🏥", title: "Emergency Medical Consent", desc: "Authorization for staff to seek emergency medical treatment for your child if you are unreachable." },
-                  { icon: "🔒", title: "Data Privacy Agreement", desc: "Acknowledgment that your personal and child information is stored securely per our privacy policy." },
-                  { icon: "📋", title: "Program Rules & Policies", desc: "Agreement to abide by the Merry Explorers code of conduct, attendance policies, and pickup procedures." },
-                ].map(({ icon, title, desc }) => (
-                  <div key={title} style={{ display: "flex", gap: "14px", padding: "14px 16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
-                    <span style={{ fontSize: "20px", flexShrink: 0, marginTop: "2px" }}>{icon}</span>
-                    <div>
-                      <div style={{ fontWeight: "700", color: "#002f76", fontSize: "14px", marginBottom: "3px" }}>{title}</div>
-                      <div style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.55" }}>{desc}</div>
+              {/* Signed-by info */}
+              {waiverSigned && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "24px", padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
+                  {[
+                    { label: "Signed By", value: profile.fullName },
+                    { label: "Child", value: profile.childName },
+                    { label: "Date Signed", value: profile.waiverSignedAt ? new Date(profile.waiverSignedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—" },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>{label}</div>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: "#002f76" }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Signature image */}
+              {waiverSigned && profile.waiverSignature && (
+                <div style={{ marginBottom: "28px" }}>
+                  <div style={{ fontWeight: "800", color: "#002f76", fontSize: "14px", marginBottom: "10px" }}>✍️ Your Signature on File</div>
+                  <div style={{ border: "1.5px solid #c5d6ff", borderRadius: "12px", padding: "12px", background: "#f8faff", display: "inline-block" }}>
+                    <img src={profile.waiverSignature} alt="Your signature" style={{ maxHeight: "100px", display: "block" }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Full waiver text — re-readable */}
+              <div style={{ fontWeight: "800", color: "#002f76", fontSize: "15px", marginBottom: "16px" }}>📄 Your Full Agreement</div>
+              <div style={{ border: "1px solid #e8efff", borderRadius: "14px", overflow: "hidden" }}>
+                <div style={{ background: "#f8faff", padding: "10px 16px", borderBottom: "1px solid #e8efff", fontSize: "12px", fontWeight: "700", color: "#64748b" }}>Read-only — for your reference</div>
+                <div style={{ padding: "20px 24px", fontSize: "13px", color: "#334155", lineHeight: 1.75, maxHeight: "400px", overflowY: "auto" }}>
+                  <style>{`
+                    .waiver-ro h3 { color: #0050d5; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; margin: 18px 0 6px; }
+                    .waiver-ro p { margin: 0 0 10px; }
+                    .waiver-ro ul { margin: 0 0 10px; padding-left: 20px; }
+                    .waiver-ro li { margin-bottom: 4px; }
+                  `}</style>
+                  <div className="waiver-ro">
+                    <p style={{ fontWeight: "800", color: "#002f76", fontSize: "14px", marginBottom: "12px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT &amp; AGREEMENT</p>
+                    <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
+                    <h3>1. ADVENTURE / CYCLE</h3>
+                    <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
+                    <h3>2. PROGRAMS</h3>
+                    <p style={{ fontWeight: "700" }}>Discovery Club — Discover Through Play</p>
+                    <ul>
+                      <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
+                      <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
+                      <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
+                    </ul>
+                    <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building.</p>
+                    <p style={{ fontWeight: "700" }}>💡 Trailblazer: Brave Explorer — Prepare for What&apos;s Next</p>
+                    <ul><li>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</li></ul>
+                    <h3>3. REGISTRATION, PAYMENTS &amp; PENALTIES</h3>
+                    <p>60% non-refundable reservation fee upon registration. 40% balance due on or before the 6th session. 4% weekly interest on overdue balances. Accepted payments: Cash, GCash, BDO Bank Transfer, Credit/Debit Card (via GCash QR).</p>
+                    <h3>4. ATTENDANCE, ABSENCES &amp; MAKE-UP SESSIONS</h3>
+                    <p>Make-up sessions are subject to availability and must be completed within the current Adventure. Unused make-ups do not carry over. Merry Explorers may reschedule classes due to force majeure with a complimentary make-up session.</p>
+                    <h3>5. PHOTO &amp; VIDEO HIGHLIGHTS</h3>
+                    <p>Photos/videos are shared privately and deleted 30 days after sharing. If you do not consent, notify us in writing before the first session.</p>
+                    <h3>6. UNIFORM POLICY</h3>
+                    <p>The Merry Explorers uniform is the SAME uniform across chapters. Uniform Days: Wednesday &amp; Friday. Welcome Kit (₱750) and Lanyard &amp; Name Tag (₱200) available separately.</p>
+                    <div style={{ background: "#f0f5ff", border: "1.5px solid #c5d6ff", borderRadius: "10px", padding: "16px", marginTop: "16px" }}>
+                      <p style={{ fontWeight: "800", color: "#002f76", fontSize: "13px", marginBottom: "6px" }}>PARENT/GUARDIAN ACKNOWLEDGMENT</p>
+                      <p style={{ margin: 0 }}>I confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement. By signing, I voluntarily acknowledge, accept, and agree to be bound by these terms as part of my child&apos;s registration with Merry Explorers Playgroup Learning Center.</p>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
 
               <p style={{ marginTop: "20px", fontSize: "12px", color: "#94a3b8", lineHeight: "1.6" }}>
-                For questions about the waiver or to request a copy, please contact us at{" "}
+                For questions about the waiver, please contact us at{" "}
                 <a href="mailto:merryexplorerscenter@gmail.com" style={{ color: "#0050d5", fontWeight: "700" }}>merryexplorerscenter@gmail.com</a>.
               </p>
             </div>
