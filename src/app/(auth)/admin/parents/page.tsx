@@ -464,7 +464,7 @@ export default function AdminParentsPage() {
       setLoading(true);
       const data = await cachedFetch<any[]>("accounts:parents", "/api/accounts", 60_000);
       if (Array.isArray(data)) {
-        const parents = data.filter((a: any) => a.role === "Parent").map(normalizeAccount);
+        const parents = data.filter((a: any) => a.role === "Parent" || a.role === "parent").map(normalizeAccount);
         setData(parents);
       }
     } catch (e) {
