@@ -96,6 +96,8 @@ type ParentAccount = {
   classTime: string;
   status: "active" | "inactive";
   role: string;
+  virtualSessionLink?: string;
+  renewalLink?: string;
 };
 
 type Draft = Omit<ParentAccount, "id" | "initials">;
@@ -114,6 +116,8 @@ function emptyDraft(): Draft {
     classTime: "",
     status: "active",
     role: "Parent",
+    virtualSessionLink: "",
+    renewalLink: "",
   };
 }
 
@@ -131,6 +135,8 @@ function draftFromUser(u: ParentAccount): Draft {
     classTime: u.classTime || "",
     status: u.status || "active",
     role: u.role || "Parent",
+    virtualSessionLink: u.virtualSessionLink || "",
+    renewalLink: u.renewalLink || "",
   };
 }
 
@@ -142,6 +148,8 @@ function normalizeAccount(a: any): ParentAccount {
     program: a.program ?? "",
     schedule: a.schedule ?? "",
     classTime: a.classTime ?? "",
+    virtualSessionLink: a.virtualSessionLink ?? "",
+    renewalLink: a.renewalLink ?? "",
   };
 }
 
@@ -273,6 +281,8 @@ function ParentModal({
         classTime: draft.classTime.trim(),
         status: draft.status,
         role: "Parent",
+        virtualSessionLink: draft.virtualSessionLink?.trim() || "",
+        renewalLink: draft.renewalLink?.trim() || "",
       };
 
       return await onSave(account, initial?.id);
@@ -420,6 +430,17 @@ function ParentModal({
                 </select>
                 <Chevron />
               </div>
+            </Field>
+
+            {/* Links */}
+            <SectionHeading>Links</SectionHeading>
+
+            <Field label="Virtual Session Link (Zoom/Meet)">
+              <input type="url" className={INPUT_CLS} placeholder="https://zoom.us/j/..." value={draft.virtualSessionLink || ""} onChange={(e) => set("virtualSessionLink", e.target.value)} />
+            </Field>
+
+            <Field label="Renewal Link">
+              <input type="url" className={INPUT_CLS} placeholder="https://docs.google.com/forms/..." value={draft.renewalLink || ""} onChange={(e) => set("renewalLink", e.target.value)} />
             </Field>
 
             {/* Account */}

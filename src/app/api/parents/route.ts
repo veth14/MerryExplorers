@@ -295,12 +295,34 @@ export async function GET(request: Request) {
       photos: (a.photos || []).map((p: any) => ({ url: p.url, caption: p.caption })),
     }));
 
+    // Fetch the linked student record via parent email
+    const studentRecord = await db
+      .collection("students")
+      .findOne({ "parentInfo.email": account.email });
+
+    const studentInfo = studentRecord
+      ? {
+          id: studentRecord._id.toString(),
+          registrationId: studentRecord.registrationId,
+          program: studentRecord.program,
+          programName: studentRecord.programName,
+          classTime: studentRecord.classTime,
+          schedule: studentRecord.schedule,
+          enrolledAt: studentRecord.enrolledAt,
+          status: studentRecord.status,
+          childInfo: studentRecord.childInfo,
+        }
+      : null;
+
     return NextResponse.json({
       ...account,
       id: uid,
       _id: undefined,
       waiverSignature: account.waiverSignature || null,
       waiverSignedAt: account.waiverSignedAt ? new Date(account.waiverSignedAt).toISOString() : null,
+      virtualSessionLink: account.virtualSessionLink || null,
+      renewalLink: account.renewalLink || null,
+      studentInfo,
       albums: safeAlbums,
     });
   } catch (error: any) {

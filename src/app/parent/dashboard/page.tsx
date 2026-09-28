@@ -44,6 +44,29 @@ type ParentProfile = {
   albums: Album[];
   waiverSignature?: string;
   waiverSignedAt?: string;
+  virtualSessionLink?: string;
+  renewalLink?: string;
+  studentInfo?: {
+    id: string;
+    registrationId: string;
+    program: string;
+    programName: string;
+    classTime: string;
+    schedule: string;
+    enrolledAt: string;
+    status: string;
+    childInfo: {
+      firstName: string;
+      lastName: string;
+      nickname?: string;
+      dateOfBirth?: string;
+      gender?: string;
+      healthProfile?: string;
+      favoriteSong?: string;
+      favoriteColor?: string;
+      favoriteCharacter?: string;
+    };
+  } | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -492,7 +515,7 @@ export default function ParentDashboardPage() {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history">("session");
+  const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history" | "virtual" | "renewal">("session");
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -560,9 +583,11 @@ export default function ParentDashboardPage() {
 
   const tabs = [
     { id: "session", label: "📅 Session", icon: "📅" },
+    { id: "virtual", label: "🖥️ Virtual Class", icon: "🖥️" },
     { id: "photos", label: "📸 Photos", icon: "📸" },
     { id: "waiver", label: "📄 Waiver", icon: "📄" },
     { id: "history", label: "🏕️ History", icon: "🏕️" },
+    { id: "renewal", label: "🔄 Renewal", icon: "🔄" },
   ] as const;
 
   return (
@@ -855,21 +880,66 @@ export default function ParentDashboardPage() {
               <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                   <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>👦</div>
-                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#002f76" }}>Child Information</div>
+                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#002f76" }}>Explorer Profile</div>
                 </div>
-                <dl style={{ margin: 0, display: "grid", gap: "10px" }}>
-                  {[
-                    { label: "Name", value: profile.childName },
-                    { label: "Program", value: profile.program },
-                    { label: "Schedule", value: profile.schedule || "—" },
-                    { label: "Class Time", value: profile.classTime || "—" },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f8faff", borderRadius: "8px" }}>
-                      <dt style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</dt>
-                      <dd style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", margin: 0, textAlign: "right", maxWidth: "60%" }}>{value}</dd>
+                {profile.studentInfo ? (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", background: "linear-gradient(135deg,#f0f7ff,#e8f0fe)", borderRadius: "12px", marginBottom: "12px" }}>
+                      <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "linear-gradient(135deg,#002f76,#0050d5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", color: "white", fontWeight: "800", flexShrink: 0 }}>
+                        {profile.studentInfo.childInfo.firstName?.[0] || "?"}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: "800", fontSize: "16px", color: "#002f76" }}>
+                          {profile.studentInfo.childInfo.firstName} {profile.studentInfo.childInfo.lastName}
+                        </div>
+                        {profile.studentInfo.childInfo.nickname && (
+                          <div style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>&quot;{profile.studentInfo.childInfo.nickname}&quot;</div>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </dl>
+                    <dl style={{ margin: 0, display: "grid", gap: "8px" }}>
+                      {([
+                        { label: "Program", value: profile.studentInfo.programName || profile.studentInfo.program },
+                        { label: "Schedule", value: profile.studentInfo.schedule || profile.schedule || "—" },
+                        { label: "Class Time", value: profile.studentInfo.classTime || profile.classTime || "—" },
+                        { label: "Date of Birth", value: profile.studentInfo.childInfo.dateOfBirth || "—" },
+                        { label: "Gender", value: profile.studentInfo.childInfo.gender || "—" },
+                        { label: "Health Notes", value: profile.studentInfo.childInfo.healthProfile || "None" },
+                        { label: "Enrolled", value: profile.studentInfo.enrolledAt ? new Date(profile.studentInfo.enrolledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—" },
+                        { label: "Registration ID", value: profile.studentInfo.registrationId || "—" },
+                      ] as const).map(({ label, value }) => (
+                        <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f8faff", borderRadius: "8px" }}>
+                          <dt style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</dt>
+                          <dd style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", margin: 0, textAlign: "right", maxWidth: "60%" }}>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {(profile.studentInfo.childInfo.favoriteSong || profile.studentInfo.childInfo.favoriteColor || profile.studentInfo.childInfo.favoriteCharacter) && (
+                      <div style={{ marginTop: "12px", padding: "12px", background: "#fff8f0", borderRadius: "10px", border: "1px solid #fed7aa" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#b45309", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "6px" }}>⭐ Favorites</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                          {profile.studentInfo.childInfo.favoriteSong && <span style={{ padding: "3px 10px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "600", color: "#92400e", border: "1px solid #fde68a" }}>🎵 {profile.studentInfo.childInfo.favoriteSong}</span>}
+                          {profile.studentInfo.childInfo.favoriteColor && <span style={{ padding: "3px 10px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "600", color: "#92400e", border: "1px solid #fde68a" }}>🎨 {profile.studentInfo.childInfo.favoriteColor}</span>}
+                          {profile.studentInfo.childInfo.favoriteCharacter && <span style={{ padding: "3px 10px", background: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "600", color: "#92400e", border: "1px solid #fde68a" }}>⭐ {profile.studentInfo.childInfo.favoriteCharacter}</span>}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <dl style={{ margin: 0, display: "grid", gap: "10px" }}>
+                    {[
+                      { label: "Name", value: profile.childName },
+                      { label: "Program", value: profile.program },
+                      { label: "Schedule", value: profile.schedule || "—" },
+                      { label: "Class Time", value: profile.classTime || "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f8faff", borderRadius: "8px" }}>
+                        <dt style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</dt>
+                        <dd style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", margin: 0, textAlign: "right", maxWidth: "60%" }}>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </div>
             </div>
           )}
@@ -1112,6 +1182,106 @@ export default function ParentDashboardPage() {
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── VIRTUAL CLASS TAB ────────────────────────────────────────────── */}
+          {activeTab === "virtual" && (
+            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+              {profile.virtualSessionLink ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#e0e7ff,#c7d2fe)", padding: "20px", borderRadius: "16px", border: "1px solid #a5b4fc" }}>
+                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: "0 4px 12px rgba(79,70,229,0.4)" }}>
+                      🖥️
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: "800", fontSize: "18px", color: "#312e81" }}>Virtual Session Link Available</div>
+                      <div style={{ fontSize: "14px", color: "#4338ca", fontWeight: "600", marginTop: "4px" }}>Click the button below to join the online session</div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
+                    <div style={{ fontSize: "40px", marginBottom: "16px", animation: "bounce 2s infinite" }}>🎥</div>
+                    <a
+                      href={profile.virtualSessionLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "inline-block",
+                        padding: "16px 32px",
+                        background: "linear-gradient(135deg,#002f76,#0050d5)",
+                        color: "white",
+                        borderRadius: "14px",
+                        fontSize: "16px",
+                        fontWeight: "800",
+                        textDecoration: "none",
+                        boxShadow: "0 8px 24px rgba(0,47,118,0.3)",
+                        transition: "all 0.2s"
+                      }}
+                      onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                      onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
+                    >
+                      Join Virtual Class Now
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                  <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>📴</div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>No Virtual Session Link</h3>
+                  <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Your teacher hasn't posted a virtual session link for your class yet.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── RENEWAL TAB ──────────────────────────────────────────────────── */}
+          {activeTab === "renewal" && (
+            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+              {profile.renewalLink ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#fce7f3,#fbcfe8)", padding: "20px", borderRadius: "16px", border: "1px solid #f9a8d4" }}>
+                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#db2777", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: "0 4px 12px rgba(219,39,119,0.4)" }}>
+                      🔄
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: "800", fontSize: "18px", color: "#831843" }}>It's Time to Renew!</div>
+                      <div style={{ fontSize: "14px", color: "#be185d", fontWeight: "600", marginTop: "4px" }}>Secure your child's slot for the next adventure</div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ textAlign: "center", padding: "40px 20px", background: "#fdf2f8", borderRadius: "16px", border: "1px dashed #f9a8d4" }}>
+                    <div style={{ fontSize: "40px", marginBottom: "16px" }}>📝</div>
+                    <a
+                      href={profile.renewalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "inline-block",
+                        padding: "16px 32px",
+                        background: "linear-gradient(135deg,#be185d,#db2777)",
+                        color: "white",
+                        borderRadius: "14px",
+                        fontSize: "16px",
+                        fontWeight: "800",
+                        textDecoration: "none",
+                        boxShadow: "0 8px 24px rgba(219,39,119,0.3)",
+                        transition: "all 0.2s"
+                      }}
+                      onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                      onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
+                    >
+                      Fill out Renewal Form
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                  <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>⏳</div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>Not Ready for Renewal Yet</h3>
+                  <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>We will post the renewal form link here when the current adventure is nearing its end.</p>
                 </div>
               )}
             </div>
