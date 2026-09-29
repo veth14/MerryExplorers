@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { PROGRAM_SLOTS } from "@/data/landing";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,13 @@ type ParentProfile = {
       favoriteCharacter?: string;
     };
   } | null;
+  renewalStatus?: {
+    hasSubmitted: boolean;
+    returning: string;
+    notes: string;
+    reason: string;
+    submittedAt: string;
+  };
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -139,6 +147,49 @@ function getNextSessionDate(schedule: string, classTime: string): Date | null {
   return null;
 }
 
+function parseEndTime(classTime: string): { hour: number; minute: number } | null {
+  const matches = [...classTime.matchAll(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi)];
+  if (matches.length < 2) return null;
+  const match = matches[1];
+  let hour = parseInt(match[1], 10);
+  const min = parseInt(match[2], 10);
+  const meridiem = match[3].toUpperCase();
+  if (meridiem === "PM" && hour < 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return { hour, minute: min };
+}
+
+function getCompletedSessionsCount(enrolledAtStr: string | undefined, schedule: string, classTime: string): number {
+  if (!enrolledAtStr) return 0;
+  const days = parseScheduleDays(schedule);
+  const endTime = parseEndTime(classTime) || parseStartTime(classTime);
+  if (days.length === 0 || !endTime) return 0;
+
+  const startDate = new Date(enrolledAtStr);
+  startDate.setHours(0, 0, 0, 0);
+  
+  const now = new Date();
+  let count = 0;
+  let current = new Date(startDate);
+  
+  while (current <= now) {
+    if (days.includes(current.getDay())) {
+      const isToday = current.toDateString() === now.toDateString();
+      if (isToday) {
+         const endOfClassToday = new Date(now);
+         endOfClassToday.setHours(endTime.hour, endTime.minute, 0, 0);
+         if (now >= endOfClassToday) {
+           count++;
+         }
+      } else {
+         count++;
+      }
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Spinner() {
@@ -200,6 +251,32 @@ function Lightbox({ photos, startIndex, onClose }: { photos: PhotoItem[]; startI
         onClick={(e) => { e.stopPropagation(); next(); }}
         style={{ position: "absolute", right: "20px", top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "50%", width: "48px", height: "48px", color: "white", fontSize: "22px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
       >›</button>
+
+      <button
+        onClick={async (e) => {
+          e.stopPropagation();
+          try {
+            const res = await fetch(photo.url);
+            const blob = await res.blob();
+            const objectUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = objectUrl;
+            a.download = `merry_explorers_photo_${idx + 1}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(objectUrl);
+          } catch (err) {
+            console.error("Failed to download image", err);
+            // Fallback for cross-origin issues
+            window.open(photo.url, "_blank");
+          }
+        }}
+        style={{ position: "absolute", top: "20px", right: "70px", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "white", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+        title="Download photo"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
 
       <button
         onClick={onClose}
@@ -509,6 +586,12 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
+type RenewalSettings = {
+  nextAdventureStart: string | null;
+  renewalOpen: boolean;
+  renewalOpenDate: string | null;
+};
+
 export default function ParentDashboardPage() {
   const { user, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -519,6 +602,26 @@ export default function ParentDashboardPage() {
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
+  // We also cache the full per-program list so we can resolve after profile loads
+  const [allRenewalPrograms, setAllRenewalPrograms] = useState<{ programKey: string; nextAdventureStart: string | null; renewalOpen: boolean; renewalOpenDate: string | null; virtualLink?: string; virtualLinkOpen?: boolean }[]>([]);
+  
+  // Inline Renewal Form State
+  const [showRenewalForm, setShowRenewalForm] = useState(false);
+  const [renewalForm, setRenewalForm] = useState({ returning: "yes", notes: "", reason: "", agreed: false });
+  const [submittingRenewal, setSubmittingRenewal] = useState(false);
+  const [renewalSubmitted, setRenewalSubmitted] = useState(false);
+
+  // Downpayment form state
+  const [dpPaymentType, setDpPaymentType] = useState<"downpayment" | "full">("downpayment");
+  const [dpPaymentMethod, setDpPaymentMethod] = useState("");
+  const [dpReceiptPreview, setDpReceiptPreview] = useState("");
+  const [dpReceiptBase64, setDpReceiptBase64] = useState("");
+  const [dpReferenceNumber, setDpReferenceNumber] = useState("");
+  const [dpAmountPaid, setDpAmountPaid] = useState("");
+  const [submittingDp, setSubmittingDp] = useState(false);
+  const [dpSubmitted, setDpSubmitted] = useState(false);
+  const dpFileRef = typeof window !== 'undefined' ? { current: null as HTMLInputElement | null } : { current: null as HTMLInputElement | null };
 
   useEffect(() => {
     if (authLoading) return;
@@ -527,7 +630,29 @@ export default function ParentDashboardPage() {
       return;
     }
     fetchProfile(user.uid);
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        // New per-program shape: { programs: [...] }
+        if (Array.isArray(d.programs)) {
+          setAllRenewalPrograms(d.programs);
+        }
+      })
+      .catch(() => {});
   }, [user, authLoading, router]);
+
+  // Once both profile and allRenewalPrograms are loaded, resolve the right program entry
+  useEffect(() => {
+    if (!profile || allRenewalPrograms.length === 0) return;
+    const match = allRenewalPrograms.find((p) => p.programKey === profile.program);
+    if (match) {
+      setRenewalSettings({
+        nextAdventureStart: match.nextAdventureStart,
+        renewalOpen: match.renewalOpen,
+        renewalOpenDate: match.renewalOpenDate,
+      });
+    }
+  }, [profile, allRenewalPrograms]);
 
   async function fetchProfile(uid: string) {
     try {
@@ -736,7 +861,7 @@ export default function ParentDashboardPage() {
           <div style={{ display: "flex", gap: "16px", flexShrink: 0 }}>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
               <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
-                {profile.albums.length}
+                {getCompletedSessionsCount(profile.studentInfo?.enrolledAt, profile.schedule, profile.classTime)}
                 <span style={{ fontSize: "14px", color: "#64748b", fontWeight: "600", marginLeft: "2px" }}>
                   {(() => {
                     const programs: Record<string, number> = {
@@ -1186,7 +1311,7 @@ export default function ParentDashboardPage() {
                         <div key={album.id} style={{ display: "flex", gap: "24px", paddingLeft: "0" }}>
                           {/* Dot */}
                           <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: idx === 0 ? "#0050d5" : "#f0f5ff", border: `3px solid ${idx === 0 ? "#0050d5" : "#c5d6ff"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "16px", fontWeight: "800", color: idx === 0 ? "white" : "#0050d5", zIndex: 1 }}>
-                            {idx === 0 ? "★" : profile.albums.length - idx}
+                            {profile.albums.length - idx}
                           </div>
 
                           {/* Content */}
@@ -1231,8 +1356,13 @@ export default function ParentDashboardPage() {
 
           {/* ── VIRTUAL CLASS TAB ────────────────────────────────────────────── */}
           {activeTab === "virtual" && (
-            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
-              {profile.virtualSessionLink ? (
+            (() => {
+              const programSetting = allRenewalPrograms?.find((p: any) => p.programKey === profile.program);
+              const activeLink = profile.virtualSessionLink || (programSetting?.virtualLinkOpen ? programSetting?.virtualLink : null);
+
+            return (
+              <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+                {activeLink ? (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#e0e7ff,#c7d2fe)", padding: "20px", borderRadius: "16px", border: "1px solid #a5b4fc" }}>
                     <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: "0 4px 12px rgba(79,70,229,0.4)" }}>
@@ -1247,7 +1377,7 @@ export default function ParentDashboardPage() {
                   <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
                     <div style={{ fontSize: "40px", marginBottom: "16px", animation: "bounce 2s infinite" }}>🎥</div>
                     <a
-                      href={profile.virtualSessionLink}
+                      href={activeLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
@@ -1277,57 +1407,578 @@ export default function ParentDashboardPage() {
                 </div>
               )}
             </div>
+            );
+            })()
           )}
 
           {/* ── RENEWAL TAB ──────────────────────────────────────────────────── */}
-          {activeTab === "renewal" && (
-            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
-              {profile.renewalLink ? (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#fce7f3,#fbcfe8)", padding: "20px", borderRadius: "16px", border: "1px solid #f9a8d4" }}>
-                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#db2777", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: "0 4px 12px rgba(219,39,119,0.4)" }}>
-                      🔄
-                    </div>
+          {activeTab === "renewal" && (() => {
+            const isDeadlinePassed = renewalSettings.renewalOpenDate ? new Date() >= new Date(renewalSettings.renewalOpenDate) : false;
+            
+            const handleRenewalSubmit = async (e: React.FormEvent) => {
+              e.preventDefault();
+              if (!renewalForm.agreed || !user) return;
+              setSubmittingRenewal(true);
+              
+              try {
+                const res = await fetch("/api/parents/renewal", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ uid: user.uid, ...renewalForm })
+                });
+                
+                if (!res.ok) throw new Error("Failed to submit");
+                
+                // Refresh profile so the UI instantly updates to the "Submitted" state
+                await fetchProfile(user.uid);
+                
+                setSubmittingRenewal(false);
+                setRenewalSubmitted(true);
+                setShowRenewalForm(false);
+              } catch (err) {
+                console.error(err);
+                setSubmittingRenewal(false);
+                alert("Failed to submit renewal. Please try again.");
+              }
+            };
+
+            // If the parent has already submitted the renewal form
+            if (profile.renewalStatus?.hasSubmitted) {
+              const status = profile.renewalStatus;
+              
+              return (
+                <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#f0fdf4,#dcfce7)", padding: "20px", borderRadius: "16px", border: "1px solid #bbf7d0" }}>
+                    <div style={{ width: "52px", height: "52px", borderRadius: "50%", background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0, boxShadow: "0 4px 16px rgba(21,128,61,0.3)" }}>✅</div>
                     <div>
-                      <div style={{ fontWeight: "800", fontSize: "18px", color: "#831843" }}>It's Time to Renew!</div>
-                      <div style={{ fontSize: "14px", color: "#be185d", fontWeight: "600", marginTop: "4px" }}>Secure your child's slot for the next adventure</div>
+                      <div style={{ fontWeight: "800", fontSize: "18px", color: "#14532d" }}>Renewal Submitted</div>
+                      <div style={{ fontSize: "13px", color: "#166534", fontWeight: "600", marginTop: "4px" }}>
+                        Received on {new Date(status.submittedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </div>
                     </div>
                   </div>
-                  
-                  <div style={{ textAlign: "center", padding: "40px 20px", background: "#fdf2f8", borderRadius: "16px", border: "1px dashed #f9a8d4" }}>
-                    <div style={{ fontSize: "40px", marginBottom: "16px" }}>📝</div>
-                    <a
-                      href={profile.renewalLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "inline-block",
-                        padding: "16px 32px",
-                        background: "linear-gradient(135deg,#be185d,#db2777)",
-                        color: "white",
-                        borderRadius: "14px",
-                        fontSize: "16px",
-                        fontWeight: "800",
-                        textDecoration: "none",
-                        boxShadow: "0 8px 24px rgba(219,39,119,0.3)",
-                        transition: "all 0.2s"
-                      }}
-                      onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                      onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
-                    >
-                      Fill out Renewal Form
-                    </a>
+
+                  <div style={{ padding: "24px", background: "#f8faff", borderRadius: "16px", border: "1px solid #c5d6ff" }}>
+                    <h3 style={{ margin: "0 0 16px", fontSize: "14px", color: "#002f76", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.5px" }}>Current Status</h3>
+                    
+                    {status.returning === "no" && (
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                        <span style={{ fontSize: "24px" }}>👋</span>
+                        <div>
+                          <p style={{ margin: "0 0 4px", fontWeight: "700", color: "#334155" }}>Not Returning Next Adventure</p>
+                          <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>We're sorry to see you go! Thank you for being a part of Merry Explorers.</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {status.returning === "maybe" && (
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                        <span style={{ fontSize: "24px" }}>🤔</span>
+                        <div>
+                          <p style={{ margin: "0 0 4px", fontWeight: "700", color: "#334155" }}>Undecided</p>
+                          <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>You've indicated you need more time. Please let us know soon so we can hold your slot!</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {status.returning === "yes" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                          <span style={{ fontSize: "24px" }}>{isDeadlinePassed ? "💳" : "🎟️"}</span>
+                          <div>
+                            <p style={{ margin: "0 0 4px", fontWeight: "800", color: isDeadlinePassed ? "#c2410c" : "#15803d" }}>
+                              {isDeadlinePassed ? "Pending Downpayment" : "Slot Secured (Free for now)"}
+                            </p>
+                            <p style={{ margin: 0, fontSize: "14px", color: "#475569" }}>
+                              {isDeadlinePassed
+                                ? "Your slot is currently on hold. Please submit your downpayment to finalize your renewal."
+                                : `Your slot is secured! A downpayment will be required on ${renewalSettings.renewalOpenDate ? new Date(renewalSettings.renewalOpenDate).toLocaleDateString() : "the deadline"}.`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!dpSubmitted && (
+                          <div style={{ marginTop: "8px", border: "1.5px solid #e2e8f0", borderRadius: "16px", overflow: "hidden" }}>
+                            <div style={{ background: "linear-gradient(135deg,#002f76,#0050d5)", padding: "14px 20px", color: "white" }}>
+                              <div style={{ fontWeight: "800", fontSize: "14px", letterSpacing: "0.3px" }}>💳 Submit Downpayment</div>
+                              <div style={{ fontSize: "12px", opacity: 0.8, marginTop: "2px" }}>
+                                {isDeadlinePassed
+                                  ? "Your slot is on hold — submit your downpayment now to secure it."
+                                  : "Pay your downpayment early to fully secure your slot before the deadline."}
+                              </div>
+                            </div>
+
+                            <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fafbff" }}>
+
+                              {(() => {
+                                const progKey = profile.studentInfo?.program || Object.keys(PROGRAM_SLOTS).find(k => PROGRAM_SLOTS[k as keyof typeof PROGRAM_SLOTS].name === profile.program);
+                                const progData = progKey ? PROGRAM_SLOTS[progKey as keyof typeof PROGRAM_SLOTS] : null;
+                                const dpAmount = progData ? progData.downpayment : 0;
+                                const fullAmount = progData ? progData.rate : 0;
+                                const amountDue = dpPaymentType === "full" ? fullAmount : dpAmount;
+
+                                return (
+                                  <>
+                                    {/* Payment Type */}
+                                    {progData && (
+                                      <div>
+                                        <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>Payment Option</div>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDpPaymentType("downpayment")}
+                                            style={{
+                                              padding: "16px 12px", borderRadius: "14px", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px",
+                                              border: `2px solid ${dpPaymentType === "downpayment" ? "#002f76" : "#e2e8f0"}`,
+                                              background: dpPaymentType === "downpayment" ? "#f0f5ff" : "white",
+                                              cursor: "pointer", transition: "all 0.15s"
+                                            }}
+                                          >
+                                            <span style={{ fontSize: "20px" }}>💳</span>
+                                            <span style={{ fontWeight: "800", fontSize: "13px", color: "#002f76" }}>Downpayment</span>
+                                            <span style={{ fontWeight: "900", fontSize: "15px", color: "#0050d5" }}>₱{dpAmount.toLocaleString()}</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDpPaymentType("full")}
+                                            style={{
+                                              padding: "16px 12px", borderRadius: "14px", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px",
+                                              border: `2px solid ${dpPaymentType === "full" ? "#15803d" : "#e2e8f0"}`,
+                                              background: dpPaymentType === "full" ? "#f0fdf4" : "white",
+                                              cursor: "pointer", transition: "all 0.15s"
+                                            }}
+                                          >
+                                            <span style={{ fontSize: "20px" }}>🏆</span>
+                                            <span style={{ fontWeight: "800", fontSize: "13px", color: "#002f76" }}>Full Payment</span>
+                                            <span style={{ fontWeight: "900", fontSize: "15px", color: "#16a34a" }}>₱{fullAmount.toLocaleString()}</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Amount Due Card */}
+                                    {progData && (
+                                      <div style={{ background: dpPaymentType === "full" ? "linear-gradient(135deg,#16a34a,#22c55e)" : "linear-gradient(135deg,#002f76,#0050d5)", color: "white", padding: "20px", borderRadius: "16px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                                        <div style={{ fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.8 }}>Amount Due</div>
+                                        <div style={{ fontSize: "32px", fontWeight: "900", marginTop: "2px" }}>₱{amountDue.toLocaleString()}</div>
+                                      </div>
+                                    )}
+                              <div>
+                                <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>Select Payment Method</div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                                  {[
+                                    { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
+                                    { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
+                                    { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
+                                  ].map((method) => (
+                                    <button
+                                      key={method.id}
+                                      type="button"
+                                      onClick={() => setDpPaymentMethod(method.id)}
+                                      style={{
+                                        padding: "12px 8px",
+                                        borderRadius: "12px",
+                                        border: `2px solid ${dpPaymentMethod === method.id ? "#002f76" : "#e2e8f0"}`,
+                                        background: dpPaymentMethod === method.id ? "#f0f5ff" : "white",
+                                        cursor: "pointer",
+                                        fontWeight: "700",
+                                        fontSize: "12px",
+                                        color: dpPaymentMethod === method.id ? "#002f76" : "#64748b",
+                                        transition: "all 0.15s"
+                                      }}
+                                    >
+                                      {method.id === "gcash" ? "💚" : method.id === "bpi" ? "🏦" : "🏛️"} {method.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* QR Code */}
+                              {dpPaymentMethod && (
+                                <div style={{ textAlign: "center", padding: "16px", background: "white", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                                  <div style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Scan to Pay via {dpPaymentMethod === "gcash" ? "GCash" : dpPaymentMethod === "bpi" ? "BPI" : "Mari Bank"}</div>
+                                  <img
+                                    src={dpPaymentMethod === "gcash" ? "/GCASHQRONLY.png" : dpPaymentMethod === "bpi" ? "/BPIQRONLY.png" : "/MARIBANKQRONLY.png"}
+                                    alt="QR Code"
+                                    style={{ width: "160px", height: "160px", objectFit: "contain", margin: "0 auto", display: "block" }}
+                                  />
+                                </div>
+                              )}
+
+                                    {/* Amount Paid */}
+                                    <div>
+                                      <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>Amount Paid (₱)</div>
+                                      <input
+                                        type="number"
+                                        placeholder={`e.g. ${amountDue || 1500}`}
+                                        value={dpAmountPaid}
+                                        onChange={(e) => setDpAmountPaid(e.target.value)}
+                                        style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #e2e8f0", borderRadius: "10px", fontSize: "14px", fontWeight: "700", outline: "none", boxSizing: "border-box", background: "white" }}
+                                      />
+                                    </div>
+
+                                    {/* Reference Number */}
+                                    <div>
+                                      <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>Reference Number</div>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. ITO1234567890"
+                                        value={dpReferenceNumber}
+                                        onChange={(e) => setDpReferenceNumber(e.target.value)}
+                                        style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #e2e8f0", borderRadius: "10px", fontSize: "14px", fontWeight: "700", outline: "none", boxSizing: "border-box", background: "white" }}
+                                      />
+                                    </div>
+
+                                    {/* Receipt Upload */}
+                                    <div>
+                                      <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>Upload Receipt / Screenshot</div>
+                                      {dpReceiptPreview ? (
+                                        <div style={{ position: "relative", textAlign: "center" }}>
+                                          <img src={dpReceiptPreview} alt="Receipt" style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "10px", border: "1px solid #e2e8f0", objectFit: "contain" }} />
+                                          <button
+                                            type="button"
+                                            onClick={() => { setDpReceiptPreview(""); setDpReceiptBase64(""); }}
+                                            style={{ marginTop: "8px", fontSize: "12px", color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontWeight: "700" }}
+                                          >✕ Remove</button>
+                                        </div>
+                                      ) : (
+                                        <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", padding: "24px", border: "2px dashed #c5d6ff", borderRadius: "12px", cursor: "pointer", background: "#f8faff" }}>
+                                          <span style={{ fontSize: "28px" }}>📸</span>
+                                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#0050d5" }}>Tap to upload receipt</span>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: "none" }}
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0];
+                                              if (!file) return;
+                                              const reader = new FileReader();
+                                              reader.onload = () => {
+                                                const result = reader.result as string;
+                                                setDpReceiptPreview(result);
+                                                setDpReceiptBase64(result);
+                                              };
+                                              reader.readAsDataURL(file);
+                                            }}
+                                          />
+                                        </label>
+                                      )}
+                                    </div>
+
+                                    {/* Submit */}
+                                    <button
+                                      type="button"
+                                      disabled={!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid || !dpReferenceNumber || submittingDp}
+                                      onClick={async () => {
+                                        if (!user) return;
+                                        setSubmittingDp(true);
+                                        try {
+                                          const res = await fetch("/api/parents/downpayment", {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({
+                                              uid: user.uid,
+                                              paymentMethod: dpPaymentMethod,
+                                              paymentType: dpPaymentType,
+                                              receiptBase64: dpReceiptBase64,
+                                              referenceNumber: dpReferenceNumber,
+                                              amountPaid: parseFloat(dpAmountPaid),
+                                              expectedAmount: amountDue,
+                                            })
+                                          });
+                                          if (!res.ok) throw new Error("Failed");
+                                          setDpSubmitted(true);
+                                        } catch {
+                                          alert("Failed to submit. Please try again.");
+                                        } finally {
+                                          setSubmittingDp(false);
+                                        }
+                                      }}
+                                      style={{
+                                        width: "100%",
+                                        padding: "14px",
+                                        background: (!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid || !dpReferenceNumber) ? "#cbd5e1" : "linear-gradient(135deg,#002f76,#0050d5)",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "12px",
+                                        fontSize: "15px",
+                                        fontWeight: "800",
+                                        cursor: (!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid || !dpReferenceNumber) ? "not-allowed" : "pointer",
+                                        boxShadow: "0 4px 16px rgba(0,47,118,0.2)",
+                                        transition: "all 0.2s"
+                                      }}
+                                    >
+                                      {submittingDp ? "Submitting..." : `Submit ${dpPaymentType === 'full' ? 'Full Payment' : 'Downpayment'}`}
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {dpSubmitted && (
+                          <div style={{ textAlign: "center", padding: "20px", background: "#f0fdf4", borderRadius: "14px", border: "1px solid #bbf7d0" }}>
+                            <div style={{ fontSize: "36px", marginBottom: "8px" }}>🎉</div>
+                            <p style={{ fontWeight: "800", color: "#14532d", margin: "0 0 4px" }}>Downpayment Submitted!</p>
+                            <p style={{ fontSize: "13px", color: "#166534", margin: 0 }}>Our team will verify your payment within 1–2 business days.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </>
-              ) : (
-                <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                  <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>⏳</div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>Not Ready for Renewal Yet</h3>
-                  <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>We will post the renewal form link here when the current adventure is nearing its end.</p>
                 </div>
-              )}
-            </div>
-          )}
+              );
+            }
+
+            return (
+              <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+                {renewalSettings.renewalOpen ? (
+                  <>
+                    {renewalSubmitted ? (
+                      <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                        <div style={{ fontSize: "64px", marginBottom: "16px" }}>🎉</div>
+                        <h1 style={{ color: "#002f76", fontSize: "28px", fontWeight: "900", margin: "0 0 12px" }}>Renewal Received!</h1>
+                        <p style={{ color: "#64748b", fontSize: "16px", margin: "0 0 32px", lineHeight: "1.6", maxWidth: "400px", display: "inline-block" }}>
+                          Thank you for renewing {profile.childName}&apos;s slot for the next adventure. 
+                          {isDeadlinePassed ? " Our team will contact you shortly regarding your downpayment." : " You've successfully secured your slot for FREE!"}
+                        </p>
+                      </div>
+                    ) : showRenewalForm ? (
+                      <div>
+                        {/* Form Header with Back Button */}
+                        <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", gap: "16px" }}>
+                          <button 
+                            onClick={() => setShowRenewalForm(false)}
+                            style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid #cbd5e1", background: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "20px", color: "#64748b" }}
+                          >
+                            ←
+                          </button>
+                          <div>
+                            <h2 style={{ color: "#002f76", fontSize: "24px", fontWeight: "900", margin: 0 }}>Renewal Form</h2>
+                            <p style={{ color: "#64748b", fontSize: "14px", margin: "4px 0 0" }}>Secure {profile.childName}&apos;s slot in the {profile.program} program.</p>
+                          </div>
+                        </div>
+
+                        {/* Status Banner inside form */}
+                        <div style={{ padding: "16px", borderRadius: "14px", marginBottom: "24px", display: "flex", gap: "12px", alignItems: "center", background: isDeadlinePassed ? "linear-gradient(135deg,#ffedd5,#fed7aa)" : "linear-gradient(135deg,#f0f7ff,#e8f0fe)", border: isDeadlinePassed ? "1px solid #fdba74" : "1px solid #bfdbfe" }}>
+                          <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: isDeadlinePassed ? "linear-gradient(135deg,#c2410c,#ea580c)" : "linear-gradient(135deg,#002f76,#0050d5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0, boxShadow: isDeadlinePassed ? "0 4px 16px rgba(234,88,12,0.4)" : "0 4px 16px rgba(0,47,118,0.4)" }}>
+                            {isDeadlinePassed ? "⚠️" : "🎟️"}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: "800", fontSize: "14px", color: isDeadlinePassed ? "#7c2d12" : "#002f76" }}>
+                              {isDeadlinePassed ? "Downpayment Required" : "Slot Security is FREE"}
+                            </div>
+                            <div style={{ fontSize: "13px", color: isDeadlinePassed ? "#9a3412" : "#0050d5", fontWeight: "500", marginTop: "2px" }}>
+                              {isDeadlinePassed 
+                                ? "The deadline has passed. A downpayment is now required to renew." 
+                                : "You are renewing before the deadline! No downpayment required right now."}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Inline Form */}
+                        <form onSubmit={handleRenewalSubmit} style={{ display: "grid", gap: "20px" }}>
+                          
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", padding: "16px", background: "#f8faff", borderRadius: "14px", border: "1px dashed #cbd5e1" }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Explorer Name</label>
+                              <div style={{ fontSize: "14px", fontWeight: "700", color: "#002f76" }}>{profile.childName}</div>
+                            </div>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Program</label>
+                              <div style={{ fontSize: "14px", fontWeight: "700", color: "#002f76" }}>{profile.program}</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#0f172a", marginBottom: "8px" }}>
+                              Are you renewing for the next adventure?
+                            </label>
+                            <select 
+                              value={renewalForm.returning}
+                              onChange={(e) => setRenewalForm({...renewalForm, returning: e.target.value})}
+                              style={{ width: "100%", padding: "14px 16px", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                            >
+                              <option value="yes">Yes, definitely!</option>
+                              <option value="maybe">I need more time to decide</option>
+                              <option value="no">No, we will not be returning</option>
+                            </select>
+                          </div>
+
+                          {renewalForm.returning === "yes" && !profile.program.toLowerCase().includes("trailblazer") && (
+                            <div>
+                              <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#0f172a", marginBottom: "8px" }}>
+                                Any special requests or schedule changes? (Optional)
+                              </label>
+                              <textarea 
+                                value={renewalForm.notes}
+                                onChange={(e) => setRenewalForm({...renewalForm, notes: e.target.value})}
+                                rows={3}
+                                placeholder="e.g. Can we switch to the afternoon class?"
+                                style={{ width: "100%", padding: "14px 16px", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                              />
+                            </div>
+                          )}
+
+                          {renewalForm.returning === "no" && (
+                            <div>
+                              <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#0f172a", marginBottom: "8px" }}>
+                                We&apos;re sorry to see you go! Could you let us know why you won&apos;t be returning? (Optional)
+                              </label>
+                              <textarea 
+                                value={renewalForm.reason}
+                                onChange={(e) => setRenewalForm({...renewalForm, reason: e.target.value})}
+                                rows={3}
+                                placeholder="Your feedback helps us improve..."
+                                style={{ width: "100%", padding: "14px 16px", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                              />
+                            </div>
+                          )}
+
+                          <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginTop: "4px", cursor: "pointer" }}>
+                            <input 
+                              type="checkbox" 
+                              checked={renewalForm.agreed}
+                              onChange={(e) => setRenewalForm({...renewalForm, agreed: e.target.checked})}
+                              style={{ width: "20px", height: "20px", marginTop: "2px", accentColor: "#0050d5" }}
+                            />
+                            <span style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5" }}>
+                              I confirm that I am the authorized parent/guardian of this child and understand that {isDeadlinePassed ? "a downpayment is required to secure this slot" : "this form secures our slot for the upcoming adventure"}.
+                            </span>
+                          </label>
+
+                          <div style={{ marginTop: "16px", paddingTop: "20px", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end" }}>
+                            <button
+                              type="submit"
+                              disabled={submittingRenewal || !renewalForm.agreed}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "14px 32px",
+                                background: submittingRenewal || !renewalForm.agreed ? "#cbd5e1" : "linear-gradient(135deg,#002f76,#0050d5)",
+                                color: submittingRenewal || !renewalForm.agreed ? "#94a3b8" : "white",
+                                border: "none",
+                                borderRadius: "12px",
+                                fontSize: "14px",
+                                fontWeight: "800",
+                                cursor: submittingRenewal || !renewalForm.agreed ? "not-allowed" : "pointer",
+                                boxShadow: submittingRenewal || !renewalForm.agreed ? "none" : "0 4px 16px rgba(0,47,118,0.25)",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              {submittingRenewal ? "Submitting..." : (isDeadlinePassed ? "Submit & Pay Downpayment" : "Secure Slot Now")}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Header banner */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: isDeadlinePassed ? "linear-gradient(135deg,#ffedd5,#fed7aa)" : "linear-gradient(135deg,#f0f7ff,#e8f0fe)", padding: "20px", borderRadius: "16px", border: isDeadlinePassed ? "1px solid #fdba74" : "1px solid #bfdbfe" }}>
+                          <div style={{ width: "52px", height: "52px", borderRadius: "50%", background: isDeadlinePassed ? "linear-gradient(135deg,#c2410c,#ea580c)" : "linear-gradient(135deg,#002f76,#0050d5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0, boxShadow: isDeadlinePassed ? "0 4px 16px rgba(234,88,12,0.4)" : "0 4px 16px rgba(0,47,118,0.4)" }}>{isDeadlinePassed ? "⚠️" : "🔄"}</div>
+                          <div>
+                            <div style={{ fontWeight: "800", fontSize: "18px", color: isDeadlinePassed ? "#7c2d12" : "#002f76" }}>{isDeadlinePassed ? "Slot Forfeited — Downpayment Required" : "Renewal is Now Open!"}</div>
+                            <div style={{ fontSize: "13px", color: isDeadlinePassed ? "#9a3412" : "#0050d5", fontWeight: "600", marginTop: "4px" }}>
+                              {isDeadlinePassed 
+                                ? `The deadline passed. Secure ${profile.childName || "your child"}'s slot with a downpayment now.` 
+                                : `Secure ${profile.childName || "your child"}'s slot for the next adventure`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Info cards */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px" }}>
+                          {/* Slot security */}
+                          <div style={{ background: isDeadlinePassed ? "linear-gradient(135deg,#fee2e2,#fecaca)" : "linear-gradient(135deg,#f0fdf4,#dcfce7)", borderRadius: "14px", padding: "16px", border: isDeadlinePassed ? "1px solid #fca5a5" : "1px solid #bbf7d0" }}>
+                            <div style={{ fontSize: "20px", marginBottom: "6px" }}>🎟️</div>
+                            <div style={{ fontSize: "12px", fontWeight: "800", color: isDeadlinePassed ? "#b91c1c" : "#15803d", textTransform: "uppercase", letterSpacing: "0.05em" }}>Slot Security</div>
+                            <div style={{ fontSize: "13px", color: isDeadlinePassed ? "#991b1b" : "#166534", fontWeight: "600", marginTop: "4px" }}>
+                              {isDeadlinePassed ? "Slot forfeited for next adventure." : "FREE to secure your slot — just fill out the form!"}
+                            </div>
+                          </div>
+                          {/* Downpayment deadline */}
+                          <div style={{ background: "linear-gradient(135deg,#fff7ed,#ffedd5)", borderRadius: "14px", padding: "16px", border: "1px solid #fed7aa" }}>
+                            <div style={{ fontSize: "20px", marginBottom: "6px" }}>💳</div>
+                            <div style={{ fontSize: "12px", fontWeight: "800", color: "#c2410c", textTransform: "uppercase", letterSpacing: "0.05em" }}>{isDeadlinePassed ? "Downpayment Required Now" : "Downpayment Due"}</div>
+                            <div style={{ fontSize: "13px", color: "#9a3412", fontWeight: "600", marginTop: "4px" }}>
+                              {isDeadlinePassed ? "You must pay the downpayment to renew again." : (renewalSettings.renewalOpenDate
+                                ? new Date(renewalSettings.renewalOpenDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                                : "2 weeks before the next adventure")}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Next adventure date */}
+                        {renewalSettings.nextAdventureStart && (
+                          <div style={{ background: "linear-gradient(135deg,#eff6ff,#dbeafe)", borderRadius: "14px", padding: "16px", border: "1px solid #bfdbfe", marginBottom: "24px", display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ fontSize: "22px" }}>🚀</div>
+                            <div>
+                              <div style={{ fontSize: "11px", fontWeight: "800", color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Next Adventure Starts</div>
+                              <div style={{ fontSize: "15px", color: "#1e3a8a", fontWeight: "800", marginTop: "2px" }}>
+                                {new Date(renewalSettings.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CTA Button */}
+                        <div style={{ textAlign: "center", padding: "32px 20px", background: isDeadlinePassed ? "#fff7ed" : "#f8faff", borderRadius: "16px", border: isDeadlinePassed ? "1px dashed #fdba74" : "1px dashed #bfdbfe" }}>
+                          <div style={{ fontSize: "36px", marginBottom: "12px" }}>📝</div>
+                          <p style={{ margin: "0 0 20px", fontSize: "14px", color: isDeadlinePassed ? "#c2410c" : "#0050d5", fontWeight: "600" }}>
+                            {isDeadlinePassed ? `Fill out the renewal form to reserve ${profile.childName || "your child"}'s spot with a downpayment!` : `Fill out the renewal form to reserve ${profile.childName || "your child"}'s spot!`}
+                          </p>
+                          <button
+                            onClick={() => setShowRenewalForm(true)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "10px",
+                              padding: "16px 36px",
+                              background: isDeadlinePassed ? "linear-gradient(135deg,#ea580c,#f97316)" : "linear-gradient(135deg,#002f76,#0050d5)",
+                              color: "white",
+                              borderRadius: "14px",
+                              fontSize: "16px",
+                              fontWeight: "800",
+                              border: "none",
+                              cursor: "pointer",
+                              textDecoration: "none",
+                              boxShadow: isDeadlinePassed ? "0 8px 24px rgba(234,88,12,0.35)" : "0 8px 24px rgba(0,47,118,0.25)",
+                              transition: "all 0.2s",
+                            }}
+                            onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = isDeadlinePassed ? "0 12px 32px rgba(234,88,12,0.45)" : "0 12px 32px rgba(0,47,118,0.35)"; }}
+                            onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = isDeadlinePassed ? "0 8px 24px rgba(234,88,12,0.35)" : "0 8px 24px rgba(0,47,118,0.25)"; }}
+                          >
+                            <span>📋</span> {isDeadlinePassed ? "Renew with Downpayment" : "Renew Now"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                    <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>⏳</div>
+                    <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>Not Ready for Renewal Yet</h3>
+                    <p style={{ margin: "0 0 24px", fontSize: "14px", color: "#64748b" }}>We will post the renewal form link here when the current adventure is nearing its end.</p>
+                    {renewalSettings.nextAdventureStart && (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "10px", background: "linear-gradient(135deg,#eff6ff,#dbeafe)", borderRadius: "14px", padding: "14px 20px", border: "1px solid #bfdbfe" }}>
+                        <span style={{ fontSize: "18px" }}>🚀</span>
+                        <div style={{ textAlign: "left" }}>
+                          <div style={{ fontSize: "10px", fontWeight: "800", color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Next Adventure Starts</div>
+                          <div style={{ fontSize: "14px", color: "#1e3a8a", fontWeight: "800" }}>
+                            {new Date(renewalSettings.nextAdventureStart).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
         </div>
       </div>

@@ -98,6 +98,25 @@ type ParentAccount = {
   role: string;
   virtualSessionLink?: string;
   renewalLink?: string;
+  renewalStatus?: {
+    hasSubmitted: boolean;
+    returning: string;
+    notes?: string;
+    reason?: string;
+    slotSecured?: boolean;
+    downpayment?: {
+      submitted: boolean;
+      paymentMethod: string;
+      receiptBase64: string;
+      referenceNumber: string;
+      amountPaid: number;
+      submittedAt: string;
+      verified: boolean;
+      rejected: boolean;
+      reviewedAt?: string;
+      adminNote?: string;
+    };
+  };
 };
 
 type Draft = Omit<ParentAccount, "id" | "initials">;
@@ -461,6 +480,34 @@ function ParentModal({
                 {error}
               </div>
             )}
+
+            {initial?.renewalStatus?.hasSubmitted && (
+              <>
+                <SectionHeading>Renewal Submission</SectionHeading>
+                <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] font-extrabold text-[#64748b] uppercase tracking-wider">Returning:</span>
+                    {initial.renewalStatus.returning === "yes" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-bold text-[#15803d]">✅ Yes</span>}
+                    {initial.renewalStatus.returning === "no" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fecaca] bg-[#fef2f2] px-2.5 py-1 text-[11px] font-bold text-[#b91c1c]">❌ No</span>}
+                    {initial.renewalStatus.returning === "maybe" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fef08a] bg-[#fefce8] px-2.5 py-1 text-[11px] font-bold text-[#a16207]">🤔 Undecided</span>}
+                  </div>
+                  
+                  {initial.renewalStatus.notes && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] font-extrabold text-[#002f76] uppercase tracking-wider">Schedule/Request Notes:</span>
+                      <p className="text-[13px] font-medium text-[#334155] bg-white p-3 rounded-lg border border-[#e2e8f0] m-0 whitespace-pre-wrap">{initial.renewalStatus.notes}</p>
+                    </div>
+                  )}
+
+                  {initial.renewalStatus.reason && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] font-extrabold text-[#b91c1c] uppercase tracking-wider">Reason for not returning:</span>
+                      <p className="text-[13px] font-medium text-[#334155] bg-white p-3 rounded-lg border border-[#fecaca] m-0 whitespace-pre-wrap">{initial.renewalStatus.reason}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="bg-[#f8fafc] px-6 py-4 flex flex-col md:flex-row justify-between gap-3 shrink-0 border-t border-[#e2e8f0]">
@@ -476,6 +523,680 @@ function ParentModal({
         </div>
       </div>
     </>
+  );
+}
+
+// ─── Downpayment Verification Panel ──────────────────────────────────────────
+function DownpaymentPanel({ data, onRefresh }: { data: ParentAccount[]; onRefresh: () => void }) {
+  const pending = data.filter(
+    (p) =>
+      p.renewalStatus?.downpayment?.submitted &&
+      !p.renewalStatus.downpayment.verified &&
+      !p.renewalStatus.downpayment.rejected
+  );
+  const verified = data.filter((p) => p.renewalStatus?.downpayment?.verified);
+  const rejected = data.filter((p) => p.renewalStatus?.downpayment?.rejected);
+
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
+  const [adminNote, setAdminNote] = useState<Record<string, string>>({});
+  const [collapsed, setCollapsed] = useState(false);
+
+  const totalWithPayment = pending.length + verified.length + rejected.length;
+  if (totalWithPayment === 0) return null;
+
+  async function handleAction(uid: string, action: "verify" | "reject") {
+    setActing(uid + action);
+    try {
+      const res = await fetch("/api/parents/downpayment", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, action, adminNote: adminNote[uid] || "" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      onRefresh();
+    } catch {
+      alert("Failed to update payment. Please try again.");
+    } finally {
+      setActing(null);
+    }
+  }
+
+  const statusColor = pending.length > 0 ? { bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b", text: "#92400e" } : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#10b981", text: "#065f46" };
+
+  return (
+    <div style={{ marginBottom: "24px", borderRadius: "18px", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,47,118,0.08)", border: "1.5px solid #e2e8f0", background: "white" }}>
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", border: "none", cursor: "pointer", textAlign: "left" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>💳</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: "15px", color: "white" }}>Renewal Downpayments</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", marginTop: "1px" }}>
+              {pending.length > 0 ? `${pending.length} pending verification` : "All payments reviewed"} · {verified.length} verified · {rejected.length} rejected
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {pending.length > 0 && (
+            <span style={{ background: "#fbbf24", color: "#78350f", fontWeight: 800, fontSize: "12px", padding: "3px 10px", borderRadius: "20px" }}>
+              {pending.length} Pending
+            </span>
+          )}
+          <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "18px" }}>{collapsed ? "▼" : "▲"}</span>
+        </div>
+      </button>
+
+      {!collapsed && (
+        <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: "12px" }}>
+          {/* Pending */}
+          {pending.length > 0 && (
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>⏳ Awaiting Verification</div>
+              <div style={{ display: "grid", gap: "12px" }}>
+                {pending.map((parent) => {
+                  const dp = parent.renewalStatus!.downpayment!;
+                  return (
+                    <div key={parent.id} style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: "14px", padding: "16px 18px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {/* Parent info */}
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76" }}>{parent.fullName}</div>
+                          <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>{parent.childName} · {parent.program}</div>
+                          <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, background: "#f0f5ff", color: "#0050d5", padding: "2px 10px", borderRadius: "20px", border: "1px solid #c5d6ff" }}>
+                              {dp.paymentMethod}
+                            </span>
+                            {dp.referenceNumber && (
+                              <span style={{ fontSize: "12px", fontWeight: 700, background: "#f8faff", color: "#5a6e8c", padding: "2px 10px", borderRadius: "20px", border: "1px solid #e2e8f0" }}>
+                                Ref: {dp.referenceNumber}
+                              </span>
+                            )}
+                            {dp.amountPaid > 0 && (
+                              <span style={{ fontSize: "12px", fontWeight: 700, background: "#f0fdf4", color: "#15803d", padding: "2px 10px", borderRadius: "20px", border: "1px solid #bbf7d0" }}>
+                                ₱{dp.amountPaid.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>
+                            Submitted {new Date(dp.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </div>
+                        {/* Receipt thumbnail */}
+                        {dp.receiptBase64 && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImg(dp.receiptBase64)}
+                            style={{ width: "72px", height: "72px", borderRadius: "10px", overflow: "hidden", border: "2px solid #fbbf24", cursor: "pointer", flexShrink: 0, background: "#fef9c3", padding: 0 }}
+                          >
+                            <img src={dp.receiptBase64} alt="Receipt" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </button>
+                        )}
+                      </div>
+                      {/* Admin note */}
+                      <input
+                        type="text"
+                        placeholder="Add a note (optional)..."
+                        value={adminNote[parent.id] || ""}
+                        onChange={(e) => setAdminNote((n) => ({ ...n, [parent.id]: e.target.value }))}
+                        style={{ width: "100%", boxSizing: "border-box", border: "1.5px solid #fde68a", borderRadius: "10px", padding: "8px 12px", fontSize: "13px", color: "#334155", background: "white", outline: "none" }}
+                      />
+                      {/* Actions */}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          type="button"
+                          disabled={acting === parent.id + "verify"}
+                          onClick={() => handleAction(parent.id, "verify")}
+                          style={{ flex: 1, padding: "9px 0", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#059669,#10b981)", color: "white", fontWeight: 800, fontSize: "13px", cursor: "pointer", opacity: acting === parent.id + "verify" ? 0.6 : 1 }}
+                        >
+                          {acting === parent.id + "verify" ? "Verifying…" : "✅ Verify Payment"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={acting === parent.id + "reject"}
+                          onClick={() => handleAction(parent.id, "reject")}
+                          style={{ flex: 1, padding: "9px 0", borderRadius: "10px", border: "1.5px solid #fca5a5", background: "#fff0f0", color: "#b91c1c", fontWeight: 800, fontSize: "13px", cursor: "pointer", opacity: acting === parent.id + "reject" ? 0.6 : 1 }}
+                        >
+                          {acting === parent.id + "reject" ? "Rejecting…" : "❌ Reject"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Verified */}
+          {verified.length > 0 && (
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#065f46", textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>✅ Verified Payments</div>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {verified.map((parent) => {
+                  const dp = parent.renewalStatus!.downpayment!;
+                  return (
+                    <div key={parent.id} style={{ background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: "12px", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{parent.fullName} <span style={{ color: "#64748b", fontWeight: 500 }}>— {parent.childName}</span></div>
+                        <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>
+                          {dp.paymentMethod}{dp.amountPaid ? ` · ₱${dp.amountPaid.toLocaleString()}` : ""}{dp.adminNote ? ` · "${dp.adminNote}"` : ""}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: "11px", color: "#15803d", fontWeight: 700, background: "#dcfce7", padding: "3px 10px", borderRadius: "20px", border: "1px solid #86efac", flexShrink: 0 }}>🔒 Slot Secured</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Rejected */}
+          {rejected.length > 0 && (
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>❌ Rejected Payments</div>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {rejected.map((parent) => {
+                  const dp = parent.renewalStatus!.downpayment!;
+                  return (
+                    <div key={parent.id} style={{ background: "#fff0f0", border: "1.5px solid #fca5a5", borderRadius: "12px", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{parent.fullName} <span style={{ color: "#64748b", fontWeight: 500 }}>— {parent.childName}</span></div>
+                        <div style={{ fontSize: "12px", color: "#b91c1c", marginTop: "2px" }}>
+                          {dp.paymentMethod}{dp.adminNote ? ` · Reason: "${dp.adminNote}"` : ""}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAction(parent.id, "verify")}
+                        style={{ fontSize: "12px", fontWeight: 700, color: "#059669", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "4px 12px", borderRadius: "20px", cursor: "pointer" }}
+                      >
+                        Re-verify
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Receipt lightbox */}
+      {previewImg && (
+        <div
+          onClick={() => setPreviewImg(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}>
+            <img src={previewImg} alt="Receipt" style={{ maxWidth: "100%", maxHeight: "85vh", borderRadius: "14px", objectFit: "contain" }} />
+            <button onClick={() => setPreviewImg(null)} style={{ position: "absolute", top: "-16px", right: "-16px", width: "36px", height: "36px", borderRadius: "50%", background: "white", border: "none", fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>✕</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Renewal Settings Panel (Admin) ──────────────────────────────────────────
+// Program colours for visual distinction
+const PROGRAM_META: Record<string, { emoji: string; color: string; bg: string; border: string; short: string }> = {
+  "Discovery Club: Curious Explorer":  { emoji: "🔍", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", short: "Curious Explorer" },
+  "Discovery Club: Creative Explorer": { emoji: "🎨", color: "#0e7490", bg: "#ecfeff", border: "#a5f3fc", short: "Creative Explorer" },
+  "Discovery Club: Everyday Curious":  { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Curious" },
+  "Trailblazer: Brave Explorer":       { emoji: "🏕️", color: "#b45309", bg: "#fffbeb", border: "#fde68a", short: "Brave Explorer" },
+};
+
+type ProgramEntry = {
+  programKey: string;
+  nextAdventureStart: string | null;
+  renewalOpen: boolean;
+  renewalOpenDate: string | null;
+  virtualLink?: string;
+  virtualLinkOpen?: boolean;
+};
+
+type RenewalCfg = {
+  programs: ProgramEntry[];
+  updatedAt: string | null;
+};
+
+const RENEWAL_PROGRAMS = [
+  "Discovery Club: Curious Explorer",
+  "Discovery Club: Creative Explorer",
+  "Discovery Club: Everyday Curious",
+  "Trailblazer: Brave Explorer",
+];
+
+function defaultPrograms(): ProgramEntry[] {
+  return RENEWAL_PROGRAMS.map((p) => ({
+    programKey: p,
+    nextAdventureStart: null,
+    renewalOpen: false,
+    renewalOpenDate: null,
+    virtualLink: "",
+    virtualLinkOpen: false,
+  }));
+}
+
+function RenewalSettingsPanel() {
+  const [cfg, setCfg] = useState<RenewalCfg>({ programs: defaultPrograms(), updatedAt: null });
+  const [collapsed, setCollapsed] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [loadingCfg, setLoadingCfg] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.programs) {
+          // Merge: ensure all programs are present
+          const merged = RENEWAL_PROGRAMS.map((key) => {
+            const existing = d.programs.find((p: ProgramEntry) => p.programKey === key);
+            return existing ?? { programKey: key, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
+          });
+          setCfg({ programs: merged, updatedAt: d.updatedAt ?? null });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingCfg(false));
+  }, []);
+
+  function updateProgram(key: string, patch: Partial<ProgramEntry>) {
+    setCfg((prev) => ({
+      ...prev,
+      programs: prev.programs.map((p) => (p.programKey === key ? { ...p, ...patch } : p)),
+    }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/renewal-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ programs: cfg.programs }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // Refresh computed deadlines from server response
+        setCfg((prev) => ({
+          programs: prev.programs.map((p) => {
+            const updated = (data.programs as ProgramEntry[]).find((x) => x.programKey === p.programKey);
+            return updated ?? p;
+          }),
+          updatedAt: new Date().toISOString(),
+        }));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const openCount = cfg.programs.filter((p) => p.renewalOpen).length;
+
+  return (
+    <div className="mb-6 rounded-2xl border border-[#e2e8f0] bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-[#f8faff] transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#be185d] to-[#db2777] flex items-center justify-center text-white text-[17px] shadow-sm">
+            🔄
+          </div>
+          <div className="text-left">
+            <div className="font-extrabold text-[14px] text-[#002f76]">Renewal Settings</div>
+            <div className="text-[11px] font-semibold text-[#5a6e8c] mt-0.5">
+              Per-program adventure start dates &amp; renewal windows
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {!loadingCfg && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
+                openCount > 0
+                  ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
+                  : "bg-[#f1f5f9] text-[#64748b] border border-[#cbd5e1]"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${openCount > 0 ? "bg-[#15803d]" : "bg-[#64748b]"}`} />
+              {openCount > 0 ? `${openCount} Program${openCount > 1 ? "s" : ""} Open` : "All Closed"}
+            </span>
+          )}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2.5}
+            stroke="currentColor"
+            className={`w-4 h-4 text-[#94a3b8] transition-transform ${collapsed ? "" : "rotate-180"}`}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Body */}
+      {!collapsed && (
+        <div className="border-t border-[#f1f5f9]">
+          {/* Legend */}
+          <div className="px-6 pt-4 pb-2 text-[11px] font-semibold text-[#94a3b8]">
+            Set each program's next start date independently. The downpayment deadline is auto-set to 2 weeks before start. Toggle renewal open so parents see the form link on their dashboard.
+          </div>
+
+          {/* Program rows */}
+          <div className="divide-y divide-[#f1f5f9]">
+            {cfg.programs.map((prog) => {
+              const meta = PROGRAM_META[prog.programKey] ?? { emoji: "📚", color: "#002f76", bg: "#f8faff", border: "#e2e8f0", short: prog.programKey };
+              const deadlineLabel = prog.renewalOpenDate
+                ? new Date(prog.renewalOpenDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                : prog.nextAdventureStart
+                ? "2 wks before start"
+                : "—";
+
+              return (
+                <div key={prog.programKey} className="px-6 py-4">
+                  {/* Program name badge */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold"
+                        style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}
+                      >
+                        {meta.emoji} {meta.short}
+                      </span>
+                    </div>
+                    {/* Renewal toggle */}
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[11px] font-bold ${prog.renewalOpen ? "text-[#15803d]" : "text-[#94a3b8]"}`}>
+                        {prog.renewalOpen ? "Open" : "Closed"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateProgram(prog.programKey, { renewalOpen: !prog.renewalOpen })}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${prog.renewalOpen ? "bg-[#15803d]" : "bg-[#cbd5e1]"}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${prog.renewalOpen ? "translate-x-5" : ""}`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Date + deadline row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-extrabold uppercase tracking-wider text-[#5a6e8c]">
+                        🚀 Next Adventure Start
+                      </label>
+                      <input
+                        type="date"
+                        className={INPUT_CLS}
+                        value={prog.nextAdventureStart ? prog.nextAdventureStart.slice(0, 10) : ""}
+                        onChange={(e) =>
+                          updateProgram(prog.programKey, {
+                            nextAdventureStart: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
+                          })
+                        }
+                      />
+                    </div>
+                    <div
+                      className="flex flex-col justify-center rounded-xl px-4 py-2.5 text-[12px]"
+                      style={{ background: meta.bg, border: `1px solid ${meta.border}` }}
+                    >
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5" style={{ color: meta.color }}>
+                        💳 Downpayment Deadline
+                      </span>
+                      <span className="font-bold" style={{ color: meta.color }}>
+                        {deadlineLabel}
+                      </span>
+                      {prog.nextAdventureStart && (
+                        <span className="text-[10px] text-[#94a3b8] mt-0.5">auto · 2 weeks before start</span>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Save footer */}
+          <div className="flex items-center gap-3 px-6 py-4 border-t border-[#f1f5f9] bg-[#f8fafc]">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-full bg-[#005cc8] px-5 py-2.5 text-[13px] font-bold text-white hover:bg-[#004bb0] transition-colors disabled:opacity-60"
+            >
+              {saving ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              ) : (
+                "Save All Programs"
+              )}
+            </button>
+            {saved && (
+              <span className="text-[12px] font-bold text-[#15803d] flex items-center gap-1">✓ Saved successfully</span>
+            )}
+            {cfg.updatedAt && !saved && (
+              <span className="text-[11px] text-[#94a3b8]">
+                Last saved: {new Date(cfg.updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrailblazerVirtualSettings() {
+  const [cfg, setCfg] = useState<RenewalCfg>({ programs: defaultPrograms(), updatedAt: null });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [loadingCfg, setLoadingCfg] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.programs) {
+          const merged = RENEWAL_PROGRAMS.map((key) => {
+            const existing = d.programs.find((p: ProgramEntry) => p.programKey === key);
+            return existing ?? { programKey: key, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
+          });
+          setCfg({ programs: merged, updatedAt: d.updatedAt ?? null });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingCfg(false));
+  }, []);
+
+  const trailblazerProg = cfg.programs.find((p) => p.programKey === "Trailblazer: Brave Explorer");
+
+  function updateLink(virtualLink: string) {
+    setCfg((prev) => ({
+      ...prev,
+      programs: prev.programs.map((p) => (p.programKey === "Trailblazer: Brave Explorer" ? { ...p, virtualLink } : p)),
+    }));
+  }
+
+  function toggleOpen() {
+    if (!trailblazerProg) return;
+    setCfg((prev) => ({
+      ...prev,
+      programs: prev.programs.map((p) => (p.programKey === "Trailblazer: Brave Explorer" ? { ...p, virtualLinkOpen: !p.virtualLinkOpen } : p)),
+    }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/renewal-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ programs: cfg.programs }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCfg((prev) => ({
+          programs: prev.programs.map((p) => {
+            const updated = (data.programs as ProgramEntry[]).find((x) => x.programKey === p.programKey);
+            return updated ?? p;
+          }),
+          updatedAt: new Date().toISOString(),
+        }));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loadingCfg || !trailblazerProg) return null;
+
+  return (
+    <div style={{
+      marginBottom: "24px", borderRadius: "18px", overflow: "hidden",
+      boxShadow: "0 4px 24px rgba(0,47,118,0.12)",
+      background: "linear-gradient(135deg, #1a1060 0%, #002f76 55%, #005cc8 100%)",
+      border: "1.5px solid rgba(255,255,255,0.08)",
+      display: "flex", alignItems: "center",
+      padding: "0 24px", gap: "20px", minHeight: "76px",
+      position: "relative",
+    }}>
+      {/* Decorative blobs */}
+      <div style={{ position:"absolute", top:"-40px", left:"200px", width:"140px", height:"140px", borderRadius:"50%", background:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
+      <div style={{ position:"absolute", bottom:"-30px", right:"280px", width:"90px", height:"90px", borderRadius:"50%", background:"rgba(255,255,255,0.05)", pointerEvents:"none" }} />
+
+      {/* Icon */}
+      <div style={{
+        width:"44px", height:"44px", borderRadius:"12px", flexShrink:0,
+        background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
+        display:"flex", alignItems:"center", justifyContent:"center", fontSize:"20px",
+        position:"relative",
+      }}>🎥</div>
+
+      {/* Title */}
+      <div style={{ flexShrink:0 }}>
+        <div style={{ fontWeight:800, fontSize:"15px", color:"white", letterSpacing:"-0.2px" }}>
+          Trailblazer Virtual Class
+        </div>
+        <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.55)", fontWeight:500, marginTop:"1px" }}>
+          🏕️ Brave Explorer Program
+        </div>
+      </div>
+
+      {/* Status badge */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:"6px",
+        background: trailblazerProg.virtualLinkOpen ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.1)",
+        border: `1px solid ${trailblazerProg.virtualLinkOpen ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.18)"}`,
+        borderRadius:"100px", padding:"4px 11px 4px 8px", flexShrink:0, transition:"all 0.3s",
+      }}>
+        <div style={{
+          width:"7px", height:"7px", borderRadius:"50%", flexShrink:0,
+          background: trailblazerProg.virtualLinkOpen ? "#10b981" : "rgba(255,255,255,0.4)",
+          boxShadow: trailblazerProg.virtualLinkOpen ? "0 0 0 3px rgba(16,185,129,0.25)" : "none",
+          transition:"all 0.3s",
+        }} />
+        <span style={{ fontSize:"11.5px", fontWeight:700, color:"white" }}>
+          {trailblazerProg.virtualLinkOpen ? "Live to parents" : "Hidden"}
+        </span>
+      </div>
+
+      {/* Spacer */}
+      <div style={{ flex:1 }} />
+
+      {/* Link input */}
+      <div style={{ position:"relative", width:"320px", flexShrink:0 }}>
+        <span style={{ position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)", fontSize:"14px", pointerEvents:"none" }}>🔗</span>
+        <input
+          type="url"
+          placeholder="https://zoom.us/j/...  or  meet.google.com/..."
+          style={{
+            width:"100%", boxSizing:"border-box",
+            borderRadius:"10px", border:"1.5px solid rgba(255,255,255,0.2)",
+            background:"rgba(255,255,255,0.1)", padding:"9px 12px 9px 34px",
+            fontSize:"13px", fontWeight:600, color:"white",
+            outline:"none", backdropFilter:"blur(4px)",
+            transition:"border-color 0.2s, background 0.2s, box-shadow 0.2s",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.18)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(255,255,255,0.1)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+          value={trailblazerProg.virtualLink || ""}
+          onChange={(e) => updateLink(e.target.value)}
+        />
+      </div>
+
+      {/* Toggle */}
+      <div style={{ display:"flex", alignItems:"center", gap:"8px", flexShrink:0 }}>
+        <span style={{ fontSize:"11.5px", fontWeight:700, color:"rgba(255,255,255,0.75)" }}>
+          {trailblazerProg.virtualLinkOpen ? "On" : "Off"}
+        </span>
+        <button type="button" onClick={toggleOpen} style={{
+          position:"relative", width:"40px", height:"22px", borderRadius:"100px",
+          border:"2px solid rgba(255,255,255,0.25)", cursor:"pointer", outline:"none", padding:0,
+          background: trailblazerProg.virtualLinkOpen ? "#10b981" : "rgba(255,255,255,0.2)",
+          transition:"background 0.25s",
+        }}>
+          <span style={{
+            position:"absolute", top:"1px",
+            left: trailblazerProg.virtualLinkOpen ? "18px" : "1px",
+            width:"16px", height:"16px", borderRadius:"50%",
+            background:"white", boxShadow:"0 1px 4px rgba(0,0,0,0.3)",
+            transition:"left 0.25s", display:"block",
+          }} />
+        </button>
+      </div>
+
+      {/* Save button */}
+      <button
+        type="button" onClick={handleSave} disabled={saving}
+        style={{
+          flexShrink:0, display:"flex", alignItems:"center", gap:"6px",
+          borderRadius:"10px",
+          cursor: saving ? "not-allowed" : "pointer",
+          padding:"9px 18px", fontWeight:800, fontSize:"13px", color:"white",
+          background: saved ? "rgba(16,185,129,0.85)" : "rgba(255,255,255,0.15)",
+          border: `1.5px solid ${saved ? "rgba(16,185,129,0.6)" : "rgba(255,255,255,0.25)"}`,
+          backdropFilter:"blur(4px)",
+          opacity: saving ? 0.7 : 1, transition:"all 0.25s",
+          whiteSpace:"nowrap",
+        }}
+        onMouseOver={(e) => { if (!saving) { e.currentTarget.style.background = saved ? "rgba(16,185,129,0.95)" : "rgba(255,255,255,0.22)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
+        onMouseOut={(e) => { e.currentTarget.style.background = saved ? "rgba(16,185,129,0.85)" : "rgba(255,255,255,0.15)"; e.currentTarget.style.transform = "translateY(0)"; }}
+      >
+        {saving
+          ? <span style={{ width:"14px", height:"14px", borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"white", animation:"spin 0.7s linear infinite", display:"inline-block" }} />
+          : saved ? "✓ Saved!" : "📤 Post Link"}
+      </button>
+    </div>
   );
 }
 
@@ -587,6 +1308,15 @@ export default function AdminParentsPage() {
           </div>
         )}
 
+        {/* Renewal Settings Panel */}
+        <RenewalSettingsPanel />
+
+        {/* Trailblazer Virtual Class – full-width below renewal settings */}
+        <TrailblazerVirtualSettings />
+
+        {/* Downpayment Verification Panel */}
+        <DownpaymentPanel data={data} onRefresh={loadAccounts} />
+
         {/* Toolbar */}
         <div className="mb-4 flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:max-w-2xl">
@@ -636,13 +1366,14 @@ export default function AdminParentsPage() {
             <table className="w-full min-w-[1100px] text-left">
               <thead>
                 <tr className="border-b border-[#f1f5f9]">
-                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[22%]">Parent</th>
+                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[20%]">Parent</th>
                   <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[10%]">Relationship</th>
                   <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[12%]">Phone</th>
-                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[14%]">Child</th>
-                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[17%]">Program / Adventure</th>
-                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[15%]">Schedule</th>
-                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[10%]">Status</th>
+                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[12%]">Child</th>
+                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[15%]">Program / Adventure</th>
+                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[12%]">Schedule</th>
+                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[10%]">Renewal</th>
+                  <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[9%]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f1f5f9]">
@@ -703,6 +1434,19 @@ export default function AdminParentsPage() {
                             </div>
                           ) : (
                             <span className="text-[13.5px] font-semibold text-[#94a3b8]">—</span>
+                          )}
+                        </td>
+                        <td className="py-4 pr-4">
+                          {parent.renewalStatus?.hasSubmitted ? (
+                            parent.renewalStatus.returning === "yes" ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11.5px] font-bold text-[#15803d]">✅ Yes</span>
+                            ) : parent.renewalStatus.returning === "no" ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fecaca] bg-[#fef2f2] px-2.5 py-1 text-[11.5px] font-bold text-[#b91c1c]">❌ No</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fef08a] bg-[#fefce8] px-2.5 py-1 text-[11.5px] font-bold text-[#a16207]">🤔 Undecided</span>
+                            )
+                          ) : (
+                            <span className="text-[13px] font-semibold text-[#94a3b8]">—</span>
                           )}
                         </td>
                         <td className="py-4">
