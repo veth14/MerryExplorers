@@ -15,11 +15,12 @@ type ProgramKey = typeof RENEWAL_PROGRAMS[number];
 
 export type ProgramRenewalEntry = {
   programKey: ProgramKey;
+  currentAdventure: number;            // which adventure number the program is currently in
   nextAdventureStart: string | null;  // ISO date string
   renewalOpen: boolean;
   renewalOpenDate: string | null;     // auto-computed: 2 weeks before start
-  virtualLink?: string;               // universal virtual session link for the program
-  virtualLinkOpen?: boolean;          // whether the universal link is visible to parents
+  virtualLink?: string;
+  virtualLinkOpen?: boolean;
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -32,6 +33,7 @@ function computeDeadline(startIso: string | null): string | null {
 function defaultPrograms(): ProgramRenewalEntry[] {
   return RENEWAL_PROGRAMS.map((programKey) => ({
     programKey,
+    currentAdventure: 1,
     nextAdventureStart: null,
     renewalOpen: false,
     renewalOpenDate: null,
@@ -50,7 +52,10 @@ export async function GET() {
     // Fill in any programs that might not exist in the stored doc
     const merged = RENEWAL_PROGRAMS.map((key) => {
       const existing = programs.find((p) => p.programKey === key);
-      return existing ?? { programKey: key, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
+      // Always spread existing so legacy records get the new currentAdventure field backfilled
+      return existing
+        ? { ...existing, currentAdventure: existing.currentAdventure ?? 1 }
+        : { programKey: key, currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
     });
 
     return NextResponse.json({ programs: merged, updatedAt: doc?.updatedAt ?? null });
@@ -73,6 +78,7 @@ export async function PUT(req: NextRequest) {
       const renewalOpen = p?.renewalOpen ?? false;
       return {
         programKey: key,
+        currentAdventure: p?.currentAdventure ?? 1,
         nextAdventureStart,
         renewalOpen,
         renewalOpenDate: computeDeadline(nextAdventureStart),

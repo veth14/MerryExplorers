@@ -527,7 +527,7 @@ function ParentModal({
 }
 
 // ─── Downpayment Verification Panel ──────────────────────────────────────────
-function DownpaymentPanel({ data, onRefresh }: { data: ParentAccount[]; onRefresh: () => void }) {
+function DownpaymentPanel({ data, onRefresh, renewalSettings }: { data: ParentAccount[]; onRefresh: () => void; renewalSettings?: ProgramEntry[] }) {
   const pending = data.filter(
     (p) =>
       p.renewalStatus?.downpayment?.submitted &&
@@ -600,13 +600,17 @@ function DownpaymentPanel({ data, onRefresh }: { data: ParentAccount[]; onRefres
               <div style={{ display: "grid", gap: "12px" }}>
                 {pending.map((parent) => {
                   const dp = parent.renewalStatus!.downpayment!;
+                  const prog = renewalSettings?.find((p) => p.programKey === parent.program);
+                  const renewingForAdv = (prog?.currentAdventure || 1) + 1;
                   return (
                     <div key={parent.id} style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: "14px", padding: "16px 18px", display: "flex", flexDirection: "column", gap: "12px" }}>
                       {/* Parent info */}
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76" }}>{parent.fullName}</div>
-                          <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>{parent.childName} · {parent.program}</div>
+                          <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+                            {parent.childName} · {parent.program} <span style={{ color: "#b45309", fontWeight: 700 }}>· Renewing for Adventure {renewingForAdv}</span>
+                          </div>
                           <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
                             <span style={{ fontSize: "12px", fontWeight: 700, background: "#f0f5ff", color: "#0050d5", padding: "2px 10px", borderRadius: "20px", border: "1px solid #c5d6ff" }}>
                               {dp.paymentMethod}
@@ -678,10 +682,15 @@ function DownpaymentPanel({ data, onRefresh }: { data: ParentAccount[]; onRefres
               <div style={{ display: "grid", gap: "8px" }}>
                 {verified.map((parent) => {
                   const dp = parent.renewalStatus!.downpayment!;
+                  const prog = renewalSettings?.find((p) => p.programKey === parent.program);
+                  const renewingForAdv = (prog?.currentAdventure || 1) + 1;
                   return (
                     <div key={parent.id} style={{ background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: "12px", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{parent.fullName} <span style={{ color: "#64748b", fontWeight: 500 }}>— {parent.childName}</span></div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>
+                          {parent.fullName} <span style={{ color: "#64748b", fontWeight: 500 }}>— {parent.childName}</span>
+                          <span style={{ marginLeft: "6px", fontSize: "11px", color: "#065f46", background: "#dcfce7", padding: "2px 6px", borderRadius: "8px", fontWeight: 800 }}>Adv {renewingForAdv}</span>
+                        </div>
                         <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>
                           {dp.paymentMethod}{dp.amountPaid ? ` · ₱${dp.amountPaid.toLocaleString()}` : ""}{dp.adminNote ? ` · "${dp.adminNote}"` : ""}
                         </div>
@@ -701,10 +710,15 @@ function DownpaymentPanel({ data, onRefresh }: { data: ParentAccount[]; onRefres
               <div style={{ display: "grid", gap: "8px" }}>
                 {rejected.map((parent) => {
                   const dp = parent.renewalStatus!.downpayment!;
+                  const prog = renewalSettings?.find((p) => p.programKey === parent.program);
+                  const renewingForAdv = (prog?.currentAdventure || 1) + 1;
                   return (
                     <div key={parent.id} style={{ background: "#fff0f0", border: "1.5px solid #fca5a5", borderRadius: "12px", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{parent.fullName} <span style={{ color: "#64748b", fontWeight: 500 }}>— {parent.childName}</span></div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>
+                          {parent.fullName} <span style={{ color: "#64748b", fontWeight: 500 }}>— {parent.childName}</span>
+                          <span style={{ marginLeft: "6px", fontSize: "11px", color: "#991b1b", background: "#fee2e2", padding: "2px 6px", borderRadius: "8px", fontWeight: 800 }}>Adv {renewingForAdv}</span>
+                        </div>
                         <div style={{ fontSize: "12px", color: "#b91c1c", marginTop: "2px" }}>
                           {dp.paymentMethod}{dp.adminNote ? ` · Reason: "${dp.adminNote}"` : ""}
                         </div>
@@ -752,6 +766,7 @@ const PROGRAM_META: Record<string, { emoji: string; color: string; bg: string; b
 
 type ProgramEntry = {
   programKey: string;
+  currentAdventure: number;
   nextAdventureStart: string | null;
   renewalOpen: boolean;
   renewalOpenDate: string | null;
@@ -774,6 +789,7 @@ const RENEWAL_PROGRAMS = [
 function defaultPrograms(): ProgramEntry[] {
   return RENEWAL_PROGRAMS.map((p) => ({
     programKey: p,
+    currentAdventure: 1,
     nextAdventureStart: null,
     renewalOpen: false,
     renewalOpenDate: null,
@@ -797,7 +813,7 @@ function RenewalSettingsPanel() {
           // Merge: ensure all programs are present
           const merged = RENEWAL_PROGRAMS.map((key) => {
             const existing = d.programs.find((p: ProgramEntry) => p.programKey === key);
-            return existing ?? { programKey: key, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
+            return existing ?? { programKey: key, currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
           });
           setCfg({ programs: merged, updatedAt: d.updatedAt ?? null });
         }
@@ -936,8 +952,29 @@ function RenewalSettingsPanel() {
                     </div>
                   </div>
 
-                  {/* Date + deadline row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Adventure # + Date + deadline row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Current adventure number */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-extrabold uppercase tracking-wider text-[#5a6e8c]">
+                        🏕️ Current Adventure #
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateProgram(prog.programKey, { currentAdventure: Math.max(1, (prog.currentAdventure ?? 1) - 1) })}
+                          className="w-9 h-9 rounded-xl border border-[#e2e8f0] bg-[#f8faff] text-[#002f76] font-bold text-[18px] flex items-center justify-center hover:bg-[#e8f0ff] transition-colors"
+                        >−</button>
+                        <div className="flex-1 text-center">
+                          <div className="font-extrabold text-[22px]" style={{ color: meta.color }}>Adventure {prog.currentAdventure ?? 1}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => updateProgram(prog.programKey, { currentAdventure: (prog.currentAdventure ?? 1) + 1 })}
+                          className="w-9 h-9 rounded-xl border border-[#e2e8f0] bg-[#f8faff] text-[#002f76] font-bold text-[18px] flex items-center justify-center hover:bg-[#e8f0ff] transition-colors"
+                        >+</button>
+                      </div>
+                    </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] font-extrabold uppercase tracking-wider text-[#5a6e8c]">
                         🚀 Next Adventure Start
@@ -1211,9 +1248,14 @@ export default function AdminParentsPage() {
 
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
   const [editingAccount, setEditingAccount] = useState<ParentAccount | undefined>();
+  const [renewalSettings, setRenewalSettings] = useState<ProgramEntry[]>([]);
 
   useEffect(() => {
     loadAccounts();
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((d) => { if (d.programs) setRenewalSettings(d.programs); })
+      .catch(() => {});
   }, []);
 
   async function loadAccounts() {
@@ -1315,7 +1357,7 @@ export default function AdminParentsPage() {
         <TrailblazerVirtualSettings />
 
         {/* Downpayment Verification Panel */}
-        <DownpaymentPanel data={data} onRefresh={loadAccounts} />
+        <DownpaymentPanel data={data} onRefresh={loadAccounts} renewalSettings={renewalSettings} />
 
         {/* Toolbar */}
         <div className="mb-4 flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1419,9 +1461,20 @@ export default function AdminParentsPage() {
                         <td className="py-4 pr-4 text-[13.5px] font-bold text-[#002f76]">{parent.childName || "—"}</td>
                         <td className="py-4 pr-4">
                           {parent.program ? (
-                            <span className="inline-flex items-center rounded-full border border-[#c5d6ff] bg-[#f0f5ff] px-3 py-1.5 text-[12px] font-bold text-[#0050d5]">
-                              {parent.program}
-                            </span>
+                            <div className="flex flex-col gap-1.5">
+                              <span className="inline-flex items-center rounded-full border border-[#c5d6ff] bg-[#f0f5ff] px-3 py-1.5 text-[12px] font-bold text-[#0050d5]">
+                                {parent.program}
+                              </span>
+                              {(() => {
+                                const prog = renewalSettings.find((p) => p.programKey === parent.program);
+                                const adv = (prog?.currentAdventure) || 1;
+                                return (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-[#fde68a] bg-[#fffbeb] px-2.5 py-1 text-[11px] font-extrabold text-[#92400e]">
+                                    🏕️ Adventure {adv}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           ) : (
                             <span className="text-[13.5px] font-semibold text-[#94a3b8]">—</span>
                           )}

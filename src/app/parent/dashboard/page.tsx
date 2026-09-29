@@ -587,6 +587,7 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 type RenewalSettings = {
+  currentAdventure: number;
   nextAdventureStart: string | null;
   renewalOpen: boolean;
   renewalOpenDate: string | null;
@@ -602,9 +603,9 @@ export default function ParentDashboardPage() {
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
+  const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
   // We also cache the full per-program list so we can resolve after profile loads
-  const [allRenewalPrograms, setAllRenewalPrograms] = useState<{ programKey: string; nextAdventureStart: string | null; renewalOpen: boolean; renewalOpenDate: string | null; virtualLink?: string; virtualLinkOpen?: boolean }[]>([]);
+  const [allRenewalPrograms, setAllRenewalPrograms] = useState<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null; renewalOpen: boolean; renewalOpenDate: string | null; virtualLink?: string; virtualLinkOpen?: boolean }[]>([]);
   
   // Inline Renewal Form State
   const [showRenewalForm, setShowRenewalForm] = useState(false);
@@ -647,6 +648,7 @@ export default function ParentDashboardPage() {
     const match = allRenewalPrograms.find((p) => p.programKey === profile.program);
     if (match) {
       setRenewalSettings({
+        currentAdventure: match.currentAdventure ?? 1,
         nextAdventureStart: match.nextAdventureStart,
         renewalOpen: match.renewalOpen,
         renewalOpenDate: match.renewalOpenDate,
@@ -845,6 +847,10 @@ export default function ParentDashboardPage() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               <span style={{ padding: "4px 12px", background: "#f0f5ff", color: "#0050d5", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #c5d6ff" }}>
                 {profile.program}
+              </span>
+              {/* Prominent Adventure Badge */}
+              <span style={{ padding: "5px 14px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)", color: "#92400e", borderRadius: "20px", fontSize: "13px", fontWeight: "900", border: "2px solid #fbbf24", letterSpacing: "0.2px", boxShadow: "0 2px 8px rgba(251,191,36,0.25)" }}>
+                🏕️ Adventure {renewalSettings.currentAdventure || 1}
               </span>
               {profile.classTime && (
                 <span style={{ padding: "4px 12px", background: "#f0fdf4", color: "#15803d", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #bbf7d0" }}>
