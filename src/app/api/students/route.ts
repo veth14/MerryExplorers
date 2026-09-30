@@ -22,11 +22,26 @@ export async function GET(request: Request) {
       .sort({ enrolledAt: -1 })
       .toArray();
 
-    const formatted = students.map((s) => ({
-      ...s,
-      id: s._id.toString(),
-      _id: undefined,
-    }));
+    // Fetch parent accounts to get consent and waiver data
+    const parentEmails = [...new Set(students.map(s => s.parentInfo?.email))].filter(Boolean);
+    const parents = await db
+      .collection("accounts")
+      .find({ email: { $in: parentEmails } })
+      .toArray();
+    
+    const parentMap = new Map(parents.map(p => [p.email, p]));
+
+    const formatted = students.map((s) => {
+      const parentAcc = parentMap.get(s.parentInfo?.email);
+      return {
+        ...s,
+        id: s._id.toString(),
+        _id: undefined,
+        photoConsent: parentAcc?.photoConsent !== undefined ? parentAcc.photoConsent : s.photoConsent,
+        waiverSignedAt: parentAcc?.waiverSignedAt || s.waiverSignedAt,
+        waiverSignature: parentAcc?.waiverSignature || s.waiverSignature,
+      };
+    });
 
     return NextResponse.json({ success: true, data: formatted });
   } catch (error: any) {

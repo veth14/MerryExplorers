@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 // POST /api/parents/waiver — Save parent's waiver signature
 export async function POST(request: Request) {
   try {
-    const { uid, signature } = await request.json();
+    const { uid, signature, photoConsent } = await request.json();
 
     if (!uid || !signature) {
       return NextResponse.json({ error: "uid and signature are required" }, { status: 400 });
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         $set: {
           waiverSignature: signature,
           waiverSignedAt: new Date(),
+          photoConsent: photoConsent !== undefined ? photoConsent : true,
         },
       }
     );

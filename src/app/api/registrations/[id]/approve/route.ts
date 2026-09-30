@@ -108,6 +108,9 @@ export async function POST(
       schedule: PROGRAM_SCHEDULES[program] || "",
       uniformOrdered: uniformOrdered || false,
       lanyardOrdered: lanyardOrdered || false,
+      photoConsent: registration.photoConsent,
+      waiverSignature: registration.signatureUrl,
+      waiverSignedAt: registration.submittedAt,
       enrolledAt: new Date(),
       status: "active",
     });

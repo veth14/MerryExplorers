@@ -45,6 +45,7 @@ type ParentProfile = {
   albums: Album[];
   waiverSignature?: string;
   waiverSignedAt?: string;
+  photoConsent?: boolean;
   virtualSessionLink?: string;
   renewalLink?: string;
   studentInfo?: {
@@ -347,7 +348,7 @@ function NextSessionCountdown({ schedule, classTime }: { schedule: string; class
 
 // ─── Waiver Gate ─────────────────────────────────────────────────────────────
 
-function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplete: (sig: string) => void }) {
+function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplete: (sig: string, photoConsent: boolean) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -355,6 +356,7 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
   const [hasSigned, setHasSigned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [photoConsent, setPhotoConsent] = useState(true);
 
   function getPos(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current!;
@@ -415,10 +417,10 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
       const res = await fetch("/api/parents/waiver", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: profile.id, signature: sig }),
+        body: JSON.stringify({ uid: profile.id, signature: sig, photoConsent }),
       });
       if (!res.ok) throw new Error("Failed to save signature.");
-      onComplete(sig);
+      onComplete(sig, photoConsent);
     } catch (e: any) {
       setError(e.message || "Something went wrong.");
     } finally {
@@ -435,26 +437,36 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
         .waiver-section ul { margin: 0 0 10px; padding-left: 20px; }
         .waiver-section li { margin-bottom: 4px; }
         .sig-canvas { touch-action: none; cursor: crosshair; }
+        
+        @media (max-width: 768px) {
+          .waiver-banner { padding: 24px 20px !important; text-align: center; }
+          .waiver-content { padding: 20px 16px !important; }
+          .waiver-signature-box { padding: 24px 20px !important; }
+          .waiver-signed-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+          .waiver-header-nav { padding: 0 16px !important; }
+          .waiver-header-nav-inner { justify-content: center !important; }
+          .waiver-header-subtitle { display: none !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <nav style={{ background: "linear-gradient(90deg,#002f76 0%,#0050d5 100%)", padding: "0 24px", boxShadow: "0 2px 20px rgba(0,47,118,0.25)", flexShrink: 0 }}>
-        <div style={{ maxWidth: "900px", margin: "0 auto", display: "flex", alignItems: "center", gap: "12px", height: "64px" }}>
+      <nav className="waiver-header-nav" style={{ background: "linear-gradient(90deg,#002f76 0%,#0050d5 100%)", padding: "0 24px", boxShadow: "0 2px 20px rgba(0,47,118,0.25)", flexShrink: 0 }}>
+        <div className="waiver-header-nav-inner" style={{ maxWidth: "900px", margin: "0 auto", display: "flex", alignItems: "center", gap: "12px", height: "64px" }}>
           <div style={{ width: "36px", height: "36px", borderRadius: "50%", overflow: "hidden", background: "rgba(255,255,255,0.15)", position: "relative", flexShrink: 0 }}>
             <Image src="/LOGO-noBG.png" alt="Merry Explorers" fill style={{ objectFit: "contain", padding: "3px" }} />
           </div>
-          <div>
+          <div style={{ display: "flex", alignItems: "center" }}>
             <span style={{ color: "white", fontWeight: "800", fontSize: "16px" }}>Merry Explorers</span>
-            <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "500", marginLeft: "8px" }}>Parent Portal</span>
+            <span className="waiver-header-subtitle" style={{ color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "500", marginLeft: "8px" }}>Parent Portal</span>
           </div>
         </div>
       </nav>
 
       {/* Main content */}
-      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "32px 20px", flex: 1, display: "flex", flexDirection: "column", gap: "24px", animation: "fadeUp 0.4s ease" }}>
+      <div className="waiver-content" style={{ maxWidth: "900px", margin: "0 auto", padding: "32px 20px", flex: 1, display: "flex", flexDirection: "column", gap: "24px", animation: "fadeUp 0.4s ease" }}>
 
         {/* Intro banner */}
-        <div style={{ background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", borderRadius: "20px", padding: "28px 32px", color: "white", boxShadow: "0 8px 32px rgba(0,47,118,0.25)" }}>
+        <div className="waiver-banner" style={{ background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", borderRadius: "20px", padding: "28px 32px", color: "white", boxShadow: "0 8px 32px rgba(0,47,118,0.25)" }}>
           <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
           <h1 style={{ margin: "0 0 8px", fontSize: "22px", fontWeight: "800", letterSpacing: "-0.3px" }}>Welcome, {profile.fullName.split(" ")[0]}!</h1>
           <p style={{ margin: 0, fontSize: "15px", opacity: 0.85, lineHeight: 1.6 }}>Before you enter the Parent Portal, please read the full Merry Explorers Parent/Guardian Acknowledgment & Agreement below. Scroll all the way to the bottom, then sign to confirm.</p>
@@ -524,7 +536,16 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
         </div>
 
         {/* Signature section — unlocked only after scrolling */}
-        <div style={{ background: "white", borderRadius: "20px", padding: "28px 32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", opacity: hasScrolled ? 1 : 0.45, pointerEvents: hasScrolled ? "auto" : "none", transition: "opacity 0.4s" }}>
+        <div className="waiver-signature-box" style={{ background: "white", borderRadius: "20px", padding: "28px 32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", opacity: hasScrolled ? 1 : 0.45, pointerEvents: hasScrolled ? "auto" : "none", transition: "opacity 0.4s" }}>
+          
+          {/* Photo Consent Checkbox */}
+          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "24px", padding: "16px", background: "#f0f5ff", borderRadius: "12px", border: "1px solid #c5d6ff" }}>
+            <input type="checkbox" id="photoConsent" checked={photoConsent} onChange={e => setPhotoConsent(e.target.checked)} style={{ marginTop: "4px", width: "20px", height: "20px", cursor: "pointer", accentColor: "#0050d5" }} />
+            <label htmlFor="photoConsent" style={{ fontSize: "14px", color: "#334155", lineHeight: 1.5, cursor: "pointer" }}>
+              <strong>I grant permission</strong> for my child to be photographed and/or filmed during Merry Explorers sessions, and for these media files to be shared within the private Merry Explorers community for documentation and highlighting learning moments.
+            </label>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
               <div style={{ fontWeight: "800", color: "#002f76", fontSize: "16px" }}>✍️ Your Signature</div>
@@ -552,7 +573,7 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
           {!hasSigned && hasScrolled && <p style={{ textAlign: "center", fontSize: "12px", color: "#94a3b8", marginTop: "8px", fontWeight: "600" }}>Draw your signature above</p>}
 
           {/* Signed-by line */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginTop: "20px", padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
+          <div className="waiver-signed-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginTop: "20px", padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
             {[
               { label: "Name", value: profile.fullName },
               { label: "Child", value: profile.childName },
@@ -609,7 +630,7 @@ export default function ParentDashboardPage() {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history" | "virtual" | "renewal">("session");
+  const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history" | "virtual" | "renewal" | "profile">("session");
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -708,7 +729,7 @@ export default function ParentDashboardPage() {
     return (
       <WaiverGate
         profile={profile}
-        onComplete={(sig) => setProfile((p) => p ? { ...p, waiverSignature: sig, waiverSignedAt: new Date().toISOString() } : p)}
+        onComplete={(sig, photoConsent) => setProfile((p) => p ? { ...p, waiverSignature: sig, waiverSignedAt: new Date().toISOString(), photoConsent } : p)}
       />
     );
   }
@@ -725,6 +746,7 @@ export default function ParentDashboardPage() {
     { id: "waiver", label: "📄 Waiver", icon: "📄" },
     { id: "history", label: "🏕️ History", icon: "🏕️" },
     { id: "renewal", label: "🔄 Renewal", icon: "🔄" },
+    { id: "profile", label: "👤 Profile", icon: "👤" },
   ] as const;
 
   return (
@@ -745,10 +767,89 @@ export default function ParentDashboardPage() {
         .tab-btn { transition: all 0.2s; cursor: pointer; border: none; background: none; }
         .tab-btn:hover { background: rgba(0,80,213,0.08) !important; }
         .nav-link:hover { background: rgba(255,255,255,0.15) !important; }
+        
+        /* Mobile & Tablet Responsiveness */
+        @media (max-width: 768px) {
+          .responsive-hero-card {
+            flex-direction: column !important;
+            text-align: center !important;
+            padding: 24px 20px !important;
+          }
+          .responsive-hero-card > div {
+            width: 100%;
+          }
+          .responsive-hero-tags {
+            justify-content: center !important;
+          }
+          .responsive-hero-stats {
+            justify-content: center !important;
+            width: 100%;
+          }
+          .responsive-tab-bar {
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+          }
+          .responsive-tab-btn {
+            flex: 0 0 auto;
+            padding: 10px 14px !important;
+            font-size: 12px !important;
+          }
+          .responsive-banner {
+            padding: 24px 20px !important;
+            text-align: center;
+          }
+          .responsive-banner-inner {
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 16px !important;
+          }
+          .responsive-banner-actions {
+            width: 100%;
+            justify-content: center !important;
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+          .responsive-banner-actions button {
+            width: 100%;
+          }
+          .hide-on-mobile {
+            display: none !important;
+          }
+          .responsive-card {
+            padding: 20px !important;
+          }
+          .responsive-grid-2 {
+            grid-template-columns: 1fr !important;
+          }
+          .responsive-nav {
+            padding: 0 16px !important;
+          }
+          .responsive-nav-title {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .responsive-nav-title > span:last-child {
+            margin-left: 0 !important;
+            font-size: 10px !important;
+          }
+          .responsive-nav-actions {
+            gap: 6px !important;
+          }
+          .responsive-nav-actions button {
+            padding: 6px 10px !important;
+            font-size: 11px !important;
+          }
+          .responsive-banner-box {
+            width: 100% !important;
+          }
+        }
       `}</style>
 
       {/* ── Top Nav ─────────────────────────────────────────────────────────── */}
       <nav
+        className="responsive-nav"
         style={{
           background: "linear-gradient(90deg,#002f76 0%,#0050d5 100%)",
           padding: "0 24px",
@@ -763,13 +864,13 @@ export default function ParentDashboardPage() {
             <div style={{ width: "36px", height: "36px", borderRadius: "50%", overflow: "hidden", background: "rgba(255,255,255,0.15)", position: "relative", flexShrink: 0 }}>
               <Image src="/LOGO-noBG.png" alt="Merry Explorers" fill style={{ objectFit: "contain", padding: "3px" }} />
             </div>
-            <div>
+            <div className="responsive-nav-title">
               <span style={{ color: "white", fontWeight: "800", fontSize: "16px", letterSpacing: "-0.2px" }}>Merry Explorers</span>
               <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "500", marginLeft: "8px" }}>Parent Portal</span>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ color: "rgba(255,255,255,0.85)", fontSize: "13px", fontWeight: "600", display: "none" }} className="sm:block">
+          <div className="responsive-nav-actions" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span className="hide-on-mobile" style={{ color: "rgba(255,255,255,0.85)", fontSize: "13px", fontWeight: "600" }}>
               Hi, {profile.fullName.split(" ")[0]}!
             </span>
             <button
@@ -813,7 +914,7 @@ export default function ParentDashboardPage() {
       {/* ── Hero / Profile Card ───────────────────────────────────────────── */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "32px 20px 0" }}>
         <div
-          className="fade-up"
+          className="fade-up responsive-hero-card"
           style={{
             background: "white",
             borderRadius: "24px",
@@ -854,7 +955,7 @@ export default function ParentDashboardPage() {
             <p style={{ margin: "0 0 8px", color: "#64748b", fontSize: "14px", fontWeight: "500" }}>
               {profile.relationship} of <strong style={{ color: "#0050d5" }}>{profile.childName}</strong>
             </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            <div className="responsive-hero-tags" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               <span style={{ padding: "4px 12px", background: "#f0f5ff", color: "#0050d5", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #c5d6ff" }}>
                 {profile.program}
               </span>
@@ -874,7 +975,7 @@ export default function ParentDashboardPage() {
           </div>
 
           {/* Quick stats */}
-          <div style={{ display: "flex", gap: "16px", flexShrink: 0 }}>
+          <div className="responsive-hero-stats" style={{ display: "flex", gap: "16px", flexShrink: 0 }}>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
               <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
                 {getCompletedSessionsCount(profile.studentInfo?.enrolledAt, profile.schedule, profile.classTime)}
@@ -904,6 +1005,7 @@ export default function ParentDashboardPage() {
 
         {/* ── Tab Bar ───────────────────────────────────────────────────────── */}
         <div
+          className="responsive-tab-bar"
           style={{
             display: "flex",
             gap: "4px",
@@ -919,7 +1021,7 @@ export default function ParentDashboardPage() {
             <button
               key={tab.id}
               id={`parent-tab-${tab.id}`}
-              className="tab-btn"
+              className="tab-btn responsive-tab-btn"
               onClick={() => setActiveTab(tab.id)}
               style={{
                 flex: 1,
@@ -945,7 +1047,7 @@ export default function ParentDashboardPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
 
               {/* ── Hero Program Banner ── */}
-              <div style={{
+              <div className="responsive-banner" style={{
                 background: "linear-gradient(135deg,#001a4d 0%,#002f76 45%,#0050d5 100%)",
                 borderRadius: "24px",
                 padding: "36px 40px",
@@ -958,7 +1060,7 @@ export default function ParentDashboardPage() {
                 <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "200px", height: "200px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
                 <div style={{ position: "absolute", bottom: "-60px", right: "80px", width: "160px", height: "160px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "24px", position: "relative" }}>
+                <div className="responsive-banner-inner" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "24px", position: "relative" }}>
                   <div style={{ flex: 1, minWidth: "200px" }}>
                     <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "2px", opacity: 0.6, marginBottom: "8px" }}>🎓 Current Program</div>
                     <div style={{ fontSize: "28px", fontWeight: "900", lineHeight: "1.2", marginBottom: "20px", letterSpacing: "-0.5px" }}>
@@ -966,13 +1068,13 @@ export default function ParentDashboardPage() {
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                       {profile.schedule && (
-                        <div style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: "12px", padding: "10px 16px", border: "1px solid rgba(255,255,255,0.15)" }}>
+                        <div className="responsive-banner-box" style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: "12px", padding: "10px 16px", border: "1px solid rgba(255,255,255,0.15)" }}>
                           <div style={{ fontSize: "10px", opacity: 0.65, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "3px" }}>📅 Schedule</div>
                           <div style={{ fontWeight: "800", fontSize: "14px" }}>{profile.schedule}</div>
                         </div>
                       )}
                       {profile.classTime && (
-                        <div style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: "12px", padding: "10px 16px", border: "1px solid rgba(255,255,255,0.15)" }}>
+                        <div className="responsive-banner-box" style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: "12px", padding: "10px 16px", border: "1px solid rgba(255,255,255,0.15)" }}>
                           <div style={{ fontSize: "10px", opacity: 0.65, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "3px" }}>🕐 Class Time</div>
                           <div style={{ fontWeight: "800", fontSize: "14px" }}>{profile.classTime}</div>
                         </div>
@@ -982,7 +1084,7 @@ export default function ParentDashboardPage() {
 
                   {/* Countdown */}
                   {profile.schedule && profile.classTime && (
-                    <div style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(12px)", borderRadius: "16px", padding: "20px 24px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", minWidth: "220px" }}>
+                    <div className="responsive-banner-box" style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(12px)", borderRadius: "16px", padding: "20px 24px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", minWidth: "220px" }}>
                       <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.65, marginBottom: "10px" }}>⏱ Next Session</div>
                       <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} />
                     </div>
@@ -991,7 +1093,7 @@ export default function ParentDashboardPage() {
               </div>
 
               {/* ── Two-column cards row ── */}
-              <div style={{ display: "grid", gap: "20px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+              <div className="responsive-grid-2" style={{ display: "grid", gap: "20px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
 
                 {/* Latest Session Card */}
                 <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
@@ -1230,11 +1332,12 @@ export default function ParentDashboardPage() {
 
               {/* Signed-by info */}
               {waiverSigned && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "24px", padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
+                <div className="responsive-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "24px", padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px solid #e8efff" }}>
                   {[
                     { label: "Signed By", value: profile.fullName },
                     { label: "Child", value: profile.childName },
                     { label: "Date Signed", value: profile.waiverSignedAt ? new Date(profile.waiverSignedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—" },
+                    { label: "Photo Consent", value: profile.photoConsent ? "Granted" : "Not Granted" }
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>{label}</div>
@@ -2002,6 +2105,9 @@ export default function ParentDashboardPage() {
             );
           })()}
 
+          {/* ── PROFILE TAB ──────────────────────────────────────────────────── */}
+          {activeTab === "profile" && <ProfileTab profile={profile} user={user} />}
+
         </div>
       </div>
 
@@ -2018,6 +2124,206 @@ export default function ParentDashboardPage() {
       {showPasswordModal && (
         <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
       )}
+    </div>
+  );
+}
+
+// ─── Profile Tab Component ────────────────────────────────────────────────────
+function ProfileTab({ profile, user }: { profile: any, user: any }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    nickname: profile.studentInfo?.childInfo?.nickname || "",
+    dateOfBirth: profile.studentInfo?.childInfo?.dateOfBirth || "",
+    gender: profile.studentInfo?.childInfo?.gender || "",
+    healthProfile: profile.studentInfo?.childInfo?.healthProfile || "",
+    favoriteSong: profile.studentInfo?.childInfo?.favoriteSong || "",
+    favoriteColor: profile.studentInfo?.childInfo?.favoriteColor || "",
+    favoriteCharacter: profile.studentInfo?.childInfo?.favoriteCharacter || "",
+    emName: profile.studentInfo?.emergencyContact?.name || "",
+    emRelationship: profile.studentInfo?.emergencyContact?.relationship || "",
+    emPhone: profile.studentInfo?.emergencyContact?.phone || "",
+  });
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/parents/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: user.uid,
+          childInfo: {
+            nickname: formData.nickname,
+            dateOfBirth: formData.dateOfBirth,
+            gender: formData.gender,
+            healthProfile: formData.healthProfile,
+            favoriteSong: formData.favoriteSong,
+            favoriteColor: formData.favoriteColor,
+            favoriteCharacter: formData.favoriteCharacter,
+          },
+          emergencyContact: {
+            name: formData.emName,
+            relationship: formData.emRelationship,
+            phone: formData.emPhone,
+          }
+        })
+      });
+      
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert("Failed to save changes.");
+        setSaving(false);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("An error occurred.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      
+      {/* ── Hero Profile Banner ── */}
+      <div className="responsive-banner" style={{
+        background: "linear-gradient(135deg,#001a4d 0%,#002f76 45%,#0050d5 100%)",
+        borderRadius: "24px",
+        padding: "36px 40px",
+        color: "white",
+        boxShadow: "0 12px 48px rgba(0,47,118,0.35)",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        {/* Decorative circles */}
+        <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "200px", height: "200px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-60px", right: "80px", width: "160px", height: "160px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
+
+        <div className="responsive-banner-inner" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "24px", position: "relative" }}>
+          <div style={{ flex: 1, minWidth: "200px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "2px", opacity: 0.6, marginBottom: "8px" }}>👤 Explorer Settings</div>
+            <div style={{ fontSize: "28px", fontWeight: "900", lineHeight: "1.2", marginBottom: "20px", letterSpacing: "-0.5px" }}>
+              Profile & Emergency Contact
+            </div>
+            <p style={{ margin: 0, color: "rgba(255,255,255,0.8)", fontSize: "14px", maxWidth: "400px", lineHeight: "1.6" }}>
+              Keep your child&apos;s details updated to help us provide the best care and experience in class.
+            </p>
+          </div>
+          
+          <div className="responsive-banner-actions" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {!isEditing ? (
+              <button onClick={() => setIsEditing(true)} style={{ padding: "12px 24px", borderRadius: "14px", background: "white", color: "#002f76", fontWeight: "800", fontSize: "14px", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>Edit Profile</button>
+            ) : (
+              <>
+                <button onClick={() => setIsEditing(false)} style={{ padding: "12px 24px", borderRadius: "14px", background: "rgba(255,255,255,0.15)", color: "white", fontWeight: "700", fontSize: "14px", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"} onMouseOut={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}>Cancel</button>
+                <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", borderRadius: "14px", background: "linear-gradient(135deg,#16a34a,#22c55e)", color: "white", fontWeight: "800", fontSize: "14px", border: "none", cursor: "pointer", opacity: saving ? 0.7 : 1, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", transition: "all 0.2s" }} onMouseOver={e => !saving && (e.currentTarget.style.transform = "translateY(-2px)")} onMouseOut={e => !saving && (e.currentTarget.style.transform = "translateY(0)")}>
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="responsive-grid-2" style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+        
+        {/* Child Info Card */}
+        <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+            <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#e0e7ff,#c7d2fe)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>👦</div>
+            <div>
+              <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Child Information</div>
+              <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>Basic details and health notes</div>
+            </div>
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Nickname</label>
+              <input disabled={!isEditing} type="text" value={formData.nickname} onChange={e => setFormData({ ...formData, nickname: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Date of Birth</label>
+                <input disabled={!isEditing} type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Gender</label>
+                <select disabled={!isEditing} value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"}>
+                  <option value="">Select...</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Health Notes & Allergies</label>
+              <textarea disabled={!isEditing} value={formData.healthProfile} onChange={e => setFormData({ ...formData, healthProfile: e.target.value })} placeholder="Any allergies or health conditions?" rows={3} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", resize: "none", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+            </div>
+          </div>
+        </div>
+
+        {/* Right side: Favorites & Emergency Contact */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          
+          {/* Favorites Card */}
+          <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#fef3c7,#fde68a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>⭐</div>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Favorites</div>
+                <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>Things they love</div>
+              </div>
+            </div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Favorite Song</label>
+                <input disabled={!isEditing} type="text" value={formData.favoriteSong} onChange={e => setFormData({ ...formData, favoriteSong: e.target.value })} placeholder="e.g. Baby Shark" style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#f59e0b"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Favorite Color</label>
+                <input disabled={!isEditing} type="text" value={formData.favoriteColor} onChange={e => setFormData({ ...formData, favoriteColor: e.target.value })} placeholder="e.g. Blue" style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#f59e0b"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Favorite Character / Show</label>
+              <input disabled={!isEditing} type="text" value={formData.favoriteCharacter} onChange={e => setFormData({ ...formData, favoriteCharacter: e.target.value })} placeholder="e.g. Peppa Pig" style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#f59e0b"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+            </div>
+          </div>
+
+          {/* Emergency Contact Card */}
+          <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#fee2e2,#fca5a5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>🚨</div>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Emergency Contact</div>
+                <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>In case we can&apos;t reach you</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Full Name</label>
+              <input disabled={!isEditing} type="text" value={formData.emName} onChange={e => setFormData({ ...formData, emName: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Relationship</label>
+                <input disabled={!isEditing} type="text" value={formData.emRelationship} onChange={e => setFormData({ ...formData, emRelationship: e.target.value })} placeholder="e.g. Aunt" style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Phone Number</label>
+                <input disabled={!isEditing} type="text" value={formData.emPhone} onChange={e => setFormData({ ...formData, emPhone: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
     </div>
   );
 }

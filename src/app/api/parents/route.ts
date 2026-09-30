@@ -311,6 +311,7 @@ export async function GET(request: Request) {
           enrolledAt: studentRecord.enrolledAt,
           status: studentRecord.status,
           childInfo: studentRecord.childInfo,
+          emergencyContact: studentRecord.emergencyContact || { name: "", relationship: "", phone: "" },
         }
       : null;
 
