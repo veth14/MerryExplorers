@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     // 1. Fetch Accounts (Teachers, Executives, Developers, etc. - exclude Admin/Owner)
     const accounts = await db.collection("accounts").find({
-      role: { $nin: ["admin", "owner"] }
+      role: { $nin: ["admin", "owner", "parent", "Parent"] }
     }).toArray();
 
     // 3. Determine the required attendance date range.

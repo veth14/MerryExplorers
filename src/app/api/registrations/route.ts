@@ -103,6 +103,7 @@ export async function POST(request: Request) {
         program,
         classTime,
         status: { $in: ["pending", "approved", "reserved"] },
+        "parentInfo.name": { $not: /ian angelo valmores/i },
       });
       if (takenSlots >= maxSlots) {
         return NextResponse.json({ error: `Sorry, ${classTime} for this program is now full.` }, { status: 409 });

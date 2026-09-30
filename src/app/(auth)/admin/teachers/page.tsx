@@ -55,7 +55,10 @@ export default function TeachersPage() {
       try {
         const json = await cachedFetch<any[]>("accounts:all", "/api/accounts", 60_000);
         if (Array.isArray(json)) {
-          const teachersOnly = json.filter((acc) => (acc.role || "").toLowerCase() !== "admin");
+          const teachersOnly = json.filter((acc) => {
+            const r = (acc.role || "").toLowerCase();
+            return r !== "admin" && r !== "parent";
+          });
           setAccounts(teachersOnly.map(mapAccountToTeacher));
         }
       } catch (err) {

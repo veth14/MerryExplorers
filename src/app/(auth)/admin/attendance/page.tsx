@@ -110,7 +110,10 @@ export default function AttendancePage() {
         setExemptions(attendanceJson.exemptions ?? []);
       }
       if (Array.isArray(accountsJson)) {
-        setAccounts(accountsJson.filter((a) => (a.role || "").toLowerCase() !== "admin"));
+        setAccounts(accountsJson.filter((a) => {
+          const r = (a.role || "").toLowerCase();
+          return r !== "admin" && r !== "parent";
+        }));
       }
     } catch (err) {
       console.error("Failed to fetch attendance:", err);

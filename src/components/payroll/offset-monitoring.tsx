@@ -146,11 +146,10 @@ export function OffsetMonitoring() {
       .then((r) => r.json())
       .then((data: Account[]) => {
         if (Array.isArray(data)) {
-          const eligibleAccounts = data.filter((a) =>
-            a.role !== "admin" &&
-            a.role !== "owner" &&
-            !(a.fullName && a.fullName.toLowerCase().includes("merry"))
-          );
+          const eligibleAccounts = data.filter((a) => {
+            const r = (a.role || "").toLowerCase();
+            return r !== "admin" && r !== "owner" && r !== "parent" && !(a.fullName && a.fullName.toLowerCase().includes("merry"));
+          });
           setAccounts(eligibleAccounts);
           if (eligibleAccounts.length > 0) setSelectedEmployeeId(eligibleAccounts[0].id);
         }

@@ -74,6 +74,16 @@ type ParentProfile = {
     notes: string;
     reason: string;
     submittedAt: string;
+    downpayment?: {
+      submitted: boolean;
+      paymentMethod: string;
+      receiptBase64: string;
+      referenceNumber: string;
+      amountPaid: number;
+      submittedAt: string;
+      verified: boolean;
+      rejected: boolean;
+    };
   };
 };
 
@@ -1420,6 +1430,8 @@ export default function ParentDashboardPage() {
           {/* ── RENEWAL TAB ──────────────────────────────────────────────────── */}
           {activeTab === "renewal" && (() => {
             const isDeadlinePassed = renewalSettings.renewalOpenDate ? new Date() >= new Date(renewalSettings.renewalOpenDate) : false;
+            const isDpSubmitted = dpSubmitted || !!profile.renewalStatus?.downpayment?.submitted;
+            const isDpVerified = !!profile.renewalStatus?.downpayment?.verified;
             
             const handleRenewalSubmit = async (e: React.FormEvent) => {
               e.preventDefault();
@@ -1492,20 +1504,24 @@ export default function ParentDashboardPage() {
                     {status.returning === "yes" && (
                       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                          <span style={{ fontSize: "24px" }}>{isDeadlinePassed ? "💳" : "🎟️"}</span>
+                          <span style={{ fontSize: "24px" }}>{isDpVerified ? "🎉" : isDpSubmitted ? "⏳" : isDeadlinePassed ? "💳" : "🎟️"}</span>
                           <div>
-                            <p style={{ margin: "0 0 4px", fontWeight: "800", color: isDeadlinePassed ? "#c2410c" : "#15803d" }}>
-                              {isDeadlinePassed ? "Pending Downpayment" : "Slot Secured (Free for now)"}
+                            <p style={{ margin: "0 0 4px", fontWeight: "800", color: isDpVerified ? "#15803d" : isDpSubmitted ? "#b45309" : isDeadlinePassed ? "#c2410c" : "#15803d" }}>
+                              {isDpVerified ? "Slot Confirmed!" : isDpSubmitted ? "Pending Verification" : isDeadlinePassed ? "Pending Downpayment" : "Slot Secured (Free for now)"}
                             </p>
                             <p style={{ margin: 0, fontSize: "14px", color: "#475569" }}>
-                              {isDeadlinePassed
+                              {isDpVerified
+                                ? "Your renewal downpayment has been verified. Your slot for the next adventure is fully secured!"
+                                : isDpSubmitted
+                                ? "Your downpayment is currently being verified by our team. We'll update this status once confirmed."
+                                : isDeadlinePassed
                                 ? "Your slot is currently on hold. Please submit your downpayment to finalize your renewal."
                                 : `Your slot is secured! A downpayment will be required on ${renewalSettings.renewalOpenDate ? new Date(renewalSettings.renewalOpenDate).toLocaleDateString() : "the deadline"}.`}
                             </p>
                           </div>
                         </div>
 
-                        {!dpSubmitted && (
+                        {!isDpSubmitted && (
                           <div style={{ marginTop: "8px", border: "1.5px solid #e2e8f0", borderRadius: "16px", overflow: "hidden" }}>
                             <div style={{ background: "linear-gradient(135deg,#002f76,#0050d5)", padding: "14px 20px", color: "white" }}>
                               <div style={{ fontWeight: "800", fontSize: "14px", letterSpacing: "0.3px" }}>💳 Submit Downpayment</div>

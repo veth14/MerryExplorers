@@ -18,6 +18,7 @@ export async function GET() {
           program: programId,
           classTime: cls.name,
           status: { $in: ["pending", "approved"] },
+          "parentInfo.name": { $not: /ian angelo valmores/i },
         });
         result[programId][cls.name] = {
           maxSlots: cls.maxSlots,
