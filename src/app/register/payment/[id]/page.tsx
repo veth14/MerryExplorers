@@ -5,12 +5,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { m, AnimatePresence } from "framer-motion";
-import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
+import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
-import { NAV_LINKS } from "@/data/landing";
 import Tesseract from "tesseract.js";
 
 type ProgramId = keyof typeof PROGRAM_SLOTS;
+
+type RegData = {
+  status: string;
+  program: ProgramId;
+  reservedUntil: string;
+  paymentDeadline?: string;
+};
 
 const inputCls =
   "w-full bg-[#f8fafc] border-2 border-transparent rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-[#002f76] placeholder:text-[#94a3b8] placeholder:font-medium focus:outline-none focus:border-[#0033A0]/30 focus:bg-white transition-all";
@@ -26,7 +32,7 @@ export default function PaymentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const [regData, setRegData] = useState<{ status: string; program: ProgramId; reservedUntil: string } | null>(null);
+  const [regData, setRegData] = useState<RegData | null>(null);
 
   const [paymentMethod, setPaymentMethod] = useState("");
   const [receiptPreview, setReceiptPreview] = useState("");
@@ -41,6 +47,7 @@ export default function PaymentPage() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrDone, setOcrDone] = useState(false);
+  const [timeLeft, setTimeLeft] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,7 +59,7 @@ export default function PaymentPage() {
         .then((data) => {
           if (data.success) {
             setRegData(data.data);
-            if (data.data.status !== "reserved") {
+            if (data.data.status !== "reserved" && data.data.status !== "early-bird") {
               setError(
                 data.data.status === "expired"
                   ? "Your slot reservation has expired."
@@ -68,6 +75,28 @@ export default function PaymentPage() {
     }
   }, [id]);
 
+  // Reservation countdown
+  useEffect(() => {
+    if (!regData?.reservedUntil || regData.status !== "reserved") return;
+    const tick = () => {
+      const remaining = new Date(regData.reservedUntil).getTime() - Date.now();
+      if (remaining <= 0) {
+        setTimeLeft("00:00");
+        setError("Your slot reservation has expired.");
+        return true;
+      }
+      const mins = Math.floor(remaining / 1000 / 60);
+      const secs = Math.floor((remaining / 1000) % 60);
+      setTimeLeft(`${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`);
+      return false;
+    };
+    if (tick()) return;
+    const interval = setInterval(() => {
+      if (tick()) clearInterval(interval);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [regData]);
+
   const prog = regData ? PROGRAM_SLOTS[regData.program] : null;
 
   const isBallet = regData?.program === "ballet";
@@ -79,15 +108,14 @@ export default function PaymentPage() {
       : (welcomeKitOrdered ? UNIFORM_KIT.welcomeKitPrice : 0) +
       (uniformOrdered ? UNIFORM_KIT.price : 0) +
       (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0));
-      
+
   const amountDue = prog
     ? (paymentType === "full" ? prog.rate : prog.downpayment) + addonCost
     : 0;
-    
+
   const parsedAmountPaid = parseFloat(amountPaid.replace(/,/g, "")) || 0;
   const creditBalance = parsedAmountPaid > 0 && parsedAmountPaid > amountDue ? +(parsedAmountPaid - amountDue).toFixed(2) : 0;
   const amountShort = parsedAmountPaid > 0 && parsedAmountPaid < amountDue ? +(amountDue - parsedAmountPaid).toFixed(2) : 0;
-  const amountExact = parsedAmountPaid > 0 && parsedAmountPaid === amountDue;
 
   const runOCR = useCallback(async (imageDataUrl: string) => {
     setOcrLoading(true);
@@ -101,7 +129,7 @@ export default function PaymentPage() {
         /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i,
         /\b(\d{13})\b/,
         /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i,
-        /\b(\d{10,20})\b/
+        /\b(\d{10,20})\b/,
       ];
 
       let extractedRef = "";
@@ -122,20 +150,25 @@ export default function PaymentPage() {
     }
   }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setReceiptPreview(result);
-      setReceiptBase64(result);
-      setReferenceNumber("");
-      setOcrDone(false);
-      runOCR(result);
-    };
-    reader.readAsDataURL(file);
-  }, [runOCR]);
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setReceiptPreview(result);
+        setReceiptBase64(result);
+        setReferenceNumber("");
+        setOcrDone(false);
+        runOCR(result);
+      };
+      reader.readAsDataURL(file);
+      // allow re-selecting the same file after removing it
+      e.target.value = "";
+    },
+    [runOCR]
+  );
 
   const canProceed = paymentMethod !== "" && receiptBase64 !== "" && amountPaid !== "" && amountShort === 0;
 
@@ -174,26 +207,11 @@ export default function PaymentPage() {
     }
   }
 
-  // Time remaining calculator
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    if (!regData?.reservedUntil || regData.status !== "reserved") return;
-    const interval = setInterval(() => {
-      const remaining = new Date(regData.reservedUntil).getTime() - Date.now();
-      if (remaining <= 0) {
-        setTimeLeft("00:00");
-        setError("Your slot reservation has expired.");
-        clearInterval(interval);
-      } else {
-        const m = Math.floor((remaining / 1000 / 60) % 60);
-        const s = Math.floor((remaining / 1000) % 60);
-        setTimeLeft(`${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [regData]);
-
   if (!mounted) return null;
+
+  const isExpired = timeLeft === "00:00";
+  const showErrorScreen =
+    !!error && (!regData || regData.status !== "reserved" || isExpired);
 
   return (
     <div className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
@@ -240,16 +258,40 @@ export default function PaymentPage() {
                 </Link>
               </div>
             </m.div>
-          ) : error && (!regData || regData.status !== "reserved") ? (
+          ) : regData?.status === "early-bird" ? (
+            <m.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-3xl bg-white p-10 shadow-[0_8px_40px_rgba(234,88,12,0.1)] text-center border-t-8 border-orange-500 relative overflow-hidden">
+              <div aria-hidden className="absolute -top-20 -right-20 w-40 h-40 bg-orange-400 rounded-full blur-[80px] opacity-20 pointer-events-none"></div>
+              <span className="text-6xl mb-6 block drop-shadow-sm">🐣</span>
+              <h2 className="font-headline text-[32px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-amber-500 mb-3 tracking-tight">Slot Secured!</h2>
+              <div className="text-[16px] font-medium text-[#64748b] mb-8 max-w-[400px] mx-auto leading-relaxed">
+                <p>
+                  You are registered as an <strong className="text-orange-600">Early Bird</strong>! Your slot is guaranteed and no payment is required right now.
+                </p>
+                {regData.paymentDeadline && (
+                  <span className="block mt-3 px-4 py-2 bg-orange-50 rounded-xl text-orange-700 font-bold border border-orange-100 text-[14px]">
+                    Payment is due by {new Date(regData.paymentDeadline).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
+                  </span>
+                )}
+                <span className="block mt-4 text-[14px]">We will send you an email reminder when it&apos;s time to open your payment portal!</span>
+              </div>
+              <div className="mt-8 flex justify-center">
+                <Link href="/" className="rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-orange-500/25 hover:from-orange-600 hover:to-amber-600 transition-colors">
+                  Back to Home
+                </Link>
+              </div>
+            </m.div>
+          ) : showErrorScreen || !prog ? (
             <div className="rounded-3xl bg-white p-8 shadow-xl text-center">
               <span className="text-4xl mb-4 block">⚠️</span>
-              <h2 className="font-headline text-[24px] font-extrabold text-red-600 mb-2">{error}</h2>
+              <h2 className="font-headline text-[24px] font-extrabold text-red-600 mb-2">
+                {error || "We couldn't find this registration."}
+              </h2>
               <p className="text-[#64748b] mb-6">If you believe this is a mistake, please contact us.</p>
               <Link href="/" className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50">Back to Home</Link>
             </div>
           ) : (
             <m.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white">
-              
+
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-100 pb-4">
                 <div>
                   <h2 className="font-headline text-[24px] font-extrabold text-[#002f76]">Secure Your Slot</h2>
@@ -279,7 +321,7 @@ export default function PaymentPage() {
                   >
                     <span className="text-2xl">💳</span>
                     <p className="text-[14px] font-extrabold text-[#002f76]">Downpayment</p>
-                    <p className="text-[18px] font-extrabold text-[#0033A0]">₱{(prog!.downpayment + addonCost).toLocaleString()}</p>
+                    <p className="text-[18px] font-extrabold text-[#0033A0]">₱{(prog.downpayment + addonCost).toLocaleString()}</p>
                     {paymentType === "downpayment" && <span className="mt-1 inline-flex rounded-full bg-[#0033A0] px-3 py-0.5 text-[10px] font-bold text-white">✓ Selected</span>}
                   </button>
                   <button
@@ -291,7 +333,7 @@ export default function PaymentPage() {
                   >
                     <span className="text-2xl">🏆</span>
                     <p className="text-[14px] font-extrabold text-[#002f76]">Full Payment</p>
-                    <p className="text-[18px] font-extrabold text-green-600">₱{(prog!.rate + addonCost).toLocaleString()}</p>
+                    <p className="text-[18px] font-extrabold text-green-600">₱{(prog.rate + addonCost).toLocaleString()}</p>
                     {paymentType === "full" && <span className="mt-1 inline-flex rounded-full bg-green-500 px-3 py-0.5 text-[10px] font-bold text-white">✓ Selected</span>}
                   </button>
                 </div>
@@ -304,7 +346,7 @@ export default function PaymentPage() {
                 <div className="mt-4 space-y-1.5 bg-white/10 rounded-2xl px-4 py-3 text-[13px]">
                   <div className="flex justify-between">
                     <span className="opacity-80">{paymentType === "full" ? "Program Rate" : "Downpayment"}</span>
-                    <span className="font-bold">₱{(paymentType === "full" ? prog!.rate : prog!.downpayment).toLocaleString()}</span>
+                    <span className="font-bold">₱{(paymentType === "full" ? prog.rate : prog.downpayment).toLocaleString()}</span>
                   </div>
                   {isBallet && recitalKitOrdered && (
                     <div className="flex justify-between">
@@ -336,9 +378,9 @@ export default function PaymentPage() {
                 <h3 className="mb-4 font-headline text-[16px] font-extrabold text-[#0033A0]">Select Payment Method</h3>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    { id: "gcash", label: "GCash", logo: "/gcash-logo.svg", qr: "/GCASHQRONLY.png" },
-                    { id: "bpi", label: "BPI", logo: "/bpi-logo.svg", qr: "/BPIQRONLY.png" },
-                    { id: "mari-bank", label: "Mari Bank", logo: "/maribank-logo.svg", qr: "/MARIBANKQRONLY.png" },
+                    { id: "gcash", label: "GCash", logo: "/gcash-logo.svg" },
+                    { id: "bpi", label: "BPI", logo: "/bpi-logo.svg" },
+                    { id: "mari-bank", label: "Mari Bank", logo: "/maribank-logo.svg" },
                   ].map((method) => (
                     <button
                       key={method.id}
@@ -356,14 +398,14 @@ export default function PaymentPage() {
                       { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
                       { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
                       { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
-                    ].filter(m => m.id === paymentMethod).map(m => (
-                      <div key={m.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center text-center gap-5">
+                    ].filter((pm) => pm.id === paymentMethod).map((pm) => (
+                      <div key={pm.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center text-center gap-5">
                         <div className="relative w-full max-w-[320px] aspect-square rounded-2xl border-2 bg-white shadow-md">
-                          <Image src={m.qr} alt="QR" fill className="object-contain p-4" />
+                          <Image src={pm.qr} alt="QR" fill className="object-contain p-4" />
                         </div>
                         <div className="max-w-sm">
-                          <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {m.label}</p>
-                          <a href={m.qr} download={`${m.label}QR.png`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0033A0]/10 px-4 py-2 text-[12px] font-bold text-[#0033A0] mb-3">⬇️ Download QR Code</a>
+                          <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {pm.label}</p>
+                          <a href={pm.qr} download={`${pm.label}QR.png`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0033A0]/10 px-4 py-2 text-[12px] font-bold text-[#0033A0] mb-3">⬇️ Download QR Code</a>
                           <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱{amountDue.toLocaleString()}</strong>. Then upload the screenshot below.</p>
                         </div>
                       </div>
@@ -378,7 +420,7 @@ export default function PaymentPage() {
                   <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">🩰 Recital Kit (Optional Preorder)</h3>
                   <p className="mb-4 text-[13px] text-[#64748b]">Recital kit preorder starts on October 3. Inclusive of 2 guest passes, 1 mini bouquet, and 1 set of costume. Recital kit is required to participate in the group themed performance.</p>
                   <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 ${recitalKitOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"}`}>
-                    <input type="checkbox" checked={recitalKitOrdered} onChange={e => setRecitalKitOrdered(e.target.checked)} className="mt-1" />
+                    <input type="checkbox" checked={recitalKitOrdered} onChange={(e) => setRecitalKitOrdered(e.target.checked)} className="mt-1" />
                     <div>
                       <p className="text-[14px] font-bold text-[#002f76]">Include Recital Kit — ₱1,500</p>
                       <p className="text-[12px] text-[#64748b]">Added to your total due today.</p>
@@ -390,7 +432,15 @@ export default function PaymentPage() {
                   <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">👕 Uniform & Add-ons</h3>
                   <p className="mb-4 text-[13px] text-[#64748b]">{UNIFORM_KIT.note}</p>
                   <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 mb-4 ${isNewFamily ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"}`}>
-                    <input type="checkbox" checked={isNewFamily} onChange={e => { setIsNewFamily(e.target.checked); if(e.target.checked) setUniformOrdered(false); }} className="mt-0.5" />
+                    <input
+                      type="checkbox"
+                      checked={isNewFamily}
+                      onChange={(e) => {
+                        setIsNewFamily(e.target.checked);
+                        if (e.target.checked) setUniformOrdered(false);
+                      }}
+                      className="mt-0.5"
+                    />
                     <div>
                       <p className="text-[14px] font-bold text-[#002f76]">We are a New Family</p>
                       <p className="text-[12px] text-[#64748b]">Welcome Kit (₱{UNIFORM_KIT.welcomeKitPrice}) is required.</p>
@@ -398,7 +448,7 @@ export default function PaymentPage() {
                   </label>
                   {!isNewFamily && (
                     <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 ${uniformOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"}`}>
-                      <input type="checkbox" checked={uniformOrdered} onChange={e => setUniformOrdered(e.target.checked)} className="mt-1" />
+                      <input type="checkbox" checked={uniformOrdered} onChange={(e) => setUniformOrdered(e.target.checked)} className="mt-1" />
                       <div><p className="text-[14px] font-bold text-[#002f76]">Uniform Set only — ₱{UNIFORM_KIT.price.toLocaleString()}</p></div>
                     </label>
                   )}
@@ -412,19 +462,33 @@ export default function PaymentPage() {
                 {receiptPreview ? (
                   <div className="relative">
                     <div className="relative aspect-[4/3] w-full max-w-sm mx-auto rounded-2xl border border-slate-200 overflow-hidden"><Image src={receiptPreview} alt="Preview" fill className="object-contain" /></div>
-                    <button onClick={() => { setReceiptPreview(""); setReceiptBase64(""); }} className="mt-3 text-[13px] text-red-500">Remove</button>
+                    <button
+                      onClick={() => {
+                        setReceiptPreview("");
+                        setReceiptBase64("");
+                        setReferenceNumber("");
+                        setOcrDone(false);
+                      }}
+                      className="mt-3 text-[13px] text-red-500"
+                    >
+                      Remove
+                    </button>
                   </div>
                 ) : (
                   <button onClick={() => fileInputRef.current?.click()} className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 px-6 text-center hover:bg-[#f0f5ff]"><span className="text-4xl">📸</span><p className="text-[14px] font-bold text-[#002f76]">Upload receipt</p></button>
                 )}
-                
+
                 {receiptBase64 && (
                   <div className="mt-5 border-t border-slate-100 pt-5">
                     <label className={labelCls}>Reference Number</label>
-                    <input className={inputCls} value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} />
-                    
+                    <input className={inputCls} value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
+                    {ocrLoading && <p className="text-[12px] text-[#64748b] mt-1 animate-pulse">Reading receipt…</p>}
+                    {ocrDone && !ocrLoading && !referenceNumber && (
+                      <p className="text-[12px] text-[#64748b] mt-1">Couldn&apos;t detect the reference number — please enter it manually.</p>
+                    )}
+
                     <label className={`${labelCls} mt-4`}>Amount Sent</label>
-                    <input className={inputCls} value={amountPaid} onChange={e => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} />
+                    <input className={inputCls} value={amountPaid} onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} />
                     {amountShort > 0 && <p className="text-red-500 text-[12px] mt-1 font-bold">Short by ₱{amountShort.toLocaleString()}</p>}
                   </div>
                 )}

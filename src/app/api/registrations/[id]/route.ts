@@ -30,6 +30,8 @@ export async function GET(
       program: registration.program,
       classTime: registration.classTime,
       reservedUntil: registration.reservedUntil,
+      paymentDeadline: registration.paymentDeadline || null,
+      earlyBirdBy: registration.earlyBirdBy || null,
     };
 
     return NextResponse.json({ success: true, data: publicData });

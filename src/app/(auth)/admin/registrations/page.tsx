@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 
-type Status = "pending" | "approved" | "rejected";
+type Status = "pending" | "approved" | "rejected" | "early-bird";
 
 interface Registration {
   id: string;
@@ -32,6 +32,11 @@ interface Registration {
   approvedBy?: string;
   rejectionReason?: string;
   confirmationEmailSent?: boolean;
+  earlyBirdAt?: string;
+  earlyBirdBy?: string;
+  paymentDeadline?: string;
+  paymentPortalOpen?: boolean;
+  paymentPortalOpenedAt?: string;
 }
 
 const PROGRAM_NAMES: Record<string, string> = {
@@ -54,15 +59,17 @@ const STATUS_STYLES: Record<Status, string> = {
   pending: "bg-amber-100 text-amber-700",
   approved: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-600",
+  "early-bird": "bg-orange-100 text-orange-700",
 };
 
 const STATUS_LABELS: Record<Status, string> = {
   pending: "⏳ Pending",
   approved: "✅ Approved",
   rejected: "❌ Rejected",
+  "early-bird": "🐣 Early Bird",
 };
 
-type FilterTab = "all" | Status;
+type FilterTab = "all" | Status | "reserved";
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "blue" | "red" }) {
@@ -91,17 +98,24 @@ function SectionCard({ emoji, title, children }: { emoji: string; title: string;
 }
 
 function DetailModal({
-  reg, onClose, onApprove, onReject, isProcessing,
+  reg, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, isProcessing,
 }: {
   reg: Registration;
   onClose: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
+  onEarlyBird: (id: string, deadline: string) => void;
+  onOpenPayment: (id: string) => void;
   isProcessing: boolean;
 }) {
   const [rejectMode, setRejectMode] = useState(false);
+  const [earlyBirdMode, setEarlyBirdMode] = useState(false);
   const [reason, setReason] = useState("");
+  const [earlyBirdDeadline, setEarlyBirdDeadline] = useState("");
   const accent = PROGRAM_ACCENTS[reg.program] || "#0033A0";
+  const isEarlyBird = reg.status === "early-bird";
+  const isPending = reg.status === "pending";
+  const isReserved = (reg as any).status === "reserved" || (reg as any).status === "expired";
   
   // Calculate true remaining balance for the whole program
   const programDetails = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
@@ -272,25 +286,89 @@ function DetailModal({
           </div>
 
           {/* ── Sticky action bar ── */}
-          {reg.status === "pending" && (
+          {(isPending || isEarlyBird || isReserved) && (
             <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              {!rejectMode ? (
-                <div className="flex gap-3">
+
+              {/* Early Bird info banner */}
+              {isEarlyBird && (
+                <div className="mb-3 flex items-start gap-3 rounded-2xl bg-orange-50 border border-orange-200 px-4 py-3">
+                  <span className="text-lg shrink-0">🐣</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-extrabold text-orange-700">Early Bird — Slot Secured</p>
+                    <p className="text-[11px] text-orange-600 mt-0.5">
+                      {reg.paymentDeadline
+                        ? `Payment due by ${new Date(reg.paymentDeadline).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`
+                        : "No payment deadline set yet"}
+                    </p>
+                  </div>
                   <button
-                    onClick={() => setRejectMode(true)}
+                    onClick={() => onOpenPayment(reg.id)}
                     disabled={isProcessing}
-                    className="flex-1 rounded-2xl border-2 border-red-200 bg-red-50 py-4 text-[14px] font-bold text-red-600 hover:bg-red-100 active:scale-[0.98] transition-all disabled:opacity-40"
+                    className="shrink-0 rounded-xl bg-orange-500 px-3 py-2 text-[12px] font-bold text-white hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-40"
                   >
-                    ✕ Reject
+                    {isProcessing ? "…" : "Open Payment"}
                   </button>
-                  <button
-                    onClick={() => onApprove(reg.id)}
-                    disabled={isProcessing}
-                    className="flex-[2] rounded-2xl py-4 text-[14px] font-bold text-white active:scale-[0.98] transition-all disabled:opacity-40 shadow-lg"
-                    style={{ background: `linear-gradient(135deg, #22c55e, #16a34a)`, boxShadow: "0 8px 24px rgba(34,197,94,0.3)" }}
-                  >
-                    {isProcessing ? "Processing…" : "✅ Approve & Send Email"}
-                  </button>
+                </div>
+              )}
+
+              {!rejectMode && !earlyBirdMode ? (
+                <div className="space-y-2">
+                  {isPending && (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setRejectMode(true)}
+                        disabled={isProcessing}
+                        className="flex-1 rounded-2xl border-2 border-red-200 bg-red-50 py-4 text-[14px] font-bold text-red-600 hover:bg-red-100 active:scale-[0.98] transition-all disabled:opacity-40"
+                      >
+                        ✕ Reject
+                      </button>
+                      <button
+                        onClick={() => onApprove(reg.id)}
+                        disabled={isProcessing}
+                        className="flex-[2] rounded-2xl py-4 text-[14px] font-bold text-white active:scale-[0.98] transition-all disabled:opacity-40 shadow-lg"
+                        style={{ background: `linear-gradient(135deg, #22c55e, #16a34a)`, boxShadow: "0 8px 24px rgba(34,197,94,0.3)" }}
+                      >
+                        {isProcessing ? "Processing…" : "✅ Approve & Send Email"}
+                      </button>
+                    </div>
+                  )}
+                  {(isPending || isReserved) && !isEarlyBird && (
+                    <button
+                      onClick={() => setEarlyBirdMode(true)}
+                      disabled={isProcessing}
+                      className="w-full rounded-2xl border-2 border-orange-200 bg-orange-50 py-3 text-[13px] font-bold text-orange-700 hover:bg-orange-100 active:scale-[0.98] transition-all disabled:opacity-40"
+                    >
+                      🐣 Mark as Early Bird (Secure Slot, Defer Payment)
+                    </button>
+                  )}
+                </div>
+              ) : earlyBirdMode ? (
+                <div className="space-y-3">
+                  <p className="text-[13px] font-bold text-[#334155]">Set payment deadline <span className="font-normal text-[#94a3b8]">(optional)</span></p>
+                  <p className="text-[12px] text-[#64748b]">The slot will be secured. You can open the payment portal any time before this date.</p>
+                  <input
+                    type="date"
+                    className="w-full rounded-2xl bg-[#f8fafc] border-2 border-slate-200 px-4 py-3 text-[13px] font-medium text-[#334155] focus:outline-none focus:border-orange-400 focus:bg-white transition-all"
+                    value={earlyBirdDeadline}
+                    onChange={e => setEarlyBirdDeadline(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setEarlyBirdMode(false)}
+                      className="flex-1 rounded-2xl border-2 border-slate-200 py-3.5 text-[13px] font-bold text-[#64748b] hover:bg-slate-50 active:scale-[0.98] transition-all"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={() => onEarlyBird(reg.id, earlyBirdDeadline)}
+                      disabled={isProcessing}
+                      className="flex-1 rounded-2xl py-3.5 text-[13px] font-bold text-white active:scale-[0.98] transition-all disabled:opacity-40 shadow-lg"
+                      style={{ background: "linear-gradient(135deg, #f97316, #ea580c)", boxShadow: "0 8px 24px rgba(249,115,22,0.3)" }}
+                    >
+                      {isProcessing ? "Saving…" : "🐣 Confirm Early Bird"}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -397,15 +475,57 @@ export default function AdminRegistrationsPage() {
     finally { setIsProcessing(false); }
   }
 
+  async function handleEarlyBird(id: string, deadline: string) {
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/registrations/${id}/early-bird`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentDeadline: deadline || undefined, actorName: userProfile?.fullName || user?.email }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToast("🐣 Marked as Early Bird! Slot secured.");
+        setSelected(null);
+        fetchRegistrations();
+      } else {
+        setToast(`❌ ${data.error}`);
+      }
+    } catch { setToast("❌ Network error"); }
+    finally { setIsProcessing(false); }
+  }
+
+  async function handleOpenPayment(id: string) {
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/registrations/${id}/open-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorName: userProfile?.fullName || user?.email, sendEmail: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToast(data.emailSent ? "✅ Payment portal opened! Reminder email sent." : "✅ Payment portal opened! (Email failed)");
+        setSelected(null);
+        fetchRegistrations();
+      } else {
+        setToast(`❌ ${data.error}`);
+      }
+    } catch { setToast("❌ Network error"); }
+    finally { setIsProcessing(false); }
+  }
+
   const counts = {
     all: registrations.length,
     pending: registrations.filter(r => r.status === "pending").length,
     approved: registrations.filter(r => r.status === "approved").length,
     rejected: registrations.filter(r => r.status === "rejected").length,
+    "early-bird": registrations.filter(r => r.status === "early-bird").length,
   };
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "pending", label: `Pending (${counts.pending})` },
+    { key: "early-bird", label: `🐣 Early Bird (${counts["early-bird"]})` },
     { key: "approved", label: `Approved (${counts.approved})` },
     { key: "rejected", label: `Rejected (${counts.rejected})` },
     { key: "all", label: `All (${counts.all})` },
@@ -567,6 +687,8 @@ export default function AdminRegistrationsPage() {
           onClose={() => setSelected(null)}
           onApprove={handleApprove}
           onReject={handleReject}
+          onEarlyBird={handleEarlyBird}
+          onOpenPayment={handleOpenPayment}
           isProcessing={isProcessing}
         />
       )}
