@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     } = data;
 
     // Validate required fields
-    if (!program || !classTime || !parentInfo?.email || !parentInfo?.name || !childInfo?.firstName || !signatureBase64) {
+    if (!program || !classTime || !parentInfo?.email || !parentInfo?.name || !childInfo?.firstName || (program !== "brave-explorer" && !signatureBase64)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -76,17 +76,20 @@ export async function POST(request: Request) {
     // Upload signature to Cloudinary
     let signatureUrl = "";
     let signaturePublicId = "";
-    try {
-      const uploadResult = await cloudinary.uploader.upload(signatureBase64, {
-        folder: "merry_explorers_signatures",
-        resource_type: "image",
-      });
-      signatureUrl = uploadResult.secure_url;
-      signaturePublicId = uploadResult.public_id;
-    } catch (err: any) {
-      console.error("[registrations POST] Cloudinary signature upload failed:", err);
-      return NextResponse.json({ error: "Failed to upload signature. Please try again." }, { status: 500 });
+    if (signatureBase64) {
+      try {
+        const uploadResult = await cloudinary.uploader.upload(signatureBase64, {
+          folder: "merry_explorers_signatures",
+          resource_type: "image",
+        });
+        signatureUrl = uploadResult.secure_url;
+        signaturePublicId = uploadResult.public_id;
+      } catch (err: any) {
+        console.error("[registrations POST] Cloudinary signature upload failed:", err);
+        return NextResponse.json({ error: "Failed to upload signature. Please try again." }, { status: 500 });
+      }
     }
+
 
     const { db } = await connectToDatabase();
 

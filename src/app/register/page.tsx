@@ -801,76 +801,77 @@ export default function RegisterPage() {
                   </div>
 
                   {/* Program Waiver — modal trigger */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl transition-all ${waiverRead ? "bg-green-100" : "bg-[#0033A0]/10"}`}>
-                        {waiverRead ? "✅" : "📋"}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">Parent/Guardian Acknowledgment & Agreement</h3>
-                        <p className="text-[13px] text-[#64748b] mt-1">
-                          {waiverRead
-                            ? "You have read and accepted the program waiver."
-                            : "You must read and accept the full waiver before signing."}
-                        </p>
-                      </div>
-                    </div>
-
-                    {waiverRead ? (
-                      <div className="flex items-center gap-2 rounded-2xl bg-green-50 border border-green-200 px-4 py-3">
-                        <span className="text-green-600 font-bold text-[13px]">✓ Waiver accepted</span>
-                        <button onClick={() => setWaiverModalOpen(true)} className="ml-auto text-[12px] text-[#0033A0] hover:underline font-semibold">Re-read</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setWaiverModalOpen(true)}
-                        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0033A0] py-4 text-[14px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002f76] transition-colors"
-                      >
-                        📄 Read & Accept Waiver
-                      </button>
-                    )}
-
-                    {/* Signature — only shown after waiver is accepted */}
-                    {waiverRead && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-2">Signature over Printed Name of Parent/Guardian</p>
-                        <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-[#f8fafc] overflow-hidden">
-                          <SignatureCanvas
-                            ref={sigCanvas}
-                            penColor="#0033A0"
-                            canvasProps={{ className: "w-full", height: 160 }}
-                            onEnd={() => {
-                              if (sigCanvas.current) {
-                                setSignatureBase64(sigCanvas.current.toDataURL("image/png"));
-                              }
-                            }}
-                          />
+                  {selectedProgram !== "brave-explorer" && (
+                    <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
+                      <div className="flex items-start gap-4">
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl transition-all ${waiverRead ? "bg-green-100" : "bg-[#0033A0]/10"}`}>
+                          {waiverRead ? "✅" : "📋"}
                         </div>
-                        <div className="mt-3 flex items-center justify-between">
-                          <div className="text-[12px] text-[#64748b]">
-                            <span className="font-semibold text-[#334155]">{parentInfo.name || "Parent/Guardian Name"}</span>
-                            <span className="ml-3 text-[#94a3b8]">{new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</span>
+                        <div className="flex-1">
+                          <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">Parent/Guardian Acknowledgment & Agreement</h3>
+                          <p className="text-[13px] text-[#64748b] mt-1">
+                            {waiverRead
+                              ? "You have read and accepted the program waiver."
+                              : "You must read and accept the full waiver before signing."}
+                          </p>
+                        </div>
+                      </div>
+
+                      {waiverRead ? (
+                        <div className="flex items-center gap-2 rounded-2xl bg-green-50 border border-green-200 px-4 py-3">
+                          <span className="text-green-600 font-bold text-[13px]">✓ Waiver accepted</span>
+                          <button onClick={() => setWaiverModalOpen(true)} className="ml-auto text-[12px] text-[#0033A0] hover:underline font-semibold">Re-read</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setWaiverModalOpen(true)}
+                          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0033A0] py-4 text-[14px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002f76] transition-colors"
+                        >
+                          📄 Read & Accept Waiver
+                        </button>
+                      )}
+
+                      {/* Signature — only shown after waiver is accepted */}
+                      {waiverRead && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-2">Signature over Printed Name of Parent/Guardian</p>
+                          <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-[#f8fafc] overflow-hidden">
+                            <SignatureCanvas
+                              ref={sigCanvas}
+                              penColor="#0033A0"
+                              canvasProps={{ className: "w-full", height: 160 }}
+                              onEnd={() => {
+                                if (sigCanvas.current) {
+                                  setSignatureBase64(sigCanvas.current.toDataURL("image/png"));
+                                }
+                              }}
+                            />
                           </div>
-                          <button
-                            onClick={() => { sigCanvas.current?.clear(); setSignatureBase64(""); }}
-                            className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors"
-                          >
-                            Clear
-                          </button>
+                          <div className="mt-3 flex items-center justify-between">
+                            <div className="text-[12px] text-[#64748b]">
+                              <span className="font-semibold text-[#334155]">{parentInfo.name || "Parent/Guardian Name"}</span>
+                              <span className="ml-3 text-[#94a3b8]">{new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</span>
+                            </div>
+                            <button
+                              onClick={() => { sigCanvas.current?.clear(); setSignatureBase64(""); }}
+                              className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          {!signatureBase64 && (
+                            <p className="mt-2 text-[11px] text-amber-600 font-medium">✏️ Please sign in the box above to proceed.</p>
+                          )}
                         </div>
-                        {!signatureBase64 && (
-                          <p className="mt-2 text-[11px] text-amber-600 font-medium">✏️ Please sign in the box above to proceed.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
+                      )}
+                    </div>
+                  )}
                   <div className="mt-8 flex justify-between">
                     <button onClick={() => setStep(1)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
                       ← Back
                     </button>
                     <button
-                      disabled={!photoConsent || !waiverRead || !signatureBase64}
+                      disabled={!photoConsent || (selectedProgram !== "brave-explorer" && (!waiverRead || !signatureBase64))}
                       onClick={() => setStep(3)}
                       className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
                     >
