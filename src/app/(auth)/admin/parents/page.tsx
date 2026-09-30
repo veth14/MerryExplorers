@@ -554,6 +554,7 @@ function DownpaymentPanel({ data, onRefresh, renewalSettings }: { data: ParentAc
         body: JSON.stringify({ uid, action, adminNote: adminNote[uid] || "" }),
       });
       if (!res.ok) throw new Error("Failed");
+      invalidateCache("accounts:parents");
       onRefresh();
     } catch {
       alert("Failed to update payment. Please try again.");
