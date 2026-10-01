@@ -99,9 +99,34 @@ function fmtDate(str: string) {
   });
 }
 
+// Date + time in Manila time, e.g. "Sat, Oct 3, 11:59 PM PHT"
+function fmtExpiry(str: string) {
+  return (
+    new Date(str).toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "Asia/Manila",
+    }) + " PHT"
+  );
+}
+
 function isExpired(expiresAt: string | null) {
   if (!expiresAt) return false;
   return new Date(expiresAt) < new Date();
+}
+
+// Trailblazer = program slug "brave-explorer", or the program name says so
+function isTrailblazerProfile(profile: ParentProfile): boolean {
+  const re = /trailblazer|brave explorer/i;
+  return (
+    profile.program === "brave-explorer" ||
+    profile.studentInfo?.program === "brave-explorer" ||
+    re.test(profile.program || "") ||
+    re.test(profile.studentInfo?.programName || "")
+  );
 }
 
 function parseScheduleDays(schedule: string): number[] {
@@ -178,22 +203,22 @@ function getCompletedSessionsCount(enrolledAtStr: string | undefined, schedule: 
 
   const startDate = new Date(enrolledAtStr);
   startDate.setHours(0, 0, 0, 0);
-  
+
   const now = new Date();
   let count = 0;
   let current = new Date(startDate);
-  
+
   while (current <= now) {
     if (days.includes(current.getDay())) {
       const isToday = current.toDateString() === now.toDateString();
       if (isToday) {
-         const endOfClassToday = new Date(now);
-         endOfClassToday.setHours(endTime.hour, endTime.minute, 0, 0);
-         if (now >= endOfClassToday) {
-           count++;
-         }
+        const endOfClassToday = new Date(now);
+        endOfClassToday.setHours(endTime.hour, endTime.minute, 0, 0);
+        if (now >= endOfClassToday) {
+          count++;
+        }
       } else {
-         count++;
+        count++;
       }
     }
     current.setDate(current.getDate() + 1);
@@ -286,7 +311,7 @@ function Lightbox({ photos, startIndex, onClose }: { photos: PhotoItem[]; startI
         style={{ position: "absolute", top: "20px", right: "70px", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "white", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
         title="Download photo"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
       </button>
 
       <button
@@ -308,7 +333,7 @@ function NextSessionCountdown({ schedule, classTime }: { schedule: string; class
     const interval = setInterval(() => {
       const now = new Date();
       const diff = nextDate.getTime() - now.getTime();
-      
+
       if (diff <= 0) {
         setTimeLeft({ d: 0, h: 0, m: 0, s: 0 });
         return;
@@ -537,7 +562,7 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
 
         {/* Signature section — unlocked only after scrolling */}
         <div className="waiver-signature-box" style={{ background: "white", borderRadius: "20px", padding: "28px 32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", opacity: hasScrolled ? 1 : 0.45, pointerEvents: hasScrolled ? "auto" : "none", transition: "opacity 0.4s" }}>
-          
+
           {/* Photo Consent Checkbox */}
           <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "24px", padding: "16px", background: "#f0f5ff", borderRadius: "12px", border: "1px solid #c5d6ff" }}>
             <input type="checkbox" id="photoConsent" checked={photoConsent} onChange={e => setPhotoConsent(e.target.checked)} style={{ marginTop: "4px", width: "20px", height: "20px", cursor: "pointer", accentColor: "#0050d5" }} />
@@ -637,7 +662,7 @@ export default function ParentDashboardPage() {
   const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
   // We also cache the full per-program list so we can resolve after profile loads
   const [allRenewalPrograms, setAllRenewalPrograms] = useState<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null; renewalOpen: boolean; renewalOpenDate: string | null; virtualLink?: string; virtualLinkOpen?: boolean }[]>([]);
-  
+
   // Inline Renewal Form State
   const [showRenewalForm, setShowRenewalForm] = useState(false);
   const [renewalForm, setRenewalForm] = useState({ returning: "yes", notes: "", reason: "", agreed: false });
@@ -670,7 +695,7 @@ export default function ParentDashboardPage() {
           setAllRenewalPrograms(d.programs);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [user, authLoading, router]);
 
   // Once both profile and allRenewalPrograms are loaded, resolve the right program entry
@@ -736,6 +761,7 @@ export default function ParentDashboardPage() {
 
   const recentAlbum = profile.albums[0] ?? null;
   const waiverSigned = !!profile.waiverSignature;
+  const isTrailblazer = isTrailblazerProfile(profile);
 
   // ─── Tabs ─────────────────────────────────────────────────────────────────
 
@@ -996,7 +1022,7 @@ export default function ParentDashboardPage() {
             </div>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
               <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
-                {profile.albums.reduce((sum, a) => sum + a.photoCount, 0)}
+                {profile.albums.filter((a) => !isExpired(a.expiresAt)).reduce((sum, a) => sum + a.photoCount, 0)}
               </div>
               <div style={{ fontSize: "11px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Photos</div>
             </div>
@@ -1119,7 +1145,7 @@ export default function ParentDashboardPage() {
                         </span>
                         {recentAlbum.expiresAt && !isExpired(recentAlbum.expiresAt) && (
                           <span style={{ padding: "5px 14px", background: "#fff8e1", color: "#b45309", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #fde68a" }}>
-                            ⏰ Expires {fmtDate(recentAlbum.expiresAt)}
+                            ⏰ Expires {fmtExpiry(recentAlbum.expiresAt)}
                           </span>
                         )}
                         {recentAlbum.expiresAt && isExpired(recentAlbum.expiresAt) && (
@@ -1128,14 +1154,16 @@ export default function ParentDashboardPage() {
                           </span>
                         )}
                       </div>
-                      <button
-                        onClick={() => { setActiveTab("photos"); setExpandedAlbum(recentAlbum.id); }}
-                        style={{ padding: "12px 20px", background: "linear-gradient(135deg,#002f76,#0050d5)", color: "white", border: "none", borderRadius: "12px", fontWeight: "700", fontSize: "13px", cursor: "pointer", width: "100%", boxShadow: "0 4px 16px rgba(0,47,118,0.25)", transition: "all 0.2s" }}
-                        onMouseOver={e => (e.currentTarget.style.transform = "translateY(-1px)")}
-                        onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}
-                      >
-                        View Session Photos →
-                      </button>
+                      {!isExpired(recentAlbum.expiresAt) && (
+                        <button
+                          onClick={() => { setActiveTab("photos"); setExpandedAlbum(recentAlbum.id); }}
+                          style={{ padding: "12px 20px", background: "linear-gradient(135deg,#002f76,#0050d5)", color: "white", border: "none", borderRadius: "12px", fontWeight: "700", fontSize: "13px", cursor: "pointer", width: "100%", boxShadow: "0 4px 16px rgba(0,47,118,0.25)", transition: "all 0.2s" }}
+                          onMouseOver={e => (e.currentTarget.style.transform = "translateY(-1px)")}
+                          onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}
+                        >
+                          View Session Photos →
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div style={{ textAlign: "center", padding: "32px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
@@ -1241,18 +1269,23 @@ export default function ParentDashboardPage() {
               ) : (
                 <div style={{ display: "grid", gap: "20px" }}>
                   {profile.albums.map((album) => {
-                    const expanded = expandedAlbum === album.id;
                     const expired = isExpired(album.expiresAt);
+                    // Expired albums can never be opened
+                    const expanded = expandedAlbum === album.id && !expired;
                     return (
                       <div
                         key={album.id}
                         id={`album-${album.id}`}
-                        style={{ background: "white", borderRadius: "20px", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}
+                        style={{ background: "white", borderRadius: "20px", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", opacity: expired ? 0.7 : 1 }}
                       >
                         {/* Album header */}
                         <button
-                          onClick={() => setExpandedAlbum(expanded ? null : album.id)}
-                          style={{ width: "100%", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+                          onClick={() => {
+                            if (expired) return;
+                            setExpandedAlbum(expanded ? null : album.id);
+                          }}
+                          disabled={expired}
+                          style={{ width: "100%", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", cursor: expired ? "default" : "pointer", textAlign: "left" }}
                         >
                           <div>
                             <div style={{ fontWeight: "800", color: "#002f76", fontSize: "15px", marginBottom: "4px" }}>{album.sessionLabel}</div>
@@ -1264,13 +1297,22 @@ export default function ParentDashboardPage() {
                                 <span style={{ fontSize: "12px", fontWeight: "600", color: "#ba1a1a", background: "#fff0f0", padding: "3px 10px", borderRadius: "20px", border: "1px solid #ffd5d5" }}>Expired</span>
                               ) : album.expiresAt ? (
                                 <span style={{ fontSize: "12px", fontWeight: "600", color: "#b45309", background: "#fffbeb", padding: "3px 10px", borderRadius: "20px", border: "1px solid #fde68a" }}>
-                                  ⏰ Until {fmtDate(album.expiresAt)}
+                                  ⏰ Until {fmtExpiry(album.expiresAt)}
                                 </span>
                               ) : null}
                             </div>
                           </div>
-                          <span style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>{expanded ? "▲" : "▼"}</span>
+                          {!expired && (
+                            <span style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>{expanded ? "▲" : "▼"}</span>
+                          )}
                         </button>
+
+                        {/* Expired message */}
+                        {expired && (
+                          <p style={{ color: "#94a3b8", fontSize: "13px", fontWeight: "600", textAlign: "center", padding: "0 24px 20px", margin: 0 }}>
+                            This album has expired and the photos are no longer available.
+                          </p>
+                        )}
 
                         {/* Album photos grid */}
                         {expanded && (
@@ -1305,6 +1347,21 @@ export default function ParentDashboardPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Trailblazer disclaimer (bottom of the tab) */}
+              {isTrailblazer && (
+                <div style={{ background: "#f0f6ff", border: "1.5px solid #bfdbfe", borderRadius: "16px", padding: "14px 18px", marginTop: "20px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                  <span style={{ fontSize: "20px", flexShrink: 0 }}>📌</span>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: "800", color: "#0033A0", marginBottom: "2px" }}>About Trailblazer photos</div>
+                    <p style={{ margin: 0, fontSize: "13px", color: "#334155", lineHeight: "1.6", fontWeight: "500" }}>
+                      Photos for Trailblazer are shared every <strong>Thursday and Friday</strong>. Photos from{" "}
+                      <strong>Monday to Wednesday</strong> sessions are posted in the <strong>weekly highlights</strong> instead.
+                      Albums are removed every <strong>Saturday at 11:59 PM</strong>, so please save any photos you love before then.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -1455,7 +1512,7 @@ export default function ParentDashboardPage() {
                                 <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>photos</div>
                               </div>
                             </div>
-                            {album.photoCount > 0 && (
+                            {album.photoCount > 0 && !isExpired(album.expiresAt) && (
                               <button
                                 onClick={() => { setActiveTab("photos"); setExpandedAlbum(album.id); }}
                                 style={{ marginTop: "12px", padding: "7px 16px", background: "transparent", border: "1.5px solid #c5d6ff", color: "#0050d5", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
@@ -1479,54 +1536,54 @@ export default function ParentDashboardPage() {
               const programSetting = allRenewalPrograms?.find((p: any) => p.programKey === profile.program);
               const activeLink = profile.virtualSessionLink || (programSetting?.virtualLinkOpen ? programSetting?.virtualLink : null);
 
-            return (
-              <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
-                {activeLink ? (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#e0e7ff,#c7d2fe)", padding: "20px", borderRadius: "16px", border: "1px solid #a5b4fc" }}>
-                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: "0 4px 12px rgba(79,70,229,0.4)" }}>
-                      🖥️
+              return (
+                <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+                  {activeLink ? (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#e0e7ff,#c7d2fe)", padding: "20px", borderRadius: "16px", border: "1px solid #a5b4fc" }}>
+                        <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: "0 4px 12px rgba(79,70,229,0.4)" }}>
+                          🖥️
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: "800", fontSize: "18px", color: "#312e81" }}>Virtual Session Link Available</div>
+                          <div style={{ fontSize: "14px", color: "#4338ca", fontWeight: "600", marginTop: "4px" }}>Click the button below to join the online session</div>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
+                        <div style={{ fontSize: "40px", marginBottom: "16px", animation: "bounce 2s infinite" }}>🎥</div>
+                        <a
+                          href={activeLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-block",
+                            padding: "16px 32px",
+                            background: "linear-gradient(135deg,#002f76,#0050d5)",
+                            color: "white",
+                            borderRadius: "14px",
+                            fontSize: "16px",
+                            fontWeight: "800",
+                            textDecoration: "none",
+                            boxShadow: "0 8px 24px rgba(0,47,118,0.3)",
+                            transition: "all 0.2s"
+                          }}
+                          onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                          onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
+                        >
+                          Join Virtual Class Now
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                      <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>📴</div>
+                      <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>No Virtual Session Link</h3>
+                      <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Your teacher hasn't posted a virtual session link for your class yet.</p>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: "800", fontSize: "18px", color: "#312e81" }}>Virtual Session Link Available</div>
-                      <div style={{ fontSize: "14px", color: "#4338ca", fontWeight: "600", marginTop: "4px" }}>Click the button below to join the online session</div>
-                    </div>
-                  </div>
-                  
-                  <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
-                    <div style={{ fontSize: "40px", marginBottom: "16px", animation: "bounce 2s infinite" }}>🎥</div>
-                    <a
-                      href={activeLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "inline-block",
-                        padding: "16px 32px",
-                        background: "linear-gradient(135deg,#002f76,#0050d5)",
-                        color: "white",
-                        borderRadius: "14px",
-                        fontSize: "16px",
-                        fontWeight: "800",
-                        textDecoration: "none",
-                        boxShadow: "0 8px 24px rgba(0,47,118,0.3)",
-                        transition: "all 0.2s"
-                      }}
-                      onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                      onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
-                    >
-                      Join Virtual Class Now
-                    </a>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                  <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>📴</div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>No Virtual Session Link</h3>
-                  <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Your teacher hasn't posted a virtual session link for your class yet.</p>
+                  )}
                 </div>
-              )}
-            </div>
-            );
+              );
             })()
           )}
 
@@ -1535,12 +1592,12 @@ export default function ParentDashboardPage() {
             const isDeadlinePassed = renewalSettings.renewalOpenDate ? new Date() >= new Date(renewalSettings.renewalOpenDate) : false;
             const isDpSubmitted = dpSubmitted || !!profile.renewalStatus?.downpayment?.submitted;
             const isDpVerified = !!profile.renewalStatus?.downpayment?.verified;
-            
+
             const handleRenewalSubmit = async (e: React.FormEvent) => {
               e.preventDefault();
               if (!renewalForm.agreed || !user) return;
               setSubmittingRenewal(true);
-              
+
               try {
                 const res = await fetch("/api/parents/renewal", {
                   method: "POST",
@@ -1549,12 +1606,12 @@ export default function ParentDashboardPage() {
                   },
                   body: JSON.stringify({ uid: user.uid, ...renewalForm })
                 });
-                
+
                 if (!res.ok) throw new Error("Failed to submit");
-                
+
                 // Refresh profile so the UI instantly updates to the "Submitted" state
                 await fetchProfile(user.uid);
-                
+
                 setSubmittingRenewal(false);
                 setRenewalSubmitted(true);
                 setShowRenewalForm(false);
@@ -1568,7 +1625,7 @@ export default function ParentDashboardPage() {
             // If the parent has already submitted the renewal form
             if (profile.renewalStatus?.hasSubmitted) {
               const status = profile.renewalStatus;
-              
+
               return (
                 <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px", background: "linear-gradient(135deg,#f0fdf4,#dcfce7)", padding: "20px", borderRadius: "16px", border: "1px solid #bbf7d0" }}>
@@ -1583,7 +1640,7 @@ export default function ParentDashboardPage() {
 
                   <div style={{ padding: "24px", background: "#f8faff", borderRadius: "16px", border: "1px solid #c5d6ff" }}>
                     <h3 style={{ margin: "0 0 16px", fontSize: "14px", color: "#002f76", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.5px" }}>Current Status</h3>
-                    
+
                     {status.returning === "no" && (
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                         <span style={{ fontSize: "24px" }}>👋</span>
@@ -1593,7 +1650,7 @@ export default function ParentDashboardPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     {status.returning === "maybe" && (
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                         <span style={{ fontSize: "24px" }}>🤔</span>
@@ -1616,10 +1673,10 @@ export default function ParentDashboardPage() {
                               {isDpVerified
                                 ? "Your renewal downpayment has been verified. Your slot for the next adventure is fully secured!"
                                 : isDpSubmitted
-                                ? "Your downpayment is currently being verified by our team. We'll update this status once confirmed."
-                                : isDeadlinePassed
-                                ? "Your slot is currently on hold. Please submit your downpayment to finalize your renewal."
-                                : `Your slot is secured! A downpayment will be required on ${renewalSettings.renewalOpenDate ? new Date(renewalSettings.renewalOpenDate).toLocaleDateString() : "the deadline"}.`}
+                                  ? "Your downpayment is currently being verified by our team. We'll update this status once confirmed."
+                                  : isDeadlinePassed
+                                    ? "Your slot is currently on hold. Please submit your downpayment to finalize your renewal."
+                                    : `Your slot is secured! A downpayment will be required on ${renewalSettings.renewalOpenDate ? new Date(renewalSettings.renewalOpenDate).toLocaleDateString() : "the deadline"}.`}
                             </p>
                           </div>
                         </div>
@@ -1690,47 +1747,47 @@ export default function ParentDashboardPage() {
                                         <div style={{ fontSize: "32px", fontWeight: "900", marginTop: "2px" }}>₱{amountDue.toLocaleString()}</div>
                                       </div>
                                     )}
-                              <div>
-                                <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>Select Payment Method</div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                                  {[
-                                    { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
-                                    { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
-                                    { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
-                                  ].map((method) => (
-                                    <button
-                                      key={method.id}
-                                      type="button"
-                                      onClick={() => setDpPaymentMethod(method.id)}
-                                      style={{
-                                        padding: "12px 8px",
-                                        borderRadius: "12px",
-                                        border: `2px solid ${dpPaymentMethod === method.id ? "#002f76" : "#e2e8f0"}`,
-                                        background: dpPaymentMethod === method.id ? "#f0f5ff" : "white",
-                                        cursor: "pointer",
-                                        fontWeight: "700",
-                                        fontSize: "12px",
-                                        color: dpPaymentMethod === method.id ? "#002f76" : "#64748b",
-                                        transition: "all 0.15s"
-                                      }}
-                                    >
-                                      {method.id === "gcash" ? "💚" : method.id === "bpi" ? "🏦" : "🏛️"} {method.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                                    <div>
+                                      <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>Select Payment Method</div>
+                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                                        {[
+                                          { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
+                                          { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
+                                          { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
+                                        ].map((method) => (
+                                          <button
+                                            key={method.id}
+                                            type="button"
+                                            onClick={() => setDpPaymentMethod(method.id)}
+                                            style={{
+                                              padding: "12px 8px",
+                                              borderRadius: "12px",
+                                              border: `2px solid ${dpPaymentMethod === method.id ? "#002f76" : "#e2e8f0"}`,
+                                              background: dpPaymentMethod === method.id ? "#f0f5ff" : "white",
+                                              cursor: "pointer",
+                                              fontWeight: "700",
+                                              fontSize: "12px",
+                                              color: dpPaymentMethod === method.id ? "#002f76" : "#64748b",
+                                              transition: "all 0.15s"
+                                            }}
+                                          >
+                                            {method.id === "gcash" ? "💚" : method.id === "bpi" ? "🏦" : "🏛️"} {method.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
 
-                              {/* QR Code */}
-                              {dpPaymentMethod && (
-                                <div style={{ textAlign: "center", padding: "16px", background: "white", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                                  <div style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Scan to Pay via {dpPaymentMethod === "gcash" ? "GCash" : dpPaymentMethod === "bpi" ? "BPI" : "Mari Bank"}</div>
-                                  <img
-                                    src={dpPaymentMethod === "gcash" ? "/GCASHQRONLY.png" : dpPaymentMethod === "bpi" ? "/BPIQRONLY.png" : "/MARIBANKQRONLY.png"}
-                                    alt="QR Code"
-                                    style={{ width: "160px", height: "160px", objectFit: "contain", margin: "0 auto", display: "block" }}
-                                  />
-                                </div>
-                              )}
+                                    {/* QR Code */}
+                                    {dpPaymentMethod && (
+                                      <div style={{ textAlign: "center", padding: "16px", background: "white", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                                        <div style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Scan to Pay via {dpPaymentMethod === "gcash" ? "GCash" : dpPaymentMethod === "bpi" ? "BPI" : "Mari Bank"}</div>
+                                        <img
+                                          src={dpPaymentMethod === "gcash" ? "/GCASHQRONLY.png" : dpPaymentMethod === "bpi" ? "/BPIQRONLY.png" : "/MARIBANKQRONLY.png"}
+                                          alt="QR Code"
+                                          style={{ width: "160px", height: "160px", objectFit: "contain", margin: "0 auto", display: "block" }}
+                                        />
+                                      </div>
+                                    )}
 
                                     {/* Amount Paid */}
                                     <div>
@@ -1867,7 +1924,7 @@ export default function ParentDashboardPage() {
                         <div style={{ fontSize: "64px", marginBottom: "16px" }}>🎉</div>
                         <h1 style={{ color: "#002f76", fontSize: "28px", fontWeight: "900", margin: "0 0 12px" }}>Renewal Received!</h1>
                         <p style={{ color: "#64748b", fontSize: "16px", margin: "0 0 32px", lineHeight: "1.6", maxWidth: "400px", display: "inline-block" }}>
-                          Thank you for renewing {profile.childName}&apos;s slot for the next adventure. 
+                          Thank you for renewing {profile.childName}&apos;s slot for the next adventure.
                           {isDeadlinePassed ? " Our team will contact you shortly regarding your downpayment." : " You've successfully secured your slot for FREE!"}
                         </p>
                       </div>
@@ -1875,7 +1932,7 @@ export default function ParentDashboardPage() {
                       <div>
                         {/* Form Header with Back Button */}
                         <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", gap: "16px" }}>
-                          <button 
+                          <button
                             onClick={() => setShowRenewalForm(false)}
                             style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid #cbd5e1", background: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "20px", color: "#64748b" }}
                           >
@@ -1897,8 +1954,8 @@ export default function ParentDashboardPage() {
                               {isDeadlinePassed ? "Downpayment Required" : "Slot Security is FREE"}
                             </div>
                             <div style={{ fontSize: "13px", color: isDeadlinePassed ? "#9a3412" : "#0050d5", fontWeight: "500", marginTop: "2px" }}>
-                              {isDeadlinePassed 
-                                ? "The deadline has passed. A downpayment is now required to renew." 
+                              {isDeadlinePassed
+                                ? "The deadline has passed. A downpayment is now required to renew."
                                 : "You are renewing before the deadline! No downpayment required right now."}
                             </div>
                           </div>
@@ -1906,7 +1963,7 @@ export default function ParentDashboardPage() {
 
                         {/* Inline Form */}
                         <form onSubmit={handleRenewalSubmit} style={{ display: "grid", gap: "20px" }}>
-                          
+
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", padding: "16px", background: "#f8faff", borderRadius: "14px", border: "1px dashed #cbd5e1" }}>
                             <div>
                               <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Explorer Name</label>
@@ -1922,9 +1979,9 @@ export default function ParentDashboardPage() {
                             <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#0f172a", marginBottom: "8px" }}>
                               Are you renewing for the next adventure?
                             </label>
-                            <select 
+                            <select
                               value={renewalForm.returning}
-                              onChange={(e) => setRenewalForm({...renewalForm, returning: e.target.value})}
+                              onChange={(e) => setRenewalForm({ ...renewalForm, returning: e.target.value })}
                               style={{ width: "100%", padding: "14px 16px", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
                             >
                               <option value="yes">Yes, definitely!</option>
@@ -1938,9 +1995,9 @@ export default function ParentDashboardPage() {
                               <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#0f172a", marginBottom: "8px" }}>
                                 Any special requests or schedule changes? (Optional)
                               </label>
-                              <textarea 
+                              <textarea
                                 value={renewalForm.notes}
-                                onChange={(e) => setRenewalForm({...renewalForm, notes: e.target.value})}
+                                onChange={(e) => setRenewalForm({ ...renewalForm, notes: e.target.value })}
                                 rows={3}
                                 placeholder="e.g. Can we switch to the afternoon class?"
                                 style={{ width: "100%", padding: "14px 16px", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
@@ -1953,9 +2010,9 @@ export default function ParentDashboardPage() {
                               <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#0f172a", marginBottom: "8px" }}>
                                 We&apos;re sorry to see you go! Could you let us know why you won&apos;t be returning? (Optional)
                               </label>
-                              <textarea 
+                              <textarea
                                 value={renewalForm.reason}
-                                onChange={(e) => setRenewalForm({...renewalForm, reason: e.target.value})}
+                                onChange={(e) => setRenewalForm({ ...renewalForm, reason: e.target.value })}
                                 rows={3}
                                 placeholder="Your feedback helps us improve..."
                                 style={{ width: "100%", padding: "14px 16px", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
@@ -1964,10 +2021,10 @@ export default function ParentDashboardPage() {
                           )}
 
                           <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginTop: "4px", cursor: "pointer" }}>
-                            <input 
-                              type="checkbox" 
+                            <input
+                              type="checkbox"
                               checked={renewalForm.agreed}
-                              onChange={(e) => setRenewalForm({...renewalForm, agreed: e.target.checked})}
+                              onChange={(e) => setRenewalForm({ ...renewalForm, agreed: e.target.checked })}
                               style={{ width: "20px", height: "20px", marginTop: "2px", accentColor: "#0050d5" }}
                             />
                             <span style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5" }}>
@@ -2008,8 +2065,8 @@ export default function ParentDashboardPage() {
                           <div>
                             <div style={{ fontWeight: "800", fontSize: "18px", color: isDeadlinePassed ? "#7c2d12" : "#002f76" }}>{isDeadlinePassed ? "Slot Forfeited — Downpayment Required" : "Renewal is Now Open!"}</div>
                             <div style={{ fontSize: "13px", color: isDeadlinePassed ? "#9a3412" : "#0050d5", fontWeight: "600", marginTop: "4px" }}>
-                              {isDeadlinePassed 
-                                ? `The deadline passed. Secure ${profile.childName || "your child"}'s slot with a downpayment now.` 
+                              {isDeadlinePassed
+                                ? `The deadline passed. Secure ${profile.childName || "your child"}'s slot with a downpayment now.`
                                 : `Secure ${profile.childName || "your child"}'s slot for the next adventure`}
                             </div>
                           </div>
@@ -2132,7 +2189,7 @@ export default function ParentDashboardPage() {
 function ProfileTab({ profile, user }: { profile: any, user: any }) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     nickname: profile.studentInfo?.childInfo?.nickname || "",
     dateOfBirth: profile.studentInfo?.childInfo?.dateOfBirth || "",
@@ -2171,7 +2228,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
           }
         })
       });
-      
+
       if (res.ok) {
         window.location.reload();
       } else {
@@ -2187,7 +2244,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      
+
       {/* ── Hero Profile Banner ── */}
       <div className="responsive-banner" style={{
         background: "linear-gradient(135deg,#001a4d 0%,#002f76 45%,#0050d5 100%)",
@@ -2212,7 +2269,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
               Keep your child&apos;s details updated to help us provide the best care and experience in class.
             </p>
           </div>
-          
+
           <div className="responsive-banner-actions" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             {!isEditing ? (
               <button onClick={() => setIsEditing(true)} style={{ padding: "12px 24px", borderRadius: "14px", background: "white", color: "#002f76", fontWeight: "800", fontSize: "14px", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>Edit Profile</button>
@@ -2229,7 +2286,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
       </div>
 
       <div className="responsive-grid-2" style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
-        
+
         {/* Child Info Card */}
         <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
@@ -2239,7 +2296,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
               <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>Basic details and health notes</div>
             </div>
           </div>
-          
+
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div>
               <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Nickname</label>
@@ -2269,7 +2326,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
 
         {/* Right side: Favorites & Emergency Contact */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          
+
           {/* Favorites Card */}
           <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
@@ -2279,7 +2336,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
                 <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>Things they love</div>
               </div>
             </div>
-            
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Favorite Song</label>
@@ -2321,7 +2378,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
               </div>
             </div>
           </div>
-          
+
         </div>
       </div>
     </div>
@@ -2366,7 +2423,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
       // Update password
       await updatePassword(user, newPassword);
-      
+
       setSuccess(true);
       setTimeout(() => onClose(), 2000);
     } catch (err: any) {
@@ -2384,7 +2441,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,15,40,0.6)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", animation: "fadeUp 0.3s ease" }}>
       <div style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "420px", overflow: "hidden", boxShadow: "0 32px 100px rgba(0,47,118,0.3)" }}>
-        
+
         {/* Header */}
         <div style={{ background: "linear-gradient(135deg,#f8faff,#f0f4ff)", padding: "24px", borderBottom: "1px solid #e8efff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "800", color: "#002f76", letterSpacing: "-0.2px" }}>Change Password</h2>
@@ -2401,7 +2458,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              
+
               <div>
                 <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>Current Password</label>
                 <div style={{ position: "relative" }}>
