@@ -5,6 +5,36 @@ import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
 
+const PHT_OFFSET_MS = 8 * 60 * 60 * 1000; // Asia/Manila is UTC+8, no DST
+
+// Trailblazer = program slug "brave-explorer", or the display name says so
+function isTrailblazerProgram(program?: string, programName?: string): boolean {
+  return program === "brave-explorer" || /trailblazer|brave explorer/i.test(programName || "");
+}
+
+// Current day of week in Manila (0 = Sunday ... 6 = Saturday)
+function getManilaDayOfWeek(now = new Date()): number {
+  return new Date(now.getTime() + PHT_OFFSET_MS).getUTCDay();
+}
+
+// The coming Saturday at 23:59:00 PHT, returned as a real UTC Date
+function getNextSaturdayExpiry(now = new Date()): Date {
+  const manila = new Date(now.getTime() + PHT_OFFSET_MS);
+  const day = manila.getUTCDay();
+  const daysUntilSaturday = (6 - day + 7) % 7;
+  const utcMs =
+    Date.UTC(
+      manila.getUTCFullYear(),
+      manila.getUTCMonth(),
+      manila.getUTCDate() + daysUntilSaturday,
+      23,
+      59,
+      0,
+      0
+    ) - PHT_OFFSET_MS;
+  return new Date(utcMs);
+}
+
 function buildEmailHtml({
   childFirstName,
   childNickname,
@@ -16,6 +46,7 @@ function buildEmailHtml({
   expiresAt,
   photoCount,
   appUrl,
+  isTrailblazer,
 }: {
   childFirstName: string;
   childNickname: string;
@@ -27,6 +58,7 @@ function buildEmailHtml({
   expiresAt: Date;
   photoCount: number;
   appUrl: string;
+  isTrailblazer: boolean;
 }): string {
   const displayName = childNickname || childFirstName;
   const viewUrl = `${appUrl}/photos/${accessCode}`;
@@ -99,6 +131,16 @@ function buildEmailHtml({
           <a href="${viewUrl}" style="color:#0033A0;">${viewUrl}</a>
         </p>
 
+        ${isTrailblazer ? `
+        <!-- Trailblazer disclaimer -->
+        <div style="background:#f0f6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px 18px;text-align:center;margin-bottom:16px;">
+          <p style="margin:0 0 4px;font-size:12px;font-weight:800;color:#0033A0;">📌 About Trailblazer photos</p>
+          <p style="margin:0;font-size:12px;color:#334155;line-height:1.6;">
+            Photos for Trailblazer are shared every <strong>Thursday and Friday</strong>.
+            Photos from <strong>Monday to Wednesday</strong> sessions are posted in the <strong>Facebook page weekly highlights</strong> instead.
+          </p>
+        </div>` : ""}
+
         <!-- Expiry notice -->
         <div style="background:#fff8e1;border:1.5px solid #fbbf24;border-radius:12px;padding:14px 18px;text-align:center;">
           <p style="margin:0;font-size:12px;color:#92400e;font-weight:700;">
@@ -151,6 +193,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No parent email on record for this student" }, { status: 400 });
     }
 
+    // ── Trailblazer rules ─────────────────────────────────────────────
+    const isTrailblazer = isTrailblazerProgram(album.program, album.programName);
+    let expiresAt: Date = album.expiresAt;
+
+    if (isTrailblazer) {
+      const day = getManilaDayOfWeek();
+      // Trailblazer photos go out on Thursday (4) and Friday (5) only
+      if (day !== 4 && day !== 5) {
+        return NextResponse.json(
+          {
+            error:
+              "Trailblazer photos can only be sent on Thursdays and Fridays. Mon–Wed photos are shared in the weekly highlights.",
+          },
+          { status: 400 }
+        );
+      }
+      // Always deleted this coming Saturday at exactly 11:59 PM PHT
+      expiresAt = getNextSaturdayExpiry();
+    }
+
     // Build transporter using Gmail credentials from .env.local
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -175,18 +237,26 @@ export async function POST(request: Request) {
         note: album.note,
         accessCode: album.accessCode,
         pin: album.pin,
-        expiresAt: album.expiresAt,
+        expiresAt,
         photoCount: album.photos.length,
         appUrl,
+        isTrailblazer,
       }),
     });
 
-    // Mark email as sent
+    // Mark email as sent (and persist the Trailblazer expiry so the
+    // viewer page and cleanup use the same deadline)
     await db
       .collection("student_photo_albums")
       .updateOne(
         { _id: new ObjectId(albumId) },
-        { $set: { emailSent: true, emailSentAt: new Date() } }
+        {
+          $set: {
+            emailSent: true,
+            emailSentAt: new Date(),
+            ...(isTrailblazer ? { expiresAt, isTrailblazer: true } : {}),
+          },
+        }
       );
 
     // Audit log

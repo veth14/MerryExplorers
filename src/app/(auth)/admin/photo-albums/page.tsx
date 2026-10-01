@@ -37,6 +37,7 @@ interface PhotoAlbum {
   emailSentAt: string | null;
   expiresAt: string;
   createdAt: string;
+  isTrailblazer?: boolean;
 }
 
 interface PhotoPreview {
@@ -48,6 +49,45 @@ interface PhotoPreview {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const PHT_OFFSET_MS = 8 * 60 * 60 * 1000; // Asia/Manila is UTC+8, no DST
+
+// Trailblazer = program slug "brave-explorer", or the display name says so
+function isTrailblazerProgram(program?: string, programName?: string): boolean {
+  return program === "brave-explorer" || /trailblazer|brave explorer/i.test(programName || "");
+}
+
+// Mirrors the server: Saturday 23:59:00 PHT. Created Sun–Fri -> this coming
+// Saturday; created on Saturday -> next Saturday.
+function getTrailblazerExpiry(now = new Date()): Date {
+  const manila = new Date(now.getTime() + PHT_OFFSET_MS);
+  const day = manila.getUTCDay();
+  const daysUntilSaturday = day === 6 ? 7 : 6 - day;
+  const utcMs =
+    Date.UTC(
+      manila.getUTCFullYear(),
+      manila.getUTCMonth(),
+      manila.getUTCDate() + daysUntilSaturday,
+      23,
+      59,
+      0,
+      0
+    ) - PHT_OFFSET_MS;
+  return new Date(utcMs);
+}
+
+function fmtExpiry(d: Date) {
+  return (
+    d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "Asia/Manila",
+    }) + " PHT"
+  );
+}
 
 function timeUntilExpiry(expiresAt: string): { label: string; urgent: boolean } {
   const diff = new Date(expiresAt).getTime() - Date.now();
@@ -171,7 +211,7 @@ function AlbumCard({
 
         {/* Categories / Badges */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          <span 
+          <span
             className="rounded-full px-2.5 py-1 text-[10px] font-bold border"
             style={{ backgroundColor: accentSoft, color: accent, borderColor: `${accent}30` }}
           >
@@ -193,7 +233,7 @@ function AlbumCard({
         </div>
 
         {/* Access code + link */}
-        <div 
+        <div
           className="flex items-center gap-2 rounded-xl bg-[#f0f6ff] border border-[#dbeafe] px-3 py-2 mb-3"
           onClick={(e) => e.stopPropagation()}
         >
@@ -213,11 +253,10 @@ function AlbumCard({
           <button
             onClick={(e) => { e.stopPropagation(); onSendEmail(album); }}
             disabled={isSending}
-            className={`flex-1 rounded-xl py-2 text-[12px] font-bold transition-all ${
-              album.emailSent
+            className={`flex-1 rounded-xl py-2 text-[12px] font-bold transition-all ${album.emailSent
                 ? "bg-slate-100 text-[#64748b] hover:bg-slate-200"
                 : "bg-[#0033A0] text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002580]"
-            } disabled:opacity-50`}
+              } disabled:opacity-50`}
           >
             {isSending ? "Sending…" : album.emailSent ? "Resend Email" : "📧 Send Email"}
           </button>
@@ -279,7 +318,7 @@ function ViewAlbumPanel({ album, onClose }: { album: PhotoAlbum; onClose: () => 
                 )}
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                <span 
+                <span
                   className="rounded-full px-2.5 py-1 text-[11px] font-bold border"
                   style={{ backgroundColor: accentSoft, color: accent, borderColor: `${accent}30` }}
                 >
@@ -360,7 +399,7 @@ function CreatePanel({
     fetch("/api/students")
       .then((r) => r.json())
       .then((d) => { if (d.success) setStudents(d.data); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const filtered = students.filter((s) => {
@@ -472,6 +511,9 @@ function CreatePanel({
   }
 
   const prog = selectedStudent ? PROGRAMS.find((p) => p.id === selectedStudent.program) : null;
+  const selectedIsTrailblazer = selectedStudent
+    ? isTrailblazerProgram(selectedStudent.program, prog?.name)
+    : false;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -516,7 +558,7 @@ function CreatePanel({
                 {filtered.map((s) => {
                   const p = PROGRAMS.find((p) => p.id === s.program);
                   const isSelected = selectedStudent?.id === s.id;
-                  
+
                   const shortName = p?.name?.includes(":") ? p.name.split(":")[1].trim() : p?.name;
                   const c = (p as any)?.classes?.find((x: any) => x.name === s.classTime);
                   const timeStr = c ? ` (${c.time})` : "";
@@ -525,9 +567,8 @@ function CreatePanel({
                     <button
                       key={s.id}
                       onClick={() => setSelectedStudent(s)}
-                      className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${
-                        isSelected ? "bg-[#0033A0] text-white" : "bg-slate-50 hover:bg-slate-100"
-                      }`}
+                      className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${isSelected ? "bg-[#0033A0] text-white" : "bg-slate-50 hover:bg-slate-100"
+                        }`}
                     >
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFC107]/20 text-[14px] font-black text-[#0033A0]">
                         {s.childInfo.firstName[0]?.toUpperCase()}
@@ -679,8 +720,18 @@ function CreatePanel({
                 <div className="grid grid-cols-2 gap-3 text-[12px]">
                   <div><p className="text-[#94a3b8] font-semibold">Parent email</p><p className="font-bold text-[#0f172a]">{selectedStudent.parentInfo.email}</p></div>
                   <div><p className="text-[#94a3b8] font-semibold">Photos</p><p className="font-bold text-[#0f172a]">{photos.filter(p => p.status === "ready").length} photos</p></div>
-                  <div><p className="text-[#94a3b8] font-semibold">Expires</p><p className="font-bold text-amber-600">3 days from now</p></div>
-                  <div><p className="text-[#94a3b8] font-semibold">Email</p><p className="font-bold text-[#0f172a]">Sent separately after creating</p></div>
+                  <div>
+                    <p className="text-[#94a3b8] font-semibold">Expires</p>
+                    <p className="font-bold text-amber-600">
+                      {selectedIsTrailblazer ? fmtExpiry(getTrailblazerExpiry()) : "3 days from now"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#94a3b8] font-semibold">Email</p>
+                    <p className="font-bold text-[#0f172a]">
+                      {selectedIsTrailblazer ? "Send on Thursday or Friday only" : "Sent separately after creating"}
+                    </p>
+                  </div>
                 </div>
                 {note && (
                   <div className="rounded-xl bg-white border border-[#dbeafe] px-3 py-2">
@@ -781,7 +832,7 @@ export default function PhotoAlbumsPage() {
     fetch("/api/photo-albums")
       .then((r) => r.json())
       .then((d) => { if (d.success) setAlbums(d.data); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -832,6 +883,16 @@ export default function PhotoAlbumsPage() {
           prev.map((a) => a.id === album.id ? { ...a, emailSent: true, emailSentAt: new Date().toISOString() } : a)
         );
         setToast({ msg: `Email sent to ${album.parentEmail} 📧`, type: "success" });
+
+        // Trailblazer albums get their expiry reset server-side on send,
+        // so refresh the list to show the correct "time left" badge.
+        try {
+          const listRes = await fetch("/api/photo-albums");
+          const listData = await listRes.json();
+          if (listData.success) setAlbums(listData.data);
+        } catch {
+          /* non-fatal: badge will correct itself on next reload */
+        }
       } else {
         setToast({ msg: data.error || "Failed to send email", type: "error" });
       }
@@ -849,10 +910,10 @@ export default function PhotoAlbumsPage() {
       a.programName.toLowerCase().includes(q) ||
       (a.childNickname || "").toLowerCase().includes(q) ||
       a.parentEmail.toLowerCase().includes(q);
-      
+
     const progMatch = programFilter === "ALL" || a.programName === programFilter;
     const timeMatch = timeFilter === "ALL" || a.classTime === timeFilter;
-    
+
     return textMatch && progMatch && timeMatch;
   });
 
@@ -877,7 +938,7 @@ export default function PhotoAlbumsPage() {
     <>
       <AppShell
         title="Photo Albums"
-        description="Send session highlights directly to parents. Albums expire automatically after 3 days."
+        description="Send session highlights directly to parents. Albums expire automatically after 3 days (Trailblazer albums: Saturday 11:59 PM)."
       >
         {/* Top bar */}
         <div className="mb-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
@@ -910,8 +971,11 @@ export default function PhotoAlbumsPage() {
         <div className="mb-5 flex items-start gap-3 rounded-2xl bg-[#fff8e1] border border-[#fde68a] px-4 py-3">
           <span className="text-lg shrink-0">⏰</span>
           <p className="text-[12px] font-semibold text-[#92400e]">
-            Albums are automatically deleted after <strong>3 days</strong>. Parents should save photos before the link expires. 
+            Albums are automatically deleted after <strong>3 days</strong>. Parents should save photos before the link expires.
             Always send the email after creating the album.
+            <br />
+            <strong>Trailblazer (Brave Explorer)</strong> albums are deleted every <strong>Saturday at 11:59 PM</strong> instead,
+            and can only be emailed on <strong>Thursdays and Fridays</strong>.
           </p>
         </div>
 
@@ -986,9 +1050,8 @@ export default function PhotoAlbumsPage() {
             initial={{ opacity: 0, y: 24, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.95 }}
-            className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-3 rounded-full px-6 py-3 text-white shadow-xl ${
-              toast.type === "success" ? "bg-emerald-500 shadow-emerald-500/20" : "bg-red-500 shadow-red-500/20"
-            }`}
+            className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-3 rounded-full px-6 py-3 text-white shadow-xl ${toast.type === "success" ? "bg-emerald-500 shadow-emerald-500/20" : "bg-red-500 shadow-red-500/20"
+              }`}
           >
             <span className="text-[14px] font-bold">{toast.msg}</span>
           </m.div>

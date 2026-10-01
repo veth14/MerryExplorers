@@ -14,9 +14,60 @@ export const dynamic = "force-dynamic";
 
 const MAX_PHOTOS = 30;
 const TTL_DAYS = 3;
+const PHT_OFFSET_MS = 8 * 60 * 60 * 1000; // Asia/Manila is UTC+8, no DST
 
 function generateAccessCode(): string {
   return randomBytes(5).toString("base64url").toUpperCase().slice(0, 8);
+}
+
+// Trailblazer = program slug "brave-explorer", or the display name says so
+function isTrailblazerProgram(program?: string, programName?: string): boolean {
+  return program === "brave-explorer" || /trailblazer|brave explorer/i.test(programName || "");
+}
+
+// Saturday 23:59:00 PHT, returned as a real UTC Date.
+// Created Sun–Fri -> this coming Saturday. Created on Saturday -> next Saturday
+// (the photos for that week are sent the following Thu/Fri).
+function getTrailblazerExpiry(now = new Date()): Date {
+  const manila = new Date(now.getTime() + PHT_OFFSET_MS);
+  const day = manila.getUTCDay();
+  const daysUntilSaturday = day === 6 ? 7 : 6 - day;
+  const utcMs =
+    Date.UTC(
+      manila.getUTCFullYear(),
+      manila.getUTCMonth(),
+      manila.getUTCDate() + daysUntilSaturday,
+      23,
+      59,
+      0,
+      0
+    ) - PHT_OFFSET_MS;
+  return new Date(utcMs);
+}
+
+// Deletes expired albums' Cloudinary photos, then the album record.
+// Runs opportunistically when the admin list is loaded (no cron needed).
+async function sweepExpiredAlbums(db: any) {
+  const expired = await db
+    .collection("student_photo_albums")
+    .find({ expiresAt: { $lte: new Date() } })
+    .limit(50)
+    .toArray();
+
+  for (const album of expired) {
+    if (Array.isArray(album.photos)) {
+      for (const photo of album.photos) {
+        if (photo.cloudinaryPublicId) {
+          try {
+            await cloudinary.uploader.destroy(photo.cloudinaryPublicId);
+          } catch (e) {
+            console.warn("Cloudinary delete failed for", photo.cloudinaryPublicId);
+          }
+        }
+      }
+    }
+    await db.collection("student_photo_albums").deleteOne({ _id: album._id });
+  }
 }
 
 // GET /api/photo-albums — Admin only, list all albums
@@ -26,6 +77,14 @@ export async function GET(request: Request) {
 
   try {
     const { db } = await connectToDatabase();
+
+    // Clean up expired albums (and their Cloudinary files) before listing
+    try {
+      await sweepExpiredAlbums(db);
+    } catch (e) {
+      console.warn("[photo-albums GET] sweep failed", e);
+    }
+
     const albums = await db
       .collection("student_photo_albums")
       .find({})
@@ -98,7 +157,13 @@ export async function POST(request: Request) {
     const pin = Math.floor(1000 + Math.random() * 9000).toString();
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + TTL_DAYS * 24 * 60 * 60 * 1000);
+    const isTrailblazer = isTrailblazerProgram(program, programName);
+
+    // Trailblazers: deleted Saturday 11:59 PM PHT (set at creation so the
+    // album can't expire before the Thu/Fri send). Everyone else: TTL_DAYS.
+    const expiresAt = isTrailblazer
+      ? getTrailblazerExpiry(now)
+      : new Date(now.getTime() + TTL_DAYS * 24 * 60 * 60 * 1000);
 
     const sessionLabel = `${classTime} · ${new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}`;
 
@@ -118,6 +183,7 @@ export async function POST(request: Request) {
       pin,
       emailSent: false,
       emailSentAt: null,
+      isTrailblazer,
       expiresAt,
       createdAt: now,
       createdBy: actorUid || null,
