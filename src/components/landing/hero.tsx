@@ -101,7 +101,7 @@ export function HeroSection() {
             className="mt-10 flex flex-wrap items-center gap-4 mobile-no-animate"
           >
             <Link
-              href="/inquire"
+              href="/register"
               id="hero-enroll-btn"
               className="group inline-flex items-center gap-4 rounded-[1.25rem] bg-[#0033A0] px-8 py-4 text-[17px] font-bold text-white shadow-[0_12px_24px_rgba(0,51,160,0.2)] transition-all duration-300 hover:bg-[#002f76] hover:shadow-[0_16px_32px_rgba(0,51,160,0.3)] hover:-translate-y-1"
             >

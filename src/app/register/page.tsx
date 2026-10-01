@@ -14,7 +14,8 @@ import SignatureCanvas from "react-signature-canvas";
 type ProgramId = keyof typeof PROGRAM_SLOTS;
 type SlotData = Record<string, Record<string, { maxSlots: number; taken: number; available: number }>>;
 
-const STEPS = ["Program", "Details", "Consents", "Review"];
+// Step order: 0 = Details, 1 = Program, 2 = Consents, 3 = Review
+const STEPS = ["Details", "Program", "Consents", "Review"];
 
 const inputCls =
   "w-full bg-[#f8fafc] border-2 border-transparent rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-[#002f76] placeholder:text-[#94a3b8] placeholder:font-medium focus:outline-none focus:border-[#0033A0]/30 focus:bg-white transition-all";
@@ -64,7 +65,8 @@ function SlotPill({ available, max }: { available: number; max: number }) {
   );
 }
 
-const STORAGE_KEY = "me_register_draft";
+// New key so drafts saved with the old step order are ignored
+const STORAGE_KEY = "me_register_draft_v2";
 
 function loadDraft() {
   if (typeof window === "undefined") return null;
@@ -95,6 +97,10 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [registrationId, setRegistrationId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Lead capture (created when the parent continues from Details)
+  const [leadId, setLeadId] = useState<string>(draft?.leadId ?? "");
+  const [savingLead, setSavingLead] = useState(false);
 
   // Form state — all hydrated from localStorage draft on first render
   const [selectedProgram, setSelectedProgram] = useState<ProgramId | "">(draft?.selectedProgram ?? "");
@@ -149,6 +155,7 @@ export default function RegisterPage() {
       photoConsent, waiverRead, signatureBase64,
       paymentMethod, receiptPreview, receiptBase64,
       isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
+      leadId,
     });
   }, [
     step, selectedProgram, selectedClass,
@@ -156,6 +163,7 @@ export default function RegisterPage() {
     photoConsent, waiverRead, signatureBase64,
     paymentMethod, receiptPreview, receiptBase64,
     isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
+    leadId,
   ]);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
@@ -246,6 +254,31 @@ export default function RegisterPage() {
 
   const canProceedStep1 = missingStep1.length === 0;
 
+  // ── Save the Details as a lead, then move on to Program ──
+  async function handleDetailsContinue() {
+    setSavingLead(true);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId,
+          source: "register",
+          childInfo,
+          parentInfo,
+          emergencyContact,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data?.id) setLeadId(data.data.id);
+    } catch {
+      // Don't block the parent if lead capture fails
+    } finally {
+      setSavingLead(false);
+      setStep(1);
+    }
+  }
+
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
@@ -261,6 +294,7 @@ export default function RegisterPage() {
           emergencyContact,
           photoConsent,
           signatureBase64,
+          leadId, // lets the API mark the lead as "converted"
         }),
       });
       const data = await res.json();
@@ -517,143 +551,9 @@ export default function RegisterPage() {
           >
             <AnimatePresence mode="wait">
 
-              {/* ── STEP 0: Choose Program ── */}
+              {/* ── STEP 0: Details (creates the lead on Continue) ── */}
               {step === 0 && (
                 <m.div key="step0" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose a Program</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time that works best for your child.</p>
-
-                  <div className="mb-8 flex flex-wrap justify-center gap-3">
-                    {[
-                      { id: "discovery", label: "Discovery Club" },
-                      { id: "trailblazer", label: "Trailblazer" },
-                      { id: "weekend", label: "Weekend Adventures" },
-                    ].map((tab) => {
-                      const isActive = activeTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
-                          className={`relative overflow-hidden rounded-full px-5 py-2.5 text-[13px] font-bold transition-all duration-300 ${isActive
-                            ? "text-white shadow-md shadow-[#0033A0]/20"
-                            : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0]"
-                            }`}
-                        >
-                          {isActive && (
-                            <m.div
-                              layoutId="registerActiveTabIndicator"
-                              className="absolute inset-0 bg-[#0033A0]"
-                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                            />
-                          )}
-                          <span className="relative z-10">{tab.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <m.div layout className="space-y-5">
-                    <AnimatePresence mode="popLayout">
-                    {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
-                      .filter(p => {
-                        if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
-                        if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
-                        if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
-                        return true;
-                      })
-                      .map((p) => {
-                      const programSlots = slots[p.id] || {};
-                      const totalAvailable = Object.values(programSlots).reduce((a, c) => a + c.available, 0);
-                      const isSelected = selectedProgram === p.id;
-
-                      return (
-                        <m.div
-                          layout
-                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                          transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
-                          key={p.id}
-                          className={`rounded-3xl border-2 overflow-hidden transition-all duration-200 cursor-pointer ${isSelected ? "border-[#0033A0] shadow-lg shadow-[#0033A0]/10" : "border-slate-100 hover:border-slate-200 bg-white"}`}
-                          onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
-                        >
-                          {/* Card header */}
-                          <div className="flex items-center justify-between px-6 py-5 bg-white">
-                            <div className="flex items-center gap-4">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: p.accentSoft }}>
-                                {p.icon}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-headline text-[16px] font-extrabold text-[#002f76]">{p.name}</h3>
-                                  {totalAvailable === 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Full</span>}
-                                </div>
-                                <p className="text-[12px] text-[#64748b]">{p.ageRange} • {p.schedule} • {p.sessions} Sessions</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[18px] font-extrabold text-[#002f76]">₱{p.rate.toLocaleString()}</p>
-                              <p className="text-[11px] text-[#94a3b8]">60% down: ₱{p.downpayment.toLocaleString()}</p>
-                            </div>
-                          </div>
-
-                          {/* Class options */}
-                          {isSelected && (
-                            <div className="border-t border-slate-100 bg-[#f8fafc] px-6 py-4 space-y-3">
-                              {p.prerequisite && (
-                                <div className="flex gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-[12px] text-amber-800 font-medium">
-                                  <span className="shrink-0">⚠️</span> <span><strong>Pre-requisite:</strong> {p.prerequisite}</span>
-                                </div>
-                              )}
-                              <p className="text-[12px] font-bold text-[#64748b] uppercase tracking-widest">Select Class Time</p>
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                {p.classes.map((cls) => {
-                                  const slotInfo = programSlots[cls.name];
-                                  const isFull = slotInfo ? slotInfo.available === 0 : false;
-                                  const isClassSelected = selectedClass === cls.name;
-                                  return (
-                                    <button
-                                      key={cls.name}
-                                      disabled={isFull}
-                                      onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
-                                      className={[
-                                        "flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150",
-                                        isFull ? "opacity-40 cursor-not-allowed border-slate-200 bg-white" :
-                                          isClassSelected ? "border-[#0033A0] bg-[#0033A0]/5 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300",
-                                      ].join(" ")}
-                                    >
-                                      <div>
-                                        <p className="text-[13px] font-bold text-[#002f76]">{cls.name}</p>
-                                        <p className="text-[11px] text-[#64748b]">{cls.time}</p>
-                                      </div>
-                                      {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </m.div>
-                      );
-                    })}
-                    </AnimatePresence>
-                  </m.div>
-
-                  <div className="mt-8 flex justify-end">
-                    <button
-                      disabled={!canProceedStep0}
-                      onClick={() => setStep(1)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Continue <span>→</span>
-                    </button>
-                  </div>
-                </m.div>
-              )}
-
-              {/* ── STEP 1: Details ── */}
-              {step === 1 && (
-                <m.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
                   <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Explorer Information</h2>
                   <p className="mb-6 text-[14px] text-[#64748b]">Tell us about your child and your contact details.</p>
 
@@ -752,18 +652,152 @@ export default function RegisterPage() {
                         </ul>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
-                        ← Back
-                      </button>
+                    <div className="flex justify-end">
                       <button
-                        disabled={!canProceedStep1}
-                        onClick={() => setStep(2)}
+                        disabled={!canProceedStep1 || savingLead}
+                        onClick={handleDetailsContinue}
                         className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Continue <span>→</span>
+                        {savingLead ? "Saving..." : <>Continue <span>→</span></>}
                       </button>
                     </div>
+                  </div>
+                </m.div>
+              )}
+
+              {/* ── STEP 1: Choose Program ── */}
+              {step === 1 && (
+                <m.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose a Program</h2>
+                  <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time that works best for your child.</p>
+
+                  <div className="mb-8 flex flex-wrap justify-center gap-3">
+                    {[
+                      { id: "discovery", label: "Discovery Club" },
+                      { id: "trailblazer", label: "Trailblazer" },
+                      { id: "weekend", label: "Weekend Adventures" },
+                    ].map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`relative overflow-hidden rounded-full px-5 py-2.5 text-[13px] font-bold transition-all duration-300 ${isActive
+                            ? "text-white shadow-md shadow-[#0033A0]/20"
+                            : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0]"
+                            }`}
+                        >
+                          {isActive && (
+                            <m.div
+                              layoutId="registerActiveTabIndicator"
+                              className="absolute inset-0 bg-[#0033A0]"
+                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                            />
+                          )}
+                          <span className="relative z-10">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <m.div layout className="space-y-5">
+                    <AnimatePresence mode="popLayout">
+                      {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
+                        .filter(p => {
+                          if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
+                          if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
+                          if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
+                          return true;
+                        })
+                        .map((p) => {
+                          const programSlots = slots[p.id] || {};
+                          const totalAvailable = Object.values(programSlots).reduce((a, c) => a + c.available, 0);
+                          const isSelected = selectedProgram === p.id;
+
+                          return (
+                            <m.div
+                              layout
+                              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                              transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
+                              key={p.id}
+                              className={`rounded-3xl border-2 overflow-hidden transition-all duration-200 cursor-pointer ${isSelected ? "border-[#0033A0] shadow-lg shadow-[#0033A0]/10" : "border-slate-100 hover:border-slate-200 bg-white"}`}
+                              onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
+                            >
+                              {/* Card header */}
+                              <div className="flex items-center justify-between px-6 py-5 bg-white">
+                                <div className="flex items-center gap-4">
+                                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: p.accentSoft }}>
+                                    {p.icon}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-headline text-[16px] font-extrabold text-[#002f76]">{p.name}</h3>
+                                      {totalAvailable === 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Full</span>}
+                                    </div>
+                                    <p className="text-[12px] text-[#64748b]">{p.ageRange} • {p.schedule} • {p.sessions} Sessions</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[18px] font-extrabold text-[#002f76]">₱{p.rate.toLocaleString()}</p>
+                                  <p className="text-[11px] text-[#94a3b8]">60% down: ₱{p.downpayment.toLocaleString()}</p>
+                                </div>
+                              </div>
+
+                              {/* Class options */}
+                              {isSelected && (
+                                <div className="border-t border-slate-100 bg-[#f8fafc] px-6 py-4 space-y-3">
+                                  {p.prerequisite && (
+                                    <div className="flex gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-[12px] text-amber-800 font-medium">
+                                      <span className="shrink-0">⚠️</span> <span><strong>Pre-requisite:</strong> {p.prerequisite}</span>
+                                    </div>
+                                  )}
+                                  <p className="text-[12px] font-bold text-[#64748b] uppercase tracking-widest">Select Class Time</p>
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    {p.classes.map((cls) => {
+                                      const slotInfo = programSlots[cls.name];
+                                      const isFull = slotInfo ? slotInfo.available === 0 : false;
+                                      const isClassSelected = selectedClass === cls.name;
+                                      return (
+                                        <button
+                                          key={cls.name}
+                                          disabled={isFull}
+                                          onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
+                                          className={[
+                                            "flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150",
+                                            isFull ? "opacity-40 cursor-not-allowed border-slate-200 bg-white" :
+                                              isClassSelected ? "border-[#0033A0] bg-[#0033A0]/5 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300",
+                                          ].join(" ")}
+                                        >
+                                          <div>
+                                            <p className="text-[13px] font-bold text-[#002f76]">{cls.name}</p>
+                                            <p className="text-[11px] text-[#64748b]">{cls.time}</p>
+                                          </div>
+                                          {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </m.div>
+                          );
+                        })}
+                    </AnimatePresence>
+                  </m.div>
+
+                  <div className="mt-8 flex justify-between">
+                    <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
+                      ← Back
+                    </button>
+                    <button
+                      disabled={!canProceedStep0}
+                      onClick={() => setStep(2)}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Continue <span>→</span>
+                    </button>
                   </div>
                 </m.div>
               )}

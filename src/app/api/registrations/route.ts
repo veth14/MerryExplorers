@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb"; // NEW
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { v2 as cloudinary } from "cloudinary";
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       amountPaid,
       creditBalance,
       referenceNumber,
+      leadId, // NEW — sent by the register page after the Details step
     } = data;
 
     // Validate required fields
@@ -138,9 +140,30 @@ export async function POST(request: Request) {
       approvedAt: null,
       approvedBy: null,
       confirmationEmailSent: false,
+      leadId: leadId || null, // NEW
     };
 
     const result = await db.collection("student_registrations").insertOne(newRegistration);
+
+    // NEW — mark the lead as converted. Never block the registration if this fails.
+    if (leadId && ObjectId.isValid(leadId)) {
+      try {
+        await db.collection("leads").updateOne(
+          { _id: new ObjectId(leadId) },
+          {
+            $set: {
+              status: "converted",
+              registrationId: result.insertedId.toString(),
+              program,
+              classTime,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      } catch (err) {
+        console.error("[registrations POST] Failed to mark lead as converted:", err);
+      }
+    }
 
     // Notifications and emails have been moved to the payment verification step
 

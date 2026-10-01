@@ -10,6 +10,8 @@ import { PROGRAM_SLOTS } from "@/data/landing";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type EmergencyContact = { name: string; relationship: string; phone: string };
+
 type PhotoItem = { url: string; caption: string };
 
 type Album = {
