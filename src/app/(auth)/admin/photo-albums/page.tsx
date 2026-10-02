@@ -32,7 +32,7 @@ interface PhotoAlbum {
   sessionLabel: string;
   sessionDate: string;
   note: string;
-  photos: { url: string; caption: string }[];
+  photos: { url: string; caption: string; cloudinaryPublicId?: string }[];
   emailSent: boolean;
   emailSentAt: string | null;
   expiresAt: string;
@@ -148,13 +148,14 @@ function DeleteConfirm({
 // ─── Album Card ───────────────────────────────────────────────────────────────
 
 function AlbumCard({
-  album, onDelete, onSendEmail, isSending, onView
+  album, onDelete, onSendEmail, isSending, onView, onEdit
 }: {
   album: PhotoAlbum;
   onDelete: (album: PhotoAlbum) => void;
   onSendEmail: (album: PhotoAlbum) => void;
   isSending: boolean;
   onView?: (album: PhotoAlbum) => void;
+  onEdit: (album: PhotoAlbum) => void;
 }) {
   const expiry = timeUntilExpiry(album.expiresAt);
   const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || "");
@@ -254,11 +255,20 @@ function AlbumCard({
             onClick={(e) => { e.stopPropagation(); onSendEmail(album); }}
             disabled={isSending}
             className={`flex-1 rounded-xl py-2 text-[12px] font-bold transition-all ${album.emailSent
-                ? "bg-slate-100 text-[#64748b] hover:bg-slate-200"
-                : "bg-[#0033A0] text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002580]"
+              ? "bg-slate-100 text-[#64748b] hover:bg-slate-200"
+              : "bg-[#0033A0] text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002580]"
               } disabled:opacity-50`}
           >
             {isSending ? "Sending…" : album.emailSent ? "Resend Email" : "📧 Send Email"}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(album); }}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-[#64748b] hover:bg-slate-200 hover:text-[#0033A0] transition-colors"
+            title="Edit album"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(album); }}
@@ -812,6 +822,427 @@ function CreatePanel({
   );
 }
 
+// ─── Edit Panel ────────────────────────────────────────────────────────────────
+
+interface ExistingPhoto {
+  key: string;
+  url: string;
+  caption: string;
+  cloudinaryPublicId?: string;
+}
+
+interface NewPhoto {
+  id: string;
+  file: File;
+  previewUrl: string;
+  caption: string;
+  status: "compressing" | "ready" | "error";
+}
+
+const MAX_PHOTOS = 30;
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+  });
+
+function toDateInput(d?: string) {
+  return d ? new Date(d).toISOString().split("T")[0] : "";
+}
+
+function EditPanel({
+  album, onClose, onSaved, actorUid, actorName,
+}: {
+  album: PhotoAlbum;
+  onClose: () => void;
+  onSaved: (album: PhotoAlbum) => void;
+  actorUid?: string;
+  actorName?: string;
+}) {
+  const [sessionDate, setSessionDate] = useState(toDateInput(album.sessionDate));
+  const [note, setNote] = useState(album.note || "");
+  const [existing, setExisting] = useState<ExistingPhoto[]>(
+    album.photos.map((p, i) => ({ ...p, key: `${p.url}-${i}` }))
+  );
+  const [removed, setRemoved] = useState<ExistingPhoto[]>([]);
+  const [added, setAdded] = useState<NewPhoto[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const readyAdded = added.filter((p) => p.status === "ready");
+  const totalCount = existing.length + added.length;
+  const readyTotal = existing.length + readyAdded.length;
+  const compressing = added.some((p) => p.status === "compressing");
+
+  const hasChanges =
+    note !== (album.note || "") ||
+    sessionDate !== toDateInput(album.sessionDate) ||
+    removed.length > 0 ||
+    readyAdded.length > 0 ||
+    existing.some((p) => {
+      const orig = album.photos.find((o) => o.url === p.url);
+      return (orig?.caption || "") !== p.caption;
+    });
+
+  const handleFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files) return;
+      const remaining = MAX_PHOTOS - totalCount;
+      const toProcess = Array.from(files).slice(0, Math.max(remaining, 0));
+
+      const previews: NewPhoto[] = toProcess.map((f) => ({
+        id: `${f.name}-${Date.now()}-${Math.random()}`,
+        file: f,
+        previewUrl: URL.createObjectURL(f),
+        caption: "",
+        status: "compressing",
+      }));
+      setAdded((prev) => [...prev, ...previews]);
+
+      for (const preview of previews) {
+        try {
+          const compressed = await imageCompression(preview.file, {
+            maxSizeMB: 0.2,
+            maxWidthOrHeight: 1080,
+            useWebWorker: true,
+            initialQuality: 0.8,
+          });
+          const previewUrl = URL.createObjectURL(compressed);
+          setAdded((prev) =>
+            prev.map((p) =>
+              p.id === preview.id ? { ...p, previewUrl, file: compressed as File, status: "ready" } : p
+            )
+          );
+        } catch {
+          setAdded((prev) => prev.map((p) => (p.id === preview.id ? { ...p, status: "error" } : p)));
+        }
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [totalCount]
+  );
+
+  function removeExisting(photo: ExistingPhoto) {
+    setExisting((prev) => prev.filter((p) => p.key !== photo.key));
+    setRemoved((prev) => [...prev, photo]);
+  }
+
+  function undoRemove(photo: ExistingPhoto) {
+    setRemoved((prev) => prev.filter((p) => p.key !== photo.key));
+    setExisting((prev) => [...prev, photo]);
+  }
+
+  function removeAdded(id: string) {
+    setAdded((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
+  async function handleSave() {
+    if (readyTotal === 0) {
+      setError("An album needs at least one photo.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      // 1. Upload any newly added photos
+      const uploaded: { url: string; cloudinaryPublicId: string; caption: string }[] = [];
+      for (const p of readyAdded) {
+        const base64 = await fileToBase64(p.file);
+        const res = await fetch("/api/upload-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64 }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error("Failed to upload one or more new photos");
+        uploaded.push({ url: data.url, cloudinaryPublicId: data.cloudinaryPublicId, caption: p.caption });
+      }
+
+      // 2. Save the album. Server deletes `removedPublicIds` from Cloudinary.
+      const res = await fetch("/api/photo-albums", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: album.id,
+          sessionDate,
+          note,
+          photos: [
+            ...existing.map((p) => ({
+              url: p.url,
+              cloudinaryPublicId: p.cloudinaryPublicId,
+              caption: p.caption,
+            })),
+            ...uploaded,
+          ],
+          removedPublicIds: removed.map((p) => p.cloudinaryPublicId).filter(Boolean),
+          actorUid,
+          actorName,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error || "Failed to save changes");
+        return;
+      }
+      onSaved(data.data);
+      onClose();
+    } catch (e: any) {
+      setError(e.message || "Network error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const labelCls = "block text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60 mb-1.5";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={saving ? undefined : onClose} />
+      <m.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        className="relative z-10 w-full sm:max-w-3xl max-h-[92vh] sm:max-h-[88vh] rounded-t-[2rem] sm:rounded-[2rem] bg-white shadow-2xl flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#0033A0]/50">Photo Albums</p>
+            <h2 className="font-headline text-[20px] font-extrabold text-[#0f172a]">
+              Edit {album.childFirstName}'s Album
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[#64748b] hover:bg-slate-200 transition-colors disabled:opacity-50"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {album.emailSent && (
+            <div className="rounded-xl bg-[#fff8e1] border border-[#fde68a] px-4 py-3 text-[12px] font-semibold text-[#92400e]">
+              📧 The email was already sent. Parents will see your changes at the same link — no need to resend
+              unless you want to notify them.
+            </div>
+          )}
+
+          {/* Read-only context */}
+          <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 border border-slate-100 p-4">
+            <div>
+              <p className={labelCls}>Student</p>
+              <p className="text-[14px] font-bold text-[#0f172a]">{album.childFirstName}</p>
+            </div>
+            <div>
+              <p className={labelCls}>Parent Email</p>
+              <p className="text-[14px] font-bold text-[#0f172a] truncate">{album.parentEmail}</p>
+            </div>
+          </div>
+
+          {/* Editable text */}
+          <div className="space-y-4">
+            <div>
+              <label className={labelCls}>Session Date</label>
+              <CustomDatePicker
+                selectedDate={sessionDate}
+                onChange={setSessionDate}
+                triggerClassName="w-full rounded-xl border-2 border-slate-100 bg-white px-3 py-2.5 text-[13px] font-bold text-[#0f172a] focus:outline-none focus:border-[#0033A0]/40 text-left flex justify-between items-center"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Teacher note</label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                placeholder="Something special about today's session…"
+                className="w-full rounded-xl border-2 border-slate-100 bg-white px-3 py-2 text-[13px] font-medium text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40 resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Photos */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60">
+                Photos ({totalCount} / {MAX_PHOTOS})
+              </p>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={totalCount >= MAX_PHOTOS || saving}
+                className="rounded-xl bg-[#0033A0] px-4 py-2 text-[13px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002580] disabled:opacity-50"
+              >
+                + Add Photos
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="hidden"
+                onChange={(e) => handleFiles(e.target.files)}
+              />
+            </div>
+
+            {totalCount === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-[#c7d7f5] bg-[#f8fafc] py-10 text-center text-[13px] font-semibold text-[#94a3b8]">
+                No photos. Add at least one before saving.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <AnimatePresence>
+                  {existing.map((p) => (
+                    <m.div
+                      key={p.key}
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="space-y-1.5"
+                    >
+                      <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 group">
+                        <Image src={p.url} alt="" fill className="object-cover" sizes="200px" />
+                        <button
+                          onClick={() => removeExisting(p)}
+                          disabled={saving}
+                          title="Remove photo"
+                          className="absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white text-[11px] shadow-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <input
+                        value={p.caption}
+                        onChange={(e) =>
+                          setExisting((prev) =>
+                            prev.map((x) => (x.key === p.key ? { ...x, caption: e.target.value } : x))
+                          )
+                        }
+                        placeholder="Caption (optional)"
+                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[12px] font-medium text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40"
+                      />
+                    </m.div>
+                  ))}
+
+                  {added.map((p) => (
+                    <m.div
+                      key={p.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="space-y-1.5"
+                    >
+                      <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 border-[#FFC107] group">
+                        <Image src={p.previewUrl} alt="" fill className="object-cover" sizes="200px" />
+                        <span className="absolute bottom-1.5 left-1.5 rounded-full bg-[#FFC107] px-2 py-0.5 text-[9px] font-black text-[#003399]">
+                          NEW
+                        </span>
+                        {p.status === "compressing" && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          </div>
+                        )}
+                        {p.status === "error" && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-red-500/70 text-[11px] font-bold text-white">
+                            Failed
+                          </div>
+                        )}
+                        <button
+                          onClick={() => removeAdded(p.id)}
+                          disabled={saving}
+                          title="Remove photo"
+                          className="absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white text-[11px] shadow-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <input
+                        value={p.caption}
+                        onChange={(e) =>
+                          setAdded((prev) => prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x)))
+                        }
+                        placeholder="Caption (optional)"
+                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[12px] font-medium text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40"
+                      />
+                    </m.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* Pending removals with undo */}
+            {removed.length > 0 && (
+              <div className="mt-4 rounded-xl bg-red-50 border border-red-100 p-3">
+                <p className="text-[11px] font-black uppercase tracking-widest text-red-400 mb-2">
+                  Will be deleted on save ({removed.length})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {removed.map((p) => (
+                    <div key={p.key} className="relative h-14 w-14 rounded-lg overflow-hidden border border-red-200">
+                      <Image src={p.url} alt="" fill className="object-cover opacity-50" sizes="56px" />
+                      <button
+                        onClick={() => undoRemove(p)}
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 text-[10px] font-bold text-white hover:bg-black/60"
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-[13px] font-semibold text-red-600">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-5 border-t border-slate-100 shrink-0 bg-white">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-xl border border-slate-200 px-5 py-2.5 text-[13px] font-bold text-[#64748b] hover:bg-slate-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || compressing || !hasChanges || readyTotal === 0}
+            className="flex items-center gap-2 rounded-xl bg-[#FFC107] px-5 py-2.5 text-[13px] font-bold text-[#003399] shadow-md shadow-[#FFC107]/30 hover:bg-[#ffb800] disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#003399]/30 border-t-[#003399]" />
+                Saving…
+              </>
+            ) : (
+              "💾 Save Changes"
+            )}
+          </button>
+        </div>
+      </m.div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PhotoAlbumsPage() {
@@ -820,6 +1251,7 @@ export default function PhotoAlbumsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [viewTarget, setViewTarget] = useState<PhotoAlbum | null>(null);
+  const [editTarget, setEditTarget] = useState<PhotoAlbum | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PhotoAlbum | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -1004,6 +1436,7 @@ export default function PhotoAlbumsPage() {
                   onSendEmail={handleSendEmail}
                   isSending={sendingId === album.id}
                   onView={setViewTarget}
+                  onEdit={setEditTarget}
                 />
               ))}
             </AnimatePresence>
@@ -1027,6 +1460,22 @@ export default function PhotoAlbumsPage() {
           <CreatePanel
             onClose={() => setShowCreate(false)}
             onCreated={(album) => setAlbums((prev) => [album, ...prev])}
+            actorUid={user?.uid}
+            actorName={userProfile?.fullName || user?.email || "Admin"}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edit panel */}
+      <AnimatePresence>
+        {editTarget && (
+          <EditPanel
+            album={editTarget}
+            onClose={() => setEditTarget(null)}
+            onSaved={(updated) => {
+              setAlbums((prev) => prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a)));
+              setToast({ msg: "Album updated ✏️", type: "success" });
+            }}
             actorUid={user?.uid}
             actorName={userProfile?.fullName || user?.email || "Admin"}
           />

@@ -57,10 +57,10 @@ export default function PublicPhotoAlbumPage({
       const savedPin = typeof window !== "undefined" ? sessionStorage.getItem(`album-pin-${code}`) : null;
       const activePin = pinToTry || savedPin;
       const url = `/api/photo-albums/${code}${activePin ? `?pin=${activePin}` : ""}`;
-      
+
       const r = await fetch(url);
       const res = await r.json();
-      
+
       if (res.success) {
         setData(res.data);
         if (!res.data.requiresPin && activePin) {
@@ -275,11 +275,10 @@ export default function PublicPhotoAlbumPage({
             <span className="inline-flex items-center gap-1.5 bg-[#FFC107] text-[#003399] px-5 py-2 rounded-full font-extrabold text-[13px] shadow-lg border-2 border-[#FFD600]">
               ✨ {data.photos.length} special moment{data.photos.length !== 1 ? "s" : ""}
             </span>
-            <span className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-bold text-[12px] border-2 shadow-md ${
-              expiry.hoursLeft < 24
+            <span className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-bold text-[12px] border-2 shadow-md ${expiry.hoursLeft < 24
                 ? "bg-red-500 text-white border-red-400"
                 : "bg-white/80 text-[#0033A0] border-[#93c5fd]"
-            }`}>
+              }`}>
               ⏰ Available for {expiry.label}
             </span>
             <span className="inline-flex items-center gap-1.5 bg-[#E8F0FF] text-[#0033A0] px-4 py-2 rounded-full font-bold text-[12px] border-2 border-[#93c5fd]">
@@ -345,28 +344,28 @@ export default function PublicPhotoAlbumPage({
         {/* Photo Gallery with Adventurous Animations */}
         <div className="relative pt-4 pb-12">
           {/* Animated Background Elements */}
-          <m.div 
+          <m.div
             animate={{ x: ["0%", "20%", "0%"], y: [0, -10, 0] }}
             transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
             className="absolute top-10 left-[-20px] text-6xl opacity-40 z-0 pointer-events-none hidden sm:block"
           >
             ☁️
           </m.div>
-          <m.div 
+          <m.div
             animate={{ x: ["0%", "-30%", "0%"], y: [0, 15, 0] }}
             transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 2 }}
             className="absolute top-40 right-[-30px] text-7xl opacity-30 z-0 pointer-events-none hidden sm:block"
           >
             ☁️
           </m.div>
-          <m.div 
+          <m.div
             animate={{ y: [0, -20, 0] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             className="absolute bottom-20 left-10 text-5xl opacity-80 z-0 pointer-events-none drop-shadow-md"
           >
             🎈
           </m.div>
-          <m.div 
+          <m.div
             animate={{ y: [0, -15, 0], x: [0, 10, 0] }}
             transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
             className="absolute top-0 right-10 text-6xl opacity-90 z-0 pointer-events-none drop-shadow-lg"
@@ -378,7 +377,7 @@ export default function PublicPhotoAlbumPage({
             <h2 className="text-[26px] sm:text-[32px] font-extrabold text-[#0033A0] mb-2 drop-shadow-sm">📸 Photo Gallery</h2>
             <p className="text-[14px] sm:text-[15px] font-medium text-[#64748b]">Tap to view full size • Hover and click ⬇ to save individually</p>
           </div>
-          
+
           <div className="relative z-10 columns-1 sm:columns-2 lg:columns-3 gap-4 sm:gap-5 space-y-4 sm:space-y-5">
             {data.photos.map((photo, i) => (
               <m.div
@@ -451,7 +450,7 @@ export default function PublicPhotoAlbumPage({
             className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center"
           >
             <div className="absolute inset-0" onClick={() => setLightboxIndex(null)} />
-            
+
             {/* Close */}
             <button
               onClick={() => setLightboxIndex(null)}
@@ -502,7 +501,7 @@ export default function PublicPhotoAlbumPage({
                   priority
                 />
               </div>
-              
+
               {/* Caption */}
               {data.photos[lightboxIndex].caption && (
                 <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md rounded-2xl px-6 py-3 max-w-xl text-center pointer-events-auto border border-white/10">
@@ -511,7 +510,7 @@ export default function PublicPhotoAlbumPage({
                   </p>
                 </div>
               )}
-              
+
               {/* Counter */}
               <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md rounded-full px-4 py-1.5 pointer-events-auto border border-white/10">
                 <p className="text-white/80 text-[12px] font-bold tracking-widest uppercase">
@@ -526,7 +525,7 @@ export default function PublicPhotoAlbumPage({
       {/* ── Footer ── */}
       <div className="text-center mt-12 px-6 pb-8">
         <div className="w-16 h-16 mx-auto flex items-center justify-center mb-2">
-          <Image src="/logo-nobg.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
+          <Image src="/LOGO-noBG.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
         </div>
         <p className="text-[13px] font-extrabold text-[#0033A0] uppercase tracking-widest mb-1 mt-2">Merry Explorers Playgroup</p>
         <p className="text-[12px] font-medium text-[#94a3b8]">Dream. Discover. Explore. 🌟</p>
