@@ -16,16 +16,16 @@ export async function POST(request: Request) {
   if (deny) return deny;
 
   try {
-    const data = await request.json();
-    const { base64 } = data;
+    const { base64 } = await request.json();
 
-    if (!base64) {
-      return NextResponse.json({ error: "Missing base64 data" }, { status: 400 });
+    if (!base64 || typeof base64 !== "string" || !base64.startsWith("data:image/")) {
+      return NextResponse.json({ error: "Missing or invalid image data" }, { status: 400 });
     }
 
+    // No incoming transformation: store exactly what the browser sent.
     const result = await cloudinary.uploader.upload(base64, {
       folder: "merry_explorers_student_albums",
-      transformation: [{ width: 1200, crop: "limit", quality: "auto:good" }],
+      resource_type: "image",
     });
 
     return NextResponse.json({

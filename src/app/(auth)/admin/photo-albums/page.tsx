@@ -105,6 +105,16 @@ function fmtDate(d: string) {
 
 const PROGRAMS = Object.values(PROGRAM_SLOTS);
 
+// Shared photo compression settings: near-original iPhone quality.
+// 2.5 MB of image becomes ~3.3 MB as base64, staying under the 4.5 MB request limit.
+const COMPRESSION_OPTIONS = {
+  maxSizeMB: 2.5,
+  maxWidthOrHeight: 4032, // 12 MP, the standard iPhone photo size
+  useWebWorker: true,
+  initialQuality: 0.9,
+  fileType: "image/jpeg",
+};
+
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 
 function DeleteConfirm({
@@ -438,12 +448,7 @@ function CreatePanel({
 
     for (const preview of newPreviews) {
       try {
-        const compressed = await imageCompression(preview.file, {
-          maxSizeMB: 0.2, // Compress down to max ~200KB
-          maxWidthOrHeight: 1080, // Cap dimensions at 1080p
-          useWebWorker: true,
-          initialQuality: 0.8, // Start with high compression
-        });
+        const compressed = await imageCompression(preview.file, COMPRESSION_OPTIONS);
         const previewUrl = URL.createObjectURL(compressed);
         setPhotos((prev) =>
           prev.map((p) => p.id === preview.id ? { ...p, previewUrl, file: compressed as File, status: "ready" } : p)
@@ -674,7 +679,7 @@ function CreatePanel({
                 >
                   <span className="text-4xl mb-3 transition-transform group-hover:scale-110">📸</span>
                   <p className="text-[14px] font-bold text-[#0033A0]">Click to upload photos</p>
-                  <p className="text-[12px] text-[#94a3b8] mt-1">Up to 30 photos · auto-compressed</p>
+                  <p className="text-[12px] text-[#94a3b8] mt-1">Up to 30 photos · high quality</p>
                 </button>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
@@ -905,12 +910,7 @@ function EditPanel({
 
       for (const preview of previews) {
         try {
-          const compressed = await imageCompression(preview.file, {
-            maxSizeMB: 0.2,
-            maxWidthOrHeight: 1080,
-            useWebWorker: true,
-            initialQuality: 0.8,
-          });
+          const compressed = await imageCompression(preview.file, COMPRESSION_OPTIONS);
           const previewUrl = URL.createObjectURL(compressed);
           setAdded((prev) =>
             prev.map((p) =>
