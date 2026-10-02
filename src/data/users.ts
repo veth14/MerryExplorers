@@ -60,6 +60,12 @@ export type UserAccount = {
 
   // Emergency contacts (optional)
   emergencyContacts: EmergencyContact[];
+
+  /**
+   * Fine-grained feature permissions granted to this employee.
+   * e.g. ["photo-albums"] gives a teacher access to the Photo Albums page.
+   */
+  permissions?: string[];
 };
 
 

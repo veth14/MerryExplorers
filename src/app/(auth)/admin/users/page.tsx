@@ -120,6 +120,7 @@ function emptyDraft(): Draft {
     perfectAttendanceIncentive: 0,
     birthdayGift: 0,
     emergencyContacts: [],
+    permissions: [],
   };
 }
 
@@ -152,6 +153,7 @@ function draftFromUser(u: UserAccount): Draft {
     perfectAttendanceIncentive: u.perfectAttendanceIncentive || 0,
     birthdayGift: u.birthdayGift || 0,
     emergencyContacts: (u.emergencyContacts || []).map((c) => ({ ...c })),
+    permissions: [...(u.permissions || [])],
   };
 }
 
@@ -264,6 +266,7 @@ function UserModal({
         perfectAttendanceIncentive: draft.perfectAttendanceIncentive,
         birthdayGift: draft.birthdayGift,
         emergencyContacts: draft.emergencyContacts.filter((c) => c.name.trim()),
+        permissions: draft.permissions || [],
       };
 
       await onSave(account, initial?.id);
@@ -700,6 +703,40 @@ function UserModal({
                         <span className="text-[12px] font-bold text-[#5a6e8c]">hours / week</span>
                       </div>
                     )}
+                  </div>
+                </label>
+
+                {/* Photo Albums Upload permission */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="relative mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={(draft.permissions || []).includes("photo-albums")}
+                      onChange={(e) => {
+                        const has = (draft.permissions || []).includes("photo-albums");
+                        if (e.target.checked && !has) {
+                          set("permissions", [...(draft.permissions || []), "photo-albums"]);
+                        } else if (!e.target.checked && has) {
+                          set("permissions", (draft.permissions || []).filter((p) => p !== "photo-albums"));
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <div className={`w-[38px] h-[22px] rounded-full transition-colors ${
+                      (draft.permissions || []).includes("photo-albums") ? "bg-[#00b894]" : "bg-[#d0d8e8]"
+                    }`}>
+                      <div className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                        (draft.permissions || []).includes("photo-albums") ? "translate-x-[18px]" : "translate-x-[3px]"
+                      }`} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#002f76] group-hover:text-[#00b894] transition-colors">
+                      📸 Photo Albums Upload
+                    </p>
+                    <p className="text-[11px] font-semibold text-[#8898aa] leading-snug mt-0.5">
+                      Grants access to the Photo Albums page so this teacher can create and upload student photo albums.
+                    </p>
                   </div>
                 </label>
               </div>

@@ -12,10 +12,15 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Only block regular teachers and parents from admin pages
+    // Teachers with the "photo-albums" permission are allowed into that one page.
+    // The middleware cannot read DB permissions, so we allow all teachers through to
+    // /admin/photo-albums — the sidebar only shows the link to permitted users.
+    if (role === 'teacher' && pathname.startsWith('/admin/photo-albums')) {
+      return NextResponse.next();
+    }
+    // Only block regular teachers and parents from other admin pages
     if (role === 'teacher' || role === 'parent') {
-      const dest = role === 'parent' ? '/parent/dashboard' : '/teacher';
-      return NextResponse.redirect(new URL(dest, request.url));
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
     // executive assistant, developer and admin can both access /admin
   }
@@ -26,11 +31,8 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
     // Block pure admins and parents from teacher pages
-    if (role === 'admin') {
-      return NextResponse.redirect(new URL('/admin', request.url));
-    }
-    if (role === 'parent') {
-      return NextResponse.redirect(new URL('/parent/dashboard', request.url));
+    if (role === 'admin' || role === 'parent') {
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
     // executive assistant and developer can access /teacher
   }
@@ -41,9 +43,8 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/parent/login', request.url));
     }
     if (role !== 'parent') {
-      // Non-parents who somehow hit /parent/* — redirect to their proper home
-      if (role === 'admin') return NextResponse.redirect(new URL('/admin', request.url));
-      return NextResponse.redirect(new URL('/teacher', request.url));
+      // Non-parents who somehow hit /parent/* — redirect to unauthorized
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
   }
 

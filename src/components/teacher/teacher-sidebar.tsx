@@ -283,6 +283,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
 
   const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive assistant";
   const isDeveloper = (userProfile?.role || "").toLowerCase() === "developer";
+  const canUploadPhotos = isExecPartner || isDeveloper || (userProfile?.permissions || []).includes("photo-albums");
 
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
@@ -375,6 +376,16 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
                 />
               );
             })}
+            {/* Photo Albums — shown to teachers with the "photo-albums" permission */}
+            {canUploadPhotos && !isExecPartner && !isDeveloper && (
+              <NavItem
+                href="/admin/photo-albums"
+                label="Photo Albums"
+                icon={<GalleryIcon />}
+                isActive={pathname === "/admin/photo-albums" || pathname.startsWith("/admin/photo-albums/")}
+                onClick={handleNavClick}
+              />
+            )}
           </div>
         </div>
 

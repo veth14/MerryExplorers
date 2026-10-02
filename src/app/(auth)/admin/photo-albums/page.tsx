@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { m, AnimatePresence } from "framer-motion";
-import imageCompression from "browser-image-compression";
 import { useAuth } from "@/lib/auth-context";
 import { AppShell } from "@/components/app-shell";
 import { PROGRAM_SLOTS } from "@/data/landing";
@@ -105,15 +104,7 @@ function fmtDate(d: string) {
 
 const PROGRAMS = Object.values(PROGRAM_SLOTS);
 
-// Shared photo compression settings: near-original iPhone quality.
-// 2.5 MB of image becomes ~3.3 MB as base64, staying under the 4.5 MB request limit.
-const COMPRESSION_OPTIONS = {
-  maxSizeMB: 2.5,
-  maxWidthOrHeight: 4032, // 12 MP, the standard iPhone photo size
-  useWebWorker: true,
-  initialQuality: 0.9,
-  fileType: "image/jpeg",
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 
@@ -431,7 +422,7 @@ function CreatePanel({
     );
   });
 
-  const handleFiles = useCallback(async (files: FileList | null) => {
+  const handleFiles = useCallback((files: FileList | null) => {
     if (!files) return;
     const remaining = 30 - photos.length;
     const toProcess = Array.from(files).slice(0, remaining);
@@ -441,33 +432,11 @@ function CreatePanel({
       file: f,
       previewUrl: URL.createObjectURL(f),
       caption: "",
-      status: "compressing" as const,
+      status: "ready" as const, // Skip compression to maintain quality
     }));
 
     setPhotos((prev) => [...prev, ...newPreviews]);
-
-    for (const preview of newPreviews) {
-      try {
-        const compressed = await imageCompression(preview.file, COMPRESSION_OPTIONS);
-        const previewUrl = URL.createObjectURL(compressed);
-        setPhotos((prev) =>
-          prev.map((p) => p.id === preview.id ? { ...p, previewUrl, file: compressed as File, status: "ready" } : p)
-        );
-      } catch {
-        setPhotos((prev) =>
-          prev.map((p) => p.id === preview.id ? { ...p, status: "error" } : p)
-        );
-      }
-    }
   }, [photos.length]);
-
-  const toBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-    });
 
   async function handleSubmit() {
     if (!selectedStudent || photos.filter((p) => p.status === "ready").length === 0) return;
@@ -478,20 +447,33 @@ function CreatePanel({
       const readyPhotos = photos.filter((p) => p.status === "ready");
       const uploadedPhotos = [];
 
+      // Get signature first
+      const signRes = await fetch("/api/cloudinary-sign");
+      const signData = await signRes.json();
+      if (!signData.signature) throw new Error("Failed to get upload signature");
+
       for (const p of readyPhotos) {
-        const base64 = await toBase64(p.file);
-        const upRes = await fetch("/api/upload-photo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64 }),
-        });
+        const formData = new FormData();
+        formData.append("file", p.file);
+        formData.append("api_key", signData.apiKey);
+        formData.append("timestamp", signData.timestamp);
+        formData.append("signature", signData.signature);
+        formData.append("folder", "merry_explorers_student_albums");
+
+        const upRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
         const upData = await upRes.json();
-        if (!upData.success) {
+        if (upData.error) {
           throw new Error("Failed to upload one or more photos");
         }
         uploadedPhotos.push({
-          url: upData.url,
-          cloudinaryPublicId: upData.cloudinaryPublicId,
+          url: upData.secure_url,
+          cloudinaryPublicId: upData.public_id,
           caption: p.caption,
         });
       }
@@ -846,14 +828,6 @@ interface NewPhoto {
 
 const MAX_PHOTOS = 30;
 
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-  });
-
 function toDateInput(d?: string) {
   return d ? new Date(d).toISOString().split("T")[0] : "";
 }
@@ -894,7 +868,7 @@ function EditPanel({
     });
 
   const handleFiles = useCallback(
-    async (files: FileList | null) => {
+    (files: FileList | null) => {
       if (!files) return;
       const remaining = MAX_PHOTOS - totalCount;
       const toProcess = Array.from(files).slice(0, Math.max(remaining, 0));
@@ -904,23 +878,10 @@ function EditPanel({
         file: f,
         previewUrl: URL.createObjectURL(f),
         caption: "",
-        status: "compressing",
+        status: "ready", // Skip compression to maintain quality
       }));
       setAdded((prev) => [...prev, ...previews]);
 
-      for (const preview of previews) {
-        try {
-          const compressed = await imageCompression(preview.file, COMPRESSION_OPTIONS);
-          const previewUrl = URL.createObjectURL(compressed);
-          setAdded((prev) =>
-            prev.map((p) =>
-              p.id === preview.id ? { ...p, previewUrl, file: compressed as File, status: "ready" } : p
-            )
-          );
-        } catch {
-          setAdded((prev) => prev.map((p) => (p.id === preview.id ? { ...p, status: "error" } : p)));
-        }
-      }
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [totalCount]
@@ -954,16 +915,32 @@ function EditPanel({
     try {
       // 1. Upload any newly added photos
       const uploaded: { url: string; cloudinaryPublicId: string; caption: string }[] = [];
+      
+      let signData: any = null;
+      if (readyAdded.length > 0) {
+        const signRes = await fetch("/api/cloudinary-sign");
+        signData = await signRes.json();
+        if (!signData.signature) throw new Error("Failed to get upload signature");
+      }
+
       for (const p of readyAdded) {
-        const base64 = await fileToBase64(p.file);
-        const res = await fetch("/api/upload-photo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64 }),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error("Failed to upload one or more new photos");
-        uploaded.push({ url: data.url, cloudinaryPublicId: data.cloudinaryPublicId, caption: p.caption });
+        const formData = new FormData();
+        formData.append("file", p.file);
+        formData.append("api_key", signData.apiKey);
+        formData.append("timestamp", signData.timestamp);
+        formData.append("signature", signData.signature);
+        formData.append("folder", "merry_explorers_student_albums");
+
+        const upRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+        const data = await upRes.json();
+        if (data.error) throw new Error("Failed to upload one or more new photos");
+        uploaded.push({ url: data.secure_url, cloudinaryPublicId: data.public_id, caption: p.caption });
       }
 
       // 2. Save the album. Server deletes `removedPublicIds` from Cloudinary.

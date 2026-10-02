@@ -248,7 +248,7 @@ export default function PublicPhotoAlbumPage({
             className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-full px-4 py-1.5 mb-5 shadow-md border border-white"
           >
             <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center">
-              <Image src="/logo-nobg.png" alt="Logo" width={24} height={24} className="object-contain" />
+              <Image src="/LOGO-noBG.png" alt="Logo" width={24} height={24} className="object-contain" />
             </div>
             <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#0033A0]">Merry Explorers</span>
           </m.div>
@@ -276,8 +276,8 @@ export default function PublicPhotoAlbumPage({
               ✨ {data.photos.length} special moment{data.photos.length !== 1 ? "s" : ""}
             </span>
             <span className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-bold text-[12px] border-2 shadow-md ${expiry.hoursLeft < 24
-                ? "bg-red-500 text-white border-red-400"
-                : "bg-white/80 text-[#0033A0] border-[#93c5fd]"
+              ? "bg-red-500 text-white border-red-400"
+              : "bg-white/80 text-[#0033A0] border-[#93c5fd]"
               }`}>
               ⏰ Available for {expiry.label}
             </span>
