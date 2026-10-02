@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { v2 as cloudinary } from "cloudinary";
@@ -18,6 +19,11 @@ const PHT_OFFSET_MS = 8 * 60 * 60 * 1000; // Asia/Manila is UTC+8, no DST
 
 function generateAccessCode(): string {
   return randomBytes(5).toString("base64url").toUpperCase().slice(0, 8);
+}
+
+// Same label format POST and PATCH both use: "<classTime> · Mon, Oct 5, 2026"
+function buildSessionLabel(classTime: string, sessionDate: string): string {
+  return `${classTime} · ${new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}`;
 }
 
 // Trailblazer = program slug "brave-explorer", or the display name says so
@@ -121,7 +127,7 @@ export async function POST(request: Request) {
       classTime,
       sessionDate,
       note,
-      photos, // array of { base64, caption }
+      photos, // array of { url, cloudinaryPublicId, caption }
       actorUid,
       actorName,
     } = data;
@@ -165,7 +171,7 @@ export async function POST(request: Request) {
       ? getTrailblazerExpiry(now)
       : new Date(now.getTime() + TTL_DAYS * 24 * 60 * 60 * 1000);
 
-    const sessionLabel = `${classTime} · ${new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}`;
+    const sessionLabel = buildSessionLabel(classTime, sessionDate);
 
     const album = {
       accessCode,
@@ -216,6 +222,117 @@ export async function POST(request: Request) {
   }
 }
 
+// PATCH /api/photo-albums — Admin only, edit date / note / photos
+export async function PATCH(request: Request) {
+  const deny = requireInternalAuth(request);
+  if (deny) return deny;
+
+  try {
+    const body = await request.json();
+    const { id, sessionDate, note, photos, removedPublicIds, actorUid, actorName } = body;
+
+    if (!id || typeof id !== "string" || !ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Missing or invalid album id" }, { status: 400 });
+    }
+    if (!Array.isArray(photos) || photos.length === 0) {
+      return NextResponse.json({ error: "An album needs at least one photo" }, { status: 400 });
+    }
+    if (photos.length > MAX_PHOTOS) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_PHOTOS} photos allowed per album.` },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+    const col = db.collection("student_photo_albums");
+
+    const album = await col.findOne({ _id: new ObjectId(id) });
+    if (!album) {
+      return NextResponse.json({ error: "Album not found" }, { status: 404 });
+    }
+
+    // Clean the incoming photo list
+    const cleanPhotos = (photos as any[])
+      .filter((p) => p && typeof p.url === "string" && p.url.startsWith("https://"))
+      .map((p) => ({
+        url: p.url as string,
+        caption: String(p.caption || "").slice(0, 200),
+        ...(p.cloudinaryPublicId ? { cloudinaryPublicId: String(p.cloudinaryPublicId) } : {}),
+      }));
+
+    if (cleanPhotos.length === 0) {
+      return NextResponse.json({ error: "No valid photos provided" }, { status: 400 });
+    }
+
+    // Only delete Cloudinary files that belonged to THIS album and were removed
+    const keptIds = new Set(cleanPhotos.map((p: any) => p.cloudinaryPublicId).filter(Boolean));
+    const ownedIds = new Set(
+      ((album.photos || []) as any[]).map((p) => p.cloudinaryPublicId).filter(Boolean)
+    );
+    const toDelete = ((removedPublicIds || []) as string[]).filter(
+      (pid) => ownedIds.has(pid) && !keptIds.has(pid)
+    );
+
+    const set: Record<string, any> = {
+      photos: cleanPhotos,
+      note: String(note || "").trim().slice(0, 1000),
+      updatedAt: new Date(),
+    };
+
+    // Same "YYYY-MM-DD" format POST stores; rebuild the label so it stays in sync
+    if (typeof sessionDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sessionDate)) {
+      set.sessionDate = sessionDate;
+      set.sessionLabel = buildSessionLabel(album.classTime, sessionDate);
+    }
+
+    // 1. Save first, so a failed save never loses photos.
+    //    $set leaves expiresAt alone, so the TTL index and the Trailblazer
+    //    Saturday expiry keep working.
+    await col.updateOne({ _id: album._id }, { $set: set });
+
+    // 2. Then remove the Cloudinary files that are no longer in the album
+    if (toDelete.length > 0) {
+      const results = await Promise.allSettled(
+        toDelete.map((pid) => cloudinary.uploader.destroy(pid))
+      );
+      results.forEach((r, i) => {
+        if (r.status === "rejected") {
+          console.warn("[photo-albums PATCH] Cloudinary delete failed for", toDelete[i]);
+        }
+      });
+    }
+
+    // Audit log
+    if (actorUid) {
+      await db.collection("audit_log").insertOne({
+        actorUid,
+        actorName: actorName || "Admin",
+        actorRole: "admin",
+        action: "UPDATE",
+        category: "photo_albums",
+        targetId: id,
+        details: `Edited photo album for ${album.childFirstName} (${set.sessionLabel || album.sessionLabel}): ${cleanPhotos.length} photos, ${toDelete.length} removed`,
+        createdAt: new Date(),
+      });
+    }
+
+    // Return only the changed fields; the page merges these into the album
+    return NextResponse.json({
+      success: true,
+      data: {
+        id,
+        photos: set.photos,
+        note: set.note,
+        ...(set.sessionDate ? { sessionDate: set.sessionDate, sessionLabel: set.sessionLabel } : {}),
+      },
+    });
+  } catch (error: any) {
+    console.error("[photo-albums PATCH]", error);
+    return NextResponse.json({ error: error.message || "Failed to update album" }, { status: 500 });
+  }
+}
+
 // DELETE /api/photo-albums?id=... — Admin only
 export async function DELETE(request: Request) {
   const deny = requireInternalAuth(request);
@@ -231,8 +348,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const { db, client } = await connectToDatabase();
-    const { ObjectId } = await import("mongodb");
+    const { db } = await connectToDatabase();
 
     const album = await db.collection("student_photo_albums").findOne({ _id: new ObjectId(id) });
     if (!album) {
