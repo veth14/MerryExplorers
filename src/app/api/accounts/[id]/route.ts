@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { deleteB2File } from "@/lib/b2";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -79,6 +80,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const id = (await params).id;
     const { db } = await connectToDatabase();
+
+    // Find the account first so we can clean up any B2 files it owns
+    const account = await db.collection("accounts").findOne({ _id: id as any });
+    if (account?.studyMaterials?.length) {
+      for (const mat of account.studyMaterials) {
+        if (mat.key) {
+          await deleteB2File(mat.key);
+        }
+      }
+    }
 
     const result = await db.collection("accounts").deleteOne({ _id: id as any });
 

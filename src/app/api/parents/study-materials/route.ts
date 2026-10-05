@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { deleteB2File } from "@/lib/b2";
 
 /**
  * POST /api/parents/study-materials
@@ -69,17 +70,27 @@ export async function DELETE(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // NOTE: We do NOT delete the file from B2 here on purpose — the admin
-    // can clean up orphaned files in the B2 console. Deleting from B2 requires
-    // listing object versions, which adds complexity. This can be added later.
+    // 1. Find the target material to check if it has an associated B2 file key
+    const account = await db.collection("accounts").findOne({ _id: uid as any });
+    const targetMaterial = (account?.studyMaterials || []).find(
+      (m: any) => m.id === materialId
+    );
+
+    // 2. Permanently delete the file from Backblaze B2 cloud storage
+    if (targetMaterial?.key) {
+      await deleteB2File(targetMaterial.key);
+    }
+
+    // 3. Remove the material record completely from the MongoDB database
     await db.collection("accounts").updateOne(
       { _id: uid as any },
       { $pull: { studyMaterials: { id: materialId } } as any }
     );
 
-    const account = await db.collection("accounts").findOne({ _id: uid as any });
-    return NextResponse.json({ success: true, studyMaterials: account?.studyMaterials || [] });
+    const updatedAccount = await db.collection("accounts").findOne({ _id: uid as any });
+    return NextResponse.json({ success: true, studyMaterials: updatedAccount?.studyMaterials || [] });
   } catch (error: any) {
+    console.error("[study-materials DELETE]", error);
     return NextResponse.json({ error: "Failed to delete material" }, { status: 500 });
   }
 }
