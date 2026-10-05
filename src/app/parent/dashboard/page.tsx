@@ -486,7 +486,6 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 1100,
         background: "linear-gradient(160deg,#1a6bbf 0%,#2d8fd4 40%,#5bc8f5 100%)",
