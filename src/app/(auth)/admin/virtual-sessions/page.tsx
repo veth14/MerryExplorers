@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
 
@@ -44,6 +44,12 @@ export default function AdminVirtualSessionsPage() {
   
   const [manageModal, setManageModal] = useState<any | null>(null);
   const [confirmEndModal, setConfirmEndModal] = useState<string | null>(null);
+  const [alertModal, setAlertModal] = useState<{ title: string; message: string; type?: "error"|"success"|"warning" } | null>(null);
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState<{ uid: string; materialId: string; title: string } | null>(null);
+
+  function showAlert(message: string, title = "Notice", type: "error"|"success"|"warning" = "error") {
+    setAlertModal({ title, message, type });
+  }
 
   // Link and Time state
   const [newLink, setNewLink] = useState("");
@@ -59,6 +65,9 @@ export default function AdminVirtualSessionsPage() {
   const [materialTitle, setMaterialTitle] = useState("");
   const [materialUrl, setMaterialUrl] = useState("");
   const [materialType, setMaterialType] = useState<"link"|"file">("link");
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedKey, setUploadedKey] = useState(""); // B2 key for file-type materials
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -170,36 +179,50 @@ export default function AdminVirtualSessionsPage() {
         setTimeout(() => setLinkSaveResult(null), 3000);
       }
     } catch (e) {
-      alert("Error ending session");
+      showAlert("Failed to end session. Please try again.", "Error", "error");
     } finally {
       setEndingSession(false);
     }
   }
 
   async function handleAddMaterial(uid: string) {
-    if (!materialTitle || !materialUrl) return alert("Title and URL required");
+    if (!materialTitle) return showAlert("Please provide a title.", "Missing Fields", "warning");
+    if (materialType === "link" && !materialUrl) return showAlert("Please provide a URL.", "Missing Fields", "warning");
+    if (materialType === "file" && !uploadedKey) return showAlert("Please upload a file first.", "Missing Fields", "warning");
     try {
+      const body: Record<string, any> = { uid, title: materialTitle, type: materialType };
+      if (materialType === "link") body.url = materialUrl;
+      else body.key = uploadedKey;
+
       const res = await fetch("/api/parents/study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid, title: materialTitle, url: materialUrl, type: materialType }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const data = await res.json();
         setAccounts(prev => prev.map(a => a.id === uid ? { ...a, studyMaterials: data.studyMaterials } : a));
+        setManageModal((prev: any) => prev ? { ...prev, studyMaterials: data.studyMaterials } : prev);
         setIsAddingMaterial(false);
         setMaterialTitle("");
         setMaterialUrl("");
+        setUploadedKey("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
       } else {
-        alert("Failed to add material");
+        showAlert("Failed to add material. Please try again.", "Error", "error");
       }
     } catch (e) {
-      alert("Error adding material");
+      showAlert("An unexpected error occurred while adding the material.", "Error", "error");
     }
   }
 
   async function handleDeleteMaterial(uid: string, materialId: string) {
-    if (!confirm("Remove this material?")) return;
+    const mat = manageModal?.studyMaterials?.find((m: any) => m.id === materialId);
+    setConfirmDeleteModal({ uid, materialId, title: mat?.title || "this material" });
+  }
+
+  async function executeDeleteMaterial(uid: string, materialId: string) {
+    setConfirmDeleteModal(null);
     try {
       const res = await fetch("/api/parents/study-materials", {
         method: "DELETE",
@@ -209,9 +232,53 @@ export default function AdminVirtualSessionsPage() {
       if (res.ok) {
         const data = await res.json();
         setAccounts(prev => prev.map(a => a.id === uid ? { ...a, studyMaterials: data.studyMaterials } : a));
+        setManageModal((prev: any) => prev ? { ...prev, studyMaterials: data.studyMaterials } : prev);
       }
     } catch (e) {
-      alert("Error deleting material");
+      showAlert("Failed to delete material. Please try again.", "Error", "error");
+    }
+  }
+
+  async function handleFileUpload(file: File) {
+    setUploadingFile(true);
+    setUploadedKey("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("folder", "study-materials");
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.success) {
+        setUploadedKey(data.key);                          // Store B2 key, NOT a URL
+        setMaterialUrl(data.key);                          // Show in the "uploaded" confirmation UI
+        if (!materialTitle) setMaterialTitle(file.name.replace(/\.[^.]+$/, ""));
+      } else {
+        showAlert("Upload failed: " + (data.error || "Unknown error"), "Upload Failed", "error");
+      }
+    } catch (e) {
+      showAlert("An error occurred during upload. Please try again.", "Upload Error", "error");
+    } finally {
+      setUploadingFile(false);
+    }
+  }
+
+  async function openMaterial(uid: string, m: any) {
+    // For link-type (YouTube, etc.) open directly
+    if (m.type === "link" || m.url) {
+      window.open(m.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // For file-type stored in B2, get a short-lived presigned URL
+    try {
+      const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(uid)}&materialId=${encodeURIComponent(m.id)}`);
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else {
+        showAlert(data.error || "Could not open file.", "Error", "error");
+      }
+    } catch {
+      showAlert("Network error. Please try again.", "Error", "error");
     }
   }
 
@@ -482,16 +549,54 @@ export default function AdminVirtualSessionsPage() {
 
                   {isAddingMaterial && (
                     <div style={{ background: "#f8faff", padding: "16px", borderRadius: "16px", border: "1px solid #e2e8f0", marginBottom: "16px" }}>
+                      {/* Type Tabs */}
                       <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                        <button onClick={() => setMaterialType("link")} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: materialType === "link" ? "none" : "1px solid #cbd5e1", background: materialType === "link" ? "#eff6ff" : "white", color: materialType === "link" ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>▶️ YouTube/Link</button>
-                        <button onClick={() => setMaterialType("file")} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: materialType === "file" ? "none" : "1px solid #cbd5e1", background: materialType === "file" ? "#eff6ff" : "white", color: materialType === "file" ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>📄 File URL</button>
+                        <button onClick={() => { setMaterialType("link"); setMaterialUrl(""); }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: materialType === "link" ? "none" : "1px solid #cbd5e1", background: materialType === "link" ? "#eff6ff" : "white", color: materialType === "link" ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>▶️ YouTube / Link</button>
+                        <button onClick={() => { setMaterialType("file"); setMaterialUrl(""); }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: materialType === "file" ? "none" : "1px solid #cbd5e1", background: materialType === "file" ? "#eff6ff" : "white", color: materialType === "file" ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>📄 Upload File</button>
                       </div>
+
+                      {/* Title */}
                       <input value={materialTitle} onChange={e => setMaterialTitle(e.target.value)} placeholder="Material Title..." style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "8px", boxSizing: "border-box" }} />
-                      <input value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="https://..." style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }} />
-                      
+
+                      {/* Link or File */}
+                      {materialType === "link" ? (
+                        <input value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="https://youtube.com/..." style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }} />
+                      ) : (
+                        <div style={{ marginBottom: "12px" }}>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp4,.mp3,.png,.jpg,.jpeg,.gif,.zip"
+                            style={{ display: "none" }}
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) handleFileUpload(f);
+                            }}
+                          />
+                          {materialUrl ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: "#f0fdf4", borderRadius: "10px", border: "1.5px solid #86efac" }}>
+                              <span style={{ fontSize: "20px" }}>✅</span>
+                              <div style={{ flex: 1, overflow: "hidden" }}>
+                                <div style={{ fontSize: "12px", fontWeight: "700", color: "#15803d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Uploaded successfully!</div>
+                                <div style={{ fontSize: "11px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{materialUrl}</div>
+                              </div>
+                              <button onClick={() => { setMaterialUrl(""); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px" }}>✕</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={uploadingFile}
+                              style={{ width: "100%", padding: "24px", borderRadius: "10px", border: "2px dashed #cbd5e1", background: uploadingFile ? "#f8faff" : "white", color: uploadingFile ? "#64748b" : "#0050d5", fontWeight: "700", fontSize: "13px", cursor: uploadingFile ? "not-allowed" : "pointer", textAlign: "center" }}
+                            >
+                              {uploadingFile ? "⏳ Uploading to Backblaze…" : "📤 Click to select file (PDF, DOC, MP4, etc.)"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       <div style={{ display: "flex", gap: "8px" }}>
-                        <button onClick={() => handleAddMaterial(manageModal.id)} style={{ flex: 1, padding: "10px", background: "#10b981", color: "white", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>Add to Folder</button>
-                        <button onClick={() => setIsAddingMaterial(false)} style={{ flex: 1, padding: "10px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>Cancel</button>
+                        <button onClick={() => handleAddMaterial(manageModal.id)} disabled={!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile} style={{ flex: 1, padding: "10px", background: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "#cbd5e1" : "#10b981", color: "white", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "not-allowed" : "pointer" }}>Add to Folder</button>
+                        <button onClick={() => { setIsAddingMaterial(false); setMaterialUrl(""); setMaterialTitle(""); setUploadedKey(""); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ flex: 1, padding: "10px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>Cancel</button>
                       </div>
                     </div>
                   )}
@@ -504,13 +609,13 @@ export default function AdminVirtualSessionsPage() {
                     )}
                     {(manageModal.studyMaterials || []).map((m: any) => (
                       <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "white", border: "1px solid #e2e8f0", borderRadius: "12px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                        <a href={m.url} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", overflow: "hidden" }}>
+                        <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", overflow: "hidden", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0 }}>
                           <span style={{ fontSize: "20px" }}>{m.type === "link" ? "▶️" : "📄"}</span>
                           <div style={{ overflow: "hidden" }}>
                             <div style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                            <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
+                            <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.type === "link" ? (m.url || "") : "📦 Stored in Backblaze (click to open)"}</div>
                           </div>
-                        </a>
+                        </button>
                         <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "12px", fontSize: "16px" }} title="Remove">
                           ✕
                         </button>
@@ -549,6 +654,68 @@ export default function AdminVirtualSessionsPage() {
                 </button>
                 <button 
                   onClick={() => setConfirmEndModal(null)}
+                  style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </m.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Alert Modal ── */}
+      <AnimatePresence>
+        {alertModal && (
+          <div onClick={() => setAlertModal(null)} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,18,51,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+            <m.div
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "400px", margin: "auto", boxShadow: "0 20px 40px rgba(0,47,118,0.2)", textAlign: "center", padding: "32px 24px" }}
+            >
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                {alertModal.type === "success" ? "✅" : alertModal.type === "warning" ? "⚠️" : "❌"}
+              </div>
+              <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: "0 0 10px" }}>{alertModal.title}</h2>
+              <p style={{ color: "#475569", fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>{alertModal.message}</p>
+              <button
+                onClick={() => setAlertModal(null)}
+                style={{ padding: "12px 32px", background: "linear-gradient(135deg,#002f76,#0050d5)", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,47,118,0.3)" }}
+              >
+                Got it
+              </button>
+            </m.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Confirm Delete Material Modal ── */}
+      <AnimatePresence>
+        {confirmDeleteModal && (
+          <div onClick={() => setConfirmDeleteModal(null)} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,18,51,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+            <m.div
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "400px", margin: "auto", boxShadow: "0 20px 40px rgba(0,47,118,0.2)", textAlign: "center", padding: "32px 24px" }}
+            >
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>🗑️</div>
+              <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: "0 0 10px" }}>Remove Material?</h2>
+              <p style={{ color: "#475569", fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
+                Are you sure you want to remove <strong>"{confirmDeleteModal.title}"</strong> from the Study Folder? This cannot be undone.
+              </p>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  onClick={() => executeDeleteMaterial(confirmDeleteModal.uid, confirmDeleteModal.materialId)}
+                  style={{ flex: 1, padding: "12px", background: "#ef4444", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 12px rgba(239,68,68,0.3)" }}
+                >
+                  Yes, Remove
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteModal(null)}
                   style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer" }}
                 >
                   Cancel

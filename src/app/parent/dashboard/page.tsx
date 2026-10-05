@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { PROGRAM_SLOTS } from "@/data/landing";
+import Tesseract from "tesseract.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -694,6 +695,41 @@ export default function ParentDashboardPage() {
   const [submittingDp, setSubmittingDp] = useState(false);
   const [dpSubmitted, setDpSubmitted] = useState(false);
   const dpFileRef = useRef<HTMLInputElement>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrDone, setOcrDone] = useState(false);
+
+  const runOCR = useCallback(async (imageDataUrl: string) => {
+    setOcrLoading(true);
+    setOcrDone(false);
+    try {
+      const result = await Tesseract.recognize(imageDataUrl, "eng");
+      const text = result.data.text;
+
+      const patterns = [
+        /\b(ITO\d{12,20})\b/i,
+        /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i,
+        /\b(\d{13})\b/,
+        /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i,
+        /\b(\d{10,20})\b/,
+      ];
+
+      let extractedRef = "";
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+          extractedRef = match[1].replace(/\s+/g, "");
+          break;
+        }
+      }
+
+      if (extractedRef) setDpReferenceNumber(extractedRef);
+    } catch {
+      // OCR failed silently
+    } finally {
+      setOcrLoading(false);
+      setOcrDone(true);
+    }
+  }, []);
   const [sessionPayments, setSessionPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
 
@@ -1689,15 +1725,38 @@ export default function ParentDashboardPage() {
               ) : (
                 <div style={{ display: "grid", gap: "12px", marginBottom: "32px" }}>
                   {profile.studyMaterials.map((m: any) => (
-                    <a key={m.id} href={m.url} target="_blank" style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", border: "1px solid #e2e8f0", borderRadius: "12px", textDecoration: "none", color: "inherit", transition: "all 0.2s", background: "#f8faff" }}>
-                      <div style={{ fontSize: "24px", color: m.type === "link" ? "#ef4444" : "#3b82f6" }}>
+                    <button
+                      key={m.id}
+                      onClick={async () => {
+                        if (m.type === "link" || m.url) {
+                          window.open(m.url, "_blank", "noopener,noreferrer");
+                          return;
+                        }
+                        // File stored in Backblaze — fetch a presigned URL
+                        try {
+                          const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(profile.id)}&materialId=${encodeURIComponent(m.id)}`);
+                          const data = await res.json();
+                          if (data.success && data.url) {
+                            window.open(data.url, "_blank", "noopener,noreferrer");
+                          } else {
+                            alert(data.error || "Could not open file.");
+                          }
+                        } catch {
+                          alert("Network error. Please try again.");
+                        }
+                      }}
+                      style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", border: "1px solid #e2e8f0", borderRadius: "12px", textDecoration: "none", color: "inherit", transition: "all 0.2s", background: "#f8faff", cursor: "pointer", textAlign: "left", width: "100%" }}
+                    >
+                      <div style={{ fontSize: "24px", color: m.type === "link" ? "#ef4444" : "#3b82f6", flexShrink: 0 }}>
                         {m.type === "link" ? "▶️" : "📄"}
                       </div>
                       <div style={{ textAlign: "left", flex: 1, overflow: "hidden" }}>
                         <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                        <div style={{ color: "#64748b", fontSize: "12px", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
+                        <div style={{ color: "#64748b", fontSize: "12px", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {m.type === "link" ? (m.url || "") : "📦 Click to open file"}
+                        </div>
                       </div>
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1767,23 +1826,32 @@ export default function ParentDashboardPage() {
                   if (!file) return;
                   const reader = new FileReader();
                   reader.onload = () => {
-                    setDpReceiptPreview(reader.result as string);
-                    setDpReceiptBase64(reader.result as string);
+                    const result = reader.result as string;
+                    setDpReceiptPreview(result);
+                    setDpReceiptBase64(result);
+                    setDpReferenceNumber("");
+                    setOcrDone(false);
+                    runOCR(result);
                   };
                   reader.readAsDataURL(file);
                 }} />
                 {dpReceiptPreview ? (
                   <div className="relative">
                     <div className="relative aspect-[4/3] w-full max-w-sm mx-auto rounded-2xl border border-slate-200 overflow-hidden"><img src={dpReceiptPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+                    {ocrLoading && <p className="text-[12px] text-[#64748b] mt-3 animate-pulse text-center font-bold">Reading receipt…</p>}
+                    {ocrDone && !ocrLoading && !dpReferenceNumber && (
+                      <p className="text-[12px] text-[#ef4444] mt-3 text-center font-bold">Couldn't read reference number. Please type it below.</p>
+                    )}
                     <button
                       onClick={() => {
                         setDpReceiptPreview("");
                         setDpReceiptBase64("");
                         setDpReferenceNumber("");
+                        setOcrDone(false);
                       }}
-                      className="mt-3 text-[13px] text-red-500"
+                      className="mt-3 text-[13px] text-red-500 font-bold block mx-auto"
                     >
-                      Remove
+                      Remove Receipt
                     </button>
                   </div>
                 ) : (
