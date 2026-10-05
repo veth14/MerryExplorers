@@ -4,7 +4,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 export async function PATCH(request: Request) {
   try {
     const data = await request.json();
-    const { uid, childInfo, emergencyContact } = data;
+    const { uid, childInfo, emergencyContact, avatarUrl, hasCompletedVirtualSurvey } = data;
 
     if (!uid) {
       return NextResponse.json({ error: "Missing uid" }, { status: 400 });
@@ -26,20 +26,41 @@ export async function PATCH(request: Request) {
       const updatedChildInfo = {
         ...student.childInfo,
         ...childInfo,
+        ...(avatarUrl ? { avatarUrl } : {}),
       };
 
       await db.collection("students").updateOne(
         { _id: student._id },
-        { $set: { childInfo: updatedChildInfo, emergencyContact } }
-      );
-    } else {
-      // No student record exists (e.g. manually created account).
-      // Save directly to the account document as a fallback.
-      await db.collection("accounts").updateOne(
-        { _id: uid },
-        { $set: { childInfo, emergencyContact } }
+        { 
+          $set: { 
+            childInfo: updatedChildInfo, 
+            ...(emergencyContact ? { emergencyContact } : {}) 
+          } 
+        }
       );
     }
+
+    // Always update accounts collection as well so avatar, survey flag, and childInfo are persisted
+    const accountUpdates: any = {
+      childInfo: {
+        ...(account.childInfo || {}),
+        ...childInfo,
+      },
+    };
+    if (avatarUrl) {
+      accountUpdates.avatarUrl = avatarUrl;
+    }
+    if (hasCompletedVirtualSurvey !== undefined) {
+      accountUpdates.hasCompletedVirtualSurvey = hasCompletedVirtualSurvey;
+    }
+    if (emergencyContact) {
+      accountUpdates.emergencyContact = emergencyContact;
+    }
+
+    await db.collection("accounts").updateOne(
+      { _id: uid },
+      { $set: accountUpdates }
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

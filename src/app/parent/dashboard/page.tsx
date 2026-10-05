@@ -8,6 +8,7 @@ import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 
 import { auth } from "@/lib/firebase";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import Tesseract from "tesseract.js";
+import { uploadAvatar } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ type ParentProfile = {
   virtualSessionLink?: string;
   virtualSessionTime?: string;
   needsSessionPayment?: boolean;
+  virtualSessionsCompleted?: number;
   renewalLink?: string;
   studyMaterials?: { id: string; title: string; url: string; type: string; createdAt?: string }[];
   sessionPayments?: {
@@ -83,8 +85,22 @@ type ParentProfile = {
       favoriteSong?: string;
       favoriteColor?: string;
       favoriteCharacter?: string;
+      avatarUrl?: string;
     };
   } | null;
+  hasCompletedVirtualSurvey?: boolean;
+  childInfo?: {
+    firstName?: string;
+    lastName?: string;
+    nickname?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    healthProfile?: string;
+    favoriteSong?: string;
+    favoriteColor?: string;
+    favoriteCharacter?: string;
+    avatarUrl?: string;
+  };
   renewalStatus?: {
     hasSubmitted: boolean;
     returning: string;
@@ -101,6 +117,13 @@ type ParentProfile = {
       verified: boolean;
       rejected: boolean;
     };
+  };
+  promoCode?: string;
+  promoDiscount?: {
+    originalPrice: number;
+    discountAmount: number;
+    finalPrice: number;
+    description: string;
   };
 };
 
@@ -988,6 +1011,587 @@ function WaiverGate({ profile, onComplete }: { profile: ParentProfile; onComplet
   );
 }
 
+// ─── Virtual Class Onboarding & Favorites Questionnaire ─────────────────────
+
+function VirtualOnboardingModal({
+  profile,
+  isGateMode = false,
+  onClose,
+  onSave,
+  showToast,
+}: {
+  profile: ParentProfile;
+  isGateMode?: boolean;
+  onClose?: () => void;
+  onSave: (updatedData: Partial<ParentProfile>) => void;
+  showToast: (msg: string, type?: "success" | "error" | "info") => void;
+}) {
+  const currentFavs = profile.studentInfo?.childInfo || profile.childInfo;
+  const [step, setStep] = useState(1);
+  const totalSteps = 4;
+  const [favoriteSong, setFavoriteSong] = useState(currentFavs?.favoriteSong || "");
+  const [favoriteColor, setFavoriteColor] = useState(currentFavs?.favoriteColor || "");
+  const [favoriteCharacter, setFavoriteCharacter] = useState(currentFavs?.favoriteCharacter || "");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>(profile.avatarUrl || currentFavs?.avatarUrl || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const songPills = [
+    { label: "Baby Shark 🦈", val: "Baby Shark" },
+    { label: "Wheels on the Bus 🚌", val: "Wheels on the Bus" },
+    { label: "Twinkle Twinkle ⭐", val: "Twinkle Twinkle Little Star" },
+    { label: "Let It Go ❄️", val: "Let It Go (Frozen)" },
+    { label: "Old MacDonald 🚜", val: "Old MacDonald" },
+  ];
+
+  const colorPills = [
+    { label: "Blue", bg: "#2563eb", text: "#fff" },
+    { label: "Pink", bg: "#ec4899", text: "#fff" },
+    { label: "Yellow", bg: "#eab308", text: "#000" },
+    { label: "Green", bg: "#16a34a", text: "#fff" },
+    { label: "Purple", bg: "#9333ea", text: "#fff" },
+    { label: "Red", bg: "#dc2626", text: "#fff" },
+    { label: "Orange", bg: "#ea580c", text: "#fff" },
+    { label: "Rainbow 🌈", bg: "linear-gradient(135deg,#f43f5e,#eab308,#06b6d4,#8b5cf6)", text: "#fff" },
+  ];
+
+  const characterPills = [
+    { label: "Paw Patrol 🐾", val: "Paw Patrol" },
+    { label: "Peppa Pig 🐷", val: "Peppa Pig" },
+    { label: "Bluey 🐶", val: "Bluey" },
+    { label: "Cocomelon 🍉", val: "Cocomelon" },
+    { label: "Elsa / Frozen ❄️", val: "Elsa (Frozen)" },
+    { label: "Spiderman 🕷️", val: "Spiderman" },
+  ];
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file (PNG, JPG, etc.).");
+      return;
+    }
+    setError("");
+    setSelectedFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+  }
+
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setSaving(true);
+    setError("");
+
+    try {
+      let finalAvatarUrl = profile.avatarUrl || "";
+
+      // Upload child picture if newly selected
+      if (selectedFile) {
+        try {
+          finalAvatarUrl = await uploadAvatar(selectedFile, profile.id);
+        } catch (uploadErr: any) {
+          console.error("Avatar upload failed:", uploadErr);
+        }
+      }
+
+      const patchPayload = {
+        uid: profile.id,
+        avatarUrl: finalAvatarUrl,
+        childInfo: {
+          favoriteSong: favoriteSong.trim(),
+          favoriteColor: favoriteColor.trim(),
+          favoriteCharacter: favoriteCharacter.trim(),
+          ...(finalAvatarUrl ? { avatarUrl: finalAvatarUrl } : {}),
+        },
+        hasCompletedVirtualSurvey: true,
+      };
+
+      const res = await fetch("/api/parents/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchPayload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save profile");
+      }
+
+      onSave({
+        avatarUrl: finalAvatarUrl,
+        hasCompletedVirtualSurvey: true,
+        childInfo: {
+          ...(profile.childInfo || {}),
+          favoriteSong: favoriteSong.trim(),
+          favoriteColor: favoriteColor.trim(),
+          favoriteCharacter: favoriteCharacter.trim(),
+          ...(finalAvatarUrl ? { avatarUrl: finalAvatarUrl } : {}),
+        },
+        studentInfo: profile.studentInfo ? {
+          ...profile.studentInfo,
+          childInfo: {
+            ...(profile.studentInfo.childInfo || {}),
+            favoriteSong: favoriteSong.trim(),
+            favoriteColor: favoriteColor.trim(),
+            favoriteCharacter: favoriteCharacter.trim(),
+            ...(finalAvatarUrl ? { avatarUrl: finalAvatarUrl } : {}),
+          },
+        } : null,
+      });
+
+      showToast("Child profile & favorites saved successfully! 🌟", "success");
+      if (onClose) onClose();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to save details. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const content = (
+    <div
+      style={{
+        background: "white",
+        borderRadius: "32px",
+        boxShadow: "0 0 0 8px rgba(255, 255, 255, 0.4), 0 24px 60px rgba(0,47,118,0.18)",
+        border: "4px solid #FFD700",
+        width: "100%",
+        maxWidth: "620px",
+        padding: "36px 32px",
+        margin: "auto",
+        position: "relative",
+        animation: "fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)"
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Close button if not forced gate */}
+      {!isGateMode && onClose && (
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: "20px",
+            right: "20px",
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            background: "#f1f5f9",
+            border: "none",
+            color: "#64748b",
+            fontSize: "16px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          ✕
+        </button>
+      )}
+
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: "32px" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#FFD700,#FFB300)", color: "#002f76", padding: "8px 18px", borderRadius: "30px", fontSize: "14px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "16px", boxShadow: "0 4px 10px rgba(255,215,0,0.4)" }}>
+          <span>🎈</span> Virtual Tutorial Onboarding
+        </div>
+        <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#0050d5", margin: "0 0 12px", letterSpacing: "-0.5px", textShadow: "0 2px 4px rgba(0,80,213,0.1)" }}>
+          Tell Us About {profile.childName || "Your Little Explorer"}! ✨
+        </h2>
+        <p style={{ fontSize: "15px", color: "#475569", margin: 0, lineHeight: 1.6, maxWidth: "480px", marginInline: "auto", fontWeight: "600" }}>
+          Our teachers personalize every virtual session with the songs, colors, and characters your child loves most!
+        </p>
+      </div>
+
+      <form onSubmit={(e) => { e.preventDefault(); if (step < totalSteps) setStep(step + 1); else handleSubmit(e); }} style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
+        
+        {/* Progress Bar */}
+        <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "8px" }}>
+          {[1, 2, 3, 4].map(s => (
+            <div key={s} style={{ height: "8px", flex: 1, borderRadius: "4px", background: s <= step ? "#FFD700" : "#e2e8f0", transition: "background 0.3s ease" }} />
+          ))}
+        </div>
+
+        {/* Step 1: Child Photo Section */}
+        {step === 1 && (
+          <div key="step1" style={{ animation: "fadeUp 0.4s ease forwards", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "20px", background: "#f8faff", borderRadius: "20px", border: "2px dashed #c7d2fe" }}>
+            <h3 style={{ margin: "0 0 10px", color: "#002f76", fontSize: "16px", fontWeight: "800" }}>Step 1: Child's Photo 📸</h3>
+            <div style={{ position: "relative" }}>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: "110px",
+                  height: "110px",
+                  borderRadius: "50%",
+                  background: previewUrl ? "transparent" : "linear-gradient(135deg,#002f76,#0050d5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  border: "4px solid #ffb800",
+                  boxShadow: "0 8px 24px rgba(0,47,118,0.2)",
+                  cursor: "pointer",
+                }}
+              >
+                {previewUrl ? (
+                  <img src={previewUrl} alt="Child preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span style={{ fontSize: "42px" }}>👶</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  position: "absolute",
+                  bottom: "-4px",
+                  right: "-4px",
+                  background: "#0050d5",
+                  color: "white",
+                  border: "3px solid white",
+                  borderRadius: "50%",
+                  width: "36px",
+                  height: "36px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+                  fontSize: "16px",
+                }}
+                title="Upload picture"
+              >
+                📷
+              </button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+            />
+
+            <div style={{ textAlign: "center", marginTop: "8px" }}>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ background: "none", border: "none", color: "#0050d5", fontSize: "15px", fontWeight: "800", cursor: "pointer", textDecoration: "underline" }}
+              >
+                {previewUrl ? "Change Picture" : "Upload Picture"}
+              </button>
+              <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
+                Optional but super fun!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Favorite Song */}
+        {step === 2 && (
+          <div key="step2" style={{ animation: "fadeUp 0.4s ease forwards" }}>
+            <h3 style={{ margin: "0 0 16px", color: "#002f76", fontSize: "16px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px" }}>
+              Step 2: Favorite Song 🎵
+            </h3>
+            <input
+              type="text"
+              value={favoriteSong}
+              onChange={(e) => setFavoriteSong(e.target.value)}
+              placeholder="e.g. Baby Shark, Wheels on the Bus..."
+              style={{
+                width: "100%",
+                padding: "16px 20px",
+                borderRadius: "20px",
+                border: "3px solid #cbd5e1",
+                fontSize: "16px",
+                fontWeight: "600",
+                outline: "none",
+                boxSizing: "border-box",
+                transition: "all 0.2s",
+                boxShadow: "inset 0 2px 6px rgba(0,0,0,0.03)",
+                marginBottom: "12px"
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "#0050d5")}
+              onBlur={(e) => (e.target.style.borderColor = "#cbd5e1")}
+              autoFocus
+            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              {songPills.map((p) => (
+                <button
+                  type="button"
+                  key={p.val}
+                  onClick={() => setFavoriteSong(p.val)}
+                  style={{
+                    background: favoriteSong === p.val ? "#fef3c7" : "#f1f5f9",
+                    color: favoriteSong === p.val ? "#92400e" : "#475569",
+                    border: favoriteSong === p.val ? "2px solid #fde68a" : "2px solid transparent",
+                    borderRadius: "20px",
+                    padding: "8px 14px",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.05)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Favorite Color */}
+        {step === 3 && (
+          <div key="step3" style={{ animation: "fadeUp 0.4s ease forwards" }}>
+            <h3 style={{ margin: "0 0 16px", color: "#002f76", fontSize: "16px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px" }}>
+              Step 3: Favorite Color 🎨
+            </h3>
+            <input
+              type="text"
+              value={favoriteColor}
+              onChange={(e) => setFavoriteColor(e.target.value)}
+              placeholder="e.g. Blue, Pink, Yellow..."
+              style={{
+                width: "100%",
+                padding: "16px 20px",
+                borderRadius: "20px",
+                border: "3px solid #cbd5e1",
+                fontSize: "16px",
+                fontWeight: "600",
+                outline: "none",
+                boxSizing: "border-box",
+                transition: "all 0.2s",
+                boxShadow: "inset 0 2px 6px rgba(0,0,0,0.03)",
+                marginBottom: "12px"
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "#0050d5")}
+              onBlur={(e) => (e.target.style.borderColor = "#cbd5e1")}
+              autoFocus
+            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              {colorPills.map((c) => (
+                <button
+                  type="button"
+                  key={c.label}
+                  onClick={() => setFavoriteColor(c.label)}
+                  style={{
+                    background: c.bg,
+                    color: c.text,
+                    border: favoriteColor.toLowerCase() === c.label.toLowerCase() ? "3px solid #002f76" : "3px solid transparent",
+                    borderRadius: "20px",
+                    padding: "8px 16px",
+                    fontSize: "14px",
+                    fontWeight: "800",
+                    cursor: "pointer",
+                    boxShadow: favoriteColor.toLowerCase() === c.label.toLowerCase() ? "0 4px 12px rgba(0,0,0,0.3)" : "none",
+                    transition: "transform 0.1s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.05)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; }}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Favorite Character */}
+        {step === 4 && (
+          <div key="step4" style={{ animation: "fadeUp 0.4s ease forwards" }}>
+            <h3 style={{ margin: "0 0 16px", color: "#002f76", fontSize: "16px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px" }}>
+              Step 4: Favorite Character / Show ⭐
+            </h3>
+            <input
+              type="text"
+              value={favoriteCharacter}
+              onChange={(e) => setFavoriteCharacter(e.target.value)}
+              placeholder="e.g. Paw Patrol, Peppa Pig..."
+              style={{
+                width: "100%",
+                padding: "16px 20px",
+                borderRadius: "20px",
+                border: "3px solid #cbd5e1",
+                fontSize: "16px",
+                fontWeight: "600",
+                outline: "none",
+                boxSizing: "border-box",
+                transition: "all 0.2s",
+                boxShadow: "inset 0 2px 6px rgba(0,0,0,0.03)",
+                marginBottom: "12px"
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "#0050d5")}
+              onBlur={(e) => (e.target.style.borderColor = "#cbd5e1")}
+              autoFocus
+            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              {characterPills.map((cp) => (
+                <button
+                  type="button"
+                  key={cp.val}
+                  onClick={() => setFavoriteCharacter(cp.val)}
+                  style={{
+                    background: favoriteCharacter === cp.val ? "#ede9fe" : "#f1f5f9",
+                    color: favoriteCharacter === cp.val ? "#6d28d9" : "#475569",
+                    border: favoriteCharacter === cp.val ? "2px solid #c4b5fd" : "2px solid transparent",
+                    borderRadius: "20px",
+                    padding: "8px 14px",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.05)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; }}
+                >
+                  {cp.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div style={{ background: "#fef2f2", color: "#b91c1c", padding: "12px 16px", borderRadius: "12px", fontSize: "14px", fontWeight: "700", border: "2px solid #fca5a5", marginTop: "8px" }}>
+            {error}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => setStep(step - 1)}
+              style={{
+                flex: 1,
+                padding: "18px",
+                background: "#f1f5f9",
+                color: "#64748b",
+                border: "4px solid #cbd5e1",
+                borderRadius: "50px",
+                fontSize: "18px",
+                fontWeight: "900",
+                cursor: "pointer",
+                transition: "transform 0.15s",
+              }}
+              onMouseOver={e => { e.currentTarget.style.transform="scale(1.04)"; }}
+              onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; }}
+            >
+              Back
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            style={{
+              flex: 2,
+              padding: "18px",
+              background: "linear-gradient(135deg,#0050d5 0%,#38b6ff 100%)",
+              color: "white",
+              border: "4px solid #FFD700",
+              borderRadius: "50px",
+              fontSize: "18px",
+              fontWeight: "900",
+              cursor: saving ? "not-allowed" : "pointer",
+              boxShadow: "0 10px 25px rgba(0,80,213,0.3)",
+              transition: "transform 0.15s, box-shadow 0.15s",
+              opacity: saving ? 0.7 : 1,
+            }}
+            onMouseOver={e => { if(!saving) { e.currentTarget.style.transform="scale(1.03)"; e.currentTarget.style.boxShadow="0 14px 30px rgba(0,80,213,0.4)"; } }}
+            onMouseOut={e => { if(!saving) { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 10px 25px rgba(0,80,213,0.3)"; } }}
+          >
+            {saving ? "Saving..." : step < totalSteps ? "Next Step 🚀" : "All Done! ✨"}
+          </button>
+        </div>
+
+        {isGateMode && (
+          <div style={{ textAlign: "center", marginTop: "-6px" }}>
+            <button
+              type="button"
+              onClick={() => {
+                onSave({ hasCompletedVirtualSurvey: true });
+                if (onClose) onClose();
+              }}
+              style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "12px", fontWeight: "600", cursor: "pointer", textDecoration: "underline" }}
+            >
+              Skip for now & fill out later in Profile
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+
+  if (isGateMode) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(180deg, #87CEEB 0%, #E0F6FF 100%)",
+          padding: "24px 16px",
+          fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        <style>{`
+          @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+          }
+          @keyframes float-cloud {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(30px); }
+            100% { transform: translateX(0); }
+          }
+        `}</style>
+        {/* Playful decorations */}
+        <div style={{ position: "absolute", top: "8%", left: "8%", fontSize: "80px", animation: "float-cloud 8s ease-in-out infinite", opacity: 0.9 }}>☁️</div>
+        <div style={{ position: "absolute", top: "15%", right: "8%", fontSize: "90px", animation: "me-spin 20s linear infinite", opacity: 0.9 }}>☀️</div>
+        <div style={{ position: "absolute", bottom: "12%", left: "5%", fontSize: "65px", transform: "rotate(-15deg)", animation: "bounce-slow 4s ease-in-out infinite" }}>🌈</div>
+        <div style={{ position: "absolute", bottom: "25%", right: "12%", fontSize: "50px", animation: "me-pulse 2s infinite" }}>⭐</div>
+        <div style={{ position: "absolute", top: "45%", left: "85%", fontSize: "45px", animation: "bounce-slow 3s infinite" }}>🚀</div>
+        <div style={{ position: "absolute", top: "35%", left: "5%", fontSize: "45px", animation: "bounce-slow 5s infinite" }}>🎨</div>
+        
+        <div style={{ position: "relative", zIndex: 10 }}>
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,18,51,0.55)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px 16px",
+        overflowY: "auto",
+        fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif",
+      }}
+      onClick={onClose}
+    >
+      {content}
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 type RenewalSettings = {
@@ -1009,6 +1613,7 @@ export default function ParentDashboardPage() {
   const [fileViewer, setFileViewer] = useState<FileViewerState | null>(null);
   const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showEditSurveyModal, setShowEditSurveyModal] = useState(false);
   const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
   // We also cache the full per-program list so we can resolve after profile loads
   const [allRenewalPrograms, setAllRenewalPrograms] = useState<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null; renewalOpen: boolean; renewalOpenDate: string | null; virtualLink?: string; virtualLinkOpen?: boolean }[]>([]);
@@ -1171,6 +1776,31 @@ export default function ParentDashboardPage() {
     profile.program === "Virtual Tutorial" ||
     profile.studentInfo?.program === "virtual-session" ||
     profile.studentInfo?.program === "Virtual Tutorial";
+
+  const childFavorites = profile.studentInfo?.childInfo || (profile as any).childInfo;
+  const hasAnsweredFavorites = Boolean(
+    childFavorites?.favoriteSong &&
+    childFavorites?.favoriteColor &&
+    childFavorites?.favoriteCharacter
+  );
+  const hasCompletedSurvey = Boolean(
+    (profile as any).hasCompletedVirtualSurvey || 
+    hasAnsweredFavorites
+  );
+
+  // Show virtual onboarding questionnaire on screen first if not yet answered
+  if (isVirtualSession && !hasCompletedSurvey) {
+    return (
+      <VirtualOnboardingModal
+        profile={profile}
+        isGateMode={true}
+        onSave={(updatedData) => {
+          setProfile((p) => (p ? { ...p, ...updatedData } : p));
+        }}
+        showToast={showToast}
+      />
+    );
+  }
 
   // ─── Tabs ─────────────────────────────────────────────────────────────────
 
@@ -1419,6 +2049,7 @@ export default function ParentDashboardPage() {
             <p style={{ margin: "0 0 8px", color: "#64748b", fontSize: "14px", fontWeight: "500" }}>
               {profile.relationship} of <strong style={{ color: "#0050d5" }}>{profile.childName}</strong>
             </p>
+
             <div className="responsive-hero-tags" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               <span style={{ padding: "4px 12px", background: "#f0f5ff", color: "#0050d5", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #c5d6ff" }}>
                 {profile.program}
@@ -1442,28 +2073,32 @@ export default function ParentDashboardPage() {
           <div className="responsive-hero-stats" style={{ display: "flex", gap: "16px", flexShrink: 0 }}>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
               <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
-                {getCompletedSessionsCount(profile.studentInfo?.enrolledAt, profile.schedule, profile.classTime)}
-                <span style={{ fontSize: "14px", color: "#64748b", fontWeight: "600", marginLeft: "2px" }}>
-                  {(() => {
-                    const programs: Record<string, number> = {
-                      "Discovery Club: Curious Explorer": 8,
-                      "Discovery Club: Creative Explorer": 12,
-                      "Discovery Club: Everyday Curious": 14,
-                      "Trailblazer: Brave Explorer": 18,
-                    };
-                    const total = programs[profile.program];
-                    return total ? `/ ${total}` : "";
-                  })()}
-                </span>
+                {isVirtualSession ? (profile.virtualSessionsCompleted || 0) : getCompletedSessionsCount(profile.studentInfo?.enrolledAt, profile.schedule, profile.classTime)}
+                {!isVirtualSession && (
+                  <span style={{ fontSize: "14px", color: "#64748b", fontWeight: "600", marginLeft: "2px" }}>
+                    {(() => {
+                      const programs: Record<string, number> = {
+                        "Discovery Club: Curious Explorer": 8,
+                        "Discovery Club: Creative Explorer": 12,
+                        "Discovery Club: Everyday Curious": 14,
+                        "Trailblazer: Brave Explorer": 18,
+                      };
+                      const total = programs[profile.program];
+                      return total ? `/ ${total}` : "";
+                    })()}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: "11px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Sessions</div>
             </div>
-            <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
-              <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
-                {profile.albums.filter((a) => !isExpired(a.expiresAt)).reduce((sum, a) => sum + a.photoCount, 0)}
+            {!isVirtualSession && (
+              <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
+                <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
+                  {profile.albums.filter((a) => !isExpired(a.expiresAt)).reduce((sum, a) => sum + a.photoCount, 0)}
+                </div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Photos</div>
               </div>
-              <div style={{ fontSize: "11px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Photos</div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -1977,7 +2612,7 @@ export default function ParentDashboardPage() {
                     <div style={{ fontSize: "56px", marginBottom: "16px", animation: "bounce 2s infinite" }}>💳</div>
                     <h2 style={{ margin: "0 0 12px", color: "#002f76", fontSize: "24px", fontWeight: "800" }}>Payment Required</h2>
                     <p style={{ margin: "0 auto 32px", color: "#64748b", fontSize: "15px", maxWidth: "400px", lineHeight: 1.6 }}>
-                      Your previous virtual session has ended! Please submit your payment of <strong>₱450</strong> to unlock your next session.
+                      Your previous virtual session has ended! Please submit your payment of <strong>₱{profile.promoDiscount ? profile.promoDiscount.finalPrice.toLocaleString() : "450"}</strong> to unlock your next session.
                     </p>
                     <button
                       onClick={() => setActiveTab("payments")}
@@ -2036,6 +2671,67 @@ export default function ParentDashboardPage() {
                       <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Your teacher hasn't posted a virtual session link for your class yet.</p>
                     </div>
                   )}
+
+                  {/* ── Child Profile & Favorites Card ── */}
+                  <div style={{ marginTop: "28px", paddingTop: "24px", borderTop: "1.5px solid #f1f5f9" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", marginBottom: "18px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                        <div style={{ width: "54px", height: "54px", borderRadius: "50%", overflow: "hidden", border: "3px solid #ffb800", background: profile.avatarColor || "#002f76", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,47,118,0.15)", flexShrink: 0 }}>
+                          {profile.avatarUrl ? (
+                            <img src={profile.avatarUrl} alt={profile.childName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            <span style={{ fontSize: "20px", fontWeight: "800", color: "white" }}>{profile.initials || "🌟"}</span>
+                          )}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <h3 style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: "#002f76" }}>{profile.childName || "Child"}&apos;s Profile & Favorites</h3>
+                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "2px 8px", background: "#f0fdf4", color: "#16a34a", borderRadius: "10px", border: "1px solid #bbf7d0" }}>Active Explorer</span>
+                          </div>
+                          <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#64748b" }}>These details help teachers personalize your child&apos;s virtual sessions!</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowEditSurveyModal(true)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "12px", border: "1.5px solid #0050d5", background: "#eff6ff", color: "#0050d5", fontSize: "12.5px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}
+                      >
+                        ✏️ Edit Favorites & Photo
+                      </button>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                      <div style={{ background: "linear-gradient(135deg, #fffbeb, #fef3c7)", border: "1px solid #fde68a", borderRadius: "14px", padding: "14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "18px" }}>🎵</span>
+                          <span style={{ fontSize: "11px", fontWeight: "800", color: "#b45309", textTransform: "uppercase", letterSpacing: "0.5px" }}>Favorite Song</span>
+                        </div>
+                        <div style={{ fontSize: "14px", fontWeight: "800", color: "#78350f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {childFavorites?.favoriteSong || <span style={{ color: "#b45309", opacity: 0.6, fontStyle: "italic", fontWeight: "500" }}>Not set yet</span>}
+                        </div>
+                      </div>
+
+                      <div style={{ background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1px solid #bfdbfe", borderRadius: "14px", padding: "14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "18px" }}>🎨</span>
+                          <span style={{ fontSize: "11px", fontWeight: "800", color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Favorite Color</span>
+                        </div>
+                        <div style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a8a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {childFavorites?.favoriteColor || <span style={{ color: "#1d4ed8", opacity: 0.6, fontStyle: "italic", fontWeight: "500" }}>Not set yet</span>}
+                        </div>
+                      </div>
+
+                      <div style={{ background: "linear-gradient(135deg, #faf5ff, #f3e8ff)", border: "1px solid #e9d5ff", borderRadius: "14px", padding: "14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "18px" }}>⭐</span>
+                          <span style={{ fontSize: "11px", fontWeight: "800", color: "#7e22ce", textTransform: "uppercase", letterSpacing: "0.5px" }}>Favorite Character</span>
+                        </div>
+                        <div style={{ fontSize: "14px", fontWeight: "800", color: "#581c87", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {childFavorites?.favoriteCharacter || <span style={{ color: "#7e22ce", opacity: 0.6, fontStyle: "italic", fontWeight: "500" }}>Not set yet</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })()
@@ -2197,10 +2893,37 @@ export default function ParentDashboardPage() {
                 </div>
               </div>
 
-              <div className="mb-6 rounded-3xl p-6 text-white shadow-xl bg-gradient-to-br from-[#0033A0] to-[#0066CC]">
-                <p className="text-[12px] font-bold uppercase tracking-widest opacity-70">Amount Due Per Session</p>
-                <p className="mt-1 text-[40px] font-extrabold leading-none">₱450</p>
-              </div>
+              {profile.promoDiscount ? (
+                <div className="mb-6 rounded-3xl p-5 shadow-xl" style={{ background: "linear-gradient(135deg, #0033A0, #0066CC)" }}>
+                  <p className="text-[12px] font-bold uppercase tracking-widest text-white/70 mb-3">Amount Due Per Session</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[13px] text-white/70">Original Price</span>
+                      <span className="text-[15px] font-bold text-white/60 line-through">₱{profile.promoDiscount.originalPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-[13px] text-green-300">Promo Discount</span>
+                        <span className="ml-2 text-[11px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5">{profile.promoCode}</span>
+                      </div>
+                      <span className="text-[13px] font-bold text-green-300">− ₱{profile.promoDiscount.discountAmount.toLocaleString()} ({Math.round(profile.promoDiscount.discountAmount / profile.promoDiscount.originalPrice * 100)}% off)</span>
+                    </div>
+                    <div className="border-t border-white/20 pt-2 flex justify-between items-center">
+                      <span className="text-[13px] font-extrabold text-white">You Pay</span>
+                      <span className="text-[40px] font-extrabold leading-none text-white">₱{profile.promoDiscount.finalPrice.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 bg-white/10 rounded-2xl px-3 py-2">
+                    <span className="text-[13px]">🏷️</span>
+                    <span className="text-[12px] font-semibold text-white/80">{profile.promoDiscount.description} applied to your account</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-6 rounded-3xl p-6 text-white shadow-xl bg-gradient-to-br from-[#0033A0] to-[#0066CC]">
+                  <p className="text-[12px] font-bold uppercase tracking-widest opacity-70">Amount Due Per Session</p>
+                  <p className="mt-1 text-[40px] font-extrabold leading-none">₱450</p>
+                </div>
+              )}
 
               <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
                 <h3 className="mb-4 font-headline text-[16px] font-extrabold text-[#0033A0]">Select Payment Method</h3>
@@ -2234,7 +2957,7 @@ export default function ParentDashboardPage() {
                         </div>
                         <div className="max-w-sm">
                           <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {pm.label}</p>
-                          <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱450</strong> (or multiple). Then upload the screenshot below.</p>
+                          <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱{profile.promoDiscount ? profile.promoDiscount.finalPrice.toLocaleString() : "450"}</strong> (or multiple). Then upload the screenshot below.</p>
                         </div>
                       </div>
                     ))}
@@ -2977,6 +3700,19 @@ export default function ParentDashboardPage() {
       {fileViewer && (
         <FileViewerModal viewer={fileViewer} onClose={() => setFileViewer(null)} />
       )}
+
+      {/* ── Edit Virtual Class Favorites & Photo Modal ──────────────────────── */}
+      {showEditSurveyModal && (
+        <VirtualOnboardingModal
+          profile={profile}
+          isGateMode={false}
+          onClose={() => setShowEditSurveyModal(false)}
+          onSave={(updatedData) => {
+            setProfile((p) => (p ? { ...p, ...updatedData } : p));
+          }}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
@@ -2986,17 +3722,18 @@ function ProfileTab({ profile, user, showToast, isVirtualTutorial }: { profile: 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const childFavs = profile.studentInfo?.childInfo || profile.childInfo;
   const [formData, setFormData] = useState({
-    nickname: profile.studentInfo?.childInfo?.nickname || "",
-    dateOfBirth: profile.studentInfo?.childInfo?.dateOfBirth || "",
-    gender: profile.studentInfo?.childInfo?.gender || "",
-    healthProfile: profile.studentInfo?.childInfo?.healthProfile || "",
-    favoriteSong: profile.studentInfo?.childInfo?.favoriteSong || "",
-    favoriteColor: profile.studentInfo?.childInfo?.favoriteColor || "",
-    favoriteCharacter: profile.studentInfo?.childInfo?.favoriteCharacter || "",
-    emName: profile.studentInfo?.emergencyContact?.name || "",
-    emRelationship: profile.studentInfo?.emergencyContact?.relationship || "",
-    emPhone: profile.studentInfo?.emergencyContact?.phone || "",
+    nickname: childFavs?.nickname || "",
+    dateOfBirth: childFavs?.dateOfBirth || "",
+    gender: childFavs?.gender || "",
+    healthProfile: childFavs?.healthProfile || "",
+    favoriteSong: childFavs?.favoriteSong || "",
+    favoriteColor: childFavs?.favoriteColor || "",
+    favoriteCharacter: childFavs?.favoriteCharacter || "",
+    emName: profile.studentInfo?.emergencyContact?.name || profile.emergencyContact?.name || "",
+    emRelationship: profile.studentInfo?.emergencyContact?.relationship || profile.emergencyContact?.relationship || "",
+    emPhone: profile.studentInfo?.emergencyContact?.phone || profile.emergencyContact?.phone || "",
   });
 
   const handleSave = async () => {

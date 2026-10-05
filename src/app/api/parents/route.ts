@@ -142,6 +142,8 @@ export async function POST(request: Request) {
       avatarUrl,
       avatarColor,
       initials,
+      promoCode,
+      promoDiscount,
     } = data;
 
     const cleanEmail = String(email || "").trim().toLowerCase();
@@ -212,6 +214,8 @@ export async function POST(request: Request) {
       initials: autoInitials,
       mustChangePassword: true,
       createdAt: new Date(),
+      ...(promoCode ? { promoCode: String(promoCode).trim().toUpperCase() } : {}),
+      ...(promoDiscount ? { promoDiscount } : {}),
     };
 
     await db.collection("accounts").insertOne(accountDoc);
@@ -300,6 +304,11 @@ export async function GET(request: Request) {
       .collection("students")
       .findOne({ "parentInfo.email": account.email });
 
+    const mergedChildInfo = {
+      ...(account.childInfo || {}),
+      ...(studentRecord?.childInfo || {}),
+    };
+
     const studentInfo = studentRecord
       ? {
           id: studentRecord._id.toString(),
@@ -310,13 +319,13 @@ export async function GET(request: Request) {
           schedule: studentRecord.schedule,
           enrolledAt: studentRecord.enrolledAt,
           status: studentRecord.status,
-          childInfo: studentRecord.childInfo,
-          emergencyContact: studentRecord.emergencyContact || { name: "", relationship: "", phone: "" },
+          childInfo: mergedChildInfo,
+          emergencyContact: studentRecord.emergencyContact || account.emergencyContact || { name: "", relationship: "", phone: "" },
         }
       : account.childInfo || account.emergencyContact ? {
           id: account._id.toString(),
           program: account.program,
-          childInfo: account.childInfo || {},
+          childInfo: mergedChildInfo,
           emergencyContact: account.emergencyContact || { name: "", relationship: "", phone: "" },
         } 
       : null;

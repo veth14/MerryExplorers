@@ -114,7 +114,7 @@ export async function sendSessionLinkEmail(toEmail: string, parentName: string, 
             <p style="color:#312e81;font-size:13px;font-weight:600;margin:0;">🕐 ${sessionTime ? `Your session is scheduled for <strong>${(() => {
               try {
                 const d = new Date(sessionTime);
-                return isNaN(d.getTime()) ? sessionTime : d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+                return isNaN(d.getTime()) ? sessionTime : (d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila'}) + ' Philippine Standard Time (PST)');
               } catch {
                 return sessionTime;
               }

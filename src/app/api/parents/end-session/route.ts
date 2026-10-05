@@ -15,6 +15,9 @@ export async function POST(request: Request) {
           virtualSessionLink: null,
           virtualSessionTime: null,
           needsSessionPayment: true
+        },
+        $inc: {
+          virtualSessionsCompleted: 1
         }
       }
     );

@@ -122,7 +122,7 @@ export async function GET(request: Request) {
               <div style="background:#f8faff;border:1px solid #e8efff;border-radius:12px;padding:20px;margin-bottom:24px;">
                 <p style="margin:0 0 8px;color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;">Program Details</p>
                 <p style="margin:0 0 4px;color:#002f76;font-size:15px;font-weight:700;">${parent.program}</p>
-                <p style="margin:0;color:#0050d5;font-size:14px;font-weight:600;">${parent.classTime}</p>
+                <p style="margin:0;color:#0050d5;font-size:14px;font-weight:600;">${parent.classTime} Philippine Standard Time (PST)</p>
               </div>
 
               <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">

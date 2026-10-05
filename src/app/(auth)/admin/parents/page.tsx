@@ -62,6 +62,13 @@ function randomColor() {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
 
+// ─── Promo Codes ──────────────────────────────────────────────────────────────
+const PROMO_CODES: Record<string, { discountAmount: number; originalPrice: number; finalPrice: number; description: string }> = {
+  "WELCOME2026": { originalPrice: 675, discountAmount: 225, finalPrice: 450, description: "Welcome Discount" },
+  "EARLYBIRD": { originalPrice: 675, discountAmount: 225, finalPrice: 450, description: "Early Bird Promo" },
+  "MERRY2026": { originalPrice: 675, discountAmount: 225, finalPrice: 450, description: "Merry Explorers Promo" },
+};
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 type ParentAccount = {
   id: string;
@@ -80,6 +87,13 @@ type ParentAccount = {
   role: string;
   virtualSessionLink?: string;
   renewalLink?: string;
+  promoCode?: string;
+  promoDiscount?: {
+    originalPrice: number;
+    discountAmount: number;
+    finalPrice: number;
+    description: string;
+  };
   renewalStatus?: {
     hasSubmitted: boolean;
     returning: string;
@@ -119,6 +133,8 @@ function emptyDraft(): Draft {
     role: "Parent",
     virtualSessionLink: "",
     renewalLink: "",
+    promoCode: "",
+    promoDiscount: undefined,
   };
 }
 
@@ -138,6 +154,8 @@ function draftFromUser(u: ParentAccount): Draft {
     role: u.role || "Parent",
     virtualSessionLink: u.virtualSessionLink || "",
     renewalLink: u.renewalLink || "",
+    promoCode: u.promoCode || "",
+    promoDiscount: u.promoDiscount,
   };
 }
 
@@ -231,7 +249,7 @@ function ParentModal({
           setRegistrations(data.data.filter((r: any) => r.status === "approved" || r.status === "early-bird"));
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setRegLoading(false));
   }, [mode]);
 
@@ -331,6 +349,7 @@ function ParentModal({
       }
 
       const program = findProgram(draft.program);
+      const promoResult = draft.promoCode ? PROMO_CODES[draft.promoCode.toUpperCase().trim()] : undefined;
 
       const account: Omit<ParentAccount, "id"> = {
         avatarUrl: finalAvatarUrl,
@@ -348,6 +367,8 @@ function ParentModal({
         role: "Parent",
         virtualSessionLink: draft.virtualSessionLink?.trim() || "",
         renewalLink: draft.renewalLink?.trim() || "",
+        promoCode: draft.promoCode?.trim().toUpperCase() || undefined,
+        promoDiscount: promoResult,
       };
 
       return await onSave(account, initial?.id);
@@ -391,7 +412,7 @@ function ParentModal({
                 </h2>
               </div>
               <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-all">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
           </div>
@@ -552,11 +573,83 @@ function ParentModal({
               </Field>
             </div>
 
+            {/* Promo Code Card */}
+            {(() => {
+              const promoKey = (draft.promoCode || "").toUpperCase().trim();
+              const promoMatch = promoKey ? PROMO_CODES[promoKey] : undefined;
+              const isInvalid = !!promoKey && !promoMatch;
+              return (
+                <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff] space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-7 h-7 rounded-lg bg-[#f0fdf4] flex items-center justify-center text-[14px]">🏷️</div>
+                    <p className="text-[13px] font-extrabold text-[#002f76]">Promo Code <span className="text-[11px] font-semibold text-[#94a3b8] normal-case">(optional)</span></p>
+                  </div>
+                  <Field label="Enter Promo Code">
+                    <div className="relative">
+                      <input
+                        className={`${INPUT_CLS} ${promoMatch ? "border-[#16a34a] ring-2 ring-[#16a34a]/15 pr-10" : isInvalid ? "border-[#dc2626] ring-2 ring-[#dc2626]/15 pr-10" : ""}`}
+                        placeholder="e.g. WELCOME2025"
+                        value={draft.promoCode || ""}
+                        onChange={(e) => set("promoCode", e.target.value)}
+                        style={{ textTransform: "uppercase" }}
+                      />
+                      {promoMatch && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#16a34a] text-[16px]">✓</span>
+                      )}
+                      {isInvalid && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#dc2626] text-[16px]">✗</span>
+                      )}
+                    </div>
+                  </Field>
+
+                  {isInvalid && (
+                    <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3 py-2.5 text-[12px] font-semibold text-[#b91c1c]">
+                      ❌ Invalid promo code. Please check and try again.
+                    </div>
+                  )}
+
+                  {promoMatch && (
+                    <div className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#15803d]">✅ {promoMatch.description} Applied!</span>
+                        <span className="text-[11px] font-bold text-[#16a34a] bg-[#dcfce7] rounded-full px-2.5 py-0.5">{promoKey}</span>
+                      </div>
+                      <div className="border-t border-[#bbf7d0] pt-2 space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[12px] text-[#4b5563]">Original Price</span>
+                          <span className="text-[13px] font-bold text-[#6b7280] line-through">₱{promoMatch.originalPrice.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[12px] text-[#dc2626]">Discount</span>
+                          <span className="text-[13px] font-bold text-[#dc2626]">− ₱{promoMatch.discountAmount.toLocaleString()} ({Math.round(promoMatch.discountAmount / promoMatch.originalPrice * 100)}% off)</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-[#bbf7d0] pt-1.5">
+                          <span className="text-[12px] font-extrabold text-[#15803d]">Final Price</span>
+                          <span className="text-[18px] font-extrabold text-[#15803d]">₱{promoMatch.finalPrice.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!promoKey && (
+                    <div className="rounded-xl border border-[#e2e8f0] bg-[#f8faff] px-3 py-2.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[12px] text-[#64748b]">Standard Rate</span>
+                        <span className="text-[14px] font-extrabold text-[#002f76]">₱675</span>
+                      </div>
+                      <p className="text-[11px] text-[#94a3b8] mt-1">Enter a promo code above to apply a discount.</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {error && (
               <div className="rounded-2xl border border-[#ba1a1a]/20 bg-[#ba1a1a]/5 px-4 py-3 text-[13px] font-bold text-[#ba1a1a] flex items-center gap-2">
                 ⚠️ {error}
               </div>
             )}
+
 
             {initial?.renewalStatus?.hasSubmitted && (
               <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff] space-y-2">
@@ -833,10 +926,10 @@ function DownpaymentPanel({ data, onRefresh, renewalSettings }: { data: ParentAc
 // ─── Renewal Settings Panel (Admin) ──────────────────────────────────────────
 // Program colours for visual distinction
 const PROGRAM_META: Record<string, { emoji: string; color: string; bg: string; border: string; short: string }> = {
-  "Discovery Club: Curious Explorer":  { emoji: "🔍", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", short: "Curious Explorer" },
+  "Discovery Club: Curious Explorer": { emoji: "🔍", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", short: "Curious Explorer" },
   "Discovery Club: Creative Explorer": { emoji: "🎨", color: "#0e7490", bg: "#ecfeff", border: "#a5f3fc", short: "Creative Explorer" },
-  "Discovery Club: Everyday Curious":  { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Curious" },
-  "Trailblazer: Brave Explorer":       { emoji: "🏕️", color: "#b45309", bg: "#fffbeb", border: "#fde68a", short: "Brave Explorer" },
+  "Discovery Club: Everyday Curious": { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Curious" },
+  "Trailblazer: Brave Explorer": { emoji: "🏕️", color: "#b45309", bg: "#fffbeb", border: "#fde68a", short: "Brave Explorer" },
 };
 
 type ProgramEntry = {
@@ -893,7 +986,7 @@ function RenewalSettingsPanel() {
           setCfg({ programs: merged, updatedAt: d.updatedAt ?? null });
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingCfg(false));
   }, []);
 
@@ -957,11 +1050,10 @@ function RenewalSettingsPanel() {
         <div className="flex items-center gap-3">
           {!loadingCfg && (
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
-                openCount > 0
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${openCount > 0
                   ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
                   : "bg-[#f1f5f9] text-[#64748b] border border-[#cbd5e1]"
-              }`}
+                }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${openCount > 0 ? "bg-[#15803d]" : "bg-[#64748b]"}`} />
               {openCount > 0 ? `${openCount} Program${openCount > 1 ? "s" : ""} Open` : "All Closed"}
@@ -995,8 +1087,8 @@ function RenewalSettingsPanel() {
               const deadlineLabel = prog.renewalOpenDate
                 ? new Date(prog.renewalOpenDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                 : prog.nextAdventureStart
-                ? "2 wks before start"
-                : "—";
+                  ? "2 wks before start"
+                  : "—";
 
               return (
                 <div key={prog.programKey} className="px-6 py-4">
@@ -1133,7 +1225,7 @@ function TrailblazerVirtualSettings() {
           setCfg({ programs: merged, updatedAt: d.updatedAt ?? null });
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingCfg(false));
   }, []);
 
@@ -1195,61 +1287,61 @@ function TrailblazerVirtualSettings() {
       position: "relative",
     }}>
       {/* Decorative blobs */}
-      <div style={{ position:"absolute", top:"-40px", left:"200px", width:"140px", height:"140px", borderRadius:"50%", background:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
-      <div style={{ position:"absolute", bottom:"-30px", right:"280px", width:"90px", height:"90px", borderRadius:"50%", background:"rgba(255,255,255,0.05)", pointerEvents:"none" }} />
+      <div style={{ position: "absolute", top: "-40px", left: "200px", width: "140px", height: "140px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "-30px", right: "280px", width: "90px", height: "90px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", pointerEvents: "none" }} />
 
       {/* Icon */}
       <div style={{
-        width:"44px", height:"44px", borderRadius:"12px", flexShrink:0,
-        background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
-        display:"flex", alignItems:"center", justifyContent:"center", fontSize:"20px",
-        position:"relative",
+        width: "44px", height: "44px", borderRadius: "12px", flexShrink: 0,
+        background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px",
+        position: "relative",
       }}>🎥</div>
 
       {/* Title */}
-      <div style={{ flexShrink:0 }}>
-        <div style={{ fontWeight:800, fontSize:"15px", color:"white", letterSpacing:"-0.2px" }}>
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: "15px", color: "white", letterSpacing: "-0.2px" }}>
           Trailblazer Virtual Class
         </div>
-        <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.55)", fontWeight:500, marginTop:"1px" }}>
+        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", fontWeight: 500, marginTop: "1px" }}>
           🏕️ Brave Explorer Program
         </div>
       </div>
 
       {/* Status badge */}
       <div style={{
-        display:"flex", alignItems:"center", gap:"6px",
+        display: "flex", alignItems: "center", gap: "6px",
         background: trailblazerProg.virtualLinkOpen ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.1)",
         border: `1px solid ${trailblazerProg.virtualLinkOpen ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.18)"}`,
-        borderRadius:"100px", padding:"4px 11px 4px 8px", flexShrink:0, transition:"all 0.3s",
+        borderRadius: "100px", padding: "4px 11px 4px 8px", flexShrink: 0, transition: "all 0.3s",
       }}>
         <div style={{
-          width:"7px", height:"7px", borderRadius:"50%", flexShrink:0,
+          width: "7px", height: "7px", borderRadius: "50%", flexShrink: 0,
           background: trailblazerProg.virtualLinkOpen ? "#10b981" : "rgba(255,255,255,0.4)",
           boxShadow: trailblazerProg.virtualLinkOpen ? "0 0 0 3px rgba(16,185,129,0.25)" : "none",
-          transition:"all 0.3s",
+          transition: "all 0.3s",
         }} />
-        <span style={{ fontSize:"11.5px", fontWeight:700, color:"white" }}>
+        <span style={{ fontSize: "11.5px", fontWeight: 700, color: "white" }}>
           {trailblazerProg.virtualLinkOpen ? "Live to parents" : "Hidden"}
         </span>
       </div>
 
       {/* Spacer */}
-      <div style={{ flex:1 }} />
+      <div style={{ flex: 1 }} />
 
       {/* Link input */}
-      <div style={{ position:"relative", width:"320px", flexShrink:0 }}>
-        <span style={{ position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)", fontSize:"14px", pointerEvents:"none" }}>🔗</span>
+      <div style={{ position: "relative", width: "320px", flexShrink: 0 }}>
+        <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "14px", pointerEvents: "none" }}>🔗</span>
         <input
           type="url"
           placeholder="https://zoom.us/j/...  or  meet.google.com/..."
           style={{
-            width:"100%", boxSizing:"border-box",
-            borderRadius:"10px", border:"1.5px solid rgba(255,255,255,0.2)",
-            background:"rgba(255,255,255,0.1)", padding:"9px 12px 9px 34px",
-            fontSize:"13px", fontWeight:600, color:"white",
-            outline:"none", backdropFilter:"blur(4px)",
-            transition:"border-color 0.2s, background 0.2s, box-shadow 0.2s",
+            width: "100%", boxSizing: "border-box",
+            borderRadius: "10px", border: "1.5px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.1)", padding: "9px 12px 9px 34px",
+            fontSize: "13px", fontWeight: 600, color: "white",
+            outline: "none", backdropFilter: "blur(4px)",
+            transition: "border-color 0.2s, background 0.2s, box-shadow 0.2s",
           }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
@@ -1267,22 +1359,22 @@ function TrailblazerVirtualSettings() {
       </div>
 
       {/* Toggle */}
-      <div style={{ display:"flex", alignItems:"center", gap:"8px", flexShrink:0 }}>
-        <span style={{ fontSize:"11.5px", fontWeight:700, color:"rgba(255,255,255,0.75)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        <span style={{ fontSize: "11.5px", fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>
           {trailblazerProg.virtualLinkOpen ? "On" : "Off"}
         </span>
         <button type="button" onClick={toggleOpen} style={{
-          position:"relative", width:"40px", height:"22px", borderRadius:"100px",
-          border:"2px solid rgba(255,255,255,0.25)", cursor:"pointer", outline:"none", padding:0,
+          position: "relative", width: "40px", height: "22px", borderRadius: "100px",
+          border: "2px solid rgba(255,255,255,0.25)", cursor: "pointer", outline: "none", padding: 0,
           background: trailblazerProg.virtualLinkOpen ? "#10b981" : "rgba(255,255,255,0.2)",
-          transition:"background 0.25s",
+          transition: "background 0.25s",
         }}>
           <span style={{
-            position:"absolute", top:"1px",
+            position: "absolute", top: "1px",
             left: trailblazerProg.virtualLinkOpen ? "18px" : "1px",
-            width:"16px", height:"16px", borderRadius:"50%",
-            background:"white", boxShadow:"0 1px 4px rgba(0,0,0,0.3)",
-            transition:"left 0.25s", display:"block",
+            width: "16px", height: "16px", borderRadius: "50%",
+            background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+            transition: "left 0.25s", display: "block",
           }} />
         </button>
       </div>
@@ -1291,21 +1383,21 @@ function TrailblazerVirtualSettings() {
       <button
         type="button" onClick={handleSave} disabled={saving}
         style={{
-          flexShrink:0, display:"flex", alignItems:"center", gap:"6px",
-          borderRadius:"10px",
+          flexShrink: 0, display: "flex", alignItems: "center", gap: "6px",
+          borderRadius: "10px",
           cursor: saving ? "not-allowed" : "pointer",
-          padding:"9px 18px", fontWeight:800, fontSize:"13px", color:"white",
+          padding: "9px 18px", fontWeight: 800, fontSize: "13px", color: "white",
           background: saved ? "rgba(16,185,129,0.85)" : "rgba(255,255,255,0.15)",
           border: `1.5px solid ${saved ? "rgba(16,185,129,0.6)" : "rgba(255,255,255,0.25)"}`,
-          backdropFilter:"blur(4px)",
-          opacity: saving ? 0.7 : 1, transition:"all 0.25s",
-          whiteSpace:"nowrap",
+          backdropFilter: "blur(4px)",
+          opacity: saving ? 0.7 : 1, transition: "all 0.25s",
+          whiteSpace: "nowrap",
         }}
-        onMouseOver={(e) => { if (!saving) { e.currentTarget.style.background = saved ? "rgba(16,185,129,0.95)" : "rgba(255,255,255,0.22)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
+        onMouseOver={(e) => { if (!saving) { e.currentTarget.style.background = saved ? "rgba(16,185,129,0.95)" : "rgba(255,255,255,0.22)"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
         onMouseOut={(e) => { e.currentTarget.style.background = saved ? "rgba(16,185,129,0.85)" : "rgba(255,255,255,0.15)"; e.currentTarget.style.transform = "translateY(0)"; }}
       >
         {saving
-          ? <span style={{ width:"14px", height:"14px", borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"white", animation:"spin 0.7s linear infinite", display:"inline-block" }} />
+          ? <span style={{ width: "14px", height: "14px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", animation: "spin 0.7s linear infinite", display: "inline-block" }} />
           : saved ? "✓ Saved!" : "📤 Post Link"}
       </button>
     </div>
@@ -1330,7 +1422,7 @@ export default function AdminParentsPage() {
     fetch("/api/renewal-settings")
       .then((r) => r.json())
       .then((d) => { if (d.programs) setRenewalSettings(d.programs); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   async function loadAccounts() {
