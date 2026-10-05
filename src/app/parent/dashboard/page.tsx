@@ -338,6 +338,338 @@ function Lightbox({ photos, startIndex, onClose }: { photos: PhotoItem[]; startI
   );
 }
 
+// ─── File Viewer Modal ─────────────────────────────────────────────────────────
+
+type FileViewerState = {
+  title: string;
+  url: string;         // presigned view URL
+  contentType: string; // e.g. "application/pdf", "image/png"
+  uid: string;         // account uid — needed to re-sign for download
+  materialId: string;  // material id  — needed to re-sign for download
+  fileKey?: string;    // actual file key in B2
+};
+
+// Spinning keyframe injected once at module level (server-safe guard)
+if (typeof document !== "undefined" && !document.getElementById("me-spin-style")) {
+  const s = document.createElement("style");
+  s.id = "me-spin-style";
+  s.textContent = `@keyframes me-spin{to{transform:rotate(360deg)}} @keyframes me-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`;
+  document.head.appendChild(s);
+}
+
+function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose: () => void }) {
+  const { title, url, contentType, fileKey } = viewer;
+  const isImage = contentType.startsWith("image/");
+  const lowerTitle = title.toLowerCase();
+  const lowerKey = (fileKey || "").toLowerCase();
+
+  const isPdf   = contentType === "application/pdf" ||
+                   contentType.includes("pdf") ||
+                   lowerTitle.endsWith(".pdf") ||
+                   lowerKey.endsWith(".pdf");
+  const isOffice =
+    contentType.includes("spreadsheet") ||
+    contentType.includes("presentation") ||
+    contentType.includes("wordprocessing") ||
+    contentType === "application/msword" ||
+    contentType === "application/vnd.ms-excel" ||
+    contentType === "application/vnd.ms-powerpoint" ||
+    lowerTitle.endsWith(".xlsx") || lowerTitle.endsWith(".xls") ||
+    lowerTitle.endsWith(".docx") || lowerTitle.endsWith(".doc") ||
+    lowerTitle.endsWith(".pptx") || lowerTitle.endsWith(".ppt") ||
+    lowerKey.endsWith(".xlsx") || lowerKey.endsWith(".xls") ||
+    lowerKey.endsWith(".docx") || lowerKey.endsWith(".doc") ||
+    lowerKey.endsWith(".pptx") || lowerKey.endsWith(".ppt");
+
+  const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
+  // landscape = wide modal; portrait = default narrower modal
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  function getFileInfo(): { icon: string; label: string } {
+    const lower = title.toLowerCase();
+    if (isImage) return { icon: "🖼️", label: "Image" };
+    if (lower.endsWith(".pdf") || contentType === "application/pdf") return { icon: "📕", label: "PDF" };
+    if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".avi")) return { icon: "🎬", label: "Video" };
+    if (lower.endsWith(".doc") || lower.endsWith(".docx")) return { icon: "📝", label: "Document" };
+    if (lower.endsWith(".ppt") || lower.endsWith(".pptx")) return { icon: "📊", label: "Slides" };
+    if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return { icon: "📈", label: "Spreadsheet" };
+    return { icon: "📄", label: "File" };
+  }
+
+  const { icon, label } = getFileInfo();
+
+  // Download uses the API's ?download=1 variant which bakes
+  // ResponseContentDisposition:attachment into the presigned URL.
+  // B2 then tells the browser "save this" — no blob fetch, no new tab.
+  async function handleDownload() {
+    try {
+      // Fetch a presigned URL with Content-Disposition:attachment baked in.
+      // We use a hidden <iframe> to trigger the browser's "Save file" dialog
+      // without navigating the current page away or opening a new tab.
+      const dlRes = await fetch(
+        `/api/files/download-url?uid=${encodeURIComponent(viewer.uid)}&materialId=${encodeURIComponent(viewer.materialId)}&download=1`
+      );
+      const dlData = await dlRes.json();
+      const downloadUrl = dlData.success && dlData.url ? dlData.url : url;
+
+      // Hidden iframe trick: browser receives Content-Disposition:attachment
+      // from B2 and saves the file; the iframe itself stays invisible.
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;";
+      iframe.src = downloadUrl;
+      document.body.appendChild(iframe);
+      // Remove after 30 s (enough time for large files to start downloading)
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch { /* already removed */ } }, 30000);
+    } catch {
+      // Last resort — open in current tab (B2 will serve it as attachment)
+      window.location.href = url;
+    }
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Modal card dimensions vary by orientation mode
+  const cardWidth  = isLandscape ? "min(98vw, 1400px)" : "min(92vw, 820px)";
+  const cardHeight = isLandscape ? "96vh" : "min(92vh, 960px)";
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1100,
+        background: "linear-gradient(160deg,#1a6bbf 0%,#2d8fd4 40%,#5bc8f5 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: isLandscape ? "8px" : "16px",
+        overflow: "hidden",
+      }}
+    >
+      {/* ── Backdrop decorations — visible only when modal doesn't fill screen ── */}
+      {!isLandscape && (<>
+        {[
+          { top:"5%",  left:"3%",  size:"26px", rot:"15deg" },
+          { top:"10%", left:"89%", size:"20px", rot:"-10deg" },
+          { top:"84%", left:"6%",  size:"18px", rot:"30deg" },
+          { top:"80%", left:"91%", size:"24px", rot:"-20deg" },
+          { top:"44%", left:"1%",  size:"16px", rot:"5deg" },
+          { top:"50%", left:"95%", size:"16px", rot:"-5deg" },
+        ].map((s, i) => (
+          <div key={i} style={{ position:"absolute", top:s.top, left:s.left, fontSize:s.size, transform:`rotate(${s.rot})`, opacity:0.8, pointerEvents:"none", userSelect:"none" }}>⭐</div>
+        ))}
+        {[
+          { top:"2%",  left:"16%", size:"34px" },
+          { top:"4%",  left:"58%", size:"26px" },
+          { top:"89%", left:"22%", size:"30px" },
+          { top:"91%", left:"65%", size:"22px" },
+        ].map((c, i) => (
+          <div key={i} style={{ position:"absolute", top:c.top, left:c.left, fontSize:c.size, opacity:0.65, pointerEvents:"none", userSelect:"none" }}>☁️</div>
+        ))}
+        <div style={{ position:"absolute", top:"7%",  left:"1%",  fontSize:"36px", opacity:0.7, pointerEvents:"none", transform:"rotate(-10deg)" }}>🌈</div>
+        <div style={{ position:"absolute", bottom:"5%", right:"2%", fontSize:"32px", opacity:0.7, pointerEvents:"none", transform:"rotate(30deg)" }}>🚀</div>
+        <div style={{ position:"absolute", top:"2%",  right:"8%", fontSize:"38px", opacity:0.75, pointerEvents:"none" }}>☀️</div>
+        <div style={{ position:"absolute", bottom:"5%", left:"2%", fontSize:"28px", opacity:0.65, pointerEvents:"none" }}>🔍</div>
+      </>)}
+
+      {/* ── Modal card ── */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: cardWidth,
+          height: cardHeight,
+          display: "flex", flexDirection: "column",
+          borderRadius: isLandscape ? "20px" : "28px",
+          overflow: "hidden",
+          boxShadow: "0 0 0 4px #FFD700, 0 20px 60px rgba(0,0,0,0.4)",
+          background: "white",
+          transition: "width 0.3s ease, height 0.3s ease, border-radius 0.3s ease",
+        }}
+      >
+        {/* ── Header ── */}
+        <div style={{
+          flexShrink: 0,
+          background: "linear-gradient(135deg,#0050d5 0%,#1a7fde 50%,#38b6ff 100%)",
+          padding: "14px 18px",
+          display: "flex", alignItems: "center", gap: "12px",
+          position: "relative", overflow: "hidden",
+          borderBottom: "4px solid #FFD700",
+        }}>
+          {/* Dot decorations */}
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{ position:"absolute", top: i%2===0?"5px":"auto", bottom:i%2!==0?"5px":"auto", left:`${10+i*18}%`, width:"7px", height:"7px", borderRadius:"50%", background:"rgba(255,255,255,0.18)", pointerEvents:"none" }} />
+          ))}
+
+          {/* Icon badge */}
+          <div style={{ width:"50px", height:"50px", borderRadius:"50%", background:"linear-gradient(135deg,#FFD700,#FFB300)", border:"3px solid white", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"26px", flexShrink:0, boxShadow:"0 3px 10px rgba(0,0,0,0.2)" }}>
+            {icon}
+          </div>
+
+          {/* Title */}
+          <div style={{ flex:1, overflow:"hidden" }}>
+            <div style={{ fontWeight:"900", fontSize:"15px", color:"white", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", textShadow:"0 1px 4px rgba(0,0,0,0.25)" }}>
+              {title}
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:"6px", marginTop:"4px" }}>
+              <span style={{ fontSize:"10px", fontWeight:"800", color:"#001a4d", background:"#FFD700", padding:"2px 9px", borderRadius:"20px" }}>{label}</span>
+              <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.6)" }}>Esc to close</span>
+            </div>
+          </div>
+
+          {/* Landscape / Portrait toggle */}
+          <button
+            onClick={() => setIsLandscape(v => !v)}
+            title={isLandscape ? "Switch to portrait view" : "Switch to landscape (wide) view"}
+            style={{
+              display:"flex", alignItems:"center", gap:"5px",
+              padding:"8px 14px",
+              background:"rgba(255,255,255,0.15)",
+              border:"1.5px solid rgba(255,255,255,0.35)",
+              borderRadius:"50px",
+              color:"white", fontWeight:"700", fontSize:"12px",
+              cursor:"pointer", flexShrink:0,
+              transition:"background 0.15s",
+            }}
+            onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.28)"}
+            onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.15)"}
+          >
+            {isLandscape ? (
+              <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/></svg> Portrait</>
+            ) : (
+              <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/></svg> Landscape</>
+            )}
+          </button>
+
+          {/* Download */}
+          <button
+            onClick={handleDownload}
+            style={{
+              display:"flex", alignItems:"center", gap:"6px",
+              padding:"9px 18px",
+              background:"linear-gradient(135deg,#FFD700,#FFB300)",
+              border:"2.5px solid white",
+              borderRadius:"50px",
+              color:"#002f76", fontWeight:"800", fontSize:"13px",
+              cursor:"pointer", flexShrink:0,
+              boxShadow:"0 3px 10px rgba(0,0,0,0.2)",
+              transition:"transform 0.1s, box-shadow 0.1s",
+            }}
+            onMouseOver={e => { e.currentTarget.style.transform="scale(1.05)"; e.currentTarget.style.boxShadow="0 5px 14px rgba(0,0,0,0.25)"; }}
+            onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 3px 10px rgba(0,0,0,0.2)"; }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download
+          </button>
+
+          {/* Close */}
+          <button
+            onClick={onClose}
+            style={{ width:"38px", height:"38px", borderRadius:"50%", background:"rgba(255,255,255,0.18)", border:"2px solid rgba(255,255,255,0.45)", color:"white", fontSize:"16px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontWeight:"700", transition:"all 0.15s" }}
+            onMouseOver={e => { e.currentTarget.style.background="#ef4444"; e.currentTarget.style.borderColor="#ef4444"; }}
+            onMouseOut={e => { e.currentTarget.style.background="rgba(255,255,255,0.18)"; e.currentTarget.style.borderColor="rgba(255,255,255,0.45)"; }}
+            title="Close (Esc)"
+          >✕</button>
+        </div>
+
+        {/* ── Viewer body ── */}
+        <div style={{ flex:1, overflow:"hidden", position:"relative", background: isOffice ? "linear-gradient(135deg,#f0f9ff,#e0f2fe)" : isPdf ? "#525659" : "linear-gradient(135deg,#f0f8ff,#e8f4ff)" }}>
+
+          {/* ── IMAGE ── */}
+          {isImage && (
+            <div style={{ width:"100%", height:"100%", overflow:"auto", display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
+              <img src={url} alt={title} style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:"16px", boxShadow:"0 8px 32px rgba(0,0,0,0.2), 0 0 0 3px #FFD700" }} />
+            </div>
+          )}
+
+          {/* ── PDF — browser renders natively ── */}
+          {!isImage && isPdf && (
+            <iframe
+              key={`${url}-${isLandscape}`}
+              src={url}
+              style={{ width:"100%", height:"100%", border:"none", display:"block" }}
+              title={title}
+            />
+          )}
+
+          {/* ── OFFICE (xlsx/docx/pptx) — external viewers can't reliably access B2
+               presigned URLs, so show a kid-friendly download card ── */}
+          {!isImage && !isPdf && isOffice && (
+            <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}>
+              <div style={{ textAlign:"center", maxWidth:"380px" }}>
+                {/* Big bouncy file icon */}
+                <div style={{ fontSize:"80px", lineHeight:1, marginBottom:"16px", filter:"drop-shadow(0 8px 16px rgba(0,80,213,0.2))" }}>
+                  {icon}
+                </div>
+                <div style={{ fontWeight:"900", fontSize:"20px", color:"#002f76", marginBottom:"8px", letterSpacing:"-0.3px" }}>{title}</div>
+                <div style={{ fontSize:"13px", color:"#64748b", marginBottom:"28px", lineHeight:"1.6" }}>
+                  This file is ready to open in <strong>{label === "Spreadsheet" ? "Microsoft Excel or Google Sheets" : label === "Slides" ? "Microsoft PowerPoint or Google Slides" : "Microsoft Word or Google Docs"}</strong>.
+                  <br/>Download it below and open it with your app! 🎉
+                </div>
+                {/* Stars decoration */}
+                <div style={{ display:"flex", justifyContent:"center", gap:"8px", marginBottom:"20px", fontSize:"20px", opacity:0.6 }}>⭐🌟⭐</div>
+                {/* Big download button */}
+                <button
+                  onClick={handleDownload}
+                  style={{
+                    display:"inline-flex", alignItems:"center", gap:"10px",
+                    padding:"14px 32px",
+                    background:"linear-gradient(135deg,#FFD700,#FFB300)",
+                    border:"3px solid #002f76",
+                    borderRadius:"50px",
+                    color:"#002f76", fontWeight:"900", fontSize:"16px",
+                    cursor:"pointer",
+                    boxShadow:"0 6px 20px rgba(255,180,0,0.4)",
+                    transition:"transform 0.15s, box-shadow 0.15s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.06)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(255,180,0,0.5)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(255,180,0,0.4)"; }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download to Open
+                </button>
+                <div style={{ marginTop:"14px", fontSize:"11px", color:"#94a3b8" }}>The file will download to your device 📥</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── OTHER — show download card (avoids spurious iframe downloads) ── */}
+          {!isImage && !isPdf && !isOffice && (
+            <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}>
+              <div style={{ textAlign:"center", maxWidth:"380px" }}>
+                <div style={{ fontSize:"80px", lineHeight:1, marginBottom:"16px", filter:"drop-shadow(0 8px 16px rgba(0,80,213,0.2))" }}>{icon}</div>
+                <div style={{ fontWeight:"900", fontSize:"20px", color:"#002f76", marginBottom:"8px" }}>{title}</div>
+                <div style={{ fontSize:"13px", color:"#64748b", marginBottom:"28px", lineHeight:"1.6" }}>
+                  This file can’t be previewed in the browser.<br/>Download it to open it on your device! 🎉
+                </div>
+                <div style={{ display:"flex", justifyContent:"center", gap:"8px", marginBottom:"20px", fontSize:"20px", opacity:0.6 }}>⭐🌟⭐</div>
+                <button
+                  onClick={handleDownload}
+                  style={{ display:"inline-flex", alignItems:"center", gap:"10px", padding:"14px 32px", background:"linear-gradient(135deg,#FFD700,#FFB300)", border:"3px solid #002f76", borderRadius:"50px", color:"#002f76", fontWeight:"900", fontSize:"16px", cursor:"pointer", boxShadow:"0 6px 20px rgba(255,180,0,0.4)", transition:"transform 0.15s, box-shadow 0.15s" }}
+                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.06)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(255,180,0,0.5)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(255,180,0,0.4)"; }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download to Open
+                </button>
+                <div style={{ marginTop:"14px", fontSize:"11px", color:"#94a3b8" }}>The file will download to your device 📥</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // Countdown Timer
 function NextSessionCountdown({ schedule, classTime }: { schedule: string; classTime: string }) {
   const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
@@ -674,6 +1006,8 @@ export default function ParentDashboardPage() {
   const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history" | "virtual" | "renewal" | "profile" | "folder" | "payments">("virtual");
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
+  const [fileViewer, setFileViewer] = useState<FileViewerState | null>(null);
+  const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
   // We also cache the full per-program list so we can resolve after profile loads
@@ -1713,20 +2047,32 @@ export default function ParentDashboardPage() {
             const files = (profile.studyMaterials || []).filter((m: any) => m.type === "file");
 
             async function openFile(m: any) {
+              // External links (YouTube etc.) — open in new tab as before
               if (m.type === "link" || m.url) {
                 window.open(m.url, "_blank", "noopener,noreferrer");
                 return;
               }
+              if (loadingFileId === m.id) return; // prevent double-click
+              setLoadingFileId(m.id);
               try {
                 const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(profile?.id ?? "")}&materialId=${encodeURIComponent(m.id)}`);
                 const data = await res.json();
                 if (data.success && data.url) {
-                  window.open(data.url, "_blank", "noopener,noreferrer");
+                  setFileViewer({
+                    title: m.title || "File",
+                    url: data.url,
+                    contentType: m.contentType || "application/octet-stream",
+                    uid: profile?.id ?? "",
+                    materialId: m.id,
+                    fileKey: m.key,
+                  });
                 } else {
                   alert(data.error || "Could not open file.");
                 }
               } catch {
                 alert("Network error. Please try again.");
+              } finally {
+                setLoadingFileId(null);
               }
             }
 
@@ -1790,22 +2136,46 @@ export default function ParentDashboardPage() {
                         <div style={{ padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px dashed #e2e8f0", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>No files uploaded yet.</div>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {files.map((m: any) => (
-                            <button
-                              key={m.id}
-                              onClick={() => openFile(m)}
-                              style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", border: "1px solid #e2e8f0", borderRadius: "12px", background: "#f8faff", cursor: "pointer", textAlign: "left", width: "100%", transition: "all 0.15s" }}
-                              onMouseOver={e => (e.currentTarget.style.background = "#eff6ff")}
-                              onMouseOut={e => (e.currentTarget.style.background = "#f8faff")}
-                            >
-                              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>📄</div>
-                              <div style={{ flex: 1, overflow: "hidden" }}>
-                                <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>Click to open file</div>
-                              </div>
-                              <div style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>⬇</div>
-                            </button>
-                          ))}
+                          {files.map((m: any) => {
+                            const isLoading = loadingFileId === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => openFile(m)}
+                                disabled={!!loadingFileId}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: "14px",
+                                  padding: "14px 16px",
+                                  border: isLoading ? "1.5px solid #3b82f6" : "1px solid #e2e8f0",
+                                  borderRadius: "12px",
+                                  background: isLoading ? "linear-gradient(135deg,#eff6ff,#dbeafe)" : "#f8faff",
+                                  cursor: isLoading ? "default" : "pointer",
+                                  textAlign: "left", width: "100%",
+                                  transition: "all 0.2s",
+                                  boxShadow: isLoading ? "0 0 0 3px rgba(59,130,246,0.15)" : "none",
+                                }}
+                                onMouseOver={e => { if (!isLoading) e.currentTarget.style.background = "#eff6ff"; }}
+                                onMouseOut={e => { if (!isLoading) e.currentTarget.style.background = "#f8faff"; }}
+                              >
+                                {/* Icon or spinner */}
+                                <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: isLoading ? "linear-gradient(135deg,#60a5fa,#818cf8)" : "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>
+                                  {isLoading ? (
+                                    <svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                    </svg>
+                                  ) : "📄"}
+                                </div>
+                                <div style={{ flex: 1, overflow: "hidden" }}>
+                                  <div style={{ fontWeight: "700", color: isLoading ? "#1d4ed8" : "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                  <div style={{ color: isLoading ? "#3b82f6" : "#94a3b8", fontSize: "12px", marginTop: "2px", animation: isLoading ? "me-pulse 1.2s ease-in-out infinite" : "none", fontWeight: isLoading ? "600" : "400" }}>
+                                    {isLoading ? "Opening… please wait" : "Click to open file"}
+                                  </div>
+                                </div>
+                                {/* Right indicator */}
+                                {!isLoading && <div style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>⬇</div>}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2601,6 +2971,11 @@ export default function ParentDashboardPage() {
       {/* ── Change Password Modal ─────────────────────────────────────────── */}
       {showPasswordModal && (
         <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
+
+      {/* ── File Viewer Modal ──────────────────────────────────────────────── */}
+      {fileViewer && (
+        <FileViewerModal viewer={fileViewer} onClose={() => setFileViewer(null)} />
       )}
     </div>
   );

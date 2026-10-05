@@ -1,47 +1,50 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import type { GetObjectCommandInput } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-
-/**
- * Same B2 S3 client configuration as /api/upload.
- * requestChecksumCalculation / responseChecksumValidation are set to
- * "WHEN_REQUIRED" to suppress the CRC-32 checksum headers that the AWS SDK
- * adds by default in v3 — B2 rejects them with a 400 error.
- */
-const s3 = new S3Client({
-  region: process.env.B2_REGION || "us-east-005",
-  endpoint: process.env.B2_ENDPOINT || "https://s3.us-east-005.backblazeb2.com",
-  credentials: {
-    accessKeyId: process.env.B2_KEY_ID!,
-    secretAccessKey: process.env.B2_APPLICATION_KEY!,
-  },
-  requestChecksumCalculation: "WHEN_REQUIRED",
-  responseChecksumValidation: "WHEN_REQUIRED",
-});
 
 const BUCKET = process.env.B2_BUCKET_NAME || "merry-explorers-files";
 const EXPIRES_IN = 300; // 5 minutes
 
 export const dynamic = "force-dynamic";
 
+function getS3Client(): S3Client {
+  const keyId = process.env.B2_KEY_ID;
+  const appKey = process.env.B2_APPLICATION_KEY;
+
+  if (!keyId || !appKey) {
+    throw new Error(
+      "Backblaze credentials are not configured. Add B2_KEY_ID and B2_APPLICATION_KEY to your Vercel environment variables."
+    );
+  }
+
+  return new S3Client({
+    region: process.env.B2_REGION || "us-east-005",
+    endpoint: process.env.B2_ENDPOINT || "https://s3.us-east-005.backblazeb2.com",
+    credentials: {
+      accessKeyId: keyId,
+      secretAccessKey: appKey,
+    },
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
+  });
+}
+
 /**
- * GET /api/files/download-url?uid=<accountId>&materialId=<materialId>
+ * GET /api/files/download-url?uid=<uid>&materialId=<id>
+ * GET /api/files/download-url?uid=<uid>&materialId=<id>&download=1
  *
- * Finds the material record in MongoDB, checks that it has a `key` field
- * (i.e. it was uploaded to Backblaze, not just a YouTube link), and returns
- * a presigned GET URL that expires in 5 minutes.
- *
- * Auth check: caller must supply the uid whose account owns the material,
- * OR be an admin/teacher (role checked via the `role` query param coming
- * from the session — in a full implementation you'd verify a session cookie;
- * for now we verify the uid owns the account).
+ * Returns a presigned GET URL for the material.
+ * When ?download=1 is present the URL includes ResponseContentDisposition=attachment
+ * so the browser saves the file directly without opening a new tab.
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const uid = searchParams.get("uid");
+    const uid        = searchParams.get("uid");
     const materialId = searchParams.get("materialId");
+    const asDownload = searchParams.get("download") === "1";
 
     if (!uid || !materialId) {
       return NextResponse.json(
@@ -52,7 +55,6 @@ export async function GET(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // Find the account that owns this material
     const account = await db.collection("accounts").findOne({ _id: uid as any });
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -65,17 +67,53 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Material not found" }, { status: 404 });
     }
 
-    // Link-type materials (YouTube, etc.) don't have a B2 key — return url directly
     if (material.type === "link" || !material.key) {
       return NextResponse.json({ success: true, url: material.url });
     }
 
-    // Generate a presigned GET URL valid for 5 minutes
-    const command = new GetObjectCommand({
+    const s3 = getS3Client();
+
+    const commandInput: GetObjectCommandInput = {
       Bucket: BUCKET,
       Key: material.key,
-    });
+    };
 
+    if (asDownload) {
+      // Extract extension from the stored key (e.g. "materials/uuid-Report.pdf" → ".pdf")
+      // The key always preserves the original extension from the upload sanitization.
+      const keyExt = (material.key as string).match(/(\.[^./\\]+)$/)?.[1] ?? "";
+
+      // Fallback: derive extension from contentType if the key has none
+      const ctExtMap: Record<string, string> = {
+        "application/pdf": ".pdf",
+        "application/msword": ".doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+        "application/vnd.ms-powerpoint": ".ppt",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+        "application/vnd.ms-excel": ".xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/gif": ".gif",
+        "image/webp": ".webp",
+      };
+      const ext = keyExt || (material.contentType ? ctExtMap[material.contentType] ?? "" : "");
+
+      const baseName = (material.title || "file").replace(/\.[^.]+$/, ""); // strip if title already has ext
+      const fullName = `${baseName}${ext}`;
+
+      // RFC 5987 — use filename* for non-ASCII-safe names, plain filename as fallback
+      const encoded = encodeURIComponent(fullName);
+      commandInput.ResponseContentDisposition =
+        `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
+
+      if (material.contentType) {
+        commandInput.ResponseContentType = material.contentType as string;
+      }
+    }
+
+
+    const command   = new GetObjectCommand(commandInput);
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: EXPIRES_IN });
 
     return NextResponse.json({ success: true, url: signedUrl });

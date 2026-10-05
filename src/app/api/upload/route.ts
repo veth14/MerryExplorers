@@ -2,32 +2,40 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
-/**
- * S3 client pointed at Backblaze B2.
- *
- * requestChecksumCalculation / responseChecksumValidation are set to
- * "WHEN_REQUIRED" because the AWS SDK v3 added automatic CRC-32 checksum
- * headers in recent versions (aws-crc32, x-amz-checksum-*).
- * Backblaze B2 rejects those headers with a 400 "Unsupported header" error,
- * so we tell the SDK only to add them when the specific API operation
- * actually requires them (none of the ones we use do).
- */
-const s3 = new S3Client({
-  region: process.env.B2_REGION || "us-east-005",
-  endpoint: process.env.B2_ENDPOINT || "https://s3.us-east-005.backblazeb2.com",
-  credentials: {
-    accessKeyId: process.env.B2_KEY_ID!,
-    secretAccessKey: process.env.B2_APPLICATION_KEY!,
-  },
-  requestChecksumCalculation: "WHEN_REQUIRED",
-  responseChecksumValidation: "WHEN_REQUIRED",
-});
-
 const BUCKET = process.env.B2_BUCKET_NAME || "merry-explorers-files";
 
 export const dynamic = "force-dynamic";
 // Allow large files (e.g. PDFs, videos up to 150 MB)
 export const maxDuration = 60;
+
+/**
+ * Lazy-initialize the S3 client so that missing env vars produce a clear
+ * 500 error message instead of crashing with "Resolved credential object
+ * is not valid" during module load.
+ */
+function getS3Client(): S3Client {
+  const keyId = process.env.B2_KEY_ID;
+  const appKey = process.env.B2_APPLICATION_KEY;
+
+  if (!keyId || !appKey) {
+    throw new Error(
+      "Backblaze credentials are not configured. Add B2_KEY_ID and B2_APPLICATION_KEY to your Vercel environment variables."
+    );
+  }
+
+  return new S3Client({
+    region: process.env.B2_REGION || "us-east-005",
+    endpoint: process.env.B2_ENDPOINT || "https://s3.us-east-005.backblazeb2.com",
+    credentials: {
+      accessKeyId: keyId,
+      secretAccessKey: appKey,
+    },
+    // Suppress CRC-32 checksum headers that AWS SDK v3 adds by default —
+    // Backblaze B2 rejects them with a 400 error.
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
+  });
+}
 
 export async function POST(request: Request) {
   try {
@@ -50,8 +58,9 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Upload to Backblaze B2 — NO ACL field (B2 does not support canned ACLs).
-    // The bucket stays Private; access is via presigned URLs generated on demand.
+    // Upload to Backblaze B2 — NO ACL (B2 does not support canned ACLs).
+    // Bucket stays Private; access is via presigned URLs generated on demand.
+    const s3 = getS3Client();
     await s3.send(
       new PutObjectCommand({
         Bucket: BUCKET,
@@ -67,19 +76,18 @@ export async function POST(request: Request) {
       const newMaterial = {
         id: crypto.randomUUID(),
         title: file.name.replace(/\.[^.]+$/, ""),
-        key,                                     // B2 object key — used to generate presigned URLs
+        key,
         type: "file" as const,
         contentType: file.type || "application/octet-stream",
         size: file.size,
         uploadedBy: uid,
         uploadedAt: new Date().toISOString(),
       };
-      await (await connectToDatabase()).db
+      await db
         .collection("accounts")
         .updateOne({ _id: uid as any }, { $push: { studyMaterials: newMaterial } as any });
     }
 
-    // Return the key so the caller can store it and generate presigned URLs later.
     return NextResponse.json({ success: true, key });
   } catch (error: any) {
     console.error("[upload] Backblaze error:", error);
