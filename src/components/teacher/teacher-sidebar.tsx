@@ -159,6 +159,39 @@ function RegistrationsIcon() {
     </svg>
   );
 }
+function CalendarIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+function CreditCardIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  );
+}
+function VideoIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <polygon points="23 7 16 12 23 17 23 7" />
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+    </svg>
+  );
+}
+function DiscoveryDayIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  );
+}
 
 // ─── Nav item ─────────────────────────────────────────────────────────────────
 function NavItem({
@@ -288,7 +321,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
 
-  // Admin groups for executive assistant & developer view
+  // Admin groups for executive assistant & developer view — mirrors sidebar.tsx exactly
   const adminGroups = [
     {
       title: "HR & People",
@@ -302,18 +335,27 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
     {
       title: "Time & Attendance",
       items: [
+        { label: "Calendar", href: "/admin/calendar", icon: <CalendarIcon /> },
         { label: "Attendance", href: "/admin/attendance", icon: <AttendanceIcon /> },
         { label: "Leave Requests", href: "/admin/leaves", icon: <LeaveIcon /> },
       ],
     },
     {
-      title: "Operations",
+      title: "Programs & Finance",
+      items: [
+        { label: "Registrations", href: "/admin/registrations", icon: <RegistrationsIcon /> },
+        { label: "Students", href: "/admin/students", icon: <StudentsIcon /> },
+        { label: "Payments", href: "/admin/payments", icon: <CreditCardIcon /> },
+        { label: "Virtual Sessions", href: "/admin/virtual-sessions", icon: <VideoIcon /> },
+        { label: "Discovery Day", href: "/admin/discovery-day", icon: <DiscoveryDayIcon /> },
+      ],
+    },
+    {
+      title: "Content & Logs",
       items: [
         { label: "Inquiries", href: "/admin/inquiries", icon: <InquiriesIcon /> },
         { label: "Reports", href: "/admin/reports", icon: <ReportsIcon /> },
         { label: "Announcements", href: "/admin/announcements", icon: <AnnouncementsIcon /> },
-        { label: "Registrations", href: "/admin/registrations", icon: <RegistrationsIcon /> },
-        { label: "Students", href: "/admin/students", icon: <StudentsIcon /> },
         { label: "Gallery", href: "/admin/gallery", icon: <GalleryIcon /> },
         { label: "Photo Albums", href: "/admin/photo-albums", icon: <GalleryIcon /> },
         { label: "Audit Log", href: "/admin/audit-log", icon: <AuditIcon /> },
