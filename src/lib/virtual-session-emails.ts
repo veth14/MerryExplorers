@@ -111,7 +111,14 @@ export async function sendSessionLinkEmail(toEmail: string, parentName: string, 
             <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;padding:14px 40px;border-radius:50px;box-shadow:0 6px 20px rgba(79,70,229,0.35);">Go to My Session →</a>
           </div>
           <div style="background:#f0f5ff;border-left:4px solid #4f46e5;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
-            <p style="color:#312e81;font-size:13px;font-weight:600;margin:0;">🕐 ${sessionTime ? `Your session is scheduled for <strong>${sessionTime}</strong>. ` : ""}Please be ready a few minutes before your scheduled session time.</p>
+            <p style="color:#312e81;font-size:13px;font-weight:600;margin:0;">🕐 ${sessionTime ? `Your session is scheduled for <strong>${(() => {
+              try {
+                const d = new Date(sessionTime);
+                return isNaN(d.getTime()) ? sessionTime : d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+              } catch {
+                return sessionTime;
+              }
+            })()}</strong>. ` : ""}Please be ready a few minutes before your scheduled session time.</p>
           </div>
           <p style="color:#64748b;font-size:13px;line-height:1.7;margin:0;">After the session, a payment prompt will appear in your portal to unlock your next session.</p>
         </td></tr>

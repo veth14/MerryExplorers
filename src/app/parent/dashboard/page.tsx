@@ -49,6 +49,8 @@ type ParentProfile = {
   waiverSignedAt?: string;
   photoConsent?: boolean;
   virtualSessionLink?: string;
+  virtualSessionTime?: string;
+  needsSessionPayment?: boolean;
   renewalLink?: string;
   studyMaterials?: { id: string; title: string; url: string; type: string; createdAt?: string }[];
   sessionPayments?: {
@@ -1599,6 +1601,24 @@ export default function ParentDashboardPage() {
           {/* ── VIRTUAL CLASS TAB ────────────────────────────────────────────── */}
           {activeTab === "virtual" && (
             (() => {
+              if (profile.needsSessionPayment) {
+                return (
+                  <div style={{ background: "white", borderRadius: "20px", padding: "40px 32px", textAlign: "center", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+                    <div style={{ fontSize: "56px", marginBottom: "16px", animation: "bounce 2s infinite" }}>💳</div>
+                    <h2 style={{ margin: "0 0 12px", color: "#002f76", fontSize: "24px", fontWeight: "800" }}>Payment Required</h2>
+                    <p style={{ margin: "0 auto 32px", color: "#64748b", fontSize: "15px", maxWidth: "400px", lineHeight: 1.6 }}>
+                      Your previous virtual session has ended! Please submit your payment of <strong>₱450</strong> to unlock your next session.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab("payments")}
+                      style={{ padding: "16px 32px", background: "linear-gradient(135deg,#002f76,#0050d5)", color: "white", borderRadius: "14px", fontSize: "16px", fontWeight: "800", border: "none", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,47,118,0.3)" }}
+                    >
+                      Go to Payment Form →
+                    </button>
+                  </div>
+                );
+              }
+
               const programSetting = allRenewalPrograms?.find((p: any) => p.programKey === profile.program);
               const activeLink = profile.virtualSessionLink || (programSetting?.virtualLinkOpen ? programSetting?.virtualLink : null);
 
@@ -1634,8 +1654,6 @@ export default function ParentDashboardPage() {
                             boxShadow: "0 8px 24px rgba(0,47,118,0.3)",
                             transition: "all 0.2s"
                           }}
-                          onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                          onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
                         >
                           Join Virtual Class Now
                         </a>
@@ -1812,6 +1830,7 @@ export default function ParentDashboardPage() {
                       setDpReferenceNumber("");
                       setDpPaymentMethod("");
                       showToast("Payment submitted! We'll verify it shortly. ✅", "success");
+                      setTimeout(() => window.location.reload(), 1500);
                     } else {
                       showToast(data.error || "Failed to submit payment.", "error");
                     }

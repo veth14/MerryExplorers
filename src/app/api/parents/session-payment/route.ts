@@ -31,7 +31,10 @@ export async function POST(request: Request) {
 
     await db.collection("accounts").updateOne(
       { _id: uid as any },
-      { $push: { sessionPayments: payment } as any }
+      { 
+        $push: { sessionPayments: payment } as any,
+        $set: { needsSessionPayment: false }
+      }
     );
 
     // Send confirmation email (non-fatal)

@@ -8,6 +8,19 @@ function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
+function formatSessionTime(dt: string) {
+  if (!dt) return "";
+  try {
+    const d = new Date(dt);
+    if (isNaN(d.getTime())) return dt; // Fallback if already plain string
+    return d.toLocaleString("en-US", {
+      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+    });
+  } catch {
+    return dt;
+  }
+}
+
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#002f76,#0050d5)",
   "linear-gradient(135deg,#7c3aed,#a78bfa)",
@@ -30,13 +43,15 @@ export default function AdminVirtualSessionsPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   
   const [manageModal, setManageModal] = useState<any | null>(null);
+  const [confirmEndModal, setConfirmEndModal] = useState<string | null>(null);
 
   // Link and Time state
   const [newLink, setNewLink] = useState("");
   const [newTime, setNewTime] = useState("");
   const [sendEmailOnSave, setSendEmailOnSave] = useState(true);
   const [savingLink, setSavingLink] = useState(false);
-  const [linkSaveResult, setLinkSaveResult] = useState<{ ok: boolean } | null>(null);
+  const [endingSession, setEndingSession] = useState(false);
+  const [linkSaveResult, setLinkSaveResult] = useState<{ ok: boolean, isEnd?: boolean } | null>(null);
   const [isEditingLink, setIsEditingLink] = useState(false);
 
   // Material state
@@ -120,6 +135,44 @@ export default function AdminVirtualSessionsPage() {
       alert("Error saving link");
     } finally {
       setSavingLink(false);
+    }
+  }
+
+  function promptEndSession(uid: string) {
+    setConfirmEndModal(uid);
+  }
+
+  async function executeEndSession(uid: string) {
+    setConfirmEndModal(null);
+    setEndingSession(true);
+    try {
+      const res = await fetch("/api/parents/end-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid }),
+      });
+      if (res.ok) {
+        setAccounts(prev => prev.map(a => {
+          if (a.id === uid) {
+            return {
+              ...a,
+              virtualSessionLink: null,
+              virtualSessionTime: null,
+              needsSessionPayment: true
+            };
+          }
+          return a;
+        }));
+        setLinkSaveResult({ ok: true, isEnd: true });
+        setTimeout(() => setLinkSaveResult(null), 3000);
+      } else {
+        setLinkSaveResult({ ok: false, isEnd: true });
+        setTimeout(() => setLinkSaveResult(null), 3000);
+      }
+    } catch (e) {
+      alert("Error ending session");
+    } finally {
+      setEndingSession(false);
     }
   }
 
@@ -283,7 +336,7 @@ export default function AdminVirtualSessionsPage() {
                       </a>
                       {acc.virtualSessionTime && (
                         <div style={{ fontSize: "11px", fontWeight: "600", color: "#64748b", marginTop: "4px" }}>
-                          🕒 {acc.virtualSessionTime}
+                          🕒 {formatSessionTime(acc.virtualSessionTime)}
                         </div>
                       )}
                     </>
@@ -368,9 +421,9 @@ export default function AdminVirtualSessionsPage() {
                       />
                       <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px" }}>Session Time (Optional)</label>
                       <input 
+                        type="datetime-local"
                         value={newTime}
                         onChange={e => setNewTime(e.target.value)}
-                        placeholder="e.g. Wed 3:00 PM - 4:15 PM"
                         style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }}
                       />
                       <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "16px", cursor: "pointer" }}>
@@ -397,16 +450,21 @@ export default function AdminVirtualSessionsPage() {
                           </div>
                           {manageModal.virtualSessionTime && (
                             <div style={{ fontSize: "13px", fontWeight: "600", color: "#475569" }}>
-                              🕒 Time: <span style={{ color: "#334155" }}>{manageModal.virtualSessionTime}</span>
+                              🕒 Time: <span style={{ color: "#334155" }}>{formatSessionTime(manageModal.virtualSessionTime)}</span>
                             </div>
                           )}
+                          <div style={{ marginTop: "16px" }}>
+                            <button onClick={() => promptEndSession(manageModal.id)} disabled={endingSession} style={{ padding: "8px 16px", background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: "8px", fontWeight: "700", fontSize: "12px", cursor: endingSession ? "not-allowed" : "pointer", opacity: endingSession ? 0.7 : 1 }}>
+                              {endingSession ? "Ending..." : "🛑 End Session & Request Payment"}
+                            </button>
+                          </div>
                         </>
                       ) : (
                         <div style={{ fontSize: "14px", color: "#94a3b8", fontWeight: "500", fontStyle: "italic" }}>No meeting link has been set yet.</div>
                       )}
                       {linkSaveResult && (
                         <div style={{ marginTop: "12px", fontSize: "12px", fontWeight: "700", color: linkSaveResult.ok ? "#15803d" : "#b91c1c" }}>
-                          {linkSaveResult.ok ? "✅ Details successfully saved" + (sendEmailOnSave ? " and email sent!" : "!") : "❌ Failed to save details"}
+                          {linkSaveResult.ok ? (linkSaveResult.isEnd ? "✅ Session ended and payment requested!" : "✅ Details successfully saved" + (sendEmailOnSave ? " and email sent!" : "!")) : (linkSaveResult.isEnd ? "❌ Failed to end session" : "❌ Failed to save details")}
                         </div>
                       )}
                     </div>
@@ -466,6 +524,41 @@ export default function AdminVirtualSessionsPage() {
           </div>
         )}
       </AnimatePresence>
+      {/* ── Confirm End Session Modal ── */}
+      <AnimatePresence>
+        {confirmEndModal && (
+          <div onClick={() => setConfirmEndModal(null)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,18,51,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyItems: "center", padding: "16px" }}>
+            <m.div 
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+              onClick={e => e.stopPropagation()} 
+              style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "420px", margin: "auto", boxShadow: "0 20px 40px rgba(0,47,118,0.2)", overflow: "hidden", textAlign: "center", padding: "32px 24px" }}
+            >
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>🛑</div>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#0f172a", margin: "0 0 12px" }}>End Virtual Session?</h2>
+              <p style={{ color: "#475569", fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
+                This will instantly clear the student's meeting link and trigger a <strong>₱450 payment prompt</strong> in their Parent Portal for their next session.
+              </p>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button 
+                  onClick={() => executeEndSession(confirmEndModal)}
+                  style={{ flex: 1, padding: "12px", background: "#ef4444", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 12px rgba(239,68,68,0.3)" }}
+                >
+                  Yes, End Session
+                </button>
+                <button 
+                  onClick={() => setConfirmEndModal(null)}
+                  style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </m.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </AppShell>
   );
 }
