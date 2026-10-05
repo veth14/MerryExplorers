@@ -20,20 +20,26 @@ export async function PATCH(request: Request) {
 
     // Find the student linked to this parent
     const student = await db.collection("students").findOne({ "parentInfo.email": account.email });
-    if (!student) {
-      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+
+    if (student) {
+      // Merge childInfo for existing student
+      const updatedChildInfo = {
+        ...student.childInfo,
+        ...childInfo,
+      };
+
+      await db.collection("students").updateOne(
+        { _id: student._id },
+        { $set: { childInfo: updatedChildInfo, emergencyContact } }
+      );
+    } else {
+      // No student record exists (e.g. manually created account).
+      // Save directly to the account document as a fallback.
+      await db.collection("accounts").updateOne(
+        { _id: uid },
+        { $set: { childInfo, emergencyContact } }
+      );
     }
-
-    // Merge childInfo
-    const updatedChildInfo = {
-      ...student.childInfo,
-      ...childInfo,
-    };
-
-    await db.collection("students").updateOne(
-      { _id: student._id },
-      { $set: { childInfo: updatedChildInfo, emergencyContact } }
-    );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -313,6 +313,12 @@ export async function GET(request: Request) {
           childInfo: studentRecord.childInfo,
           emergencyContact: studentRecord.emergencyContact || { name: "", relationship: "", phone: "" },
         }
+      : account.childInfo || account.emergencyContact ? {
+          id: account._id.toString(),
+          program: account.program,
+          childInfo: account.childInfo || {},
+          emergencyContact: account.emergencyContact || { name: "", relationship: "", phone: "" },
+        } 
       : null;
 
     return NextResponse.json({
@@ -322,6 +328,8 @@ export async function GET(request: Request) {
       waiverSignature: account.waiverSignature || null,
       waiverSignedAt: account.waiverSignedAt ? new Date(account.waiverSignedAt).toISOString() : null,
       virtualSessionLink: account.virtualSessionLink || null,
+      studyMaterials: account.studyMaterials || [],
+      sessionPayments: account.sessionPayments || [],
       renewalLink: account.renewalLink || null,
       studentInfo,
       albums: safeAlbums,

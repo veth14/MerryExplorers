@@ -12,6 +12,7 @@ type ClassTime = { label: string; range: string };
 
 type Program = {
   value: string;
+  label?: string;
   ages: string;
   days: string;
   sessions: number;
@@ -21,42 +22,23 @@ type Program = {
 
 const PROGRAMS: Program[] = [
   {
-    value: "Discovery Club: Curious Explorer",
-    ages: "1.5 – 4.11",
-    days: "Monday & Wednesday",
-    sessions: 8,
-    times: [
-      { label: "Morning Class", range: "9:45 AM – 11:00 AM" },
-      { label: "Afternoon Class", range: "1:30 PM – 2:45 PM" },
-    ],
-  },
-  {
-    value: "Discovery Club: Creative Explorer",
-    ages: "2.6 – 4.11",
-    days: "Tuesday, Thursday & Friday",
-    sessions: 12,
-    prerequisite: "Child must be able to stay independently with Teacher during sessions without a guardian.",
-    times: [
-      { label: "Morning Class", range: "9:45 AM – 11:00 AM" },
-      { label: "Mid-Day Class", range: "11:15 AM – 12:30 PM" },
-      { label: "Afternoon Class", range: "1:30 PM – 2:45 PM" },
-    ],
-  },
-  {
-    value: "Discovery Club: Everyday Curious",
-    ages: "1.5 – 4.11",
-    days: "Monday – Friday",
-    sessions: 14,
-    times: [{ label: "Afternoon Class", range: "4:25 PM – 5:25 PM" }],
-  },
-  {
     value: "Trailblazer: Brave Explorer",
+    label: "Trailblazer: Brave Explorer",
     ages: "3 – 4.11",
     days: "Monday – Friday",
     sessions: 18,
     times: [{ label: "Afternoon Class", range: "3:00 PM – 4:15 PM" }],
   },
+  {
+    value: "Virtual Tutorial",
+    label: "Virtual Tutorial",
+    ages: "All Ages",
+    days: "Flexible",
+    sessions: 1,
+    times: [{ label: "Flexible Class", range: "TBD" }],
+  },
 ];
+
 
 function classTimeValue(t: ClassTime) {
   return `${t.label} · ${t.range}`;
@@ -234,6 +216,70 @@ function ParentModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [regLoading, setRegLoading] = useState(false);
+  const [entryMode, setEntryMode] = useState<"fetch" | "manual">(mode === "add" ? "fetch" : "manual");
+  const [regEmail, setRegEmail] = useState(""); // registration email for reference
+
+  useEffect(() => {
+    if (mode === "edit") return;
+    setRegLoading(true);
+    fetch("/api/registrations")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setRegistrations(data.data.filter((r: any) => r.status === "approved" || r.status === "early-bird"));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setRegLoading(false));
+  }, [mode]);
+
+  function handleSelectRegistration(e: React.ChangeEvent<HTMLSelectElement>) {
+    const regId = e.target.value;
+    if (!regId) return;
+    const reg = registrations.find(r => r.id === regId);
+    if (!reg) return;
+
+    const PROGRAM_MAP: Record<string, string> = {
+      "curious-explorer": "Discovery Club: Curious Explorer",
+      "creative-explorer": "Discovery Club: Creative Explorer",
+      "everyday-curious": "Discovery Club: Everyday Curious",
+      "brave-explorer": "Trailblazer: Brave Explorer",
+      "ballet": "Ballet",
+      "virtual-session": "Virtual Session",
+      "saturday-playdate": "Saturday Playdate"
+    };
+
+    const programValue = PROGRAM_MAP[reg.program] || reg.program;
+
+    setDraft(d => {
+      const p = findProgram(programValue);
+      let newSchedule = d.schedule;
+      let newClassTime = reg.classTime || "";
+
+      if (p) {
+        newSchedule = p.days;
+        const matchedTime = p.times.find(t => t.label === reg.classTime || classTimeValue(t) === reg.classTime);
+        newClassTime = matchedTime ? classTimeValue(matchedTime) : reg.classTime;
+      }
+
+      return {
+        ...d,
+        fullName: reg.parentInfo.name,
+        // Don't auto-fill email — admin must enter the portal login email separately
+        phone: reg.parentInfo.phone,
+        relationship: reg.parentInfo.relationship,
+        childName: `${reg.childInfo.firstName} ${reg.childInfo.lastName}`.trim(),
+        program: programValue,
+        schedule: newSchedule,
+        classTime: newClassTime,
+      };
+    });
+    setRegEmail(reg.parentInfo.email); // store for hint only
+    setError("");
+  }
+
   function set<K extends keyof Draft>(key: K, val: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: val }));
     setError("");
@@ -329,202 +375,230 @@ function ParentModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#e2e8f0] overflow-hidden flex flex-col max-h-[90vh]">
-          <div className="bg-gradient-to-r from-[#002f76] to-[#0050d5] px-6 py-4 shrink-0">
-            <h2 className="text-[17px] font-extrabold text-white">
-              {mode === "add" ? "Add Parent Account" : "Edit Parent Account"}
-            </h2>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative w-full sm:max-w-lg rounded-t-[2rem] sm:rounded-[2rem] bg-[#f4f7fb] shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[88vh]">
+
+          {/* Header */}
+          <div className="bg-gradient-to-br from-[#001f5c] to-[#0050d5] px-6 py-5 shrink-0 relative overflow-hidden">
+            <div className="absolute top-[-40px] right-[-40px] w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+            <div className="absolute bottom-[-30px] right-[60px] w-24 h-24 rounded-full bg-white/5 pointer-events-none" />
+            <div className="relative flex items-center justify-between">
+              <div>
+                <p className="text-white/60 text-[11px] font-bold uppercase tracking-widest mb-0.5">Admin</p>
+                <h2 className="text-[18px] font-extrabold text-white">
+                  {mode === "add" ? "Add Parent Account" : "Edit Parent Account"}
+                </h2>
+              </div>
+              <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-all">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+
             {/* Avatar */}
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-4 bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff]">
               <div
-                className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-white font-extrabold text-[26px] cursor-pointer relative group"
+                className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-white font-extrabold text-[22px] cursor-pointer shadow-md flex-shrink-0"
                 style={{ backgroundColor: draft.avatarUrl ? undefined : draft.avatarColor }}
                 onClick={() => fileRef.current?.click()}
               >
                 {draft.avatarUrl ? (
                   <img src={draft.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  initials
-                )}
+                ) : initials}
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="rounded-full border border-[#c5d6ff] bg-[#f0f5ff] px-4 py-1.5 text-[12px] font-bold text-[#0050d5] hover:bg-[#dde8ff] transition-colors"
-                >
-                  Upload Photo
-                </button>
-                {draft.avatarUrl && (
-                  <button
-                    type="button"
-                    onClick={() => { set("avatarUrl", ""); setSelectedFile(null); }}
-                    className="rounded-full border border-[#ffd5d5] bg-[#fff0f0] px-4 py-1.5 text-[12px] font-bold text-[#e53935] hover:bg-[#ffe0e0] transition-colors"
-                  >
-                    Remove
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-[#002f76]">
+                  {draft.fullName || "New Account"}
+                </p>
+                <p className="text-[12px] text-[#94a3b8] mb-2">{draft.email || "No email yet"}</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                    className="rounded-full border border-[#c5d6ff] bg-[#f0f5ff] px-3 py-1 text-[11px] font-bold text-[#0050d5] hover:bg-[#dde8ff] transition-colors">
+                    Upload Photo
                   </button>
-                )}
+                  {draft.avatarUrl && (
+                    <button type="button" onClick={() => { set("avatarUrl", ""); setSelectedFile(null); }}
+                      className="rounded-full border border-[#ffd5d5] bg-[#fff0f0] px-3 py-1 text-[11px] font-bold text-[#e53935] hover:bg-[#ffe0e0] transition-colors">
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Parent details */}
-            <SectionHeading>Parent Details</SectionHeading>
-
-            <Field label="Parent's Full Name" required>
-              <input className={INPUT_CLS} placeholder="e.g. Maria Santos" value={draft.fullName} onChange={(e) => set("fullName", e.target.value)} />
-            </Field>
-            <Field label="Email Address" required>
-              <input type="email" className={INPUT_CLS} placeholder="maria@example.com" value={draft.email} onChange={(e) => set("email", e.target.value)} />
-            </Field>
-            <Field label="Phone Number">
-              <input type="tel" className={INPUT_CLS} placeholder="09XX XXX XXXX" value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
-            </Field>
-            <Field label="Relationship to Child">
-              <div className="relative">
-                <select className={SELECT_CLS} value={draft.relationship} onChange={(e) => set("relationship", e.target.value)}>
-                  <option value="Mother">Mother</option>
-                  <option value="Father">Father</option>
-                  <option value="Guardian">Guardian</option>
-                  <option value="Grandparent">Grandparent</option>
-                  <option value="Other">Other</option>
-                </select>
-                <Chevron />
-              </div>
-            </Field>
-
-            {/* Child details */}
-            <SectionHeading>Child Details</SectionHeading>
-
-            <Field label="Child's Name" required>
-              <input className={INPUT_CLS} placeholder="e.g. Leo Santos" value={draft.childName} onChange={(e) => set("childName", e.target.value)} />
-            </Field>
-
-            <Field label="Program / Adventure" required>
-              <div className="relative">
-                <select className={SELECT_CLS} value={draft.program} onChange={(e) => handleProgramChange(e.target.value)}>
-                  <option value="" disabled>Select a program</option>
-                  {!isKnownProgram && draft.program && (
-                    <option value={draft.program}>{draft.program}</option>
-                  )}
-                  {PROGRAMS.map((p) => (
-                    <option key={p.value} value={p.value}>{p.value}</option>
-                  ))}
-                </select>
-                <Chevron />
-              </div>
-            </Field>
-
-            {/* Pre-requisite notice (only for programs that have one) */}
-            {selectedProgram?.prerequisite && (
-              <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[12px] font-semibold text-[#b45309]">
-                ⚠️ Pre-requisite: {selectedProgram.prerequisite}
+            {/* Fetch from Registration */}
+            {mode === "add" && (
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-[#eef2ff] flex items-center justify-center text-[14px]">🔍</div>
+                  <p className="text-[13px] font-extrabold text-[#002f76]">Import from Registration</p>
+                </div>
+                <div className="relative">
+                  <select className={SELECT_CLS} onChange={handleSelectRegistration} disabled={regLoading}>
+                    <option value="">{regLoading ? "Loading paid registrations…" : "Select a paid student to auto-fill ↓"}</option>
+                    {registrations.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.childInfo.firstName} {r.childInfo.lastName} — {r.parentInfo.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Chevron />
+                </div>
+                {registrations.length === 0 && !regLoading && (
+                  <p className="mt-2 text-[11px] text-[#94a3b8]">No approved registrations found. Fill in details manually below.</p>
+                )}
               </div>
             )}
 
-            <Field label="Class Time" required>
-              <div className="relative">
-                <select
-                  className={SELECT_CLS}
-                  value={draft.classTime}
-                  onChange={(e) => set("classTime", e.target.value)}
-                  disabled={!draft.program}
-                >
-                  <option value="" disabled>
-                    {draft.program ? "Select class time" : "Select a program first"}
-                  </option>
-                  {!isKnownTime && draft.classTime && (
-                    <option value={draft.classTime}>{draft.classTime}</option>
-                  )}
-                  {selectedProgram?.times.map((t) => (
-                    <option key={t.label} value={classTimeValue(t)}>
-                      {classTimeValue(t)}
-                    </option>
-                  ))}
-                </select>
-                <Chevron />
+            {/* Parent Details Card */}
+            <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff] space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-[#eef2ff] flex items-center justify-center text-[14px]">👤</div>
+                <p className="text-[13px] font-extrabold text-[#002f76]">Parent Details</p>
               </div>
-            </Field>
-
-            {/* Links */}
-            <SectionHeading>Links</SectionHeading>
-
-            <Field label="Virtual Session Link (Zoom/Meet)">
-              <input type="url" className={INPUT_CLS} placeholder="https://zoom.us/j/..." value={draft.virtualSessionLink || ""} onChange={(e) => set("virtualSessionLink", e.target.value)} />
-            </Field>
-
-            <Field label="Renewal Link">
-              <input type="url" className={INPUT_CLS} placeholder="https://docs.google.com/forms/..." value={draft.renewalLink || ""} onChange={(e) => set("renewalLink", e.target.value)} />
-            </Field>
-
-            {/* Account */}
-            <SectionHeading>Account</SectionHeading>
-
-            <Field label="Status">
-              <div className="relative">
-                <select className={SELECT_CLS} value={draft.status} onChange={(e) => set("status", e.target.value as "active" | "inactive")}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-                <Chevron />
+              <Field label="Full Name" required>
+                <input className={INPUT_CLS} placeholder="e.g. Maria Santos" value={draft.fullName} onChange={(e) => set("fullName", e.target.value)} />
+              </Field>
+              <Field label="Portal Login Email" required>
+                <input type="email" className={INPUT_CLS} placeholder="Portal login email (can differ from registration)" value={draft.email} onChange={(e) => set("email", e.target.value)} />
+                {regEmail && (
+                  <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-[#fffbeb] border border-[#fde68a] px-3 py-2">
+                    <span className="text-[11px]">📋</span>
+                    <span className="text-[11px] text-[#92400e] font-semibold">Registration email was: <span className="font-extrabold">{regEmail}</span> — enter their portal login email above.</span>
+                  </div>
+                )}
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Phone">
+                  <input type="tel" className={INPUT_CLS} placeholder="09XX XXX XXXX" value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
+                </Field>
+                <Field label="Relationship">
+                  <div className="relative">
+                    <select className={SELECT_CLS} value={draft.relationship} onChange={(e) => set("relationship", e.target.value)}>
+                      <option>Mother</option>
+                      <option>Father</option>
+                      <option>Guardian</option>
+                      <option>Grandparent</option>
+                      <option>Other</option>
+                    </select>
+                    <Chevron />
+                  </div>
+                </Field>
               </div>
-            </Field>
+            </div>
+
+            {/* Child & Program Card */}
+            <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff] space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-[#eef2ff] flex items-center justify-center text-[14px]">🧒</div>
+                <p className="text-[13px] font-extrabold text-[#002f76]">Child & Program</p>
+              </div>
+              <Field label="Child's Name" required>
+                <input className={INPUT_CLS} placeholder="e.g. Leo Santos" value={draft.childName} onChange={(e) => set("childName", e.target.value)} />
+              </Field>
+              <Field label="Program" required>
+                <div className="relative">
+                  <select className={SELECT_CLS} value={draft.program} onChange={(e) => handleProgramChange(e.target.value)}>
+                    <option value="" disabled>Select a program</option>
+                    {!isKnownProgram && draft.program && (
+                      <option value={draft.program}>{draft.program}</option>
+                    )}
+                    {PROGRAMS.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label || p.value}</option>
+                    ))}
+                  </select>
+                  <Chevron />
+                </div>
+              </Field>
+              {selectedProgram?.prerequisite && (
+                <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5 text-[12px] font-semibold text-[#b45309]">
+                  ⚠️ {selectedProgram.prerequisite}
+                </div>
+              )}
+              <Field label="Class Time" required>
+                <div className="relative">
+                  <select className={SELECT_CLS} value={draft.classTime} onChange={(e) => set("classTime", e.target.value)} disabled={!draft.program}>
+                    <option value="" disabled>{draft.program ? "Select class time" : "Select a program first"}</option>
+                    {!isKnownTime && draft.classTime && (
+                      <option value={draft.classTime}>{draft.classTime}</option>
+                    )}
+                    {selectedProgram?.times.map((t) => (
+                      <option key={t.label} value={classTimeValue(t)}>{classTimeValue(t)}</option>
+                    ))}
+                  </select>
+                  <Chevron />
+                </div>
+              </Field>
+            </div>
+
+            {/* Account Status Card */}
+            <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff]">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-[#eef2ff] flex items-center justify-center text-[14px]">⚙️</div>
+                <p className="text-[13px] font-extrabold text-[#002f76]">Account Settings</p>
+              </div>
+              <Field label="Status">
+                <div className="relative">
+                  <select className={SELECT_CLS} value={draft.status} onChange={(e) => set("status", e.target.value as "active" | "inactive")}>
+                    <option value="active">✅ Active</option>
+                    <option value="inactive">⏸ Inactive</option>
+                  </select>
+                  <Chevron />
+                </div>
+              </Field>
+            </div>
 
             {error && (
-              <div className="rounded-xl border border-[#ba1a1a]/20 bg-[#ba1a1a]/5 px-4 py-3 text-[13px] font-bold text-[#ba1a1a]">
-                {error}
+              <div className="rounded-2xl border border-[#ba1a1a]/20 bg-[#ba1a1a]/5 px-4 py-3 text-[13px] font-bold text-[#ba1a1a] flex items-center gap-2">
+                ⚠️ {error}
               </div>
             )}
 
             {initial?.renewalStatus?.hasSubmitted && (
-              <>
-                <SectionHeading>Renewal Submission</SectionHeading>
-                <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-extrabold text-[#64748b] uppercase tracking-wider">Returning:</span>
-                    {initial.renewalStatus.returning === "yes" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-bold text-[#15803d]">✅ Yes</span>}
-                    {initial.renewalStatus.returning === "no" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fecaca] bg-[#fef2f2] px-2.5 py-1 text-[11px] font-bold text-[#b91c1c]">❌ No</span>}
-                    {initial.renewalStatus.returning === "maybe" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fef08a] bg-[#fefce8] px-2.5 py-1 text-[11px] font-bold text-[#a16207]">🤔 Undecided</span>}
-                  </div>
-                  
-                  {initial.renewalStatus.notes && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[11px] font-extrabold text-[#002f76] uppercase tracking-wider">Schedule/Request Notes:</span>
-                      <p className="text-[13px] font-medium text-[#334155] bg-white p-3 rounded-lg border border-[#e2e8f0] m-0 whitespace-pre-wrap">{initial.renewalStatus.notes}</p>
-                    </div>
-                  )}
-
-                  {initial.renewalStatus.reason && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[11px] font-extrabold text-[#b91c1c] uppercase tracking-wider">Reason for not returning:</span>
-                      <p className="text-[13px] font-medium text-[#334155] bg-white p-3 rounded-lg border border-[#fecaca] m-0 whitespace-pre-wrap">{initial.renewalStatus.reason}</p>
-                    </div>
-                  )}
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-[#e8efff] space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-lg bg-[#eef2ff] flex items-center justify-center text-[14px]">🔄</div>
+                  <p className="text-[13px] font-extrabold text-[#002f76]">Renewal Submission</p>
                 </div>
-              </>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-extrabold text-[#64748b] uppercase tracking-wider">Returning:</span>
+                  {initial.renewalStatus.returning === "yes" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-bold text-[#15803d]">✅ Yes</span>}
+                  {initial.renewalStatus.returning === "no" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fecaca] bg-[#fef2f2] px-2.5 py-1 text-[11px] font-bold text-[#b91c1c]">❌ No</span>}
+                  {initial.renewalStatus.returning === "maybe" && <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fef08a] bg-[#fefce8] px-2.5 py-1 text-[11px] font-bold text-[#a16207]">🤔 Undecided</span>}
+                </div>
+                {initial.renewalStatus.notes && (
+                  <p className="text-[13px] font-medium text-[#334155] bg-[#f8faff] p-3 rounded-xl border border-[#e2e8f0] m-0 whitespace-pre-wrap">{initial.renewalStatus.notes}</p>
+                )}
+                {initial.renewalStatus.reason && (
+                  <p className="text-[13px] font-medium text-[#334155] bg-[#fff0f0] p-3 rounded-xl border border-[#fecaca] m-0 whitespace-pre-wrap">{initial.renewalStatus.reason}</p>
+                )}
+              </div>
             )}
+
+            <div className="h-1" />
           </div>
 
-          <div className="bg-[#f8fafc] px-6 py-4 flex flex-col md:flex-row justify-between gap-3 shrink-0 border-t border-[#e2e8f0]">
-            <div className="flex gap-3 ml-auto">
-              <button type="button" onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] text-[#5a6e8c] hover:bg-[#e2e8f0]/50 transition-colors">
-                Cancel
-              </button>
-              <button type="button" onClick={handleSave} disabled={loading} className="px-5 py-2.5 rounded-full font-bold text-[13px] bg-[#005cc8] text-white hover:bg-[#004bb0] transition-colors flex items-center gap-2 disabled:opacity-60">
-                {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "Save"}
-              </button>
-            </div>
+          {/* Footer */}
+          <div className="bg-white px-5 py-4 flex gap-3 shrink-0 border-t border-[#e8efff]">
+            <button type="button" onClick={onClose} disabled={loading}
+              className="flex-1 py-3 rounded-2xl font-bold text-[13px] text-[#5a6e8c] border border-[#e2e8f0] hover:bg-[#f1f5f9] transition-colors">
+              Cancel
+            </button>
+            <button type="button" onClick={handleSave} disabled={loading}
+              className="flex-[2] py-3 rounded-2xl font-bold text-[13px] bg-gradient-to-r from-[#002f76] to-[#0050d5] text-white hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#0050d5]/25 disabled:opacity-60">
+              {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "💾 Save Account"}
+            </button>
           </div>
         </div>
       </div>
     </>
   );
 }
+
 
 // ─── Downpayment Verification Panel ──────────────────────────────────────────
 function DownpaymentPanel({ data, onRefresh, renewalSettings }: { data: ParentAccount[]; onRefresh: () => void; renewalSettings?: ProgramEntry[] }) {

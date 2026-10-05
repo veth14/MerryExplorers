@@ -20,6 +20,8 @@ const navItems = [
   { label: "Announcements", href: "/admin/announcements" },
   { label: "Registrations", href: "/admin/registrations" },
   { label: "Students", href: "/admin/students" },
+  { label: "Payments", href: "/admin/payments" },
+  { label: "Virtual Sessions", href: "/admin/virtual-sessions" },
   { label: "Gallery", href: "/admin/gallery" },
   { label: "Photo Albums", href: "/admin/photo-albums" },
   { label: "Payroll", href: "/admin/payroll" },
@@ -141,6 +143,22 @@ function BugReportIcon() {
     </svg>
   );
 }
+function CreditCardIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+    </svg>
+  );
+}
+function VideoIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <polygon points="23 7 16 12 23 17 23 7" />
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+    </svg>
+  );
+}
 function ClockIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
@@ -208,6 +226,8 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Announcements: AnnouncementsIcon,
   Registrations: RegistrationsIcon,
   Students: StudentsIcon,
+  Payments: CreditCardIcon,
+  "Virtual Sessions": VideoIcon,
   Gallery: GalleryIcon,
   "Photo Albums": GalleryIcon,
   Payroll: PayrollIcon,
@@ -349,7 +369,8 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = [
     { title: "HR & People", items: ["Teachers", "Accounts", "Parents", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Operations", items: ["Inquiries", "Discovery Day", "Reports", "Announcements", "Registrations", "Students", "Gallery", "Photo Albums", "Audit Log"] },
+    { title: "Programs & Finance", items: ["Registrations", "Students", "Payments", "Virtual Sessions", "Discovery Day"] },
+    { title: "Content & Logs", items: ["Inquiries", "Reports", "Announcements", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
     ...g,
     items: g.items

@@ -311,6 +311,24 @@ export const PROGRAM_SLOTS = {
       { name: "Morning Class", time: "10:30 AM – 11:45 AM", maxSlots: 10 },
     ],
   },
+  "virtual-session": {
+    id: "virtual-session",
+    name: "Virtual Tutorial",
+    ageRange: "All Ages",
+    schedule: "Flexible",
+    sessions: 1,
+    totalSlots: 100,
+    rate: 450,
+    downpayment: 450,
+    balance: 0,
+    accent: "#8b5cf6",
+    accentSoft: "#ede9fe",
+    icon: "🖥️",
+    prerequisite: null,
+    classes: [
+      { name: "Flexible Class", time: "TBD", maxSlots: 100 },
+    ],
+  },
 } as const;
 
 export const PAYMENT_TERMS = {

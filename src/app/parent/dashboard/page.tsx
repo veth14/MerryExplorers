@@ -50,6 +50,17 @@ type ParentProfile = {
   photoConsent?: boolean;
   virtualSessionLink?: string;
   renewalLink?: string;
+  studyMaterials?: { id: string; title: string; url: string; type: string; createdAt?: string }[];
+  sessionPayments?: {
+    id: string;
+    amountPaid: number;
+    paymentMethod: string;
+    referenceNumber?: string;
+    receiptBase64?: string;
+    submittedAt: string;
+    verified: boolean;
+    rejected: boolean;
+  }[];
   studentInfo?: {
     id: string;
     registrationId: string;
@@ -657,7 +668,7 @@ export default function ParentDashboardPage() {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history" | "virtual" | "renewal" | "profile">("session");
+  const [activeTab, setActiveTab] = useState<"session" | "photos" | "waiver" | "history" | "virtual" | "renewal" | "profile" | "folder" | "payments">("virtual");
   const [lightbox, setLightbox] = useState<{ album: Album; photoIdx: number } | null>(null);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -680,7 +691,18 @@ export default function ParentDashboardPage() {
   const [dpAmountPaid, setDpAmountPaid] = useState("");
   const [submittingDp, setSubmittingDp] = useState(false);
   const [dpSubmitted, setDpSubmitted] = useState(false);
-  const dpFileRef = typeof window !== 'undefined' ? { current: null as HTMLInputElement | null } : { current: null as HTMLInputElement | null };
+  const dpFileRef = useRef<HTMLInputElement>(null);
+  const [sessionPayments, setSessionPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
+  // ─── Toast ─────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(msg: string, type: "success" | "error" | "info" = "info") {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, type });
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
+  }
 
   useEffect(() => {
     if (authLoading) return;
@@ -698,6 +720,14 @@ export default function ParentDashboardPage() {
         }
       })
       .catch(() => { });
+
+    // Fetch session payment history
+    setPaymentsLoading(true);
+    fetch(`/api/parents/session-payment?uid=${user.uid}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setSessionPayments(d.payments); })
+      .catch(() => {})
+      .finally(() => setPaymentsLoading(false));
   }, [user, authLoading, router]);
 
   // Once both profile and allRenewalPrograms are loaded, resolve the right program entry
@@ -764,18 +794,35 @@ export default function ParentDashboardPage() {
   const recentAlbum = profile.albums[0] ?? null;
   const waiverSigned = !!profile.waiverSignature;
   const isTrailblazer = isTrailblazerProfile(profile);
+  const isVirtualSession = 
+    profile.program === "virtual-session" || 
+    profile.program === "Virtual Tutorial" ||
+    profile.studentInfo?.program === "virtual-session" ||
+    profile.studentInfo?.program === "Virtual Tutorial";
 
   // ─── Tabs ─────────────────────────────────────────────────────────────────
 
   const tabs = [
-    { id: "session", label: "📅 Session", icon: "📅" },
+    ...(isVirtualSession ? [] : [{ id: "session", label: "📅 Session", icon: "📅" }]),
     { id: "virtual", label: "🖥️ Virtual Class", icon: "🖥️" },
-    { id: "photos", label: "📸 Photos", icon: "📸" },
+    ...(isVirtualSession ? [
+      { id: "folder", label: "📁 Study Folder", icon: "📁" },
+      { id: "payments", label: "💳 Payments", icon: "💳" }
+    ] : []),
+    ...(isVirtualSession ? [] : [{ id: "photos", label: "📸 Photos", icon: "📸" }]),
     { id: "waiver", label: "📄 Waiver", icon: "📄" },
-    { id: "history", label: "🏕️ History", icon: "🏕️" },
-    { id: "renewal", label: "🔄 Renewal", icon: "🔄" },
+    ...(isVirtualSession ? [] : [{ id: "history", label: "🏕️ History", icon: "🏕️" }]),
+    ...(isVirtualSession ? [] : [{ id: "renewal", label: "🔄 Renewal", icon: "🔄" }]),
     { id: "profile", label: "👤 Profile", icon: "👤" },
   ] as const;
+
+  // ─── Toast UI ──────────────────────────────────────────────────────────────
+  const toastColors = {
+    success: { bg: "#f0fdf4", border: "#86efac", icon: "✅", text: "#15803d" },
+    error:   { bg: "#fef2f2", border: "#fca5a5", icon: "❌", text: "#b91c1c" },
+    info:    { bg: "#eff6ff", border: "#93c5fd", icon: "ℹ️", text: "#1d4ed8" },
+  };
+  const tc = toast ? toastColors[toast.type] : null;
 
   return (
     <div
@@ -786,10 +833,27 @@ export default function ParentDashboardPage() {
         fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif",
       }}
     >
+      {/* ─── Toast ─── */}
+      {toast && tc && (
+        <div className="toast-enter" style={{
+          position: "fixed", bottom: "28px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 99999, display: "flex", alignItems: "center", gap: "10px",
+          background: tc.bg, border: `1.5px solid ${tc.border}`, borderRadius: "16px",
+          padding: "12px 20px", boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          minWidth: "260px", maxWidth: "90vw", pointerEvents: "auto",
+        }}>
+          <span style={{ fontSize: "18px", flexShrink: 0 }}>{tc.icon}</span>
+          <span style={{ fontSize: "13px", fontWeight: 700, color: tc.text, flex: 1 }}>{toast.msg}</span>
+          <button onClick={() => setToast(null)} style={{ background: "none", border: "none", cursor: "pointer", color: tc.text, opacity: 0.5, fontSize: "16px", padding: "0 0 0 6px" }}>✕</button>
+        </div>
+      )}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes slideOutDown { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(24px) scale(0.97); } }
         .fade-up { animation: fadeUp 0.4s ease forwards; }
+        .toast-enter { animation: slideInUp 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         .photo-thumb { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
         .photo-thumb:hover { transform: scale(1.04); box-shadow: 0 12px 32px rgba(0,47,118,0.2); }
         .tab-btn { transition: all 0.2s; cursor: pointer; border: none; background: none; }
@@ -1050,7 +1114,7 @@ export default function ParentDashboardPage() {
               key={tab.id}
               id={`parent-tab-${tab.id}`}
               className="tab-btn responsive-tab-btn"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(tab.id as any)}
               style={{
                 flex: 1,
                 padding: "10px 12px",
@@ -1589,6 +1653,221 @@ export default function ParentDashboardPage() {
             })()
           )}
 
+          {/* ── FOLDER TAB ────────────────────────────────────────────── */}
+          {activeTab === "folder" && (
+            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+                <div style={{ fontSize: "28px" }}>📁</div>
+                <div>
+                  <h2 style={{ margin: 0, color: "#002f76", fontSize: "20px", fontWeight: "800" }}>Study Materials</h2>
+                  <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Access your files and video links.</p>
+                </div>
+              </div>
+
+              {(!profile.studyMaterials || profile.studyMaterials.length === 0) ? (
+                <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
+                  <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>No files or links uploaded yet. Your teacher will add them here.</p>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: "12px", marginBottom: "32px" }}>
+                  {profile.studyMaterials.map((m: any) => (
+                    <a key={m.id} href={m.url} target="_blank" style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", border: "1px solid #e2e8f0", borderRadius: "12px", textDecoration: "none", color: "inherit", transition: "all 0.2s", background: "#f8faff" }}>
+                      <div style={{ fontSize: "24px", color: m.type === "link" ? "#ef4444" : "#3b82f6" }}>
+                        {m.type === "link" ? "▶️" : "📄"}
+                      </div>
+                      <div style={{ textAlign: "left", flex: 1, overflow: "hidden" }}>
+                        <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                        <div style={{ color: "#64748b", fontSize: "12px", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── PAYMENTS TAB ────────────────────────────────────────────── */}
+          {activeTab === "payments" && (
+            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+                <div style={{ fontSize: "28px" }}>💳</div>
+                <div>
+                  <h2 style={{ margin: 0, color: "#002f76", fontSize: "20px", fontWeight: "800" }}>Submit Payment</h2>
+                  <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Upload proof of payment for your sessions.</p>
+                </div>
+              </div>
+
+              <div className="mb-6 rounded-3xl p-6 text-white shadow-xl bg-gradient-to-br from-[#0033A0] to-[#0066CC]">
+                <p className="text-[12px] font-bold uppercase tracking-widest opacity-70">Amount Due Per Session</p>
+                <p className="mt-1 text-[40px] font-extrabold leading-none">₱450</p>
+              </div>
+
+              <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
+                <h3 className="mb-4 font-headline text-[16px] font-extrabold text-[#0033A0]">Select Payment Method</h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { id: "gcash", label: "GCash", logo: "/gcash-logo.svg" },
+                    { id: "bpi", label: "BPI", logo: "/bpi-logo.svg" },
+                    { id: "mari-bank", label: "Mari Bank", logo: "/maribank-logo.svg" },
+                  ].map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => setDpPaymentMethod(method.id)}
+                      className={["flex flex-col items-center justify-center gap-3 rounded-2xl border-2 py-5 px-3", dpPaymentMethod === method.id ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"].join(" ")}
+                      style={{ background: dpPaymentMethod === method.id ? "#f0f5ff" : "white" }}
+                    >
+                      <div className="relative h-8 w-24"><Image src={method.logo} alt={method.label} fill className="object-contain" /></div>
+                      <span className="text-[13px] font-bold" style={{ color: "#0f172a" }}>{method.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {dpPaymentMethod && (
+                  <div className="mt-5">
+                    {[
+                      { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
+                      { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
+                      { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
+                    ].filter((pm) => pm.id === dpPaymentMethod).map((pm) => (
+                      <div key={pm.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center text-center gap-5">
+                        <div className="relative w-full max-w-[200px] aspect-square rounded-2xl border-2 bg-white shadow-md">
+                          <Image src={pm.qr} alt="QR" fill className="object-contain p-4" />
+                        </div>
+                        <div className="max-w-sm">
+                          <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {pm.label}</p>
+                          <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱450</strong> (or multiple). Then upload the screenshot below.</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
+                <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">Upload Payment Receipt *</h3>
+                <input ref={dpFileRef as any} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setDpReceiptPreview(reader.result as string);
+                    setDpReceiptBase64(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                }} />
+                {dpReceiptPreview ? (
+                  <div className="relative">
+                    <div className="relative aspect-[4/3] w-full max-w-sm mx-auto rounded-2xl border border-slate-200 overflow-hidden"><img src={dpReceiptPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+                    <button
+                      onClick={() => {
+                        setDpReceiptPreview("");
+                        setDpReceiptBase64("");
+                        setDpReferenceNumber("");
+                      }}
+                      className="mt-3 text-[13px] text-red-500"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => dpFileRef.current?.click()} className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 px-6 text-center hover:bg-[#f0f5ff]" style={{ cursor: "pointer", background: "white", color: "#002f76", border: "2px dashed #cbd5e1" }}>
+                    <span className="text-4xl">📸</span><p className="text-[14px] font-bold text-[#002f76]">Upload receipt</p>
+                  </button>
+                )}
+
+                {dpReceiptBase64 && (
+                  <div className="mt-5 border-t border-slate-100 pt-5">
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", color: "#0033A0", opacity: 0.6, marginBottom: "6px" }}>Reference Number</label>
+                    <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76", marginBottom: "16px" }} value={dpReferenceNumber} onChange={(e) => setDpReferenceNumber(e.target.value)} placeholder="e.g. 10000000000" />
+                    
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", color: "#0033A0", opacity: 0.6, marginBottom: "6px" }}>Amount Sent</label>
+                    <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76" }} value={dpAmountPaid} onChange={(e) => setDpAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 450" />
+                  </div>
+                )}
+              </div>
+
+              <button
+                disabled={!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid || submittingDp}
+                onClick={async () => {
+                  if (!user) return;
+                  setSubmittingDp(true);
+                  try {
+                    const res = await fetch("/api/parents/session-payment", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        uid: user.uid,
+                        paymentMethod: dpPaymentMethod,
+                        receiptBase64: dpReceiptBase64,
+                        referenceNumber: dpReferenceNumber,
+                        amountPaid: Number(dpAmountPaid) || 450,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      setSessionPayments(prev => [data.payment, ...prev]);
+                      setDpSubmitted(true);
+                      setDpReceiptPreview("");
+                      setDpReceiptBase64("");
+                      setDpAmountPaid("");
+                      setDpReferenceNumber("");
+                      setDpPaymentMethod("");
+                      showToast("Payment submitted! We'll verify it shortly. ✅", "success");
+                    } else {
+                      showToast(data.error || "Failed to submit payment.", "error");
+                    }
+                  } catch {
+                    showToast("Network error. Please try again.", "error");
+                  } finally {
+                    setSubmittingDp(false);
+                  }
+                }}
+                style={{ width: "100%", borderRadius: "16px", background: (!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid) ? "#cbd5e1" : "linear-gradient(135deg,#059669,#10b981)", padding: "16px", fontSize: "16px", fontWeight: "bold", color: "white", border: "none", cursor: (!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid) ? "not-allowed" : "pointer", boxShadow: (!dpPaymentMethod || !dpReceiptBase64 || !dpAmountPaid) ? "none" : "0 8px 24px rgba(16,185,129,0.3)" }}
+              >
+                {submittingDp ? "Submitting…" : "💳 Submit Payment"}
+              </button>
+
+              {/* Payment History */}
+              {(sessionPayments.length > 0 || paymentsLoading) && (
+                <div className="mt-6">
+                  <h3 className="text-[14px] font-extrabold text-[#002f76] mb-3">📋 Payment History</h3>
+                  {paymentsLoading ? (
+                    <div className="text-center py-6 text-[13px] text-[#94a3b8] animate-pulse">Loading history…</div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {sessionPayments.map((p, i) => (
+                        <div key={p.id || i} style={{
+                          background: p.verified ? "#f0fdf4" : p.rejected ? "#fef2f2" : "#fffbeb",
+                          border: `1.5px solid ${p.verified ? "#86efac" : p.rejected ? "#fca5a5" : "#fde68a"}`,
+                          borderRadius: "16px", padding: "14px 16px",
+                          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap"
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: "13px", color: "#002f76" }}>
+                              {p.verified ? "✅" : p.rejected ? "❌" : "⏳"} ₱{(p.amountPaid || 450).toLocaleString()} via {p.paymentMethod?.toUpperCase()}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
+                              {new Date(p.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              {p.referenceNumber && ` · Ref: ${p.referenceNumber}`}
+                            </div>
+                            {p.adminNote && <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Note: {p.adminNote}</div>}
+                          </div>
+                          <span style={{
+                            fontSize: "11px", fontWeight: 800, padding: "4px 10px", borderRadius: "20px",
+                            background: p.verified ? "#dcfce7" : p.rejected ? "#fee2e2" : "#fef9c3",
+                            color: p.verified ? "#15803d" : p.rejected ? "#b91c1c" : "#92400e",
+                            border: `1px solid ${p.verified ? "#86efac" : p.rejected ? "#fca5a5" : "#fde68a"}`,
+                          }}>
+                            {p.verified ? "Verified" : p.rejected ? "Rejected" : "Pending"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── RENEWAL TAB ──────────────────────────────────────────────────── */}
           {activeTab === "renewal" && (() => {
             const isDeadlinePassed = renewalSettings.renewalOpenDate ? new Date() >= new Date(renewalSettings.renewalOpenDate) : false;
@@ -1620,7 +1899,7 @@ export default function ParentDashboardPage() {
               } catch (err) {
                 console.error(err);
                 setSubmittingRenewal(false);
-                alert("Failed to submit renewal. Please try again.");
+                showToast("Failed to submit renewal. Please try again.", "error");
               }
             };
 
@@ -1875,7 +2154,7 @@ export default function ParentDashboardPage() {
                                           if (!res.ok) throw new Error("Failed");
                                           setDpSubmitted(true);
                                         } catch {
-                                          alert("Failed to submit. Please try again.");
+                                          showToast("Failed to submit. Please try again.", "error");
                                         } finally {
                                           setSubmittingDp(false);
                                         }
@@ -2165,7 +2444,7 @@ export default function ParentDashboardPage() {
           })()}
 
           {/* ── PROFILE TAB ──────────────────────────────────────────────────── */}
-          {activeTab === "profile" && <ProfileTab profile={profile} user={user} />}
+          {activeTab === "profile" && <ProfileTab profile={profile} user={user} showToast={showToast} isVirtualTutorial={isVirtualSession} />}
 
         </div>
       </div>
@@ -2188,7 +2467,7 @@ export default function ParentDashboardPage() {
 }
 
 // ─── Profile Tab Component ────────────────────────────────────────────────────
-function ProfileTab({ profile, user }: { profile: any, user: any }) {
+function ProfileTab({ profile, user, showToast, isVirtualTutorial }: { profile: any; user: any; showToast: (msg: string, type?: "success" | "error" | "info") => void; isVirtualTutorial?: boolean }) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -2231,15 +2510,20 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
         })
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        window.location.reload();
+        showToast("Profile changes saved successfully! ✅", "success");
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
       } else {
-        alert("Failed to save changes.");
+        showToast(data.error || "Failed to save changes. Please try again.", "error");
         setSaving(false);
       }
     } catch (e) {
       console.error(e);
-      alert("An error occurred.");
+      showToast("Network error. Please try again.", "error");
       setSaving(false);
     }
   };
@@ -2319,10 +2603,12 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
                 </select>
               </div>
             </div>
+            {!isVirtualTutorial && (
             <div>
               <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Health Notes & Allergies</label>
               <textarea disabled={!isEditing} value={formData.healthProfile} onChange={e => setFormData({ ...formData, healthProfile: e.target.value })} placeholder="Any allergies or health conditions?" rows={3} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", resize: "none", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
             </div>
+            )}
           </div>
         </div>
 
@@ -2355,7 +2641,8 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
             </div>
           </div>
 
-          {/* Emergency Contact Card */}
+          {/* Emergency Contact Card — hidden for Virtual Tutorial */}
+          {!isVirtualTutorial && (
           <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
               <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#fee2e2,#fca5a5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>🚨</div>
@@ -2380,6 +2667,7 @@ function ProfileTab({ profile, user }: { profile: any, user: any }) {
               </div>
             </div>
           </div>
+          )}
 
         </div>
       </div>

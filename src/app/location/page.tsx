@@ -101,7 +101,7 @@ export default function LocationPage() {
                     <span className="text-lg">🕘</span>
                     <div>
                       <p className="text-[13px] font-extrabold text-[#0033A0]">School Hours</p>
-                      <p className="text-[13px] font-semibold text-[#64748b]">Mon–Fri, 8AM–5PM</p>
+                      <p className="text-[13px] font-semibold text-[#64748b]">Mon–Fri, 10AM–5PM</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
