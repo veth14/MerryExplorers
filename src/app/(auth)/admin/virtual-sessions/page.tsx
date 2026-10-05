@@ -59,6 +59,7 @@ export default function AdminVirtualSessionsPage() {
   const [endingSession, setEndingSession] = useState(false);
   const [linkSaveResult, setLinkSaveResult] = useState<{ ok: boolean, isEnd?: boolean } | null>(null);
   const [isEditingLink, setIsEditingLink] = useState(false);
+  const [refreshingModal, setRefreshingModal] = useState(false);
 
   // Material state
   const [isAddingMaterial, setIsAddingMaterial] = useState(false);
@@ -282,13 +283,33 @@ export default function AdminVirtualSessionsPage() {
     }
   }
 
-  function openManageModal(acc: any) {
+  async function openManageModal(acc: any) {
+    // Show modal immediately with cached data, then refresh in background
     setManageModal(acc);
     setNewLink(acc.virtualSessionLink || "");
     setNewTime(acc.virtualSessionTime || "");
     setIsEditingLink(false);
     setIsAddingMaterial(false);
     setLinkSaveResult(null);
+    // Fetch fresh data to ensure submissions are up to date
+    refreshModalData(acc.id);
+  }
+
+  async function refreshModalData(uid: string) {
+    setRefreshingModal(true);
+    try {
+      const res = await fetch(`/api/parents?uid=${encodeURIComponent(uid)}`);
+      if (res.ok) {
+        const fresh = await res.json();
+        const formatted = { ...fresh, id: fresh.id || uid };
+        setManageModal(formatted);
+        setAccounts(prev => prev.map(a => a.id === uid ? formatted : a));
+      }
+    } catch {
+      // Silently fail — cached data is still shown
+    } finally {
+      setRefreshingModal(false);
+    }
   }
 
   return (
@@ -464,7 +485,20 @@ export default function AdminVirtualSessionsPage() {
                     {manageModal.childName || manageModal.fullName || manageModal.email}
                   </div>
                 </div>
-                <button onClick={() => setManageModal(null)} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "white", border: "1px solid #e2e8f0", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontWeight: "bold" }}>✕</button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    onClick={() => refreshModalData(manageModal.id)}
+                    disabled={refreshingModal}
+                    title="Refresh to see latest submissions"
+                    style={{ display: "flex", alignItems: "center", gap: "5px", padding: "6px 12px", borderRadius: "8px", background: refreshingModal ? "#f1f5f9" : "#eff6ff", border: "1px solid #bfdbfe", color: refreshingModal ? "#94a3b8" : "#0050d5", fontWeight: "700", fontSize: "12px", cursor: refreshingModal ? "not-allowed" : "pointer" }}
+                  >
+                    <svg style={{ animation: refreshingModal ? "me-spin 0.7s linear infinite" : "none" }} xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                    </svg>
+                    {refreshingModal ? "Refreshing…" : "Refresh"}
+                  </button>
+                  <button onClick={() => setManageModal(null)} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "white", border: "1px solid #e2e8f0", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontWeight: "bold" }}>✕</button>
+                </div>
               </div>
 
               <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>

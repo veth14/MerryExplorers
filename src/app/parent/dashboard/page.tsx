@@ -383,6 +383,12 @@ type FileViewerState = {
   uid: string;         // account uid — needed to re-sign for download
   materialId: string;  // material id  — needed to re-sign for download
   fileKey?: string;    // actual file key in B2
+  submission?: {       // parent's submitted (edited) file, if any
+    key: string;
+    fileName: string;
+    fileType: string;
+    submittedAt: string;
+  };
 };
 
 // Spinning keyframe injected once at module level (server-safe guard)
@@ -435,30 +441,35 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
 
   const { icon, label } = getFileInfo();
 
-  // Download uses the API's ?download=1 variant which bakes
-  // ResponseContentDisposition:attachment into the presigned URL.
-  // B2 then tells the browser "save this" — no blob fetch, no new tab.
+  // Download: prefer the parent's submitted (edited) file; fall back to original.
+  const hasSubmission = !!viewer.submission;
+
   async function handleDownload() {
     try {
-      // Fetch a presigned URL with Content-Disposition:attachment baked in.
-      // We use a hidden <iframe> to trigger the browser's "Save file" dialog
-      // without navigating the current page away or opening a new tab.
-      const dlRes = await fetch(
-        `/api/files/download-url?uid=${encodeURIComponent(viewer.uid)}&materialId=${encodeURIComponent(viewer.materialId)}&download=1`
-      );
-      const dlData = await dlRes.json();
-      const downloadUrl = dlData.success && dlData.url ? dlData.url : url;
+      let downloadUrl: string;
 
-      // Hidden iframe trick: browser receives Content-Disposition:attachment
-      // from B2 and saves the file; the iframe itself stays invisible.
+      if (hasSubmission && viewer.submission?.key) {
+        // Download the parent's submitted/edited version
+        const dlRes = await fetch(
+          `/api/files/download-url?submissionKey=${encodeURIComponent(viewer.submission.key)}&download=1`
+        );
+        const dlData = await dlRes.json();
+        downloadUrl = dlData.success && dlData.url ? dlData.url : url;
+      } else {
+        // Download the original teacher file
+        const dlRes = await fetch(
+          `/api/files/download-url?uid=${encodeURIComponent(viewer.uid)}&materialId=${encodeURIComponent(viewer.materialId)}&download=1`
+        );
+        const dlData = await dlRes.json();
+        downloadUrl = dlData.success && dlData.url ? dlData.url : url;
+      }
+
       const iframe = document.createElement("iframe");
       iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;";
       iframe.src = downloadUrl;
       document.body.appendChild(iframe);
-      // Remove after 30 s (enough time for large files to start downloading)
       setTimeout(() => { try { document.body.removeChild(iframe); } catch { /* already removed */ } }, 30000);
     } catch {
-      // Last resort — open in current tab (B2 will serve it as attachment)
       window.location.href = url;
     }
   }
@@ -578,29 +589,7 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
             )}
           </button>
 
-          {/* Download */}
-          <button
-            onClick={handleDownload}
-            style={{
-              display:"flex", alignItems:"center", gap:"6px",
-              padding:"9px 18px",
-              background:"linear-gradient(135deg,#FFD700,#FFB300)",
-              border:"2.5px solid white",
-              borderRadius:"50px",
-              color:"#002f76", fontWeight:"800", fontSize:"13px",
-              cursor:"pointer", flexShrink:0,
-              boxShadow:"0 3px 10px rgba(0,0,0,0.2)",
-              transition:"transform 0.1s, box-shadow 0.1s",
-            }}
-            onMouseOver={e => { e.currentTarget.style.transform="scale(1.05)"; e.currentTarget.style.boxShadow="0 5px 14px rgba(0,0,0,0.25)"; }}
-            onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 3px 10px rgba(0,0,0,0.2)"; }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download
-          </button>
-
+          {/* Download button removed as requested */}
           {/* Close */}
           <button
             onClick={onClose}
@@ -2784,6 +2773,7 @@ export default function ParentDashboardPage() {
                     uid: profile?.id ?? "",
                     materialId: m.id,
                     fileKey: m.key,
+                    submission: m.submission,
                   });
                 } else {
                   alert(data.error || "Could not open file.");
