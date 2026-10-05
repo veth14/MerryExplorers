@@ -55,7 +55,20 @@ type ParentProfile = {
   needsSessionPayment?: boolean;
   virtualSessionsCompleted?: number;
   renewalLink?: string;
-  studyMaterials?: { id: string; title: string; url: string; type: string; createdAt?: string }[];
+  studyMaterials?: { 
+    id: string; 
+    title: string; 
+    url: string; 
+    type: string; 
+    createdAt?: string;
+    submission?: {
+      key: string;
+      fileName: string;
+      fileType: string;
+      size: number;
+      submittedAt: string;
+    };
+  }[];
   sessionPayments?: {
     id: string;
     amountPaid: number;
@@ -1612,6 +1625,9 @@ export default function ParentDashboardPage() {
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
   const [fileViewer, setFileViewer] = useState<FileViewerState | null>(null);
   const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
+  const [submittingForId, setSubmittingForId] = useState<string | null>(null);
+  const [submissionSuccess, setSubmissionSuccess] = useState<string | null>(null);
+  const submissionFileRef = useRef<HTMLInputElement>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showEditSurveyModal, setShowEditSurveyModal] = useState(false);
   const [renewalSettings, setRenewalSettings] = useState<RenewalSettings>({ currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null });
@@ -2835,48 +2851,145 @@ export default function ParentDashboardPage() {
                         <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px" }}>Uploaded Files</div>
                         <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>{files.length}</div>
                       </div>
+                      {/* Hidden file input for submissions */}
+                      <input
+                        ref={submissionFileRef}
+                        type="file"
+                        style={{ display: "none" }}
+                        accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !submittingForId) return;
+                          const materialId = submittingForId;
+                          setSubmittingForId(`uploading-${materialId}`);
+                          try {
+                            // Upload to B2
+                            const form = new FormData();
+                            form.append("file", file);
+                            form.append("folder", `submissions/${profile?.id}`);
+                            const upRes = await fetch("/api/upload", { method: "POST", body: form });
+                            const upData = await upRes.json();
+                            if (!upData.success) throw new Error(upData.error || "Upload failed");
+                            // Save submission record
+                            const subRes = await fetch("/api/parents/study-materials/submit", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                uid: profile?.id,
+                                materialId,
+                                key: upData.key,
+                                fileName: file.name,
+                                fileType: file.type,
+                                size: file.size,
+                              }),
+                            });
+                            if (!subRes.ok) throw new Error("Failed to record submission");
+                            setSubmissionSuccess(materialId);
+                            setProfile((prev: any) => prev ? {
+                              ...prev,
+                              studyMaterials: prev.studyMaterials?.map((m: any) =>
+                                m.id === materialId
+                                  ? { ...m, submission: { key: upData.key, fileName: file.name, fileType: file.type, size: file.size, submittedAt: new Date().toISOString() } }
+                                  : m
+                              )
+                            } : prev);
+                            showToast("✅ Work submitted successfully!", "success");
+                          } catch (err: any) {
+                            showToast("Failed to submit. Please try again.", "error");
+                          } finally {
+                            setSubmittingForId(null);
+                            if (submissionFileRef.current) submissionFileRef.current.value = "";
+                          }
+                        }}
+                      />
                       {files.length === 0 ? (
                         <div style={{ padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px dashed #e2e8f0", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>No files uploaded yet.</div>
                       ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                           {files.map((m: any) => {
                             const isLoading = loadingFileId === m.id;
+                            const isUploading = submittingForId === `uploading-${m.id}`;
+                            const hasSubmission = !!m.submission;
                             return (
-                              <button
-                                key={m.id}
-                                onClick={() => openFile(m)}
-                                disabled={!!loadingFileId}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: "14px",
-                                  padding: "14px 16px",
-                                  border: isLoading ? "1.5px solid #3b82f6" : "1px solid #e2e8f0",
-                                  borderRadius: "12px",
-                                  background: isLoading ? "linear-gradient(135deg,#eff6ff,#dbeafe)" : "#f8faff",
-                                  cursor: isLoading ? "default" : "pointer",
-                                  textAlign: "left", width: "100%",
-                                  transition: "all 0.2s",
-                                  boxShadow: isLoading ? "0 0 0 3px rgba(59,130,246,0.15)" : "none",
-                                }}
-                                onMouseOver={e => { if (!isLoading) e.currentTarget.style.background = "#eff6ff"; }}
-                                onMouseOut={e => { if (!isLoading) e.currentTarget.style.background = "#f8faff"; }}
-                              >
-                                {/* Icon or spinner */}
-                                <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: isLoading ? "linear-gradient(135deg,#60a5fa,#818cf8)" : "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>
-                                  {isLoading ? (
-                                    <svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                                    </svg>
-                                  ) : "📄"}
-                                </div>
-                                <div style={{ flex: 1, overflow: "hidden" }}>
-                                  <div style={{ fontWeight: "700", color: isLoading ? "#1d4ed8" : "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                                  <div style={{ color: isLoading ? "#3b82f6" : "#94a3b8", fontSize: "12px", marginTop: "2px", animation: isLoading ? "me-pulse 1.2s ease-in-out infinite" : "none", fontWeight: isLoading ? "600" : "400" }}>
-                                    {isLoading ? "Opening… please wait" : "Click to open file"}
+                              <div key={m.id} style={{ border: "1px solid #e2e8f0", borderRadius: "14px", overflow: "hidden", background: "#f8faff" }}>
+                                {/* File row */}
+                                <button
+                                  onClick={() => openFile(m)}
+                                  disabled={!!loadingFileId}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: "14px",
+                                    padding: "14px 16px",
+                                    border: "none",
+                                    borderBottom: "1px solid #e8efff",
+                                    background: isLoading ? "linear-gradient(135deg,#eff6ff,#dbeafe)" : "transparent",
+                                    cursor: isLoading ? "default" : "pointer",
+                                    textAlign: "left", width: "100%",
+                                    transition: "all 0.2s",
+                                  }}
+                                  onMouseOver={e => { if (!isLoading) e.currentTarget.style.background = "#eff6ff"; }}
+                                  onMouseOut={e => { if (!isLoading) e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: isLoading ? "linear-gradient(135deg,#60a5fa,#818cf8)" : "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>
+                                    {isLoading ? (
+                                      <svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                      </svg>
+                                    ) : "📄"}
                                   </div>
+                                  <div style={{ flex: 1, overflow: "hidden" }}>
+                                    <div style={{ fontWeight: "700", color: isLoading ? "#1d4ed8" : "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                    <div style={{ color: isLoading ? "#3b82f6" : "#94a3b8", fontSize: "12px", marginTop: "2px", animation: isLoading ? "me-pulse 1.2s ease-in-out infinite" : "none", fontWeight: isLoading ? "600" : "400" }}>
+                                      {isLoading ? "Opening… please wait" : "Click to view file"}
+                                    </div>
+                                  </div>
+                                  {!isLoading && <div style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>⬇</div>}
+                                </button>
+
+                                {/* Submission row */}
+                                <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                                  {hasSubmission ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                      <span style={{ fontSize: "16px" }}>✅</span>
+                                      <div>
+                                        <div style={{ fontSize: "12px", fontWeight: "700", color: "#15803d" }}>Work Submitted</div>
+                                        <div style={{ fontSize: "11px", color: "#64748b" }}>{m.submission.fileName} · {new Date(m.submission.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                      <span style={{ fontSize: "14px" }}>📤</span>
+                                      <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "500" }}>No submission yet</span>
+                                    </div>
+                                  )}
+                                  <button
+                                    disabled={isUploading}
+                                    onClick={() => {
+                                      setSubmittingForId(m.id);
+                                      submissionFileRef.current?.click();
+                                    }}
+                                    style={{
+                                      display: "inline-flex", alignItems: "center", gap: "6px",
+                                      padding: "6px 14px",
+                                      borderRadius: "10px",
+                                      border: "none",
+                                      background: isUploading ? "#e2e8f0" : hasSubmission ? "linear-gradient(135deg,#f0fdf4,#dcfce7)" : "linear-gradient(135deg,#002f76,#0050d5)",
+                                      color: isUploading ? "#94a3b8" : hasSubmission ? "#15803d" : "white",
+                                      fontSize: "12px", fontWeight: "700",
+                                      cursor: isUploading ? "not-allowed" : "pointer",
+                                      transition: "all 0.2s",
+                                      boxShadow: hasSubmission ? "none" : "0 2px 8px rgba(0,47,118,0.2)",
+                                    }}
+                                  >
+                                    {isUploading ? (
+                                      <><svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Uploading…</>
+                                    ) : hasSubmission ? (
+                                      <>🔄 Re-submit</>
+                                    ) : (
+                                      <>📤 Submit Work</>
+                                    )}
+                                  </button>
                                 </div>
-                                {/* Right indicator */}
-                                {!isLoading && <div style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>⬇</div>}
-                              </button>
+                              </div>
                             );
                           })}
                         </div>

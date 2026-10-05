@@ -653,17 +653,45 @@ export default function AdminVirtualSessionsPage() {
                           {matFiles.length === 0 ? (
                             <div style={{ padding: "10px 14px", background: "#eff6ff", borderRadius: "10px", border: "1px dashed #bfdbfe", color: "#94a3b8", fontSize: "12px", textAlign: "center" }}>No files uploaded yet.</div>
                           ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                               {matFiles.map((m: any) => (
-                                <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px" }}>
-                                  <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "10px", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0, overflow: "hidden" }}>
-                                    <span style={{ fontSize: "18px", flexShrink: 0 }}>📄</span>
-                                    <div style={{ overflow: "hidden" }}>
-                                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e40af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                                      <div style={{ fontSize: "11px", color: "#94a3b8" }}>Click to open</div>
+                                <div key={m.id} style={{ border: "1px solid #bfdbfe", borderRadius: "10px", overflow: "hidden", background: "#eff6ff" }}>
+                                  {/* File row */}
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
+                                    <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "10px", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0, overflow: "hidden" }}>
+                                      <span style={{ fontSize: "18px", flexShrink: 0 }}>📄</span>
+                                      <div style={{ overflow: "hidden" }}>
+                                        <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e40af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>Click to open</div>
+                                      </div>
+                                    </button>
+                                    <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "8px", fontSize: "14px", flexShrink: 0 }} title="Remove">✕</button>
+                                  </div>
+                                  {/* Submission row */}
+                                  {m.submission ? (
+                                    <div style={{ padding: "8px 14px", background: "#f0fdf4", borderTop: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: "8px" }}>
+                                      <span style={{ fontSize: "14px" }}>📬</span>
+                                      <div style={{ flex: 1, overflow: "hidden" }}>
+                                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#15803d" }}>Student Submitted</div>
+                                        <div style={{ fontSize: "10px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.submission.fileName} · {new Date(m.submission.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                                      </div>
+                                      <button
+                                        onClick={async () => {
+                                          const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(manageModal.id)}&submissionKey=${encodeURIComponent(m.submission.key)}&download=1`);
+                                          const data = await res.json();
+                                          if (data.success && data.url) window.open(data.url, "_blank");
+                                          else alert("Could not fetch download link.");
+                                        }}
+                                        style={{ padding: "4px 10px", borderRadius: "8px", background: "#10b981", color: "white", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: "700", flexShrink: 0 }}
+                                      >
+                                        ⬇ View
+                                      </button>
                                     </div>
-                                  </button>
-                                  <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "8px", fontSize: "14px", flexShrink: 0 }} title="Remove">✕</button>
+                                  ) : (
+                                    <div style={{ padding: "6px 14px", background: "rgba(0,0,0,0.03)", borderTop: "1px solid #bfdbfe" }}>
+                                      <span style={{ fontSize: "11px", color: "#94a3b8", fontStyle: "italic" }}>No submission yet</span>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>

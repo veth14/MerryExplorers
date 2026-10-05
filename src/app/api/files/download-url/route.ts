@@ -42,9 +42,21 @@ function getS3Client(): S3Client {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const uid        = searchParams.get("uid");
-    const materialId = searchParams.get("materialId");
-    const asDownload = searchParams.get("download") === "1";
+    const uid           = searchParams.get("uid");
+    const materialId    = searchParams.get("materialId");
+    const submissionKey = searchParams.get("submissionKey");
+    const asDownload    = searchParams.get("download") === "1";
+
+    // ── Shortcut: admin requesting a submission file directly by its B2 key ──
+    if (submissionKey) {
+      const s3 = getS3Client();
+      const cmd: GetObjectCommandInput = { Bucket: BUCKET, Key: submissionKey };
+      if (asDownload) {
+        cmd.ResponseContentDisposition = `attachment; filename="${submissionKey.split("/").pop()}"`;
+      }
+      const url = await getSignedUrl(s3, new GetObjectCommand(cmd), { expiresIn: EXPIRES_IN });
+      return NextResponse.json({ success: true, url });
+    }
 
     if (!uid || !materialId) {
       return NextResponse.json(
