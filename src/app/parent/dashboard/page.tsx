@@ -1708,60 +1708,113 @@ export default function ParentDashboardPage() {
           )}
 
           {/* ── FOLDER TAB ────────────────────────────────────────────── */}
-          {activeTab === "folder" && (
-            <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
-                <div style={{ fontSize: "28px" }}>📁</div>
-                <div>
-                  <h2 style={{ margin: 0, color: "#002f76", fontSize: "20px", fontWeight: "800" }}>Study Materials</h2>
-                  <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Access your files and video links.</p>
-                </div>
-              </div>
+          {activeTab === "folder" && (() => {
+            const links = (profile.studyMaterials || []).filter((m: any) => m.type === "link");
+            const files = (profile.studyMaterials || []).filter((m: any) => m.type === "file");
 
-              {(!profile.studyMaterials || profile.studyMaterials.length === 0) ? (
-                <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
-                  <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>No files or links uploaded yet. Your teacher will add them here.</p>
+            async function openFile(m: any) {
+              if (m.type === "link" || m.url) {
+                window.open(m.url, "_blank", "noopener,noreferrer");
+                return;
+              }
+              try {
+                const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(profile?.id ?? "")}&materialId=${encodeURIComponent(m.id)}`);
+                const data = await res.json();
+                if (data.success && data.url) {
+                  window.open(data.url, "_blank", "noopener,noreferrer");
+                } else {
+                  alert(data.error || "Could not open file.");
+                }
+              } catch {
+                alert("Network error. Please try again.");
+              }
+            }
+
+            return (
+              <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
+                  <div style={{ fontSize: "28px" }}>📁</div>
+                  <div>
+                    <h2 style={{ margin: 0, color: "#002f76", fontSize: "20px", fontWeight: "800" }}>Study Materials</h2>
+                    <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Access your files and video links.</p>
+                  </div>
                 </div>
-              ) : (
-                <div style={{ display: "grid", gap: "12px", marginBottom: "32px" }}>
-                  {profile.studyMaterials.map((m: any) => (
-                    <button
-                      key={m.id}
-                      onClick={async () => {
-                        if (m.type === "link" || m.url) {
-                          window.open(m.url, "_blank", "noopener,noreferrer");
-                          return;
-                        }
-                        // File stored in Backblaze — fetch a presigned URL
-                        try {
-                          const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(profile.id)}&materialId=${encodeURIComponent(m.id)}`);
-                          const data = await res.json();
-                          if (data.success && data.url) {
-                            window.open(data.url, "_blank", "noopener,noreferrer");
-                          } else {
-                            alert(data.error || "Could not open file.");
-                          }
-                        } catch {
-                          alert("Network error. Please try again.");
-                        }
-                      }}
-                      style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", border: "1px solid #e2e8f0", borderRadius: "12px", textDecoration: "none", color: "inherit", transition: "all 0.2s", background: "#f8faff", cursor: "pointer", textAlign: "left", width: "100%" }}
-                    >
-                      <div style={{ fontSize: "24px", color: m.type === "link" ? "#ef4444" : "#3b82f6", flexShrink: 0 }}>
-                        {m.type === "link" ? "▶️" : "📄"}
+
+                {(!profile.studyMaterials || profile.studyMaterials.length === 0) ? (
+                  <div style={{ textAlign: "center", padding: "40px 20px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #c5d6ff" }}>
+                    <div style={{ fontSize: "40px", marginBottom: "12px", opacity: 0.5 }}>📂</div>
+                    <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>No files or links uploaded yet. Your teacher will add them here.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+
+                    {/* ── Video & Links Section ── */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                        <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: "linear-gradient(135deg,#fef3c7,#fde68a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>▶️</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px" }}>Video & Links</div>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>{links.length}</div>
                       </div>
-                      <div style={{ textAlign: "left", flex: 1, overflow: "hidden" }}>
-                        <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                        <div style={{ color: "#64748b", fontSize: "12px", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {m.type === "link" ? (m.url || "") : "📦 Click to open file"}
+                      {links.length === 0 ? (
+                        <div style={{ padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px dashed #e2e8f0", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>No video links added yet.</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {links.map((m: any) => (
+                            <button
+                              key={m.id}
+                              onClick={() => openFile(m)}
+                              style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", border: "1px solid #e2e8f0", borderRadius: "12px", background: "#fffbeb", cursor: "pointer", textAlign: "left", width: "100%", transition: "all 0.15s" }}
+                              onMouseOver={e => (e.currentTarget.style.background = "#fef3c7")}
+                              onMouseOut={e => (e.currentTarget.style.background = "#fffbeb")}
+                            >
+                              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "linear-gradient(135deg,#ef4444,#f97316)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>▶️</div>
+                              <div style={{ flex: 1, overflow: "hidden" }}>
+                                <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
+                              </div>
+                              <div style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>↗</div>
+                            </button>
+                          ))}
                         </div>
+                      )}
+                    </div>
+
+                    {/* ── Uploaded Files Section ── */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                        <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: "linear-gradient(135deg,#dbeafe,#bfdbfe)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>📄</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px" }}>Uploaded Files</div>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>{files.length}</div>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                      {files.length === 0 ? (
+                        <div style={{ padding: "16px", background: "#f8faff", borderRadius: "12px", border: "1px dashed #e2e8f0", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>No files uploaded yet.</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {files.map((m: any) => (
+                            <button
+                              key={m.id}
+                              onClick={() => openFile(m)}
+                              style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", border: "1px solid #e2e8f0", borderRadius: "12px", background: "#f8faff", cursor: "pointer", textAlign: "left", width: "100%", transition: "all 0.15s" }}
+                              onMouseOver={e => (e.currentTarget.style.background = "#eff6ff")}
+                              onMouseOut={e => (e.currentTarget.style.background = "#f8faff")}
+                            >
+                              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>📄</div>
+                              <div style={{ flex: 1, overflow: "hidden" }}>
+                                <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>Click to open file</div>
+                              </div>
+                              <div style={{ fontSize: "18px", color: "#94a3b8", flexShrink: 0 }}>⬇</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ── PAYMENTS TAB ────────────────────────────────────────────── */}
           {activeTab === "payments" && (

@@ -601,28 +601,80 @@ export default function AdminVirtualSessionsPage() {
                     </div>
                   )}
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {(!manageModal.studyMaterials || manageModal.studyMaterials.length === 0) && !isAddingMaterial && (
-                      <div style={{ textAlign: "center", padding: "24px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>
-                        Folder is empty. Add videos or files here.
-                      </div>
-                    )}
-                    {(manageModal.studyMaterials || []).map((m: any) => (
-                      <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "white", border: "1px solid #e2e8f0", borderRadius: "12px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                        <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", overflow: "hidden", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0 }}>
-                          <span style={{ fontSize: "20px" }}>{m.type === "link" ? "▶️" : "📄"}</span>
-                          <div style={{ overflow: "hidden" }}>
-                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#002f76", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                            <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.type === "link" ? (m.url || "") : "📦 Stored in Backblaze (click to open)"}</div>
+                  {/* ── Video & Links ── */}
+                  {(() => {
+                    const matLinks = (manageModal.studyMaterials || []).filter((m: any) => m.type === "link");
+                    const matFiles = (manageModal.studyMaterials || []).filter((m: any) => m.type === "file");
+                    const isEmpty = (!manageModal.studyMaterials || manageModal.studyMaterials.length === 0) && !isAddingMaterial;
+                    if (isEmpty) {
+                      return (
+                        <div style={{ textAlign: "center", padding: "24px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>
+                          Folder is empty. Add videos or files here.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                        {/* Video & Links */}
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                            <span style={{ fontSize: "13px" }}>▶️</span>
+                            <span style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Video &amp; Links</span>
+                            <span style={{ fontSize: "10px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "1px 6px", borderRadius: "8px" }}>{matLinks.length}</span>
                           </div>
-                        </button>
-                        <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "12px", fontSize: "16px" }} title="Remove">
-                          ✕
-                        </button>
+                          {matLinks.length === 0 ? (
+                            <div style={{ padding: "10px 14px", background: "#fffbeb", borderRadius: "10px", border: "1px dashed #fde68a", color: "#94a3b8", fontSize: "12px", textAlign: "center" }}>No video links yet.</div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              {matLinks.map((m: any) => (
+                                <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px" }}>
+                                  <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "10px", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0, overflow: "hidden" }}>
+                                    <span style={{ fontSize: "18px", flexShrink: 0 }}>▶️</span>
+                                    <div style={{ overflow: "hidden" }}>
+                                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                      <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
+                                    </div>
+                                  </button>
+                                  <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "8px", fontSize: "14px", flexShrink: 0 }} title="Remove">✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Uploaded Files */}
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                            <span style={{ fontSize: "13px" }}>📄</span>
+                            <span style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Uploaded Files</span>
+                            <span style={{ fontSize: "10px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "1px 6px", borderRadius: "8px" }}>{matFiles.length}</span>
+                          </div>
+                          {matFiles.length === 0 ? (
+                            <div style={{ padding: "10px 14px", background: "#eff6ff", borderRadius: "10px", border: "1px dashed #bfdbfe", color: "#94a3b8", fontSize: "12px", textAlign: "center" }}>No files uploaded yet.</div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              {matFiles.map((m: any) => (
+                                <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px" }}>
+                                  <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "10px", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0, overflow: "hidden" }}>
+                                    <span style={{ fontSize: "18px", flexShrink: 0 }}>📄</span>
+                                    <div style={{ overflow: "hidden" }}>
+                                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e40af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                      <div style={{ fontSize: "11px", color: "#94a3b8" }}>Click to open</div>
+                                    </div>
+                                  </button>
+                                  <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "8px", fontSize: "14px", flexShrink: 0 }} title="Remove">✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </div>
+
 
               </div>
             </m.div>
