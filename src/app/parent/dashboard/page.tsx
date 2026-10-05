@@ -2626,6 +2626,7 @@ export default function ParentDashboardPage() {
 
               const programSetting = allRenewalPrograms?.find((p: any) => p.programKey === profile.program);
               const activeLink = profile.virtualSessionLink || (programSetting?.virtualLinkOpen ? programSetting?.virtualLink : null);
+              const pendingPayment = profile.sessionPayments?.find((p: any) => !p.verified && !p.rejected);
 
               return (
                 <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
@@ -2664,11 +2665,17 @@ export default function ParentDashboardPage() {
                         </a>
                       </div>
                     </>
+                  ) : pendingPayment ? (
+                    <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                      <div style={{ fontSize: "56px", marginBottom: "16px", animation: "pulse 2s infinite" }}>⏳</div>
+                      <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#b45309", fontWeight: "800" }}>Payment Verification Pending</h3>
+                      <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>We&apos;ve received your payment and are currently verifying it. Your session link will be available shortly!</p>
+                    </div>
                   ) : (
                     <div style={{ textAlign: "center", padding: "60px 20px" }}>
                       <div style={{ fontSize: "56px", marginBottom: "16px", opacity: 0.5 }}>📴</div>
                       <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76", fontWeight: "800" }}>No Virtual Session Link</h3>
-                      <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Your teacher hasn't posted a virtual session link for your class yet.</p>
+                      <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Your teacher hasn&apos;t posted a virtual session link for your class yet.</p>
                     </div>
                   )}
 

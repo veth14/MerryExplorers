@@ -170,6 +170,13 @@ export default function AdminPaymentsPage() {
   }, [allPayments, activeFilter, search]);
 
   async function handleAction(uid: string, paymentId: string | null, action: "verify" | "reject", type: "session" | "downpayment" | "registration") {
+    let adminNote = "";
+    if (action === "reject") {
+      const reason = window.prompt("Please provide a reason for rejecting this payment:");
+      if (reason === null) return; // User cancelled
+      adminNote = reason;
+    }
+
     const key = `${uid}-${paymentId}-${action}`;
     setActioning(key);
     
@@ -180,9 +187,10 @@ export default function AdminPaymentsPage() {
     if (type === "registration") {
       url = `/api/registrations/${uid}/${action === "verify" ? "approve" : "reject"}`;
       method = "POST";
+      body = { adminNote };
     } else {
       url = type === "session" ? "/api/parents/session-payment" : "/api/parents/downpayment";
-      body = type === "session" ? { uid, paymentId, action } : { uid, action };
+      body = type === "session" ? { uid, paymentId, action, adminNote } : { uid, action, adminNote };
     }
 
     try {
