@@ -14,8 +14,9 @@ function formatSessionTime(dt: string) {
     const d = new Date(dt);
     if (isNaN(d.getTime())) return dt; // Fallback if already plain string
     return d.toLocaleString("en-US", {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
-    });
+      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+      timeZone: "Asia/Manila",
+    }) + " PHT";
   } catch {
     return dt;
   }
@@ -286,10 +287,14 @@ export default function AdminVirtualSessionsPage() {
   async function handleSaveLink(uid: string) {
     setSavingLink(true);
     try {
+      // datetime-local gives "2026-10-05T18:45" with no timezone.
+      // Append "+08:00" so it's treated as Philippine Standard Time,
+      // not UTC (which would shift it 8 hours forward in the email).
+      const phtTime = newTime ? `${newTime}:00+08:00` : "";
       const res = await fetch("/api/parents/virtual-link", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid, virtualSessionLink: newLink, virtualSessionTime: newTime, sendEmail: sendEmailOnSave }),
+        body: JSON.stringify({ uid, virtualSessionLink: newLink, virtualSessionTime: phtTime, sendEmail: sendEmailOnSave }),
       });
       if (res.ok) {
         setAccounts(prev => prev.map(a => a.id === uid ? { ...a, virtualSessionLink: newLink, virtualSessionTime: newTime } : a));
