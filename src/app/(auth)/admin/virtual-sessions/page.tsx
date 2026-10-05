@@ -36,12 +36,150 @@ const FILTERS = [
   { id: "has-link", label: "Link Set" },
 ];
 
+type FileViewerState = {
+  title: string;
+  url: string;
+  contentType: string;
+  uid: string;
+  materialId: string;
+  fileKey?: string;
+  submission?: {
+    key: string;
+    fileName: string;
+    fileType: string;
+    submittedAt: string;
+  };
+};
+
+if (typeof document !== "undefined" && !document.getElementById("me-spin-style")) {
+  const s = document.createElement("style");
+  s.id = "me-spin-style";
+  s.textContent = `@keyframes me-spin{to{transform:rotate(360deg)}} @keyframes me-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`;
+  document.head.appendChild(s);
+}
+
+function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose: () => void }) {
+  const { title, url, contentType, fileKey } = viewer;
+  const isImage = contentType.startsWith("image/");
+  const lowerTitle = title.toLowerCase();
+  const lowerKey = (fileKey || "").toLowerCase();
+
+  const isPdf = contentType === "application/pdf" || contentType.includes("pdf") || lowerTitle.endsWith(".pdf") || lowerKey.endsWith(".pdf");
+  const isOffice =
+    contentType.includes("spreadsheet") || contentType.includes("presentation") || contentType.includes("wordprocessing") ||
+    contentType === "application/msword" || contentType === "application/vnd.ms-excel" || contentType === "application/vnd.ms-powerpoint" ||
+    lowerTitle.endsWith(".xlsx") || lowerTitle.endsWith(".xls") || lowerTitle.endsWith(".docx") || lowerTitle.endsWith(".doc") ||
+    lowerTitle.endsWith(".pptx") || lowerTitle.endsWith(".ppt") || lowerKey.endsWith(".xlsx") || lowerKey.endsWith(".xls") ||
+    lowerKey.endsWith(".docx") || lowerKey.endsWith(".doc") || lowerKey.endsWith(".pptx") || lowerKey.endsWith(".ppt");
+
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  function getFileInfo() {
+    if (isImage) return { icon: "🖼️", label: "Image" };
+    if (isPdf) return { icon: "📕", label: "PDF" };
+    if (lowerTitle.endsWith(".mp4") || lowerTitle.endsWith(".mov")) return { icon: "🎬", label: "Video" };
+    if (lowerTitle.endsWith(".doc") || lowerTitle.endsWith(".docx")) return { icon: "📝", label: "Document" };
+    if (lowerTitle.endsWith(".ppt") || lowerTitle.endsWith(".pptx")) return { icon: "📊", label: "Slides" };
+    if (lowerTitle.endsWith(".xls") || lowerTitle.endsWith(".xlsx")) return { icon: "📈", label: "Spreadsheet" };
+    return { icon: "📄", label: "File" };
+  }
+
+  const { icon, label } = getFileInfo();
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const cardWidth = isLandscape ? "min(98vw, 1400px)" : "min(92vw, 820px)";
+  const cardHeight = isLandscape ? "96vh" : "min(92vh, 960px)";
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1100,
+        background: "linear-gradient(160deg,#1a6bbf 0%,#2d8fd4 40%,#5bc8f5 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: isLandscape ? "8px" : "16px",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: cardWidth, height: cardHeight,
+          display: "flex", flexDirection: "column",
+          borderRadius: isLandscape ? "20px" : "28px",
+          overflow: "hidden", boxShadow: "0 0 0 4px #FFD700, 0 20px 60px rgba(0,0,0,0.4)",
+          background: "white", transition: "width 0.3s ease, height 0.3s ease, border-radius 0.3s ease",
+        }}
+      >
+        <div style={{ flexShrink: 0, background: "linear-gradient(135deg,#0050d5 0%,#1a7fde 50%,#38b6ff 100%)", padding: "14px 18px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "4px solid #FFD700" }}>
+          <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "linear-gradient(135deg,#FFD700,#FFB300)", border: "3px solid white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0, boxShadow: "0 3px 10px rgba(0,0,0,0.2)" }}>
+            {icon}
+          </div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <div style={{ fontWeight: "900", fontSize: "15px", color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: "800", color: "#001a4d", background: "#FFD700", padding: "2px 9px", borderRadius: "20px" }}>{label}</span>
+              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)" }}>Esc to close</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsLandscape(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: "5px", padding: "8px 14px", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.35)", borderRadius: "50px", color: "white", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}
+          >
+            {isLandscape ? "Portrait" : "Landscape"}
+          </button>
+          <button
+            onClick={onClose}
+            style={{ width: "38px", height: "38px", borderRadius: "50%", background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.45)", color: "white", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700" }}
+          >✕</button>
+        </div>
+        <div style={{ flex: 1, overflow: "hidden", position: "relative", background: isOffice ? "linear-gradient(135deg,#f0f9ff,#e0f2fe)" : isPdf ? "#525659" : "linear-gradient(135deg,#f0f8ff,#e8f4ff)" }}>
+          {isImage && (
+            <div style={{ width: "100%", height: "100%", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+              <img src={url} alt={title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 3px #FFD700" }} />
+            </div>
+          )}
+          {!isImage && isPdf && (
+            <iframe key={`${url}-${isLandscape}`} src={url} style={{ width: "100%", height: "100%", border: "none", display: "block" }} title={title} />
+          )}
+          {!isImage && !isPdf && isOffice && (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+              <div style={{ textAlign: "center", maxWidth: "380px" }}>
+                <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px" }}>{icon}</div>
+                <h3 style={{ margin: "0 0 8px", fontSize: "20px", color: "#002f76", fontWeight: "800" }}>{title}</h3>
+                <p style={{ color: "#64748b", fontSize: "14px", lineHeight: 1.5, marginBottom: "24px" }}>This file type requires an external app to view. Click download below to save it to your device.</p>
+                <a href={url} download style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "12px 24px", background: "#0050d5", color: "white", textDecoration: "none", borderRadius: "12px", fontWeight: "800" }}>⬇ Download to View</a>
+              </div>
+            </div>
+          )}
+          {!isImage && !isPdf && !isOffice && (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "80px", marginBottom: "16px" }}>{icon}</div>
+                <h3 style={{ margin: "0 0 8px", fontSize: "18px", color: "#002f76" }}>Preview not available</h3>
+                <a href={url} download style={{ color: "#0050d5", fontWeight: "bold" }}>Download file instead</a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminVirtualSessionsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   
+  const [fileViewer, setFileViewer] = useState<FileViewerState | null>(null);
+  const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const [manageModal, setManageModal] = useState<any | null>(null);
   const [confirmEndModal, setConfirmEndModal] = useState<string | null>(null);
   const [alertModal, setAlertModal] = useState<{ title: string; message: string; type?: "error"|"success"|"warning" } | null>(null);
@@ -269,17 +407,29 @@ export default function AdminVirtualSessionsPage() {
       window.open(m.url, "_blank", "noopener,noreferrer");
       return;
     }
+    if (loadingFileId === m.id) return;
+    setLoadingFileId(m.id);
     // For file-type stored in B2, get a short-lived presigned URL
     try {
       const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(uid)}&materialId=${encodeURIComponent(m.id)}`);
       const data = await res.json();
       if (data.success && data.url) {
-        window.open(data.url, "_blank", "noopener,noreferrer");
+        setFileViewer({
+          title: m.title || "File",
+          url: data.url,
+          contentType: m.contentType || "application/octet-stream",
+          uid,
+          materialId: m.id,
+          fileKey: m.key,
+          submission: m.submission,
+        });
       } else {
         showAlert(data.error || "Could not open file.", "Error", "error");
       }
     } catch {
       showAlert("Network error. Please try again.", "Error", "error");
+    } finally {
+      setLoadingFileId(null);
     }
   }
 
@@ -314,6 +464,9 @@ export default function AdminVirtualSessionsPage() {
 
   return (
     <AppShell title="Virtual Sessions">
+      <AnimatePresence>
+        {fileViewer && <FileViewerModal viewer={fileViewer} onClose={() => setFileViewer(null)} />}
+      </AnimatePresence>
       <style>{`
         .row-hover { transition: background 0.15s; cursor: pointer; }
         .row-hover:hover { background: #f8faff !important; }
@@ -711,10 +864,26 @@ export default function AdminVirtualSessionsPage() {
                                       </div>
                                       <button
                                         onClick={async () => {
-                                          const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(manageModal.id)}&submissionKey=${encodeURIComponent(m.submission.key)}&download=1`);
-                                          const data = await res.json();
-                                          if (data.success && data.url) window.open(data.url, "_blank");
-                                          else alert("Could not fetch download link.");
+                                          if (loadingFileId === m.id) return;
+                                          setLoadingFileId(m.id);
+                                          try {
+                                            const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(manageModal.id)}&submissionKey=${encodeURIComponent(m.submission.key)}`);
+                                            const data = await res.json();
+                                            if (data.success && data.url) {
+                                              setFileViewer({
+                                                title: m.submission.fileName,
+                                                url: data.url,
+                                                contentType: m.submission.fileType || "application/octet-stream",
+                                                uid: manageModal.id,
+                                                materialId: m.id,
+                                                fileKey: m.submission.key,
+                                              });
+                                            } else {
+                                              alert("Could not fetch view link.");
+                                            }
+                                          } finally {
+                                            setLoadingFileId(null);
+                                          }
                                         }}
                                         style={{ padding: "4px 10px", borderRadius: "8px", background: "#10b981", color: "white", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: "700", flexShrink: 0 }}
                                       >
