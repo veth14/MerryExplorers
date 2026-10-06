@@ -3295,11 +3295,8 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
     setLoading(true);
     try {
-      // Re-authenticate first to ensure session is fresh
       const credential = EmailAuthProvider.credential(user.email, currentPassword);
       await reauthenticateWithCredential(user, credential);
-
-      // Update password
       await updatePassword(user, newPassword);
 
       setSuccess(true);
@@ -3316,110 +3313,114 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  // Design Tokens
+  const NAVY = "#0b2a82";
+  const SUN = "#ffd23f";
+  const SUN_LIGHT = "#ffe066";
+  const SUN_DEEP = "#ffb82e";
+  const INPUT_BG = "#f2faff";
+  const INPUT_BORDER = "#b6dcf5";
+  const ERROR = "#b3261e";
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,15,40,0.6)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", animation: "fadeUp 0.3s ease" }}>
-      <div style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "420px", overflow: "hidden", boxShadow: "0 32px 100px rgba(0,47,118,0.3)" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,15,40,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", animation: "fadeUp 0.2s ease" }}>
+      <div style={{ position: "relative", background: "#fff", border: `4px solid ${NAVY}`, borderRadius: "28px", padding: "28px", width: "100%", maxWidth: "420px", boxShadow: `0 0 0 6px #fff, 0 12px 0 6px rgba(11,42,130,0.18)` }}>
+        
+        {/* Tape Accent */}
+        <span style={{ position: "absolute", top: "-17px", left: "50%", width: "92px", height: "28px", marginLeft: "-46px", transform: "rotate(6deg)", background: `repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px)`, border: `2px solid rgba(11,42,130,0.25)`, borderRadius: "4px" }} aria-hidden="true" />
 
         {/* Header */}
-        <div style={{ background: "linear-gradient(135deg,#f8faff,#f0f4ff)", padding: "24px", borderBottom: "1px solid #e8efff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "800", color: "#002f76", letterSpacing: "-0.2px" }}>Change Password</h2>
-          <button onClick={onClose} style={{ background: "rgba(0,47,118,0.05)", border: "none", fontSize: "16px", color: "#64748b", cursor: "pointer", width: "32px", height: "32px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "rgba(0,47,118,0.1)"} onMouseOut={e => e.currentTarget.style.background = "rgba(0,47,118,0.05)"}>✕</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: "700", color: NAVY }}>Change password</h2>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: "20px", color: NAVY, cursor: "pointer", fontWeight: "700" }}>✕</button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: "32px 24px" }}>
-          {success ? (
-            <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div style={{ fontSize: "56px", marginBottom: "16px", animation: "fadeUp 0.5s ease" }}>✅</div>
-              <h3 style={{ margin: "0 0 8px", fontSize: "20px", color: "#15803d", fontWeight: "800" }}>Password Updated</h3>
-              <p style={{ margin: 0, fontSize: "15px", color: "#64748b", lineHeight: 1.5 }}>Your new password has been set securely. You can now use it on your next login.</p>
+        {success ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: "56px", marginBottom: "16px", animation: "fadeUp 0.5s ease" }}>✅</div>
+            <h3 style={{ margin: "0 0 8px", fontSize: "20px", color: "#15803d", fontWeight: "800" }}>Password Updated</h3>
+            <p style={{ margin: 0, fontSize: "15px", color: "#3d5a99", lineHeight: 1.5, fontWeight: "500" }}>Your new password has been set securely. You can now use it on your next login.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            
+            <div>
+              <label style={{ display: "block", fontSize: "15px", fontWeight: "600", color: NAVY, marginBottom: "6px" }}>Current Password</label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPasswords ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  disabled={loading}
+                  placeholder="Enter current password"
+                  style={{ width: "100%", padding: "13px 14px", background: INPUT_BG, border: `3px solid ${INPUT_BORDER}`, borderRadius: "16px", fontSize: "16px", fontWeight: "500", color: NAVY, boxSizing: "border-box", outline: "none", transition: "border 0.2s" }}
+                  onFocus={e => e.target.style.borderColor = NAVY}
+                  onBlur={e => e.target.style.borderColor = INPUT_BORDER}
+                />
+                <button type="button" onClick={() => setShowPasswords(!showPasswords)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", fontSize: "18px", cursor: "pointer", opacity: 0.6 }}>
+                  {showPasswords ? "👁️‍🗨️" : "👁️"}
+                </button>
+              </div>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>Current Password</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPasswords ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    disabled={loading}
-                    placeholder="Enter current password"
-                    style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #dde5f0", borderRadius: "12px", fontSize: "15px", background: "#f8faff", outline: "none", boxSizing: "border-box", transition: "border 0.2s" }}
-                    onFocus={e => e.target.style.borderColor = "#0050d5"}
-                    onBlur={e => e.target.style.borderColor = "#dde5f0"}
-                  />
-                  <button type="button" onClick={() => setShowPasswords(!showPasswords)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", fontSize: "18px", cursor: "pointer", opacity: 0.6 }}>
-                    {showPasswords ? "👁️‍🗨️" : "👁️"}
-                  </button>
-                </div>
+            <div>
+              <label style={{ display: "block", fontSize: "15px", fontWeight: "600", color: NAVY, marginBottom: "6px" }}>New Password</label>
+              <input
+                type={showPasswords ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={loading}
+                placeholder="At least 6 characters"
+                style={{ width: "100%", padding: "13px 14px", background: INPUT_BG, border: `3px solid ${INPUT_BORDER}`, borderRadius: "16px", fontSize: "16px", fontWeight: "500", color: NAVY, boxSizing: "border-box", outline: "none", transition: "border 0.2s" }}
+                onFocus={e => e.target.style.borderColor = NAVY}
+                onBlur={e => e.target.style.borderColor = INPUT_BORDER}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "15px", fontWeight: "600", color: NAVY, marginBottom: "6px" }}>Confirm New Password</label>
+              <input
+                type={showPasswords ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={loading}
+                placeholder="Repeat new password"
+                style={{ width: "100%", padding: "13px 14px", background: INPUT_BG, border: `3px solid ${INPUT_BORDER}`, borderRadius: "16px", fontSize: "16px", fontWeight: "500", color: NAVY, boxSizing: "border-box", outline: "none", transition: "border 0.2s" }}
+                onFocus={e => e.target.style.borderColor = NAVY}
+                onBlur={e => e.target.style.borderColor = INPUT_BORDER}
+              />
+            </div>
+
+            {error && (
+              <div style={{ background: "#fff0f0", color: ERROR, padding: "12px", borderRadius: "12px", fontSize: "14px", fontWeight: "600", border: "2px solid #ffd5d5", marginTop: "4px" }}>
+                {error}
               </div>
+            )}
 
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>New Password</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPasswords ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    disabled={loading}
-                    placeholder="At least 6 characters"
-                    style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #dde5f0", borderRadius: "12px", fontSize: "15px", background: "#f8faff", outline: "none", boxSizing: "border-box", transition: "border 0.2s" }}
-                    onFocus={e => e.target.style.borderColor = "#0050d5"}
-                    onBlur={e => e.target.style.borderColor = "#dde5f0"}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "8px" }}>Confirm New Password</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPasswords ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={loading}
-                    placeholder="Repeat new password"
-                    style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #dde5f0", borderRadius: "12px", fontSize: "15px", background: "#f8faff", outline: "none", boxSizing: "border-box", transition: "border 0.2s" }}
-                    onFocus={e => e.target.style.borderColor = "#0050d5"}
-                    onBlur={e => e.target.style.borderColor = "#dde5f0"}
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div style={{ background: "#fff0f0", color: "#ba1a1a", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", border: "1px solid #ffd5d5" }}>
-                  {error}
-                </div>
-              )}
-
-              <div style={{ marginTop: "12px", display: "flex", gap: "12px" }}>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={loading}
-                  style={{ flex: 1, padding: "14px", background: "rgba(148,163,184,0.1)", border: "none", color: "#64748b", borderRadius: "12px", fontSize: "14px", fontWeight: "800", cursor: loading ? "not-allowed" : "pointer", transition: "all 0.2s" }}
-                  onMouseOver={e => !loading && (e.currentTarget.style.background = "rgba(148,163,184,0.15)")}
-                  onMouseOut={e => !loading && (e.currentTarget.style.background = "rgba(148,163,184,0.1)")}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg,#002f76,#0050d5)", border: "none", color: "white", borderRadius: "12px", fontSize: "14px", fontWeight: "800", cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 8px 20px rgba(0,47,118,0.25)", transition: "all 0.2s" }}
-                  onMouseOver={e => !loading && (e.currentTarget.style.transform = "translateY(-1px)")}
-                  onMouseOut={e => !loading && (e.currentTarget.style.transform = "translateY(0)")}
-                >
-                  {loading ? "Updating..." : "Update Password"}
-                </button>
-              </div>
-
-            </form>
-          )}
-        </div>
-
+            <div style={{ marginTop: "12px", display: "flex", gap: "12px" }}>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                style={{ flex: 1, padding: "14px", background: "#fff", border: `3px solid ${NAVY}`, color: NAVY, borderRadius: "18px", fontSize: "16px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", boxShadow: `0 6px 0 ${NAVY}` }}
+                onMouseOver={e => !loading && (e.currentTarget.style.transform = "translateY(-2px)")}
+                onMouseOut={e => !loading && (e.currentTarget.style.transform = "none")}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ flex: 1, padding: "14px", background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`, border: `3px solid ${NAVY}`, color: NAVY, borderRadius: "18px", fontSize: "16px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", boxShadow: `0 6px 0 ${NAVY}` }}
+                onMouseOver={e => !loading && (e.currentTarget.style.transform = "translateY(-2px)")}
+                onMouseOut={e => !loading && (e.currentTarget.style.transform = "none")}
+              >
+                {loading ? "Updating..." : "Update"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
