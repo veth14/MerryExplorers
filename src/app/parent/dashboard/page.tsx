@@ -909,7 +909,11 @@ export default function ParentDashboardPage() {
   async function openFile(m: any) {
     // External links (YouTube etc.) — open in new tab
     if (m.type === "link" || m.url) {
-      window.open(m.url, "_blank", "noopener,noreferrer");
+      let url = m.url;
+      if (url && !/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
       return;
     }
     if (loadingFileId === m.id) return; // prevent double-click

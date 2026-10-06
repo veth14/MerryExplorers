@@ -430,7 +430,11 @@ export default function AdminVirtualSessionsPage() {
   async function openMaterial(uid: string, m: any) {
     // For link-type (YouTube, etc.) open directly
     if (m.type === "link" || m.url) {
-      window.open(m.url, "_blank", "noopener,noreferrer");
+      let url = m.url;
+      if (url && !/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
       return;
     }
     if (loadingFileId === m.id) return;

@@ -66,7 +66,7 @@ function Icon({ name, size = 22 }: { name: string; size?: number }) {
 const SK = "vp-sticker"; // white sticker outline
 function Cloud({ className }: { className: string }) {
     return (
-        <svg className={`vp-cloud ${SK} ${className}`} viewBox="0 0 120 60" aria-hidden="true">
+        <svg className={`vp-cloud ${SK} ${className}`} viewBox="-4 -16 124 78" aria-hidden="true">
             <path d="M26 52a18 18 0 0 1-2-35 24 24 0 0 1 46-6 20 20 0 0 1 28 18 14 14 0 0 1-4 23z" fill="#fff" stroke="#cfeaff" strokeWidth="3" />
         </svg>
     );
@@ -764,8 +764,10 @@ const CSS = `
 .vp-sun{position:absolute;top:8px;right:16px;width:150px;animation:vp-bob 5s ease-in-out infinite}
 .vp-rays{transform-origin:70px 70px;animation:vp-rot 40s linear infinite}
 .vp-rainbow{position:absolute;top:14px;left:10px;width:190px;animation:vp-bob 5s ease-in-out infinite;animation-delay:-2s}
-.vp-cloud{position:absolute;left:0;width:130px;animation:vp-drift linear infinite;will-change:transform}
-.vp-cloud.c1{top:18%;animation-duration:70s}.vp-cloud.c2{top:46%;width:100px;animation-duration:90s;animation-delay:-40s}.vp-cloud.c3{top:72%;width:150px;animation-duration:58s;animation-delay:-20s}
+.vp-cloud{position:absolute;left:0;width:130px;overflow:visible;animation:vp-drift linear infinite;will-change:transform}
+.vp-cloud.c1{top:18%;animation-duration:70s}
+.vp-cloud.c2{top:46%;width:104px;animation-duration:90s;animation-delay:-40s}
+.vp-cloud.c3{top:72%;width:156px;animation-duration:58s;animation-delay:-20s}
 .vp-star{position:absolute;width:28px;animation:vp-twinkle 2.6s ease-in-out infinite}
 .vp-bubble{position:absolute;bottom:-40px;width:22px;height:22px;border-radius:50%;border:3px solid #fff;opacity:.8;animation:vp-rise linear infinite}
 .vp-bank{position:absolute;left:-5%;bottom:-20px;width:110%;height:90px;animation:vp-sway 9s ease-in-out infinite}
