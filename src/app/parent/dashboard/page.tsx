@@ -283,11 +283,50 @@ function getCompletedSessionsCount(enrolledAtStr: string | undefined, schedule: 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Spinner() {
+  const NAVY = "#0b2a82";
+  const SUN = "#ffd23f";
+  const SUN_LIGHT = "#ffe066";
+  const SUN_DEEP = "#ffb82e";
+
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "linear-gradient(135deg,#f0f7ff 0%,#e8f0fe 40%,#fdf4ff 100%)" }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ width: "48px", height: "48px", borderRadius: "50%", border: "3px solid rgba(0,80,213,0.15)", borderTopColor: "#0050d5", animation: "spin 0.7s linear infinite", margin: "0 auto 16px" }} />
-        <p style={{ color: "#64748b", fontSize: "14px", fontWeight: "600" }}>Loading your dashboard…</p>
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh",
+      background: "linear-gradient(120deg, #f2faff, #e0f2fe, #dbeafe, #f2faff)",
+      backgroundSize: "300% 300%",
+      animation: "me-bg-pan 8s ease infinite"
+    }}>
+      <style>{`
+        @keyframes me-bg-pan {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes me-bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-12px); }
+        }
+        @keyframes me-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(0.98); }
+        }
+      `}</style>
+      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{
+          width: "72px", height: "72px",
+          background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
+          border: `4px solid ${NAVY}`,
+          borderRadius: "22px",
+          boxShadow: `0 6px 0 ${NAVY}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "34px",
+          animation: "me-bounce 1s ease-in-out infinite",
+          marginBottom: "24px"
+        }}>
+          🚀
+        </div>
+        <p style={{ color: NAVY, fontSize: "18px", fontWeight: "800", margin: 0, animation: "me-pulse 1.5s ease-in-out infinite" }}>
+          Loading dashboard...
+        </p>
       </div>
     </div>
   );
@@ -512,7 +551,16 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
         }}
       >
         {/* Tape Accent */}
-        <span style={{ position: "absolute", top: "-22px", left: "50%", width: "100px", height: "30px", marginLeft: "-50px", transform: "rotate(4deg)", background: `repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px)`, border: `2px solid rgba(11,42,130,0.25)`, borderRadius: "4px", zIndex: 100 }} aria-hidden="true" />
+        <span style={{ 
+          position: "absolute", top: "-18px", left: "50%", width: "110px", height: "32px", marginLeft: "-55px", 
+          transform: "rotate(3deg)", 
+          background: `repeating-linear-gradient(45deg, ${SUN} 0 10px, ${SUN_LIGHT} 10px 20px)`, 
+          border: `2px solid rgba(11,42,130,0.15)`, 
+          borderRadius: "6px", 
+          zIndex: 100,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.4)",
+          opacity: 0.95
+        }} aria-hidden="true" />
 
         <div
           style={{
@@ -522,31 +570,38 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
             overflow: "hidden",
             background: "#fff",
             border: `4px solid ${NAVY}`,
-            boxShadow: `0 0 0 6px #fff, 0 12px 0 6px rgba(11,42,130,0.18)`,
+            boxShadow: `0 0 0 6px #fff, 0 16px 32px rgba(0,15,40,0.25)`,
             transition: "border-radius 0.3s ease",
           }}
         >
         {/* ── Header ── */}
         <div style={{
           flexShrink: 0,
-          background: "#f2faff",
+          background: "#fff",
           padding: "16px 20px",
-          display: "flex", alignItems: "center", gap: "12px",
-          borderBottom: `3px solid #b6dcf5`,
+          display: "flex", alignItems: "center", gap: "14px",
+          borderBottom: `4px solid #f1f5f9`,
           position: "relative", zIndex: 5
         }}>
           {/* Icon badge */}
-          <div style={{ fontSize: "28px", flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))" }}>
+          <div style={{ 
+            width: "48px", height: "48px", borderRadius: "14px",
+            background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
+            border: `3px solid ${NAVY}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "24px", flexShrink: 0,
+            boxShadow: `0 4px 0 ${NAVY}`
+          }}>
             {icon}
           </div>
 
           {/* Title */}
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <div style={{ fontWeight: "700", fontSize: "18px", color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontWeight: "800", fontSize: "20px", color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: "2px" }}>
               {title}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: "#3d5a99", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px", border: "1px solid #b6dcf5" }}>{label}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "700", color: "#0050d5", background: "#e8f0fe", padding: "2px 10px", borderRadius: "12px", border: "1px solid #c2dcf6" }}>{label}</span>
             </div>
           </div>
 
