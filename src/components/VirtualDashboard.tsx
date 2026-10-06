@@ -288,7 +288,7 @@ export default function VirtualDashboard(p: Props) {
     const [tab, setTab] = useState<Tab>("virtual");
     const childFavs = profile.studentInfo?.childInfo || profile.childInfo;
     const firstName = (profile.fullName || "").split(" ")[0] || "there";
-    const due = profile.promoDiscount ? profile.promoDiscount.finalPrice : 450;
+    const due = profile.promoDiscount ? profile.promoDiscount.finalPrice : 675;
 
     const tabs: { id: Tab; label: string; icon: string }[] = [
         { id: "virtual", label: "Virtual class", icon: "monitor" },
@@ -374,7 +374,7 @@ export default function VirtualDashboard(p: Props) {
             const res = await fetch("/api/parents/session-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ uid: user.uid, paymentMethod: method, receiptBase64: receipt, referenceNumber: ref, amountPaid: Number(amount) || 450 }),
+                body: JSON.stringify({ uid: user.uid, paymentMethod: method, receiptBase64: receipt, referenceNumber: ref, amountPaid: Number(amount) || due }),
             });
             const data = await res.json();
             if (data.success) {
@@ -587,7 +587,7 @@ export default function VirtualDashboard(p: Props) {
                     {receipt && (
                         <div style={{ marginTop: 18 }}>
                             <Field label="Reference number" id="vp-ref"><input id="vp-ref" className="vp-input plain" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. 10000000000" /></Field>
-                            <Field label="Amount sent (₱)" id="vp-amt"><input id="vp-amt" className="vp-input plain" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 450" /></Field>
+                            <Field label="Amount sent (₱)" id="vp-amt"><input id="vp-amt" className="vp-input plain" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={`e.g. ${due}`} /></Field>
                         </div>
                     )}
 
@@ -606,7 +606,7 @@ export default function VirtualDashboard(p: Props) {
                                     return (
                                         <div key={x.id || i} className={`vp-pay ${state}`}>
                                             <div>
-                                                <strong>₱{(x.amountPaid || 450).toLocaleString()} via {String(x.paymentMethod || "").toUpperCase()}</strong>
+                                                <strong>₱{(x.amountPaid || 675).toLocaleString()} via {String(x.paymentMethod || "").toUpperCase()}</strong>
                                                 <small>{new Date(x.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}{x.referenceNumber ? ` · Ref ${x.referenceNumber}` : ""}</small>
                                                 {x.adminNote && <small>Note: {x.adminNote}</small>}
                                             </div>

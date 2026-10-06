@@ -1923,7 +1923,7 @@ export default function ParentDashboardPage() {
                     <div style={{ fontSize: "56px", marginBottom: "16px", animation: "bounce 2s infinite" }}>💳</div>
                     <h2 style={{ margin: "0 0 12px", color: "#002f76", fontSize: "24px", fontWeight: "800" }}>Payment Required</h2>
                     <p style={{ margin: "0 auto 32px", color: "#64748b", fontSize: "15px", maxWidth: "400px", lineHeight: 1.6 }}>
-                      Your previous virtual session has ended! Please submit your payment of <strong>₱{profile.promoDiscount ? profile.promoDiscount.finalPrice.toLocaleString() : "450"}</strong> to unlock your next session.
+                      Your previous virtual session has ended! Please submit your payment of <strong>₱{profile.promoDiscount ? profile.promoDiscount.finalPrice.toLocaleString() : "675"}</strong> to unlock your next session.
                     </p>
                     <button
                       onClick={() => setActiveTab("payments")}
@@ -2308,7 +2308,7 @@ export default function ParentDashboardPage() {
               ) : (
                 <div className="mb-6 rounded-3xl p-6 text-white shadow-xl bg-gradient-to-br from-[#0033A0] to-[#0066CC]">
                   <p className="text-[12px] font-bold uppercase tracking-widest opacity-70">Amount Due Per Session</p>
-                  <p className="mt-1 text-[40px] font-extrabold leading-none">₱450</p>
+                  <p className="mt-1 text-[40px] font-extrabold leading-none">₱675</p>
                 </div>
               )}
 
@@ -2344,7 +2344,7 @@ export default function ParentDashboardPage() {
                         </div>
                         <div className="max-w-sm">
                           <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {pm.label}</p>
-                          <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱{profile.promoDiscount ? profile.promoDiscount.finalPrice.toLocaleString() : "450"}</strong> (or multiple). Then upload the screenshot below.</p>
+                          <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱{profile.promoDiscount ? profile.promoDiscount.finalPrice.toLocaleString() : "675"}</strong> (or multiple). Then upload the screenshot below.</p>
                         </div>
                       </div>
                     ))}
@@ -2399,7 +2399,7 @@ export default function ParentDashboardPage() {
                     <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76", marginBottom: "16px" }} value={dpReferenceNumber} onChange={(e) => setDpReferenceNumber(e.target.value)} placeholder="e.g. 10000000000" />
 
                     <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", color: "#0033A0", opacity: 0.6, marginBottom: "6px" }}>Amount Sent</label>
-                    <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76" }} value={dpAmountPaid} onChange={(e) => setDpAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 450" />
+                    <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76" }} value={dpAmountPaid} onChange={(e) => setDpAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={`e.g. ${profile.promoDiscount ? profile.promoDiscount.finalPrice : 675}`} />
                   </div>
                 )}
               </div>
@@ -2418,7 +2418,7 @@ export default function ParentDashboardPage() {
                         paymentMethod: dpPaymentMethod,
                         receiptBase64: dpReceiptBase64,
                         referenceNumber: dpReferenceNumber,
-                        amountPaid: Number(dpAmountPaid) || 450,
+                        amountPaid: Number(dpAmountPaid) || (profile.promoDiscount ? profile.promoDiscount.finalPrice : 675),
                       }),
                     });
                     const data = await res.json();
@@ -2463,7 +2463,7 @@ export default function ParentDashboardPage() {
                         }}>
                           <div>
                             <div style={{ fontWeight: 800, fontSize: "13px", color: "#002f76" }}>
-                              {p.verified ? "✅" : p.rejected ? "❌" : "⏳"} ₱{(p.amountPaid || 450).toLocaleString()} via {p.paymentMethod?.toUpperCase()}
+                              {p.verified ? "✅" : p.rejected ? "❌" : "⏳"} ₱{(p.amountPaid || 675).toLocaleString()} via {p.paymentMethod?.toUpperCase()}
                             </div>
                             <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
                               {new Date(p.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}

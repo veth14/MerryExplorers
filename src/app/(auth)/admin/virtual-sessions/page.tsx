@@ -956,7 +956,7 @@ export default function AdminVirtualSessionsPage() {
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>🛑</div>
               <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#0f172a", margin: "0 0 12px" }}>End Virtual Session?</h2>
               <p style={{ color: "#475569", fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
-                This will instantly clear the student's meeting link and trigger a <strong>₱450 payment prompt</strong> in their Parent Portal for their next session.
+                This will instantly clear the student's meeting link and trigger a <strong>session payment prompt</strong> in their Parent Portal for their next session.
               </p>
               <div style={{ display: "flex", gap: "12px" }}>
                 <button 

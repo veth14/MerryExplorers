@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       paymentMethod,
       receiptBase64,
       referenceNumber: referenceNumber || "",
-      amountPaid: Number(amountPaid) || 450,
+      amountPaid: Number(amountPaid) || 675,
       submittedAt: new Date().toISOString(),
       verified: false,
       rejected: false,
