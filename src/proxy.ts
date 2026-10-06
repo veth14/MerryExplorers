@@ -38,6 +38,13 @@ export function proxy(request: NextRequest) {
   }
 
   // Protect /parent routes
+  if (pathname === '/parent' || pathname === '/parent/') {
+    if (!session || role !== 'parent') {
+      return NextResponse.redirect(new URL('/parent/login', request.url));
+    }
+    return NextResponse.redirect(new URL('/parent/dashboard', request.url));
+  }
+
   if (pathname.startsWith('/parent/dashboard') || pathname.startsWith('/parent/profile')) {
     if (!session) {
       return NextResponse.redirect(new URL('/parent/login', request.url));
@@ -74,6 +81,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/teacher/:path*', '/parent/:path*', '/login'],
+  matcher: ['/admin/:path*', '/teacher/:path*', '/parent', '/parent/:path*', '/login'],
 };
 

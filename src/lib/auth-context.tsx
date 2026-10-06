@@ -12,7 +12,7 @@ type AuthContextType = {
   userProfile: UserAccount | null;
   loading: boolean;
   signIn: (email: string, pass: string, remember?: boolean) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (redirectTo?: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,11 +103,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (redirectTo?: string) => {
+    const isParent =
+      (typeof window !== "undefined" && window.location.pathname.startsWith("/parent")) ||
+      (userProfile as any)?.role === "parent" ||
+      (typeof document !== "undefined" && document.cookie.split("; ").some((c) => c.startsWith("role=parent")));
+
+    const destination = redirectTo || (isParent ? "/parent/login" : "/login");
+
     await firebaseSignOut(auth);
     document.cookie = `session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     document.cookie = `role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-    window.location.href = "/login";
+    window.location.href = destination;
   };
 
   return (

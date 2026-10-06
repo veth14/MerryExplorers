@@ -27,12 +27,17 @@ export function Cloud({ w = 160 }: { w?: number }) {
 
 export function Rainbow({ w = 230 }: { w?: number }) {
     const bands = ["#ef4444", "#ff9a1f", "#ffd23f", "#4cc35b", "#2f8bf0", "#7c4dcc"];
+    const sticker = "drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)";
     return (
-        <svg width={w} viewBox="0 0 200 110" aria-hidden="true">
-            <path d="M12 104 A88 88 0 0 1 188 104" fill="none" stroke="#fff" strokeWidth="64" strokeLinecap="round" />
-            {bands.map((c, i) => (
-                <path key={c} d={`M${14 + i * 9} 104 A${86 - i * 9} ${86 - i * 9} 0 0 1 ${186 - i * 9} 104`} fill="none" stroke={c} strokeWidth="9.5" />
-            ))}
+        <svg width={w} viewBox="0 0 160 90" style={{ overflow: "visible", filter: sticker }} aria-hidden="true">
+            {bands.map((c, i) => {
+                const r = 68 - i * 7;
+                return <path key={c} d={`M${80 - r} 70A${r} ${r} 0 0 1 ${80 + r} 70`} fill="none" stroke={c} strokeWidth="7" />;
+            })}
+            <g fill="#fff">
+                <circle cx="14" cy="72" r="13" /><circle cx="30" cy="68" r="15" /><circle cx="26" cy="78" r="12" />
+                <circle cx="132" cy="72" r="13" /><circle cx="148" cy="68" r="12" /><circle cx="140" cy="78" r="12" />
+            </g>
         </svg>
     );
 }

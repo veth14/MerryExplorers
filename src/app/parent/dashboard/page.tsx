@@ -820,6 +820,11 @@ type RenewalSettings = {
 export default function ParentDashboardPage() {
   const { user, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut("/parent/login");
+  };
+
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -978,7 +983,7 @@ export default function ParentDashboardPage() {
       const res = await fetch(`/api/parents?uid=${uid}`);
       if (!res.ok) {
         if (res.status === 403) {
-          await signOut();
+          await handleSignOut();
           return;
         }
         throw new Error("Failed to load profile");
@@ -1061,7 +1066,7 @@ export default function ParentDashboardPage() {
           profile={profile}
           setProfile={(fn) => setProfile((p) => (p ? fn(p) : p))}
           user={user}
-          signOut={signOut}
+          signOut={handleSignOut}
           showToast={showToast}
           toast={toast}
           clearToast={() => setToast(null)}
@@ -1274,7 +1279,7 @@ export default function ParentDashboardPage() {
             </button>
             <button
               id="parent-signout-btn"
-              onClick={signOut}
+              onClick={handleSignOut}
               className="nav-link"
               style={{
                 padding: "8px 16px",
