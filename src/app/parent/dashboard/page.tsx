@@ -10,6 +10,7 @@ import { PROGRAM_SLOTS } from "@/data/landing";
 import Tesseract from "tesseract.js";
 import WaiverGate from "@/components/WaiverGate";
 import VirtualOnboardingModal from "@/components/VirtualOnboardingModal";
+import VirtualDashboard from "@/components/VirtualDashboard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,11 +57,11 @@ type ParentProfile = {
   needsSessionPayment?: boolean;
   virtualSessionsCompleted?: number;
   renewalLink?: string;
-  studyMaterials?: { 
-    id: string; 
-    title: string; 
-    url: string; 
-    type: string; 
+  studyMaterials?: {
+    id: string;
+    title: string;
+    url: string;
+    type: string;
     createdAt?: string;
     submission?: {
       key: string;
@@ -406,10 +407,10 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
   const lowerTitle = title.toLowerCase();
   const lowerKey = (fileKey || "").toLowerCase();
 
-  const isPdf   = contentType === "application/pdf" ||
-                   contentType.includes("pdf") ||
-                   lowerTitle.endsWith(".pdf") ||
-                   lowerKey.endsWith(".pdf");
+  const isPdf = contentType === "application/pdf" ||
+    contentType.includes("pdf") ||
+    lowerTitle.endsWith(".pdf") ||
+    lowerKey.endsWith(".pdf");
   const isOffice =
     contentType.includes("spreadsheet") ||
     contentType.includes("presentation") ||
@@ -482,7 +483,7 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
   }, [onClose]);
 
   // Modal card dimensions vary by orientation mode
-  const cardWidth  = isLandscape ? "min(98vw, 1400px)" : "min(92vw, 820px)";
+  const cardWidth = isLandscape ? "min(98vw, 1400px)" : "min(92vw, 820px)";
   const cardHeight = isLandscape ? "96vh" : "min(92vh, 960px)";
 
   return (
@@ -498,27 +499,27 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
       {/* ── Backdrop decorations — visible only when modal doesn't fill screen ── */}
       {!isLandscape && (<>
         {[
-          { top:"5%",  left:"3%",  size:"26px", rot:"15deg" },
-          { top:"10%", left:"89%", size:"20px", rot:"-10deg" },
-          { top:"84%", left:"6%",  size:"18px", rot:"30deg" },
-          { top:"80%", left:"91%", size:"24px", rot:"-20deg" },
-          { top:"44%", left:"1%",  size:"16px", rot:"5deg" },
-          { top:"50%", left:"95%", size:"16px", rot:"-5deg" },
+          { top: "5%", left: "3%", size: "26px", rot: "15deg" },
+          { top: "10%", left: "89%", size: "20px", rot: "-10deg" },
+          { top: "84%", left: "6%", size: "18px", rot: "30deg" },
+          { top: "80%", left: "91%", size: "24px", rot: "-20deg" },
+          { top: "44%", left: "1%", size: "16px", rot: "5deg" },
+          { top: "50%", left: "95%", size: "16px", rot: "-5deg" },
         ].map((s, i) => (
-          <div key={i} style={{ position:"absolute", top:s.top, left:s.left, fontSize:s.size, transform:`rotate(${s.rot})`, opacity:0.8, pointerEvents:"none", userSelect:"none" }}>⭐</div>
+          <div key={i} style={{ position: "absolute", top: s.top, left: s.left, fontSize: s.size, transform: `rotate(${s.rot})`, opacity: 0.8, pointerEvents: "none", userSelect: "none" }}>⭐</div>
         ))}
         {[
-          { top:"2%",  left:"16%", size:"34px" },
-          { top:"4%",  left:"58%", size:"26px" },
-          { top:"89%", left:"22%", size:"30px" },
-          { top:"91%", left:"65%", size:"22px" },
+          { top: "2%", left: "16%", size: "34px" },
+          { top: "4%", left: "58%", size: "26px" },
+          { top: "89%", left: "22%", size: "30px" },
+          { top: "91%", left: "65%", size: "22px" },
         ].map((c, i) => (
-          <div key={i} style={{ position:"absolute", top:c.top, left:c.left, fontSize:c.size, opacity:0.65, pointerEvents:"none", userSelect:"none" }}>☁️</div>
+          <div key={i} style={{ position: "absolute", top: c.top, left: c.left, fontSize: c.size, opacity: 0.65, pointerEvents: "none", userSelect: "none" }}>☁️</div>
         ))}
-        <div style={{ position:"absolute", top:"7%",  left:"1%",  fontSize:"36px", opacity:0.7, pointerEvents:"none", transform:"rotate(-10deg)" }}>🌈</div>
-        <div style={{ position:"absolute", bottom:"5%", right:"2%", fontSize:"32px", opacity:0.7, pointerEvents:"none", transform:"rotate(30deg)" }}>🚀</div>
-        <div style={{ position:"absolute", top:"2%",  right:"8%", fontSize:"38px", opacity:0.75, pointerEvents:"none" }}>☀️</div>
-        <div style={{ position:"absolute", bottom:"5%", left:"2%", fontSize:"28px", opacity:0.65, pointerEvents:"none" }}>🔍</div>
+        <div style={{ position: "absolute", top: "7%", left: "1%", fontSize: "36px", opacity: 0.7, pointerEvents: "none", transform: "rotate(-10deg)" }}>🌈</div>
+        <div style={{ position: "absolute", bottom: "5%", right: "2%", fontSize: "32px", opacity: 0.7, pointerEvents: "none", transform: "rotate(30deg)" }}>🚀</div>
+        <div style={{ position: "absolute", top: "2%", right: "8%", fontSize: "38px", opacity: 0.75, pointerEvents: "none" }}>☀️</div>
+        <div style={{ position: "absolute", bottom: "5%", left: "2%", fontSize: "28px", opacity: 0.65, pointerEvents: "none" }}>🔍</div>
       </>)}
 
       {/* ── Modal card ── */}
@@ -545,23 +546,23 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
           borderBottom: "4px solid #FFD700",
         }}>
           {/* Dot decorations */}
-          {[0,1,2,3,4].map(i => (
-            <div key={i} style={{ position:"absolute", top: i%2===0?"5px":"auto", bottom:i%2!==0?"5px":"auto", left:`${10+i*18}%`, width:"7px", height:"7px", borderRadius:"50%", background:"rgba(255,255,255,0.18)", pointerEvents:"none" }} />
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} style={{ position: "absolute", top: i % 2 === 0 ? "5px" : "auto", bottom: i % 2 !== 0 ? "5px" : "auto", left: `${10 + i * 18}%`, width: "7px", height: "7px", borderRadius: "50%", background: "rgba(255,255,255,0.18)", pointerEvents: "none" }} />
           ))}
 
           {/* Icon badge */}
-          <div style={{ width:"50px", height:"50px", borderRadius:"50%", background:"linear-gradient(135deg,#FFD700,#FFB300)", border:"3px solid white", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"26px", flexShrink:0, boxShadow:"0 3px 10px rgba(0,0,0,0.2)" }}>
+          <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "linear-gradient(135deg,#FFD700,#FFB300)", border: "3px solid white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px", flexShrink: 0, boxShadow: "0 3px 10px rgba(0,0,0,0.2)" }}>
             {icon}
           </div>
 
           {/* Title */}
-          <div style={{ flex:1, overflow:"hidden" }}>
-            <div style={{ fontWeight:"900", fontSize:"15px", color:"white", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", textShadow:"0 1px 4px rgba(0,0,0,0.25)" }}>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <div style={{ fontWeight: "900", fontSize: "15px", color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 4px rgba(0,0,0,0.25)" }}>
               {title}
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:"6px", marginTop:"4px" }}>
-              <span style={{ fontSize:"10px", fontWeight:"800", color:"#001a4d", background:"#FFD700", padding:"2px 9px", borderRadius:"20px" }}>{label}</span>
-              <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.6)" }}>Esc to close</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: "800", color: "#001a4d", background: "#FFD700", padding: "2px 9px", borderRadius: "20px" }}>{label}</span>
+              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)" }}>Esc to close</span>
             </div>
           </div>
 
@@ -570,22 +571,22 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
             onClick={() => setIsLandscape(v => !v)}
             title={isLandscape ? "Switch to portrait view" : "Switch to landscape (wide) view"}
             style={{
-              display:"flex", alignItems:"center", gap:"5px",
-              padding:"8px 14px",
-              background:"rgba(255,255,255,0.15)",
-              border:"1.5px solid rgba(255,255,255,0.35)",
-              borderRadius:"50px",
-              color:"white", fontWeight:"700", fontSize:"12px",
-              cursor:"pointer", flexShrink:0,
-              transition:"background 0.15s",
+              display: "flex", alignItems: "center", gap: "5px",
+              padding: "8px 14px",
+              background: "rgba(255,255,255,0.15)",
+              border: "1.5px solid rgba(255,255,255,0.35)",
+              borderRadius: "50px",
+              color: "white", fontWeight: "700", fontSize: "12px",
+              cursor: "pointer", flexShrink: 0,
+              transition: "background 0.15s",
             }}
-            onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.28)"}
-            onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.15)"}
+            onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
+            onMouseOut={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
           >
             {isLandscape ? (
-              <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/></svg> Portrait</>
+              <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2" /></svg> Portrait</>
             ) : (
-              <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/></svg> Landscape</>
+              <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2" /></svg> Landscape</>
             )}
           </button>
 
@@ -593,22 +594,22 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
           <button
             onClick={() => window.open(url, "_blank")}
             style={{
-              display:"flex", alignItems:"center", gap:"6px",
-              padding:"9px 18px",
-              background:"linear-gradient(135deg,#FFD700,#FFB300)",
-              border:"2.5px solid white",
-              borderRadius:"50px",
-              color:"#002f76", fontWeight:"800", fontSize:"13px",
-              cursor:"pointer", flexShrink:0,
-              boxShadow:"0 3px 10px rgba(0,0,0,0.2)",
-              transition:"transform 0.1s, box-shadow 0.1s",
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "9px 18px",
+              background: "linear-gradient(135deg,#FFD700,#FFB300)",
+              border: "2.5px solid white",
+              borderRadius: "50px",
+              color: "#002f76", fontWeight: "800", fontSize: "13px",
+              cursor: "pointer", flexShrink: 0,
+              boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
+              transition: "transform 0.1s, box-shadow 0.1s",
             }}
-            onMouseOver={e => { e.currentTarget.style.transform="scale(1.05)"; e.currentTarget.style.boxShadow="0 5px 14px rgba(0,0,0,0.25)"; }}
-            onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 3px 10px rgba(0,0,0,0.2)"; }}
+            onMouseOver={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 5px 14px rgba(0,0,0,0.25)"; }}
+            onMouseOut={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.2)"; }}
             title="Open in new tab (Use this to edit/draw on iPad)"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
             </svg>
             Open to Edit
           </button>
@@ -617,20 +618,20 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
           {/* Close */}
           <button
             onClick={onClose}
-            style={{ width:"38px", height:"38px", borderRadius:"50%", background:"rgba(255,255,255,0.18)", border:"2px solid rgba(255,255,255,0.45)", color:"white", fontSize:"16px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontWeight:"700", transition:"all 0.15s" }}
-            onMouseOver={e => { e.currentTarget.style.background="#ef4444"; e.currentTarget.style.borderColor="#ef4444"; }}
-            onMouseOut={e => { e.currentTarget.style.background="rgba(255,255,255,0.18)"; e.currentTarget.style.borderColor="rgba(255,255,255,0.45)"; }}
+            style={{ width: "38px", height: "38px", borderRadius: "50%", background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.45)", color: "white", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: "700", transition: "all 0.15s" }}
+            onMouseOver={e => { e.currentTarget.style.background = "#ef4444"; e.currentTarget.style.borderColor = "#ef4444"; }}
+            onMouseOut={e => { e.currentTarget.style.background = "rgba(255,255,255,0.18)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.45)"; }}
             title="Close (Esc)"
           >✕</button>
         </div>
 
         {/* ── Viewer body ── */}
-        <div style={{ flex:1, overflow:"hidden", position:"relative", background: isOffice ? "linear-gradient(135deg,#f0f9ff,#e0f2fe)" : isPdf ? "#525659" : "linear-gradient(135deg,#f0f8ff,#e8f4ff)" }}>
+        <div style={{ flex: 1, overflow: "hidden", position: "relative", background: isOffice ? "linear-gradient(135deg,#f0f9ff,#e0f2fe)" : isPdf ? "#525659" : "linear-gradient(135deg,#f0f8ff,#e8f4ff)" }}>
 
           {/* ── IMAGE ── */}
           {isImage && (
-            <div style={{ width:"100%", height:"100%", overflow:"auto", display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
-              <img src={url} alt={title} style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:"16px", boxShadow:"0 8px 32px rgba(0,0,0,0.2), 0 0 0 3px #FFD700" }} />
+            <div style={{ width: "100%", height: "100%", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+              <img src={url} alt={title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 3px #FFD700" }} />
             </div>
           )}
 
@@ -639,7 +640,7 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
             <iframe
               key={`${url}-${isLandscape}`}
               src={url}
-              style={{ width:"100%", height:"100%", border:"none", display:"block" }}
+              style={{ width: "100%", height: "100%", border: "none", display: "block" }}
               title={title}
             />
           )}
@@ -647,68 +648,68 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
           {/* ── OFFICE (xlsx/docx/pptx) — external viewers can't reliably access B2
                presigned URLs, so show a kid-friendly download card ── */}
           {!isImage && !isPdf && isOffice && (
-            <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}>
-              <div style={{ textAlign:"center", maxWidth:"380px" }}>
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+              <div style={{ textAlign: "center", maxWidth: "380px" }}>
                 {/* Big bouncy file icon */}
-                <div style={{ fontSize:"80px", lineHeight:1, marginBottom:"16px", filter:"drop-shadow(0 8px 16px rgba(0,80,213,0.2))" }}>
+                <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px", filter: "drop-shadow(0 8px 16px rgba(0,80,213,0.2))" }}>
                   {icon}
                 </div>
-                <div style={{ fontWeight:"900", fontSize:"20px", color:"#002f76", marginBottom:"8px", letterSpacing:"-0.3px" }}>{title}</div>
-                <div style={{ fontSize:"13px", color:"#64748b", marginBottom:"28px", lineHeight:"1.6" }}>
+                <div style={{ fontWeight: "900", fontSize: "20px", color: "#002f76", marginBottom: "8px", letterSpacing: "-0.3px" }}>{title}</div>
+                <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "28px", lineHeight: "1.6" }}>
                   This file is ready to open in <strong>{label === "Spreadsheet" ? "Microsoft Excel or Google Sheets" : label === "Slides" ? "Microsoft PowerPoint or Google Slides" : "Microsoft Word or Google Docs"}</strong>.
-                  <br/>Download it below and open it with your app! 🎉
+                  <br />Download it below and open it with your app! 🎉
                 </div>
                 {/* Stars decoration */}
-                <div style={{ display:"flex", justifyContent:"center", gap:"8px", marginBottom:"20px", fontSize:"20px", opacity:0.6 }}>⭐🌟⭐</div>
+                <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "20px", fontSize: "20px", opacity: 0.6 }}>⭐🌟⭐</div>
                 {/* Big download button */}
                 <button
                   onClick={handleDownload}
                   style={{
-                    display:"inline-flex", alignItems:"center", gap:"10px",
-                    padding:"14px 32px",
-                    background:"linear-gradient(135deg,#FFD700,#FFB300)",
-                    border:"3px solid #002f76",
-                    borderRadius:"50px",
-                    color:"#002f76", fontWeight:"900", fontSize:"16px",
-                    cursor:"pointer",
-                    boxShadow:"0 6px 20px rgba(255,180,0,0.4)",
-                    transition:"transform 0.15s, box-shadow 0.15s",
+                    display: "inline-flex", alignItems: "center", gap: "10px",
+                    padding: "14px 32px",
+                    background: "linear-gradient(135deg,#FFD700,#FFB300)",
+                    border: "3px solid #002f76",
+                    borderRadius: "50px",
+                    color: "#002f76", fontWeight: "900", fontSize: "16px",
+                    cursor: "pointer",
+                    boxShadow: "0 6px 20px rgba(255,180,0,0.4)",
+                    transition: "transform 0.15s, box-shadow 0.15s",
                   }}
-                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.06)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(255,180,0,0.5)"; }}
-                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(255,180,0,0.4)"; }}
+                  onMouseOver={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(255,180,0,0.5)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(255,180,0,0.4)"; }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
                   Download to Open
                 </button>
-                <div style={{ marginTop:"14px", fontSize:"11px", color:"#94a3b8" }}>The file will download to your device 📥</div>
+                <div style={{ marginTop: "14px", fontSize: "11px", color: "#94a3b8" }}>The file will download to your device 📥</div>
               </div>
             </div>
           )}
 
           {/* ── OTHER — show download card (avoids spurious iframe downloads) ── */}
           {!isImage && !isPdf && !isOffice && (
-            <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}>
-              <div style={{ textAlign:"center", maxWidth:"380px" }}>
-                <div style={{ fontSize:"80px", lineHeight:1, marginBottom:"16px", filter:"drop-shadow(0 8px 16px rgba(0,80,213,0.2))" }}>{icon}</div>
-                <div style={{ fontWeight:"900", fontSize:"20px", color:"#002f76", marginBottom:"8px" }}>{title}</div>
-                <div style={{ fontSize:"13px", color:"#64748b", marginBottom:"28px", lineHeight:"1.6" }}>
-                  This file can’t be previewed in the browser.<br/>Download it to open it on your device! 🎉
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+              <div style={{ textAlign: "center", maxWidth: "380px" }}>
+                <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px", filter: "drop-shadow(0 8px 16px rgba(0,80,213,0.2))" }}>{icon}</div>
+                <div style={{ fontWeight: "900", fontSize: "20px", color: "#002f76", marginBottom: "8px" }}>{title}</div>
+                <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "28px", lineHeight: "1.6" }}>
+                  This file can’t be previewed in the browser.<br />Download it to open it on your device! 🎉
                 </div>
-                <div style={{ display:"flex", justifyContent:"center", gap:"8px", marginBottom:"20px", fontSize:"20px", opacity:0.6 }}>⭐🌟⭐</div>
+                <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "20px", fontSize: "20px", opacity: 0.6 }}>⭐🌟⭐</div>
                 <button
                   onClick={handleDownload}
-                  style={{ display:"inline-flex", alignItems:"center", gap:"10px", padding:"14px 32px", background:"linear-gradient(135deg,#FFD700,#FFB300)", border:"3px solid #002f76", borderRadius:"50px", color:"#002f76", fontWeight:"900", fontSize:"16px", cursor:"pointer", boxShadow:"0 6px 20px rgba(255,180,0,0.4)", transition:"transform 0.15s, box-shadow 0.15s" }}
-                  onMouseOver={e => { e.currentTarget.style.transform="scale(1.06)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(255,180,0,0.5)"; }}
-                  onMouseOut={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(255,180,0,0.4)"; }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "10px", padding: "14px 32px", background: "linear-gradient(135deg,#FFD700,#FFB300)", border: "3px solid #002f76", borderRadius: "50px", color: "#002f76", fontWeight: "900", fontSize: "16px", cursor: "pointer", boxShadow: "0 6px 20px rgba(255,180,0,0.4)", transition: "transform 0.15s, box-shadow 0.15s" }}
+                  onMouseOver={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(255,180,0,0.5)"; }}
+                  onMouseOut={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(255,180,0,0.4)"; }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
                   Download to Open
                 </button>
-                <div style={{ marginTop:"14px", fontSize:"11px", color:"#94a3b8" }}>The file will download to your device 📥</div>
+                <div style={{ marginTop: "14px", fontSize: "11px", color: "#94a3b8" }}>The file will download to your device 📥</div>
               </div>
             </div>
           )}
@@ -762,6 +763,47 @@ function NextSessionCountdown({ schedule, classTime }: { schedule: string; class
           <div style={{ fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.6)", marginTop: "4px" }}>{label}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── WaiverAgreementText (read-only, reused in VirtualDashboard) ────────────────
+
+function WaiverAgreementText() {
+  return (
+    <div className="waiver-ro">
+      <style>{`
+        .waiver-ro h3 { color: #0050d5; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; margin: 18px 0 6px; }
+        .waiver-ro p { margin: 0 0 10px; }
+        .waiver-ro ul { margin: 0 0 10px; padding-left: 20px; }
+        .waiver-ro li { margin-bottom: 4px; }
+      `}</style>
+      <p style={{ fontWeight: "800", color: "#002f76", fontSize: "14px", marginBottom: "12px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT &amp; AGREEMENT</p>
+      <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
+      <h3>1. ADVENTURE / CYCLE</h3>
+      <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
+      <h3>2. PROGRAMS</h3>
+      <p style={{ fontWeight: "700" }}>Discovery Club — Discover Through Play</p>
+      <ul>
+        <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
+        <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
+        <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
+      </ul>
+      <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building.</p>
+      <p style={{ fontWeight: "700" }}>💡 Trailblazer: Brave Explorer — Prepare for What&apos;s Next</p>
+      <ul><li>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</li></ul>
+      <h3>3. REGISTRATION, PAYMENTS &amp; PENALTIES</h3>
+      <p>60% non-refundable reservation fee upon registration. 40% balance due on or before the 6th session. 4% weekly interest on overdue balances. Accepted payments: Cash, GCash, BDO Bank Transfer, Credit/Debit Card (via GCash QR).</p>
+      <h3>4. ATTENDANCE, ABSENCES &amp; MAKE-UP SESSIONS</h3>
+      <p>Make-up sessions are subject to availability and must be completed within the current Adventure. Unused make-ups do not carry over. Merry Explorers may reschedule classes due to force majeure with a complimentary make-up session.</p>
+      <h3>5. PHOTO &amp; VIDEO HIGHLIGHTS</h3>
+      <p>Photos/videos are shared privately and deleted 30 days after sharing. If you do not consent, notify us in writing before the first session.</p>
+      <h3>6. UNIFORM POLICY</h3>
+      <p>The Merry Explorers uniform is the SAME uniform across chapters. Uniform Days: Wednesday &amp; Friday. Welcome Kit (₱750) and Lanyard &amp; Name Tag (₱200) available separately.</p>
+      <div style={{ background: "#f0f5ff", border: "1.5px solid #c5d6ff", borderRadius: "10px", padding: "16px", marginTop: "16px" }}>
+        <p style={{ fontWeight: "800", color: "#002f76", fontSize: "13px", marginBottom: "6px" }}>PARENT/GUARDIAN ACKNOWLEDGMENT</p>
+        <p style={{ margin: 0 }}>I confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement. By signing, I voluntarily acknowledge, accept, and agree to be bound by these terms as part of my child&apos;s registration with Merry Explorers Playgroup Learning Center.</p>
+      </div>
     </div>
   );
 }
@@ -858,6 +900,38 @@ export default function ParentDashboardPage() {
     toastTimer.current = setTimeout(() => setToast(null), 4000);
   }
 
+  // ─── openFile (shared by FOLDER tab and VirtualDashboard) ──────────────────
+  async function openFile(m: any) {
+    // External links (YouTube etc.) — open in new tab
+    if (m.type === "link" || m.url) {
+      window.open(m.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (loadingFileId === m.id) return; // prevent double-click
+    setLoadingFileId(m.id);
+    try {
+      const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(profile?.id ?? "")}&materialId=${encodeURIComponent(m.id)}`);
+      const data = await res.json();
+      if (data.success && data.url) {
+        setFileViewer({
+          title: m.title || "File",
+          url: data.url,
+          contentType: m.contentType || "application/octet-stream",
+          uid: profile?.id ?? "",
+          materialId: m.id,
+          fileKey: m.key,
+          submission: m.submission,
+        });
+      } else {
+        alert(data.error || "Could not open file.");
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setLoadingFileId(null);
+    }
+  }
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -880,7 +954,7 @@ export default function ParentDashboardPage() {
     fetch(`/api/parents/session-payment?uid=${user.uid}`)
       .then(r => r.json())
       .then(d => { if (d.success) setSessionPayments(d.payments); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setPaymentsLoading(false));
   }, [user, authLoading, router]);
 
@@ -948,8 +1022,8 @@ export default function ParentDashboardPage() {
   const recentAlbum = profile.albums[0] ?? null;
   const waiverSigned = !!profile.waiverSignature;
   const isTrailblazer = isTrailblazerProfile(profile);
-  const isVirtualSession = 
-    profile.program === "virtual-session" || 
+  const isVirtualSession =
+    profile.program === "virtual-session" ||
     profile.program === "Virtual Tutorial" ||
     profile.studentInfo?.program === "virtual-session" ||
     profile.studentInfo?.program === "Virtual Tutorial";
@@ -961,7 +1035,7 @@ export default function ParentDashboardPage() {
     childFavorites?.favoriteCharacter
   );
   const hasCompletedSurvey = Boolean(
-    (profile as any).hasCompletedVirtualSurvey || 
+    (profile as any).hasCompletedVirtualSurvey ||
     hasAnsweredFavorites
   );
 
@@ -976,6 +1050,43 @@ export default function ParentDashboardPage() {
         }}
         showToast={showToast}
       />
+    );
+  }
+
+  // ─── Virtual Tutorial parents get the new VirtualDashboard UI ─────────────
+  if (isVirtualSession) {
+    return (
+      <>
+        <VirtualDashboard
+          profile={profile}
+          setProfile={(fn) => setProfile((p) => (p ? fn(p) : p))}
+          user={user}
+          signOut={signOut}
+          showToast={showToast}
+          toast={toast}
+          clearToast={() => setToast(null)}
+          allRenewalPrograms={allRenewalPrograms}
+          sessionPayments={sessionPayments}
+          setSessionPayments={setSessionPayments}
+          paymentsLoading={paymentsLoading}
+          onChangePassword={() => setShowPasswordModal(true)}
+          onEditFavorites={() => setShowEditSurveyModal(true)}
+          onOpenMaterial={openFile}
+          loadingFileId={loadingFileId}
+          agreement={<WaiverAgreementText />}
+        />
+        {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
+        {fileViewer && <FileViewerModal viewer={fileViewer} onClose={() => setFileViewer(null)} />}
+        {showEditSurveyModal && (
+          <VirtualOnboardingModal
+            profile={profile}
+            isGateMode={false}
+            onClose={() => setShowEditSurveyModal(false)}
+            onSave={(d) => setProfile((p) => (p ? { ...p, ...d } : p))}
+            showToast={showToast}
+          />
+        )}
+      </>
     );
   }
 
@@ -998,8 +1109,8 @@ export default function ParentDashboardPage() {
   // ─── Toast UI ──────────────────────────────────────────────────────────────
   const toastColors = {
     success: { bg: "#f0fdf4", border: "#86efac", icon: "✅", text: "#15803d" },
-    error:   { bg: "#fef2f2", border: "#fca5a5", icon: "❌", text: "#b91c1c" },
-    info:    { bg: "#eff6ff", border: "#93c5fd", icon: "ℹ️", text: "#1d4ed8" },
+    error: { bg: "#fef2f2", border: "#fca5a5", icon: "❌", text: "#b91c1c" },
+    info: { bg: "#eff6ff", border: "#93c5fd", icon: "ℹ️", text: "#1d4ed8" },
   };
   const tc = toast ? toastColors[toast.type] : null;
 
@@ -1669,40 +1780,7 @@ export default function ParentDashboardPage() {
               <div style={{ border: "1px solid #e8efff", borderRadius: "14px", overflow: "hidden" }}>
                 <div style={{ background: "#f8faff", padding: "10px 16px", borderBottom: "1px solid #e8efff", fontSize: "12px", fontWeight: "700", color: "#64748b" }}>Read-only — for your reference</div>
                 <div style={{ padding: "20px 24px", fontSize: "13px", color: "#334155", lineHeight: 1.75, maxHeight: "400px", overflowY: "auto" }}>
-                  <style>{`
-                    .waiver-ro h3 { color: #0050d5; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; margin: 18px 0 6px; }
-                    .waiver-ro p { margin: 0 0 10px; }
-                    .waiver-ro ul { margin: 0 0 10px; padding-left: 20px; }
-                    .waiver-ro li { margin-bottom: 4px; }
-                  `}</style>
-                  <div className="waiver-ro">
-                    <p style={{ fontWeight: "800", color: "#002f76", fontSize: "14px", marginBottom: "12px" }}>MERRY EXPLORERS PLAYGROUP LEARNING CENTER<br />PARENT/GUARDIAN ACKNOWLEDGMENT &amp; AGREEMENT</p>
-                    <p>By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
-                    <h3>1. ADVENTURE / CYCLE</h3>
-                    <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program. An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
-                    <h3>2. PROGRAMS</h3>
-                    <p style={{ fontWeight: "700" }}>Discovery Club — Discover Through Play</p>
-                    <ul>
-                      <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
-                      <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
-                      <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
-                    </ul>
-                    <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building.</p>
-                    <p style={{ fontWeight: "700" }}>💡 Trailblazer: Brave Explorer — Prepare for What&apos;s Next</p>
-                    <ul><li>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</li></ul>
-                    <h3>3. REGISTRATION, PAYMENTS &amp; PENALTIES</h3>
-                    <p>60% non-refundable reservation fee upon registration. 40% balance due on or before the 6th session. 4% weekly interest on overdue balances. Accepted payments: Cash, GCash, BDO Bank Transfer, Credit/Debit Card (via GCash QR).</p>
-                    <h3>4. ATTENDANCE, ABSENCES &amp; MAKE-UP SESSIONS</h3>
-                    <p>Make-up sessions are subject to availability and must be completed within the current Adventure. Unused make-ups do not carry over. Merry Explorers may reschedule classes due to force majeure with a complimentary make-up session.</p>
-                    <h3>5. PHOTO &amp; VIDEO HIGHLIGHTS</h3>
-                    <p>Photos/videos are shared privately and deleted 30 days after sharing. If you do not consent, notify us in writing before the first session.</p>
-                    <h3>6. UNIFORM POLICY</h3>
-                    <p>The Merry Explorers uniform is the SAME uniform across chapters. Uniform Days: Wednesday &amp; Friday. Welcome Kit (₱750) and Lanyard &amp; Name Tag (₱200) available separately.</p>
-                    <div style={{ background: "#f0f5ff", border: "1.5px solid #c5d6ff", borderRadius: "10px", padding: "16px", marginTop: "16px" }}>
-                      <p style={{ fontWeight: "800", color: "#002f76", fontSize: "13px", marginBottom: "6px" }}>PARENT/GUARDIAN ACKNOWLEDGMENT</p>
-                      <p style={{ margin: 0 }}>I confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement. By signing, I voluntarily acknowledge, accept, and agree to be bound by these terms as part of my child&apos;s registration with Merry Explorers Playgroup Learning Center.</p>
-                    </div>
-                  </div>
+                  <WaiverAgreementText />
                 </div>
               </div>
 
@@ -1926,36 +2004,7 @@ export default function ParentDashboardPage() {
             const links = (profile.studyMaterials || []).filter((m: any) => m.type === "link");
             const files = (profile.studyMaterials || []).filter((m: any) => m.type === "file");
 
-            async function openFile(m: any) {
-              // External links (YouTube etc.) — open in new tab as before
-              if (m.type === "link" || m.url) {
-                window.open(m.url, "_blank", "noopener,noreferrer");
-                return;
-              }
-              if (loadingFileId === m.id) return; // prevent double-click
-              setLoadingFileId(m.id);
-              try {
-                const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(profile?.id ?? "")}&materialId=${encodeURIComponent(m.id)}`);
-                const data = await res.json();
-                if (data.success && data.url) {
-                  setFileViewer({
-                    title: m.title || "File",
-                    url: data.url,
-                    contentType: m.contentType || "application/octet-stream",
-                    uid: profile?.id ?? "",
-                    materialId: m.id,
-                    fileKey: m.key,
-                    submission: m.submission,
-                  });
-                } else {
-                  alert(data.error || "Could not open file.");
-                }
-              } catch {
-                alert("Network error. Please try again.");
-              } finally {
-                setLoadingFileId(null);
-              }
-            }
+            // openFile is defined at component level
 
             return (
               <div style={{ background: "white", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)" }}>
@@ -2094,7 +2143,7 @@ export default function ParentDashboardPage() {
                                   <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: isLoading ? "linear-gradient(135deg,#60a5fa,#818cf8)" : "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>
                                     {isLoading ? (
                                       <svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                                       </svg>
                                     ) : "📄"}
                                   </div>
@@ -2143,7 +2192,7 @@ export default function ParentDashboardPage() {
                                     }}
                                   >
                                     {isUploading ? (
-                                      <><svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Uploading…</>
+                                      <><svg style={{ animation: "me-spin 0.7s linear infinite" }} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg> Uploading…</>
                                     ) : hasSubmission ? (
                                       <>🔄 Re-submit</>
                                     ) : (
@@ -2292,7 +2341,7 @@ export default function ParentDashboardPage() {
                   <div className="mt-5 border-t border-slate-100 pt-5">
                     <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", color: "#0033A0", opacity: 0.6, marginBottom: "6px" }}>Reference Number</label>
                     <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76", marginBottom: "16px" }} value={dpReferenceNumber} onChange={(e) => setDpReferenceNumber(e.target.value)} placeholder="e.g. 10000000000" />
-                    
+
                     <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", color: "#0033A0", opacity: 0.6, marginBottom: "6px" }}>Amount Sent</label>
                     <input style={{ width: "100%", background: "#f8fafc", border: "2px solid transparent", borderRadius: "16px", padding: "14px", fontSize: "14px", fontWeight: "600", color: "#002f76" }} value={dpAmountPaid} onChange={(e) => setDpAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 450" />
                   </div>
@@ -3138,10 +3187,10 @@ function ProfileTab({ profile, user, showToast, isVirtualTutorial }: { profile: 
               </div>
             </div>
             {!isVirtualTutorial && (
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Health Notes & Allergies</label>
-              <textarea disabled={!isEditing} value={formData.healthProfile} onChange={e => setFormData({ ...formData, healthProfile: e.target.value })} placeholder="Any allergies or health conditions?" rows={3} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", resize: "none", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
-            </div>
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Health Notes & Allergies</label>
+                <textarea disabled={!isEditing} value={formData.healthProfile} onChange={e => setFormData({ ...formData, healthProfile: e.target.value })} placeholder="Any allergies or health conditions?" rows={3} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", resize: "none", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              </div>
             )}
           </div>
         </div>
@@ -3177,30 +3226,30 @@ function ProfileTab({ profile, user, showToast, isVirtualTutorial }: { profile: 
 
           {/* Emergency Contact Card — hidden for Virtual Tutorial */}
           {!isVirtualTutorial && (
-          <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-              <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#fee2e2,#fca5a5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>🚨</div>
-              <div>
-                <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Emergency Contact</div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>In case we can&apos;t reach you</div>
+            <div style={{ background: "white", borderRadius: "20px", padding: "28px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.07)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg,#fee2e2,#fca5a5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>🚨</div>
+                <div>
+                  <div style={{ fontSize: "16px", fontWeight: "800", color: "#002f76" }}>Emergency Contact</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>In case we can&apos;t reach you</div>
+                </div>
               </div>
-            </div>
 
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Full Name</label>
-              <input disabled={!isEditing} type="text" value={formData.emName} onChange={e => setFormData({ ...formData, emName: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Relationship</label>
-                <input disabled={!isEditing} type="text" value={formData.emRelationship} onChange={e => setFormData({ ...formData, emRelationship: e.target.value })} placeholder="e.g. Aunt" style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Full Name</label>
+                <input disabled={!isEditing} type="text" value={formData.emName} onChange={e => setFormData({ ...formData, emName: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
               </div>
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Phone Number</label>
-                <input disabled={!isEditing} type="text" value={formData.emPhone} onChange={e => setFormData({ ...formData, emPhone: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Relationship</label>
+                  <input disabled={!isEditing} type="text" value={formData.emRelationship} onChange={e => setFormData({ ...formData, emRelationship: e.target.value })} placeholder="e.g. Aunt" style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>Phone Number</label>
+                  <input disabled={!isEditing} type="text" value={formData.emPhone} onChange={e => setFormData({ ...formData, emPhone: e.target.value })} style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #e2e8f0", fontSize: "14px", color: isEditing ? "#0f172a" : "#64748b", background: isEditing ? "white" : "#f8fafc", boxSizing: "border-box", transition: "border 0.2s" }} onFocus={e => e.target.style.borderColor = "#ef4444"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+                </div>
               </div>
             </div>
-          </div>
           )}
 
         </div>
