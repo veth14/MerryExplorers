@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +19,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "uid and signature are required" }, { status: 400 });
     }
 
+    let signatureUrl = signature;
+    if (signature.startsWith("data:image")) {
+      const uploadRes = await cloudinary.uploader.upload(signature, {
+        folder: "merry_explorers_waivers",
+      });
+      signatureUrl = uploadRes.secure_url;
+    }
+
     const { db } = await connectToDatabase();
 
     const result = await db.collection("accounts").updateOne(
       { _id: uid as any },
       {
         $set: {
-          waiverSignature: signature,
+          waiverSignature: signatureUrl,
           waiverSignedAt: new Date(),
           photoConsent: photoConsent !== undefined ? photoConsent : true,
         },
