@@ -2,44 +2,105 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { Fredoka } from "next/font/google";
 import { useAuth } from "@/lib/auth-context";
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-function MailIcon() {
+// Palette taken from the Merry Explorers post
+const SKY = "#8fd3f7";
+const NAVY = "#0b2a82";
+const BLUE = "#1f7ae0";
+const SUN = "#ffd23f";
+const ORANGE = "#ff8a1f";
+
+// ─── Form icons ───────────────────────────────────────────────────────────────
+
+const iconProps = {
+  width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+  strokeWidth: 2.2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true,
+};
+const MailIcon = () => (<svg {...iconProps}><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>);
+const LockIcon = () => (<svg {...iconProps}><rect width="18" height="11" x="3" y="11" rx="3" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>);
+const EyeIcon = () => (<svg {...iconProps}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>);
+const EyeOffIcon = () => (<svg {...iconProps}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></svg>);
+
+// ─── Sticker decorations ──────────────────────────────────────────────────────
+
+function Cloud({ w = 160 }: { w?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    <svg width={w} viewBox="0 0 160 90" aria-hidden="true">
+      <g fill="#fff" stroke="#fff" strokeWidth="8" strokeLinejoin="round">
+        <circle cx="45" cy="55" r="26" /><circle cx="80" cy="38" r="32" />
+        <circle cx="116" cy="55" r="26" /><rect x="45" y="55" width="72" height="26" />
+      </g>
+      <g fill="#fff" stroke="#c9e8fb" strokeWidth="2.5">
+        <circle cx="45" cy="55" r="26" /><circle cx="80" cy="38" r="32" />
+        <circle cx="116" cy="55" r="26" />
+      </g>
+      <rect x="40" y="52" width="82" height="30" fill="#fff" />
     </svg>
   );
 }
 
-function LockIcon() {
+function Rainbow({ w = 230 }: { w?: number }) {
+  const bands = ["#ef4444", "#ff9a1f", "#ffd23f", "#4cc35b", "#2f8bf0", "#7c4dcc"];
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    <svg width={w} viewBox="0 0 200 110" aria-hidden="true">
+      <path d="M12 104 A88 88 0 0 1 188 104" fill="none" stroke="#fff" strokeWidth="64" strokeLinecap="round" />
+      {bands.map((c, i) => (
+        <path key={c} d={`M${14 + i * 9} 104 A${86 - i * 9} ${86 - i * 9} 0 0 1 ${186 - i * 9} 104`} fill="none" stroke={c} strokeWidth="9.5" />
+      ))}
     </svg>
   );
 }
 
-function EyeIcon() {
+function Star({ s = 40, rot = 0 }: { s?: number; rot?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
+    <svg width={s} height={s} viewBox="0 0 24 24" style={{ transform: `rotate(${rot}deg)` }} aria-hidden="true">
+      <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" fill={SUN} stroke="#fff" strokeWidth="2.6" strokeLinejoin="round" paintOrder="stroke" />
     </svg>
   );
 }
 
-function EyeOffIcon() {
+function Sun({ s = 150 }: { s?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-      <line x1="2" x2="22" y1="2" y2="22" />
+    <svg width={s} height={s} viewBox="0 0 120 120" aria-hidden="true">
+      <g className="me-spin" style={{ transformOrigin: "60px 60px" }} stroke={SUN} strokeWidth="9" strokeLinecap="round">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <line key={i} x1="60" y1="8" x2="60" y2="20" transform={`rotate(${i * 30} 60 60)`} />
+        ))}
+      </g>
+      <circle cx="60" cy="60" r="31" fill="#ffe27a" stroke="#f6b91c" strokeWidth="4" />
+      <circle cx="49" cy="55" r="3.2" fill={NAVY} /><circle cx="71" cy="55" r="3.2" fill={NAVY} />
+      <circle cx="42" cy="66" r="5" fill="#ffa8a8" opacity=".7" /><circle cx="78" cy="66" r="5" fill="#ffa8a8" opacity=".7" />
+      <path d="M50 67 Q60 78 70 67" fill="none" stroke={NAVY} strokeWidth="3.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Plane({ w = 90 }: { w?: number }) {
+  return (
+    <svg width={w} viewBox="0 0 100 80" aria-hidden="true">
+      <path d="M6 36 L94 6 L66 74 L50 46 Z" fill="#e8f5ff" stroke="#fff" strokeWidth="8" strokeLinejoin="round" />
+      <path d="M6 36 L94 6 L66 74 L50 46 Z" fill="#e8f5ff" stroke={BLUE} strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M94 6 L50 46 L56 62 Z" fill="#9fd0f5" stroke={BLUE} strokeWidth="3.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Rocket({ s = 110 }: { s?: number }) {
+  return (
+    <svg width={s} height={s} viewBox="0 0 100 100" aria-hidden="true">
+      <g transform="rotate(40 50 50)" strokeLinejoin="round">
+        <path d="M50 4 C70 20 72 52 66 72 H34 C28 52 30 20 50 4Z" fill="#fff" stroke="#fff" strokeWidth="9" />
+        <path d="M34 50 L16 70 L18 42 Z M66 50 L84 70 L82 42 Z" fill="#e53935" stroke="#fff" strokeWidth="6" />
+        <path d="M50 4 C70 20 72 52 66 72 H34 C28 52 30 20 50 4Z" fill="#fff" stroke={NAVY} strokeWidth="3" />
+        <path d="M50 4 C58 10 63 18 65 26 H35 C37 18 42 10 50 4Z" fill="#e53935" />
+        <circle cx="50" cy="44" r="9" fill="#7fd0ff" stroke={NAVY} strokeWidth="3" />
+        <path d="M40 74 Q50 98 60 74Z" fill={SUN} stroke={ORANGE} strokeWidth="3" />
+      </g>
     </svg>
   );
 }
@@ -78,245 +139,295 @@ export default function ParentLoginPage() {
   return (
     <main
       id="parent-login-page"
-      className="flex min-h-screen w-full items-center justify-center px-4 py-10"
-      style={{
-        background: "linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 40%, #fdf4ff 100%)",
-        fontFamily: "'Plus Jakarta Sans', 'Segoe UI', sans-serif",
-      }}
+      className={`${fredoka.className} me-page`}
     >
-      {/* Background decorative blobs */}
-      <div aria-hidden="true" style={{ position: "fixed", top: "-100px", right: "-100px", width: "400px", height: "400px", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,80,213,0.10) 0%, transparent 70%)", pointerEvents: "none" }} />
-      <div aria-hidden="true" style={{ position: "fixed", bottom: "-80px", left: "-80px", width: "350px", height: "350px", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,193,7,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+      {/* Animated background */}
+      <div className="me-decor" aria-hidden="true">
+        {/* Sun + rainbow bob gently */}
+        <div className="me-pos me-bob" style={{ top: 10, left: 10 }}><Rainbow w={230} /></div>
+        <div className="me-pos me-bob" style={{ top: 14, right: 18, animationDelay: "-2s" }}><Sun s={150} /></div>
 
-      <div className="w-full max-w-md">
+        {/* Clouds sail across the whole screen at different heights and speeds */}
+        <div className="me-pos me-cross" style={{ top: "10%", animationDuration: "55s", animationDelay: "-12s" }}><Cloud w={170} /></div>
+        <div className="me-pos me-cross" style={{ top: "30%", animationDuration: "75s", animationDelay: "-48s" }}><Cloud w={120} /></div>
+        <div className="me-pos me-cross" style={{ top: "52%", animationDuration: "65s", animationDelay: "-30s" }}><Cloud w={150} /></div>
+        <div className="me-pos me-cross" style={{ top: "70%", animationDuration: "90s", animationDelay: "-70s" }}><Cloud w={110} /></div>
 
-        {/* Card */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.90)",
-            backdropFilter: "blur(20px)",
-            borderRadius: "28px",
-            boxShadow: "0 24px 80px -10px rgba(0,47,118,0.18), 0 0 0 1px rgba(0,47,118,0.06)",
-            overflow: "hidden",
-          }}
-        >
-          {/* Top accent bar */}
-          <div style={{ background: "linear-gradient(90deg, #002f76 0%, #0050d5 50%, #4a90d9 100%)", height: "5px" }} />
+        {/* Twinkling stars */}
+        <div className="me-pos me-twinkle" style={{ top: 120, left: "24%" }}><Star s={36} rot={-12} /></div>
+        <div className="me-pos me-twinkle" style={{ top: "55%", left: "6%", animationDelay: "-1s" }}><Star s={44} rot={10} /></div>
+        <div className="me-pos me-twinkle" style={{ bottom: 170, right: "8%", animationDelay: "-2s" }}><Star s={40} rot={14} /></div>
+        <div className="me-pos me-twinkle" style={{ top: "22%", right: "26%", animationDelay: "-.5s" }}><Star s={28} rot={-6} /></div>
 
-          {/* Header */}
-          <div className="flex flex-col items-center px-8 pt-10 pb-6">
-            <div
-              style={{
-                width: "76px",
-                height: "76px",
-                borderRadius: "50%",
-                overflow: "hidden",
-                background: "#f0f5ff",
-                boxShadow: "0 8px 24px rgba(0,47,118,0.18)",
-                border: "3px solid white",
-                position: "relative",
-                marginBottom: "16px",
-              }}
-            >
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers" fill className="object-contain p-1.5" />
-            </div>
-            <h1
-              style={{
-                fontSize: "24px",
-                fontWeight: "800",
-                color: "#002f76",
-                margin: "0 0 6px",
-                letterSpacing: "-0.4px",
-                textAlign: "center",
-              }}
-            >
-              Parent Portal
-            </h1>
-            <p style={{ fontSize: "14px", color: "#64748b", fontWeight: "500", margin: 0, textAlign: "center" }}>
-              Sign in to follow your child's adventure at Merry Explorers
-            </p>
-          </div>
+        {/* Colourful bubbles float up */}
+        {[
+          { l: "8%", c: "#fff", s: 14, d: 11, t: 0 },
+          { l: "18%", c: SUN, s: 10, d: 14, t: -5 },
+          { l: "32%", c: "#fff", s: 18, d: 13, t: -9 },
+          { l: "47%", c: "#ff9ec4", s: 12, d: 16, t: -3 },
+          { l: "61%", c: "#fff", s: 16, d: 12, t: -7 },
+          { l: "74%", c: SUN, s: 12, d: 15, t: -11 },
+          { l: "86%", c: "#fff", s: 20, d: 17, t: -2 },
+          { l: "94%", c: "#b7f0c2", s: 12, d: 13, t: -8 },
+        ].map((b, i) => (
+          <span
+            key={i}
+            className="me-bubble"
+            style={{ left: b.l, width: b.s, height: b.s, background: b.c, animationDuration: `${b.d}s`, animationDelay: `${b.t}s` }}
+          />
+        ))}
 
-          {/* Form */}
-          <div className="px-8 pb-8">
-            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        {/* Flyers */}
+        <div className="me-pos me-plane"><Plane w={80} /></div>
+        <div className="me-pos me-rocket"><Rocket s={110} /></div>
 
-              {/* Email */}
-              <div>
-                <label htmlFor="parent-email" style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "6px" }}>
-                  Email Address
-                </label>
-                <div style={{ position: "relative" }}>
-                  <span style={{ position: "absolute", inset: "0 auto 0 0", display: "flex", alignItems: "center", paddingLeft: "14px", color: "#94a3b8", pointerEvents: "none" }}>
-                    <MailIcon />
-                  </span>
-                  <input
-                    id="parent-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px 12px 44px",
-                      border: "1.5px solid #dde5f0",
-                      borderRadius: "12px",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      color: "#1e3a6e",
-                      background: "#f8faff",
-                      outline: "none",
-                      transition: "border-color 0.2s, box-shadow 0.2s",
-                      boxSizing: "border-box",
-                    }}
-                    onFocus={(e) => { e.target.style.borderColor = "#0050d5"; e.target.style.boxShadow = "0 0 0 3px rgba(0,80,213,0.12)"; }}
-                    onBlur={(e) => { e.target.style.borderColor = "#dde5f0"; e.target.style.boxShadow = "none"; }}
-                  />
-                </div>
-              </div>
+        {/* Bottom cloud bank sways */}
+        <div className="me-pos me-sway" style={{ bottom: 0, left: -20, right: -20, display: "flex", justifyContent: "space-around" }}>
+          <Cloud w={190} /><Cloud w={230} /><Cloud w={180} /><Cloud w={220} />
+        </div>
+      </div>
 
-              {/* Password */}
-              <div>
-                <label htmlFor="parent-password" style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e3a6e", marginBottom: "6px" }}>
-                  Password
-                </label>
-                <div style={{ position: "relative" }}>
-                  <span style={{ position: "absolute", inset: "0 auto 0 0", display: "flex", alignItems: "center", paddingLeft: "14px", color: "#94a3b8", pointerEvents: "none" }}>
-                    <LockIcon />
-                  </span>
-                  <input
-                    id="parent-password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      padding: "12px 44px 12px 44px",
-                      border: "1.5px solid #dde5f0",
-                      borderRadius: "12px",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      color: "#1e3a6e",
-                      background: "#f8faff",
-                      outline: "none",
-                      transition: "border-color 0.2s, box-shadow 0.2s",
-                      boxSizing: "border-box",
-                    }}
-                    onFocus={(e) => { e.target.style.borderColor = "#0050d5"; e.target.style.boxShadow = "0 0 0 3px rgba(0,80,213,0.12)"; }}
-                    onBlur={(e) => { e.target.style.borderColor = "#dde5f0"; e.target.style.boxShadow = "none"; }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    style={{ position: "absolute", inset: "0 0 0 auto", display: "flex", alignItems: "center", paddingRight: "14px", color: "#94a3b8", background: "none", border: "none", cursor: "pointer" }}
-                  >
-                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Remember me */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <input
-                  id="parent-remember"
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  disabled={loading}
-                  style={{ width: "16px", height: "16px", accentColor: "#0050d5", cursor: "pointer" }}
-                />
-                <label htmlFor="parent-remember" style={{ fontSize: "13px", fontWeight: "500", color: "#64748b", cursor: "pointer", userSelect: "none" }}>
-                  Remember me for 30 days
-                </label>
-              </div>
-
-              {/* Error */}
-              {error && (
-                <div
-                  role="alert"
-                  style={{
-                    background: "rgba(186,26,26,0.06)",
-                    border: "1.5px solid rgba(186,26,26,0.20)",
-                    borderRadius: "10px",
-                    padding: "10px 14px",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    color: "#ba1a1a",
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              {/* Submit */}
-              <button
-                id="parent-signin-btn"
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: loading ? "#7ba3e0" : "linear-gradient(135deg, #002f76 0%, #0050d5 100%)",
-                  color: "white",
-                  fontWeight: "800",
-                  fontSize: "15px",
-                  border: "none",
-                  borderRadius: "12px",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: loading ? "none" : "0 6px 20px rgba(0,47,118,0.30)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  transition: "all 0.2s",
-                }}
-              >
-                {loading ? (
-                  <>
-                    <span
-                      style={{
-                        width: "18px",
-                        height: "18px",
-                        borderRadius: "50%",
-                        border: "2.5px solid rgba(255,255,255,0.3)",
-                        borderTopColor: "white",
-                        animation: "spin 0.7s linear infinite",
-                        display: "inline-block",
-                      }}
-                    />
-                    Signing in…
-                  </>
-                ) : (
-                  "Sign In to Portal"
-                )}
-              </button>
-
-            </form>
-
-            {/* Footer note */}
-            <p style={{ marginTop: "24px", textAlign: "center", fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>
-              Need help?{" "}
-              <a href="mailto:merryexplorerscenter@gmail.com" style={{ color: "#0050d5", fontWeight: "700", textDecoration: "none" }}>
-                Contact our team
-              </a>
-            </p>
-          </div>
+      <div className="me-wrap">
+        {/* Logo sticker */}
+        <div className="me-logo">
+          <Image src="/LOGO-noBG.png" alt="Merry Explorers" fill className="object-contain" style={{ padding: 6 }} />
         </div>
 
-        {/* Bottom note */}
-        <p style={{ marginTop: "20px", textAlign: "center", fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>
-          © {new Date().getFullYear()} Merry Explorers · Secure Parent Portal
-        </p>
+        {/* Card — styled like the taped photo frames in the post */}
+        <div className="me-card">
+          <div className="me-tape" aria-hidden="true" />
+
+          <h1 className="me-title">Parent Portal</h1>
+          <p className="me-sub">Sign in to follow your child&apos;s adventure at Merry Explorers</p>
+
+          <form onSubmit={handleSubmit} noValidate style={{ display: "grid", gap: 18 }}>
+            {/* Email */}
+            <div>
+              <label htmlFor="parent-email" className="me-label">Email address</label>
+              <div style={{ position: "relative" }}>
+                <span className="me-icon-l"><MailIcon /></span>
+                <input
+                  id="parent-email"
+                  className="me-input"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="parent-password" className="me-label">Password</label>
+              <div style={{ position: "relative" }}>
+                <span className="me-icon-l"><LockIcon /></span>
+                <input
+                  id="parent-password"
+                  className="me-input"
+                  style={{ paddingRight: 48 }}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="me-eye"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember me */}
+            <label htmlFor="parent-remember" className="me-remember">
+              <input
+                id="parent-remember"
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                disabled={loading}
+              />
+              Remember me for 30 days
+            </label>
+
+            {/* Error */}
+            {error && (
+              <div role="alert" className="me-error">{error}</div>
+            )}
+
+            {/* Submit */}
+            <button id="parent-signin-btn" type="submit" disabled={loading} className="me-btn">
+              {loading ? (
+                <>
+                  <span className="me-spinner" />
+                  Signing in…
+                </>
+              ) : (
+                "Sign in to portal"
+              )}
+            </button>
+          </form>
+
+          <p className="me-help">
+            Need help?{" "}
+            <Link href="/parent/contact" style={{ color: BLUE, fontWeight: 600 }}>
+              Contact our team
+            </Link>
+          </p>
+        </div>
+
+        {/* Tagline banner */}
+        <div className="me-banner">
+          Dream<i /> <span>Discover</span><i /> Explore
+        </div>
+
+        <p className="me-copy">© {new Date().getFullYear()} Merry Explorers · Secure Parent Portal</p>
       </div>
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .me-page {
+          position: relative; min-height: 100vh; width: 100%; overflow: hidden;
+          display: flex; align-items: center; justify-content: center;
+          padding: 40px 16px 120px;
+          background: radial-gradient(ellipse at 50% 0%, #b9e5fb 0%, ${SKY} 60%, #74c3f1 100%);
+          color: ${NAVY};
+        }
+        .me-decor { position: absolute; inset: 0; pointer-events: none; }
+        .me-pos { position: absolute; }
+        .me-wrap { position: relative; z-index: 1; width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; }
+
+        .me-logo {
+          position: relative; z-index: 2; width: 104px; height: 104px; border-radius: 50%;
+          background: #fff; border: 4px solid ${NAVY}; box-shadow: 0 6px 0 ${NAVY}33;
+          margin-bottom: -44px; overflow: hidden;
+        }
+        .me-card {
+          position: relative; width: 100%; background: #fff; border: 4px solid ${NAVY};
+          border-radius: 28px; padding: 62px 28px 26px;
+          box-shadow: 0 0 0 6px #fff, 0 12px 0 6px ${NAVY}2e;
+        }
+        .me-tape {
+          position: absolute; top: -16px; right: 28px; width: 92px; height: 28px;
+          background: repeating-linear-gradient(45deg, #ffe58a 0 8px, #ffd95e 8px 16px);
+          opacity: .92; transform: rotate(6deg); border-radius: 3px;
+        }
+        .me-title {
+          margin: 0 0 6px; text-align: center; font-size: 40px; line-height: 1.05; font-weight: 700;
+          color: ${BLUE}; letter-spacing: .5px;
+          -webkit-text-stroke: 7px ${NAVY}; paint-order: stroke fill;
+          text-shadow: 0 4px 0 ${NAVY};
+        }
+        .me-sub { margin: 0 0 24px; text-align: center; font-size: 15px; font-weight: 500; color: #3d5a99; }
+        .me-label { display: block; margin: 0 0 6px 4px; font-size: 15px; font-weight: 600; color: ${NAVY}; }
+
+        .me-input {
+          width: 100%; padding: 13px 14px 13px 46px; font: inherit; font-size: 16px; font-weight: 500;
+          color: ${NAVY}; background: #f2faff; border: 3px solid #b6dcf5; border-radius: 16px; outline: none;
+          transition: border-color .15s, background .15s, box-shadow .15s;
+        }
+        .me-input::placeholder { color: #8aa7cc; }
+        .me-input:focus { border-color: ${BLUE}; background: #fff; box-shadow: 0 0 0 4px ${SUN}99; }
+        .me-input:disabled { opacity: .6; }
+        .me-icon-l { position: absolute; inset: 0 auto 0 0; display: flex; align-items: center; padding-left: 15px; color: ${BLUE}; pointer-events: none; }
+        .me-eye {
+          position: absolute; inset: 0 0 0 auto; display: flex; align-items: center; padding: 0 15px;
+          color: ${BLUE}; background: none; border: none; cursor: pointer; border-radius: 0 16px 16px 0;
+        }
+        .me-eye:focus-visible { outline: 3px solid ${NAVY}; outline-offset: -3px; }
+
+        .me-remember { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: #3d5a99; cursor: pointer; user-select: none; }
+        .me-remember input { width: 20px; height: 20px; accent-color: ${BLUE}; cursor: pointer; }
+
+        .me-error {
+          background: #fff1ee; border: 3px solid #ff6b57; border-radius: 14px;
+          padding: 10px 14px; font-size: 14px; font-weight: 600; color: #b3261e;
+        }
+
+        .me-btn {
+          display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+          padding: 14px; font: inherit; font-size: 18px; font-weight: 700; color: ${NAVY};
+          background: linear-gradient(180deg, #ffe066 0%, ${SUN} 55%, #ffb82e 100%);
+          border: 3px solid ${NAVY}; border-radius: 18px; box-shadow: 0 6px 0 ${NAVY};
+          cursor: pointer; transition: transform .12s, box-shadow .12s;
+        }
+        .me-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 ${NAVY}; }
+        .me-btn:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 1px 0 ${NAVY}; }
+        .me-btn:focus-visible { outline: 4px solid ${BLUE}; outline-offset: 3px; }
+        .me-btn:disabled { cursor: not-allowed; background: #ffe9a3; box-shadow: 0 6px 0 ${NAVY}66; border-color: ${NAVY}88; }
+
+        .me-spinner {
+          width: 20px; height: 20px; border-radius: 50%; display: inline-block;
+          border: 3px solid ${NAVY}33; border-top-color: ${NAVY}; animation: me-spin .7s linear infinite;
+        }
+        .me-help { margin: 22px 0 0; text-align: center; font-size: 14px; font-weight: 500; color: #5b74a8; }
+
+        .me-banner {
+          margin-top: 30px; padding: 10px 26px; border-radius: 40px; background: ${NAVY};
+          border: 4px solid #fff; box-shadow: 0 6px 0 ${NAVY}40;
+          color: #fff; font-size: 22px; font-weight: 700; letter-spacing: .5px; white-space: nowrap;
+        }
+        .me-banner span { color: ${SUN}; }
+        .me-banner i { display: inline-block; width: 8px; height: 8px; margin: 0 2px 2px; border-radius: 50%; background: #5cc0ff; }
+        .me-copy { margin: 14px 0 0; font-size: 12px; font-weight: 500; color: ${NAVY}; opacity: .75; text-align: center; }
+
+        @keyframes me-spin { to { transform: rotate(360deg); } }
+        @keyframes me-drift { 0%, 100% { translate: 0 0; } 50% { translate: 26px 0; } }
+        .me-spin { animation: me-spin 40s linear infinite; }
+        .me-drift { animation: me-drift 14s ease-in-out infinite; }
+
+        @keyframes me-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -12px; } }
+        @keyframes me-cross { from { transform: translateX(-260px); } to { transform: translateX(calc(100vw + 260px)); } }
+        @keyframes me-twinkle { 0%, 100% { scale: 1; opacity: 1; } 50% { scale: .6; opacity: .55; } }
+        @keyframes me-rise {
+          0% { transform: translateY(0) scale(.6); opacity: 0; }
+          10% { opacity: .85; }
+          100% { transform: translateY(-110vh) translateX(30px) scale(1.1); opacity: 0; }
+        }
+        @keyframes me-plane {
+          0% { transform: translate(-140px, 0) rotate(-14deg); opacity: 0; }
+          6% { opacity: 1; }
+          50% { transform: translate(50vw, -9vh) rotate(-6deg); }
+          94% { opacity: 1; }
+          100% { transform: translate(calc(100vw + 140px), -3vh) rotate(-14deg); opacity: 0; }
+        }
+        @keyframes me-rocket {
+          0% { transform: translate(-140px, 0); opacity: 0; }
+          6% { opacity: 1; }
+          94% { opacity: 1; }
+          100% { transform: translate(calc(100vw + 140px), -85vh); opacity: 0; }
+        }
+        @keyframes me-sway { 0%, 100% { translate: -14px 0; } 50% { translate: 14px 0; } }
+        .me-bob { animation: me-bob 5s ease-in-out infinite; }
+        .me-cross { left: 0; animation: me-cross linear infinite; }
+        .me-twinkle { animation: me-twinkle 2.6s ease-in-out infinite; }
+        .me-bubble { position: absolute; bottom: -30px; border-radius: 50%; border: 2px solid #ffffffaa; animation: me-rise linear infinite; }
+        .me-plane { left: 0; top: 62%; animation: me-plane 26s linear infinite; animation-delay: -4s; }
+        .me-plane::after {
+          content: ""; position: absolute; right: 78px; top: 40px; width: 160px; height: 0;
+          border-top: 4px dashed #ffffffcc; transform: rotate(-4deg); transform-origin: right;
+        }
+        .me-rocket { left: 0; bottom: 0; animation: me-rocket 20s ease-in infinite; animation-delay: -9s; }
+        .me-sway { animation: me-sway 9s ease-in-out infinite; }
+
+        @media (max-width: 900px) { .me-plane, .me-rocket { scale: .7; } }
+        @media (max-width: 480px) {
+          .me-card { padding: 58px 20px 22px; }
+          .me-title { font-size: 34px; }
+          .me-banner { font-size: 17px; padding: 8px 18px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .me-spin, .me-drift, .me-spinner, .me-bob, .me-cross, .me-twinkle, .me-sway { animation: none; }
+          .me-plane, .me-rocket, .me-bubble { display: none; }
+          .me-btn { transition: none; }
+        }
         * { box-sizing: border-box; }
       `}</style>
     </main>
