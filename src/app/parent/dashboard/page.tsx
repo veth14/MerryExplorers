@@ -11,6 +11,7 @@ import Tesseract from "tesseract.js";
 import WaiverGate from "@/components/WaiverGate";
 import VirtualOnboardingModal from "@/components/VirtualOnboardingModal";
 import VirtualDashboard from "@/components/VirtualDashboard";
+import TrailblazerDashboard from "@/components/TrailblazerDashboard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1140,6 +1141,41 @@ export default function ParentDashboardPage() {
             onClose={() => setShowEditSurveyModal(false)}
             onSave={(d) => setProfile((p) => (p ? { ...p, ...d } : p))}
             showToast={showToast}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ─── Trailblazer Brave Explorer parents get the new TrailblazerDashboard UI ─
+  if (isTrailblazer) {
+    return (
+      <>
+        <TrailblazerDashboard
+          profile={profile}
+          setProfile={(fn) => setProfile((p) => (p ? fn(p) : p))}
+          user={user}
+          signOut={handleSignOut}
+          showToast={showToast}
+          toast={toast}
+          clearToast={() => setToast(null)}
+          allRenewalPrograms={allRenewalPrograms}
+          sessionPayments={sessionPayments}
+          setSessionPayments={setSessionPayments}
+          paymentsLoading={paymentsLoading}
+          onChangePassword={() => setShowPasswordModal(true)}
+          onEditFavorites={() => setShowEditSurveyModal(true)}
+          onOpenMaterial={openFile}
+          loadingFileId={loadingFileId}
+          agreement={<WaiverAgreementText />}
+          setLightbox={setLightbox}
+        />
+        {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
+        {lightbox && (
+          <Lightbox
+            photos={lightbox.album.photos}
+            startIndex={lightbox.photoIdx}
+            onClose={() => setLightbox(null)}
           />
         )}
       </>

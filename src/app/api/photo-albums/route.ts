@@ -51,30 +51,7 @@ function getTrailblazerExpiry(now = new Date()): Date {
   return new Date(utcMs);
 }
 
-// Deletes expired albums' Cloudinary photos, then the album record.
-// Runs opportunistically when the admin list is loaded (no cron needed).
-async function sweepExpiredAlbums(db: any) {
-  const expired = await db
-    .collection("student_photo_albums")
-    .find({ expiresAt: { $lte: new Date() } })
-    .limit(50)
-    .toArray();
-
-  for (const album of expired) {
-    if (Array.isArray(album.photos)) {
-      for (const photo of album.photos) {
-        if (photo.cloudinaryPublicId) {
-          try {
-            await cloudinary.uploader.destroy(photo.cloudinaryPublicId);
-          } catch (e) {
-            console.warn("Cloudinary delete failed for", photo.cloudinaryPublicId);
-          }
-        }
-      }
-    }
-    await db.collection("student_photo_albums").deleteOne({ _id: album._id });
-  }
-}
+// Removed sweepExpiredAlbums to allow manual deletion via Archive tab.
 
 // GET /api/photo-albums — Admin only, list all albums
 export async function GET(request: Request) {
@@ -84,12 +61,7 @@ export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
 
-    // Clean up expired albums (and their Cloudinary files) before listing
-    try {
-      await sweepExpiredAlbums(db);
-    } catch (e) {
-      console.warn("[photo-albums GET] sweep failed", e);
-    }
+    // Auto-delete removed per user request: albums are now moved to Archive tab in UI
 
     const albums = await db
       .collection("student_photo_albums")

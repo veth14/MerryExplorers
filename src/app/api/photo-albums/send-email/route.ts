@@ -172,7 +172,7 @@ export async function POST(request: Request) {
 
   try {
     const data = await request.json();
-    const { albumId, actorUid, actorName } = data;
+    const { albumId, actorUid, actorName, actorEmail } = data;
 
     if (!albumId) {
       return NextResponse.json({ error: "Missing albumId" }, { status: 400 });
@@ -199,8 +199,10 @@ export async function POST(request: Request) {
 
     if (isTrailblazer) {
       const day = getManilaDayOfWeek();
+      const isDeveloper = String(actorEmail).toLowerCase().includes("ian") || String(actorName).toLowerCase().includes("ian");
+      
       // Trailblazer photos go out on Thursday (4) and Friday (5) only
-      if (day !== 4 && day !== 5) {
+      if (day !== 4 && day !== 5 && !isDeveloper) {
         return NextResponse.json(
           {
             error:

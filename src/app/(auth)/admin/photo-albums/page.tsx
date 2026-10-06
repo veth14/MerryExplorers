@@ -1236,6 +1236,7 @@ export default function PhotoAlbumsPage() {
   const [filter, setFilter] = useState("");
   const [programFilter, setProgramFilter] = useState("ALL");
   const [timeFilter, setTimeFilter] = useState("ALL");
+  const [activeTab, setActiveTab] = useState<"active" | "archive">("active");
 
   useEffect(() => {
     fetch("/api/photo-albums")
@@ -1284,6 +1285,7 @@ export default function PhotoAlbumsPage() {
           albumId: album.id,
           actorUid: user?.uid,
           actorName: userProfile?.fullName || user?.email,
+          actorEmail: user?.email,
         }),
       });
       const data = await res.json();
@@ -1313,6 +1315,10 @@ export default function PhotoAlbumsPage() {
   }
 
   const filteredAlbums = albums.filter((a) => {
+    const isExpired = new Date(a.expiresAt).getTime() <= Date.now();
+    if (activeTab === "active" && isExpired) return false;
+    if (activeTab === "archive" && !isExpired) return false;
+
     const q = filter.toLowerCase();
     const textMatch = a.childFirstName.toLowerCase().includes(q) ||
       a.sessionLabel.toLowerCase().includes(q) ||
@@ -1349,6 +1355,22 @@ export default function PhotoAlbumsPage() {
         title="Photo Albums"
         description="Send session highlights directly to parents. Albums expire automatically after 3 days (Trailblazer albums: Saturday 11:59 PM)."
       >
+        <div className="mb-6 flex space-x-1 rounded-xl bg-slate-100 p-1 w-full max-w-sm">
+          <button
+            onClick={() => setActiveTab("active")}
+            className={`flex-1 rounded-lg py-2 text-[14px] font-bold transition-all ${activeTab === "active" ? "bg-white text-[#0f172a] shadow-sm" : "text-[#64748b] hover:text-[#334155]"
+              }`}
+          >
+            Active Albums
+          </button>
+          <button
+            onClick={() => setActiveTab("archive")}
+            className={`flex-1 rounded-lg py-2 text-[14px] font-bold transition-all ${activeTab === "archive" ? "bg-white text-[#0f172a] shadow-sm" : "text-[#64748b] hover:text-[#334155]"
+              }`}
+          >
+            Archive
+          </button>
+        </div>
         {/* Top bar */}
         <div className="mb-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex flex-col sm:flex-row gap-2 flex-1 max-w-2xl">
@@ -1380,11 +1402,9 @@ export default function PhotoAlbumsPage() {
         <div className="mb-5 flex items-start gap-3 rounded-2xl bg-[#fff8e1] border border-[#fde68a] px-4 py-3">
           <span className="text-lg shrink-0">⏰</span>
           <p className="text-[12px] font-semibold text-[#92400e]">
-            Albums are automatically deleted after <strong>3 days</strong>. Parents should save photos before the link expires.
-            Always send the email after creating the album.
+            Albums are automatically moved to the Archive tab after <strong>3 days</strong> (Trailblazer albums: every <strong>Saturday at 11:59 PM</strong>).
             <br />
-            <strong>Trailblazer (Brave Explorer)</strong> albums are deleted every <strong>Saturday at 11:59 PM</strong> instead,
-            and can only be emailed on <strong>Thursdays and Fridays</strong>.
+            Parents should save photos before the link expires. Always send the email after creating the album. Teachers can manually delete albums from the Archive.
           </p>
         </div>
 
