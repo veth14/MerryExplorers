@@ -8,7 +8,7 @@ import {
   computeLateDeduction,
   computeCreditedHours,
   type LateDeductionResult,
-  SCHEDULE,
+  getScheduleTableForDate,
 } from "@/lib/attendance-rules";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -256,7 +256,8 @@ function buildSheet(
 
     // Total Hours — schedule-clamped credited hours (ONLY for regular payroll).
     // Early arrivals and late departures are excluded. Does not affect OT/offset.
-    const schedule = abbr !== "Sun" ? SCHEDULE[abbr as Exclude<DayAbbr, "Sun">] : null;
+    const scheduleTable = getScheduleTableForDate(new Date(dateStr), account.fullName);
+    const schedule = abbr !== "Sun" ? scheduleTable[abbr as Exclude<DayAbbr, "Sun">] : null;
     const totalHours = clockOut && schedule
       ? computeCreditedHours(rec!.clockInTime!, rec!.clockOutTime!, schedule.start, schedule.normalEnd, breakMins)
       : 0;
@@ -268,7 +269,7 @@ function buildSheet(
     //   2. This specific day was marked Exempt via the Flexible Schedule Override.
     let lateResult: LateDeductionResult = { deduction: 0, method: "none", lateMinutes: 0 };
     if (!account.weeklyHoursTarget && !isExempt) {
-      lateResult = computeLateDeduction(rec!.clockInTime!, rateForLate, noTimeLog);
+      lateResult = computeLateDeduction(rec!.clockInTime!, rateForLate, noTimeLog, account.fullName);
       totalLateDeduction += lateResult.deduction;
     }
 

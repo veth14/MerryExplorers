@@ -45,12 +45,21 @@ export const SCHEDULE: ScheduleTable = {
  * Tue/Thu/Fri (11:00–18:00 less a 60-min break) = 6 hrs → 2 hrs short, which
  * becomes an offset (see getOffsetHoursOwed).
  */
+export const IAN_SCHEDULE: ScheduleTable = {
+  Mon: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+  Tue: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+  Wed: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+  Thu: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+  Fri: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+  Sat: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+};
+
 export const REQUIRED_DAILY_HOURS = 8;
 
-/**
- * Returns the correct per-day schedule for a given date.
- */
-export function getScheduleTableForDate(date: Date): ScheduleTable {
+export function getScheduleTableForDate(date: Date, employeeName?: string): ScheduleTable {
+  if (employeeName && employeeName.includes("Ian Angelo Valmores")) {
+    return IAN_SCHEDULE;
+  }
   return SCHEDULE;
 }
 
@@ -93,15 +102,15 @@ export function getDayAbbr(date: Date): DayAbbr {
   return manilaLocale as DayAbbr;
 }
 
-export function getScheduleForDate(date: Date): DaySchedule | null {
+export function getScheduleForDate(date: Date, employeeName?: string): DaySchedule | null {
   const day = getDayAbbr(date);
   if (day === "Sun") return null;
-  const table = getScheduleTableForDate(date);
+  const table = getScheduleTableForDate(date, employeeName);
   return table[day as Exclude<DayAbbr, "Sun">];
 }
 
-export function getScheduledHours(date: Date): number | null {
-  const schedule = getScheduleForDate(date);
+export function getScheduledHours(date: Date, employeeName?: string): number | null {
+  const schedule = getScheduleForDate(date, employeeName);
   if (!schedule) return null;
   const [sH, sM] = schedule.start.split(":").map(Number);
   const [eH, eM] = schedule.normalEnd.split(":").map(Number);
@@ -109,11 +118,11 @@ export function getScheduledHours(date: Date): number | null {
   return Math.max(0, shiftMins - getBreakMinutesForDate(date)) / 60;
 }
 
-export function getOffsetHoursOwed(date: Date): number {
+export function getOffsetHoursOwed(date: Date, employeeName?: string): number {
   const day = getDayAbbr(date);
   if (day === "Sat" || day === "Sun") return 0;
 
-  const scheduled = getScheduledHours(date);
+  const scheduled = getScheduledHours(date, employeeName);
   if (scheduled === null) return 0;
   return Math.max(0, REQUIRED_DAILY_HOURS - scheduled);
 }
@@ -125,7 +134,8 @@ export function isWorkDay(workDays: string[], date: Date): boolean {
 
 export function computeTimeInStatus(
   clockInISO: string,
-  noTimeLog: boolean
+  noTimeLog: boolean,
+  employeeName?: string
 ): TimeInStatus {
   if (noTimeLog) return "Exempt";
 
@@ -134,7 +144,7 @@ export function computeTimeInStatus(
 
   if (day === "Sun") return "Exempt";
 
-  const scheduleTable = getScheduleTableForDate(clockIn);
+  const scheduleTable = getScheduleTableForDate(clockIn, employeeName);
   const schedule = scheduleTable[day as Exclude<DayAbbr, "Sun">];
 
   const [graceH, graceM] = schedule.graceUntil.split(":").map(Number);
@@ -155,6 +165,7 @@ export function computeDailyStatus(
     workDays: string[];
     noTimeLog: boolean;
     weeklyHoursTarget?: number | null;
+    fullName?: string;
   },
   date: Date = new Date(),
   isSuspended: boolean = false,
@@ -176,7 +187,7 @@ export function computeDailyStatus(
   }
 
   const status = (record.timeInStatus as TimeInStatus | undefined) ??
-    computeTimeInStatus(record.clockInTime, account.noTimeLog);
+    computeTimeInStatus(record.clockInTime, account.noTimeLog, account.fullName);
 
   return status as DailyAttendanceStatus;
 }
@@ -215,9 +226,10 @@ function addMinutesToTime(hhmm: string, minutes: number): string {
   return `${hh}:${mm}`;
 }
 
-export function getLateDeductionConfigForDate(date: Date): LateDeductionConfig {
+export function getLateDeductionConfigForDate(date: Date, employeeName?: string): LateDeductionConfig {
   const day = getDayAbbr(date);
-  const schedule = SCHEDULE[day === "Sun" ? "Mon" : (day as Exclude<DayAbbr, "Sun">)];
+  const table = getScheduleTableForDate(date, employeeName);
+  const schedule = table[day === "Sun" ? "Mon" : (day as Exclude<DayAbbr, "Sun">)];
   return {
     scheduledStart: schedule.start,
     lateThreshold: addMinutesToTime(schedule.start, LATE_THRESHOLD_MINUTES_AFTER_START),
@@ -238,10 +250,11 @@ export function computeLateDeduction(
   clockInISO: string,
   hourlyRate: number,
   noTimeLog: boolean,
+  employeeName?: string,
 ): LateDeductionResult {
   if (noTimeLog) return { lateMinutes: 0, deduction: 0, method: "none" };
 
-  const { scheduledStart, lateThreshold } = getLateDeductionConfigForDate(new Date(clockInISO));
+  const { scheduledStart, lateThreshold } = getLateDeductionConfigForDate(new Date(clockInISO), employeeName);
 
   const clockIn = new Date(clockInISO);
   const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });

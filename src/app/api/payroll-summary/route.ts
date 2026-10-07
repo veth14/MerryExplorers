@@ -6,7 +6,7 @@ import {
   type DayAbbr,
   computeLateDeduction,
   computeCreditedHours,
-  SCHEDULE,
+  getScheduleTableForDate,
 } from "@/lib/attendance-rules";
 import { computeContributions } from "@/lib/contributions";
 
@@ -128,13 +128,14 @@ export async function GET(request: Request) {
           // Late deduction — only if this day is NOT a flexible/exempt override AND they don't have a weekly target
           if (!acc.weeklyHoursTarget) {
             const isDayExempt = noTimeLog || exemptDates.has(dateStr);
-            const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt);
+            const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt, acc.fullName);
             totalLateDeduction += lateResult.deduction;
           }
 
           // Credited hours — tracked for reference and offset calculations
           if (rec.clockOutTime && abbr !== "Sun") {
-            const schedule = SCHEDULE[abbr as Exclude<DayAbbr, "Sun">];
+            const scheduleTable = getScheduleTableForDate(day, acc.fullName);
+            const schedule = scheduleTable[abbr as Exclude<DayAbbr, "Sun">];
             const breakMins = getBreakMinutes(dow);
             totalHours += computeCreditedHours(
               rec.clockInTime,
