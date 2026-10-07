@@ -9,8 +9,8 @@ const containerVariants: Variants = {
 };
 
 const cardVariants: Variants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.4 } },
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
 const rowVariants: Variants = {
@@ -18,24 +18,21 @@ const rowVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
 };
 
-type RenderedSession = {
+type LedgerEntry = {
   id: string;
   date: string;
-  timeIn?: string;
-  timeOut?: string;
-  type: string;
-  holiday: string;
+  timeIn: string;
+  timeOut: string;
+  type: "debt" | "credit";
   hours: number;
+  label: string;
 };
 
-type PendingGroup = {
-  id: string;
-  holidayDate: string;
-  holidayName: string;
-  timeIn?: string;
-  timeOut?: string;
-  required: number;
-  remaining: number;
+type OffsetData = {
+  totalDebt: number;
+  totalCredit: number;
+  remainingOffset: number;
+  ledger: LedgerEntry[];
 };
 
 type Account = {
@@ -53,7 +50,7 @@ function formatHours(decimalHours: number): string {
   return `${h} hrs ${m} mins`;
 }
 
-function RenderedTable({ records }: { records: RenderedSession[] }) {
+function LedgerTable({ records }: { records: LedgerEntry[] }) {
   const isEmpty = records.length === 0;
   const padCount = Math.max(0, EMPTY_ROWS - records.length);
 
@@ -62,70 +59,42 @@ function RenderedTable({ records }: { records: RenderedSession[] }) {
       <thead>
         <tr className="border-b border-brand-sky">
           <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50">Date</th>
+          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50">Type</th>
           <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-center whitespace-nowrap">Time In</th>
           <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-center whitespace-nowrap">Time Out</th>
-          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-right">Total # Of Hours</th>
+          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-blue/50 text-right">Hours</th>
         </tr>
       </thead>
       <m.tbody variants={containerVariants} initial="hidden" animate="visible">
         {records.map((r) => (
           <m.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
             <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.date}</td>
+            <td className="px-4 py-2.5 font-bold whitespace-nowrap">
+              {r.type === "debt" ? (
+                <span className="text-brand-orange bg-brand-yellow/10 px-2 py-1 rounded-md">{r.label}</span>
+              ) : (
+                <span className="text-brand-blue bg-brand-sky/40 px-2 py-1 rounded-md">{r.label}</span>
+              )}
+            </td>
             <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.timeIn || "—"}</td>
             <td className="px-3 py-2.5 text-center font-bold text-brand-blue whitespace-nowrap">{r.timeOut || "—"}</td>
-            <td className="px-4 py-2.5 text-right font-black text-brand-navy whitespace-nowrap">{formatHours(r.hours)}</td>
+            <td className="px-4 py-2.5 text-right font-black whitespace-nowrap">
+               <span className={r.type === "debt" ? "text-brand-orange" : "text-brand-blue"}>
+                 {r.type === "debt" ? "+" : "-"}{formatHours(r.hours)}
+               </span>
+            </td>
           </m.tr>
         ))}
         {isEmpty && (
           <tr style={{ height: "44px" }}>
-            <td colSpan={4} className="px-4 py-2.5 text-center text-[12px] font-bold text-brand-blue/30 italic">
-              No rendered sessions
+            <td colSpan={5} className="px-4 py-2.5 text-center text-[12px] font-bold text-brand-blue/30 italic">
+              No offset records found
             </td>
           </tr>
         )}
         {Array.from({ length: isEmpty ? padCount - 1 : padCount }).map((_, i) => (
-          <tr key={`pad-r-${i}`} className="border-b border-brand-sky/20" style={{ height: "44px" }}>
-            <td colSpan={4} />
-          </tr>
-        ))}
-      </m.tbody>
-    </table>
-  );
-}
-
-function PendingTable({ records }: { records: PendingGroup[] }) {
-  const isEmpty = records.length === 0;
-  const padCount = Math.max(0, EMPTY_ROWS - records.length);
-
-  return (
-    <table className="w-full text-left border-collapse text-xs">
-      <thead>
-        <tr className="border-b border-brand-sky">
-          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70">Date</th>
-          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-center whitespace-nowrap">Time In</th>
-          <th className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-center whitespace-nowrap">Time Out</th>
-          <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-brand-orange/70 text-right">Total # Of Hours</th>
-        </tr>
-      </thead>
-      <m.tbody variants={containerVariants} initial="hidden" animate="visible">
-        {records.map((r) => (
-          <m.tr key={r.id} variants={rowVariants} className="border-b border-brand-sky/30 hover:bg-brand-sky/20 transition-colors" style={{ height: "44px" }}>
-            <td className="px-4 py-2.5 font-bold text-brand-navy whitespace-nowrap">{r.holidayDate}</td>
-            <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.timeIn || "—"}</td>
-            <td className="px-3 py-2.5 text-center font-bold text-brand-orange whitespace-nowrap">{r.timeOut || "—"}</td>
-            <td className="px-4 py-2.5 text-right font-black text-brand-red whitespace-nowrap">{formatHours(r.required)}</td>
-          </m.tr>
-        ))}
-        {isEmpty && (
-          <tr style={{ height: "44px" }}>
-            <td colSpan={4} className="px-4 py-2.5 text-center text-[12px] font-bold text-brand-blue/30 italic">
-              No pending offsets
-            </td>
-          </tr>
-        )}
-        {Array.from({ length: isEmpty ? padCount - 1 : padCount }).map((_, i) => (
-          <tr key={`pad-p-${i}`} className="border-b border-brand-sky/20" style={{ height: "44px" }}>
-            <td colSpan={4} />
+          <tr key={`pad-${i}`} className="border-b border-brand-sky/20" style={{ height: "44px" }}>
+            <td colSpan={5} />
           </tr>
         ))}
       </m.tbody>
@@ -136,8 +105,7 @@ function PendingTable({ records }: { records: PendingGroup[] }) {
 export function OffsetMonitoring() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
-  const [rendered, setRendered] = useState<RenderedSession[]>([]);
-  const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
+  const [offsetData, setOffsetData] = useState<OffsetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [empOpen, setEmpOpen] = useState(false);
 
@@ -159,59 +127,14 @@ export function OffsetMonitoring() {
 
   useEffect(() => {
     if (!selectedEmployeeId) return;
+    setLoading(true);
     fetch(`/api/offsets?uid=${selectedEmployeeId}`)
       .then((r) => r.json())
       .then((json) => {
-        if (json.success && Array.isArray(json.data)) {
-          let allRendered: RenderedSession[] = [];
-          const allPending: PendingGroup[] = [];
-
-          for (const group of json.data) {
-            if (group.remainingHours > 0) {
-              allPending.push({
-                id: group.id,
-                holidayDate: group.sourceHoliday?.dateStr ?? "",
-                holidayName: group.sourceHoliday?.name ?? "Unknown",
-                timeIn: group.timeIn,
-                timeOut: group.timeOut,
-                required: group.requiredHours,
-                remaining: group.remainingHours,
-              });
-            }
-            if (Array.isArray(group.renderedSessions)) {
-              (group.renderedSessions || []).forEach((s: any) => {
-                allRendered.push({
-                  id: `${group.id}-${s.attendanceDateStr}`,
-                  date: s.attendanceDateStr,
-                  timeIn: s.timeIn,
-                  timeOut: s.timeOut,
-                  type: s.type,
-                  holiday: group.sourceHoliday?.name ?? "Unknown",
-                  hours: s.hours,
-                });
-              });
-            }
-          }
-
-          // Group by date to merge split sessions
-          const groupedRendered: Record<string, RenderedSession> = {};
-          allRendered.forEach(r => {
-            const key = `${r.date}_${r.timeIn}_${r.timeOut}`;
-            if (!groupedRendered[key]) {
-              groupedRendered[key] = { ...r };
-            } else {
-              groupedRendered[key].hours += r.hours;
-            }
-          });
-          allRendered = Object.values(groupedRendered);
-
-          allRendered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-          setRendered(allRendered);
-          setPendingGroups(allPending);
+        if (json.success && json.data) {
+          setOffsetData(json.data);
         } else {
-          setRendered([]);
-          setPendingGroups([]);
+          setOffsetData({ totalDebt: 0, totalCredit: 0, remainingOffset: 0, ledger: [] });
         }
       })
       .catch(console.error)
@@ -286,7 +209,7 @@ export function OffsetMonitoring() {
               <p className="text-[13px] font-bold text-brand-navy/60">Loading offsets data…</p>
             </div>
           </m.div>
-        ) : !selectedAccount ? (
+        ) : !selectedAccount || !offsetData ? (
           <m.div
             key="empty"
             initial={{ opacity: 0 }}
@@ -302,46 +225,42 @@ export function OffsetMonitoring() {
             variants={cardVariants}
             className="rounded-[2rem] bg-white border-2 border-brand-blue shadow-[var(--shadow-card)] overflow-hidden"
           >
-            {/* Employee Header */}
-            <div className="flex items-center gap-3 px-8 py-5 bg-brand-navy border-b-2 border-brand-blue/30">
-              <span
-                className="material-symbols-outlined text-brand-yellow"
-                style={{ fontSize: "22px", fontVariationSettings: "'FILL' 1" }}
-              >
-                swap_horiz
-              </span>
-              <h3 className="font-headline text-[16px] font-black text-white tracking-wide">
-                {selectedAccount.fullName}
-              </h3>
-              <div className="ml-auto flex gap-4 text-[12px] font-bold">
-                <span className="bg-[#3261a8] text-[#93c5fd] rounded-full px-4 py-1.5">
-                  {rendered.length} rendered
+            {/* Employee Header & Summary */}
+            <div className="flex flex-col md:flex-row md:items-center gap-6 px-8 py-6 bg-brand-navy border-b-2 border-brand-blue/30">
+              <div className="flex items-center gap-3">
+                <span
+                  className="material-symbols-outlined text-brand-yellow"
+                  style={{ fontSize: "28px", fontVariationSettings: "'FILL' 1" }}
+                >
+                  history_toggle_off
                 </span>
-                <span className="bg-[#294870] text-brand-yellow rounded-full px-4 py-1.5">
-                  {pendingGroups.length} to render
-                </span>
+                <div>
+                  <h3 className="font-headline text-[18px] font-black text-white tracking-wide">
+                    {selectedAccount.fullName}
+                  </h3>
+                  <p className="text-brand-sky/70 text-[12px] font-bold">Offset Ledger (from Sept 29, 2026)</p>
+                </div>
+              </div>
+              
+              <div className="ml-auto flex gap-4 text-[13px] font-black">
+                <div className="flex flex-col items-end">
+                   <span className="text-brand-sky/60 text-[10px] uppercase tracking-wider">Accrued Debt</span>
+                   <span className="text-brand-orange">{formatHours(offsetData.totalDebt)}</span>
+                </div>
+                <div className="flex flex-col items-end">
+                   <span className="text-brand-sky/60 text-[10px] uppercase tracking-wider">Worked Credit</span>
+                   <span className="text-brand-sky">{formatHours(offsetData.totalCredit)}</span>
+                </div>
+                <div className="flex flex-col items-end border-l-2 border-brand-sky/20 pl-4 ml-2">
+                   <span className="text-brand-sky/60 text-[10px] uppercase tracking-wider">Remaining Offset</span>
+                   <span className="text-brand-yellow text-[16px]">{formatHours(offsetData.remainingOffset)}</span>
+                </div>
               </div>
             </div>
 
-            {/* Split Table */}
-            <div className="flex flex-col md:flex-row">
-              {/* Rendered */}
-              <div className="flex-1 border-b-2 md:border-b-0 md:border-r-2 border-brand-sky">
-                <div className="flex items-center gap-2 px-6 py-3 bg-brand-sky/40 border-b border-brand-sky">
-                  <div className="w-2.5 h-2.5 rounded-full bg-brand-blue" />
-                  <span className="text-[11px] font-black uppercase tracking-widest text-brand-blue">RENDERED</span>
-                </div>
-                <RenderedTable records={rendered} />
-              </div>
-
-              {/* To Render */}
-              <div className="flex-1">
-                <div className="flex items-center gap-2 px-6 py-3 bg-brand-yellow/10 border-b border-brand-sky">
-                  <div className="w-2.5 h-2.5 rounded-full bg-brand-orange" />
-                  <span className="text-[11px] font-black uppercase tracking-widest text-brand-orange">TO RENDER</span>
-                </div>
-                <PendingTable records={pendingGroups} />
-              </div>
+            {/* Ledger Table */}
+            <div className="w-full">
+              <LedgerTable records={offsetData.ledger} />
             </div>
           </m.div>
         )}

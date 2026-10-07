@@ -71,6 +71,7 @@ export default function AttendancePage() {
 
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
   const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const [exportRows, setExportRows] = useState<Array<{ dateLabel: string; name: string; group: string; timeIn: string; timeOut: string; status: string; rowType: string }>>([]);
 
   // Weekly navigation — start of current week (Monday)
   const [weekStart, setWeekStart] = useState(() => {
@@ -470,6 +471,7 @@ export default function AttendancePage() {
 <\/html>`;
 
       setPrintHtml(html);
+      setExportRows(tableRows);
       setShowExportModal(false);
     } catch (e) {
       console.error("Export failed:", e);
@@ -641,18 +643,54 @@ export default function AttendancePage() {
   });
 
   if (printHtml) {
+    const handleDownloadExcel = async () => {
+      const XLSX = await import("xlsx");
+
+      const headers = ["Date", "Teacher Name", "Group", "Time In", "Time Out", "Status"];
+      const data = exportRows.map(r => ([
+        r.dateLabel,
+        r.name,
+        r.group,
+        r.timeIn,
+        r.timeOut,
+        r.status,
+      ]));
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+      // Column widths
+      ws["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+
+      XLSX.writeFile(wb, `Attendance_Report_${exportStartDate}_to_${exportEndDate}.xlsx`);
+    };
+
     return (
-      <div className="fixed inset-0 z-[9999] bg-white">
+      <div className="fixed inset-0 z-[9999] bg-[#f8fafc]">
         <iframe
           srcDoc={printHtml}
-          className="w-full h-full border-none"
+          className="w-full h-full border-none pb-[80px]"
           title="Print Preview"
         />
-        <div className="absolute top-4 right-4 flex gap-3">
+        {/* Floating Toolbar at the bottom center */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-[#e2e8f0]">
+          <button
+            onClick={handleDownloadExcel}
+            className="flex items-center gap-2 rounded-xl bg-[#0050d5] px-6 py-2.5 text-[14px] font-black text-white hover:bg-[#0042b3] shadow-md transition-all"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>download</span>
+            Download Excel
+          </button>
+          
+          <div className="w-[2px] h-8 bg-[#e2e8f0]" />
+
           <button
             onClick={() => setPrintHtml(null)}
-            className="rounded-xl border-2 border-[#e2e8f0] bg-white px-5 py-2.5 text-[13px] font-bold text-[#5a6e8c] hover:bg-[#f8fafc] shadow-sm transition-all"
+            className="flex items-center gap-2 rounded-xl border-2 border-[#e2e8f0] bg-white px-5 py-2 text-[14px] font-bold text-[#5a6e8c] hover:bg-[#f8fafc] hover:border-[#cbd5e1] hover:text-[#334155] transition-all"
           >
+            <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>close</span>
             Close Preview
           </button>
         </div>
