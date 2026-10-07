@@ -43,6 +43,14 @@ const FILTERS = [
   { id: "rejected", label: "Rejected" },
 ];
 
+// Payments belonging to these students are not tracked on this page
+const EXCLUDED_STUDENTS = ["ian angelo"];
+
+function isExcluded(...values: (string | undefined | null)[]) {
+  const haystack = values.filter(Boolean).join(" ").toLowerCase();
+  return EXCLUDED_STUDENTS.some((name) => haystack.includes(name));
+}
+
 function getStatus(p: Payment) {
   if (p.verified) return "verified";
   if (p.rejected) return "rejected";
@@ -85,13 +93,24 @@ export default function AdminPaymentsPage() {
           setAccounts(
             accountsData.filter(
               (acc: Account) =>
-                (acc.sessionPayments && acc.sessionPayments.length > 0) ||
-                acc.renewalStatus?.downpayment?.submitted
+                !isExcluded(acc.childName) &&
+                ((acc.sessionPayments && acc.sessionPayments.length > 0) ||
+                  acc.renewalStatus?.downpayment?.submitted)
             )
           );
         }
         if (regData?.success && Array.isArray(regData.data)) {
-          setRegistrations(regData.data.filter((r: any) => r.receiptUrl || r.receiptBase64 || r.amountPaid > 0));
+          setRegistrations(
+            regData.data.filter(
+              (r: any) =>
+                !isExcluded(
+                  r.childInfo?.firstName,
+                  r.childInfo?.lastName,
+                  `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""}`
+                ) &&
+                (r.receiptUrl || r.receiptBase64 || r.amountPaid > 0)
+            )
+          );
         }
       })
       .catch(console.error)
@@ -122,14 +141,14 @@ export default function AdminPaymentsPage() {
 
     registrations.forEach(r => {
       flat.push({
-        uid: r.id, 
+        uid: r.id,
         acc: {
           id: r.id,
           fullName: r.parentInfo?.name,
           email: r.parentInfo?.email || "",
           childName: r.childInfo?.firstName,
           program: r.program,
-        }, 
+        },
         type: "registration",
         payment: {
           id: "reg-" + r.id,
@@ -179,11 +198,11 @@ export default function AdminPaymentsPage() {
 
     const key = `${uid}-${paymentId}-${action}`;
     setActioning(key);
-    
+
     let url = "";
     let body: any = {};
     let method = "PATCH";
-    
+
     if (type === "registration") {
       url = `/api/registrations/${uid}/${action === "verify" ? "approve" : "reject"}`;
       method = "POST";
@@ -228,10 +247,10 @@ export default function AdminPaymentsPage() {
       {/* ── Stats Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "24px" }}>
         {[
-          { label: "Total Payments",  value: stats.total,    icon: "📋", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
-          { label: "Pending Review",  value: stats.pending,  icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
-          { label: "Verified",        value: stats.verified, icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
-          { label: "Total Revenue",   value: fmtCurrency(stats.totalRevenue), icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
+          { label: "Total Payments", value: stats.total, icon: "📋", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
+          { label: "Pending Review", value: stats.pending, icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
+          { label: "Verified", value: stats.verified, icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+          { label: "Total Revenue", value: fmtCurrency(stats.totalRevenue), icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
         ].map(s => (
           <div key={s.label} style={{ background: "white", borderRadius: "20px", padding: "20px 24px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", display: "flex", alignItems: "center", gap: "16px" }}>
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>{s.icon}</div>
