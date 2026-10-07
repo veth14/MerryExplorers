@@ -650,297 +650,332 @@ export default function AdminVirtualSessionsPage() {
 
       {/* ── Manage Modal ── */}
       <AnimatePresence>
-        {manageModal && (
-          <div onClick={() => setManageModal(null)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,18,51,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyItems: "center", padding: "16px", overflowY: "auto" }}>
-            <m.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              onClick={e => e.stopPropagation()} 
-              style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "600px", margin: "auto", boxShadow: "0 20px 40px rgba(0,47,118,0.15)", overflow: "hidden" }}
-            >
-              <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8faff" }}>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#002f76", margin: 0 }}>
-                    Manage Virtual Session
-                  </h2>
-                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px", fontWeight: "600" }}>
-                    {manageModal.childName || manageModal.fullName || manageModal.email}
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <button
-                    onClick={() => refreshModalData(manageModal.id)}
-                    disabled={refreshingModal}
-                    title="Refresh to see latest submissions"
-                    style={{ display: "flex", alignItems: "center", gap: "5px", padding: "6px 12px", borderRadius: "8px", background: refreshingModal ? "#f1f5f9" : "#eff6ff", border: "1px solid #bfdbfe", color: refreshingModal ? "#94a3b8" : "#0050d5", fontWeight: "700", fontSize: "12px", cursor: refreshingModal ? "not-allowed" : "pointer" }}
-                  >
-                    <svg style={{ animation: refreshingModal ? "me-spin 0.7s linear infinite" : "none" }} xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                    </svg>
-                    {refreshingModal ? "Refreshing…" : "Refresh"}
-                  </button>
-                  <button onClick={() => setManageModal(null)} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "white", border: "1px solid #e2e8f0", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontWeight: "bold" }}>✕</button>
-                </div>
-              </div>
+        {manageModal && (() => {
+          const matLinks = (manageModal.studyMaterials || []).filter((m: any) => m.type === "link");
+          const matFiles = (manageModal.studyMaterials || []).filter((m: any) => m.type === "file");
 
-              <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
-                {/* Link Section */}
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px" }}>🔗 Meeting Link & Time</div>
-                    {!isEditingLink && (
-                      <button onClick={() => setIsEditingLink(true)} style={{ fontSize: "12px", fontWeight: "700", color: "#0050d5", background: "#eff6ff", border: "none", padding: "4px 12px", borderRadius: "8px", cursor: "pointer" }}>Edit Details</button>
-                    )}
-                  </div>
-                  
-                  {isEditingLink ? (
-                    <div style={{ background: "#f8faff", padding: "16px", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px" }}>Virtual Class Link</label>
-                      <input 
-                        value={newLink}
-                        onChange={e => setNewLink(e.target.value)}
-                        placeholder="https://zoom.us/j/..."
-                        style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }}
-                      />
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px" }}>Session Time (Optional)</label>
-                      <input 
-                        type="datetime-local"
-                        value={newTime}
-                        onChange={e => setNewTime(e.target.value)}
-                        style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }}
-                      />
-                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "16px", cursor: "pointer" }}>
-                        <input type="checkbox" checked={sendEmailOnSave} onChange={e => setSendEmailOnSave(e.target.checked)} style={{ width: "16px", height: "16px", accentColor: "#0050d5" }} />
-                        Email parent that their session is ready
-                      </label>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button onClick={() => handleSaveLink(manageModal.id)} disabled={savingLink} style={{ flex: 1, padding: "10px", background: "#10b981", color: "white", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: savingLink ? "not-allowed" : "pointer" }}>
-                          {savingLink ? "Saving..." : "Save Details"}
-                        </button>
-                        <button onClick={() => setIsEditingLink(false)} style={{ flex: 1, padding: "10px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-                          Cancel
-                        </button>
+          return (
+            <div onClick={() => setManageModal(null)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,18,51,0.55)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px", overflowY: "auto" }}>
+              <m.div
+                initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                onClick={e => e.stopPropagation()}
+                style={{ background: "white", borderRadius: "28px", width: "100%", maxWidth: "880px", margin: "auto", boxShadow: "0 32px 80px rgba(0,47,118,0.2)", overflow: "hidden" }}
+              >
+                {/* ── Header ── */}
+                <div style={{ padding: "22px 28px", borderBottom: "2px solid #eef2ff", background: "linear-gradient(135deg,#002f76 0%,#0050d5 100%)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", border: "2px solid rgba(255,255,255,0.4)" }}>🖥️</div>
+                    <div>
+                      <h2 style={{ fontSize: "18px", fontWeight: "900", color: "white", margin: 0, letterSpacing: "-0.3px" }}>
+                        {manageModal.childName || manageModal.fullName || manageModal.email}
+                      </h2>
+                      <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", marginTop: "2px", fontWeight: "600" }}>
+                        Virtual Session Workspace
                       </div>
                     </div>
-                  ) : (
-                    <div style={{ background: "#f8faff", padding: "16px", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                      {manageModal.virtualSessionLink ? (
-                        <>
-                          <div style={{ marginBottom: manageModal.virtualSessionTime ? "8px" : "0" }}>
-                            <a href={manageModal.virtualSessionLink} target="_blank" rel="noreferrer" style={{ fontSize: "14px", fontWeight: "700", color: "#0050d5", textDecoration: "underline", wordBreak: "break-all" }}>
-                              {manageModal.virtualSessionLink}
-                            </a>
-                          </div>
-                          {manageModal.virtualSessionTime && (
-                            <div style={{ fontSize: "13px", fontWeight: "600", color: "#475569" }}>
-                              🕒 Time: <span style={{ color: "#334155" }}>{formatSessionTime(manageModal.virtualSessionTime)}</span>
-                            </div>
-                          )}
-                          <div style={{ marginTop: "16px" }}>
-                            <button onClick={() => promptEndSession(manageModal.id)} disabled={endingSession} style={{ padding: "8px 16px", background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: "8px", fontWeight: "700", fontSize: "12px", cursor: endingSession ? "not-allowed" : "pointer", opacity: endingSession ? 0.7 : 1 }}>
-                              {endingSession ? "Ending..." : "🛑 End Session & Request Payment"}
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <div style={{ fontSize: "14px", color: "#94a3b8", fontWeight: "500", fontStyle: "italic" }}>No meeting link has been set yet.</div>
-                      )}
-                      {linkSaveResult && (
-                        <div style={{ marginTop: "12px", fontSize: "12px", fontWeight: "700", color: linkSaveResult.ok ? "#15803d" : "#b91c1c" }}>
-                          {linkSaveResult.ok ? (linkSaveResult.isEnd ? "✅ Session ended and payment requested!" : "✅ Details successfully saved" + (sendEmailOnSave ? " and email sent!" : "!")) : (linkSaveResult.isEnd ? "❌ Failed to end session" : "❌ Failed to save details")}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <button
+                      onClick={() => refreshModalData(manageModal.id)}
+                      disabled={refreshingModal}
+                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.3)", color: "white", fontWeight: "700", fontSize: "12px", cursor: refreshingModal ? "not-allowed" : "pointer", transition: "all 0.2s" }}
+                    >
+                      <svg style={{ animation: refreshingModal ? "me-spin 0.7s linear infinite" : "none" }} xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                      </svg>
+                      {refreshingModal ? "Refreshing…" : "Refresh"}
+                    </button>
+                    <button onClick={() => setManageModal(null)} style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.3)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontWeight: "bold", fontSize: "16px" }}>✕</button>
+                  </div>
                 </div>
 
-                {/* Study Folder Section */}
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px" }}>📁 Study Folder</div>
-                    {!isAddingMaterial && (
-                      <button onClick={() => setIsAddingMaterial(true)} style={{ fontSize: "12px", fontWeight: "700", color: "white", background: "#002f76", border: "none", padding: "4px 12px", borderRadius: "8px", cursor: "pointer" }}>+ Add Material</button>
-                    )}
-                  </div>
+                {/* ── Two-column Body ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0" }}>
 
-                  {isAddingMaterial && (
-                    <div style={{ background: "#f8faff", padding: "16px", borderRadius: "16px", border: "1px solid #e2e8f0", marginBottom: "16px" }}>
-                      {/* Type Tabs */}
-                      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                        <button onClick={() => { setMaterialType("link"); setMaterialUrl(""); }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: materialType === "link" ? "none" : "1px solid #cbd5e1", background: materialType === "link" ? "#eff6ff" : "white", color: materialType === "link" ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>▶️ YouTube / Link</button>
-                        <button onClick={() => { setMaterialType("file"); setMaterialUrl(""); }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: materialType === "file" ? "none" : "1px solid #cbd5e1", background: materialType === "file" ? "#eff6ff" : "white", color: materialType === "file" ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>📄 Upload File</button>
-                      </div>
+                  {/* LEFT: Meeting Link Panel */}
+                  <div style={{ padding: "24px 28px", borderRight: "1.5px solid #eef2ff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                      <span style={{ width: "28px", height: "28px", background: "#eff6ff", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>🔗</span>
+                      <span style={{ fontSize: "12px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.8px" }}>Meeting Link & Time</span>
+                    </div>
 
-                      {/* Title */}
-                      <input value={materialTitle} onChange={e => setMaterialTitle(e.target.value)} placeholder="Material Title..." style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "8px", boxSizing: "border-box" }} />
-
-                      {/* Link or File */}
-                      {materialType === "link" ? (
-                        <input value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="https://youtube.com/..." style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }} />
-                      ) : (
-                        <div style={{ marginBottom: "12px" }}>
+                    {isEditingLink ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#64748b", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Virtual Class Link</label>
                           <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp4,.mp3,.png,.jpg,.jpeg,.gif,.zip"
-                            style={{ display: "none" }}
-                            onChange={e => {
-                              const f = e.target.files?.[0];
-                              if (f) handleFileUpload(f);
-                            }}
+                            value={newLink}
+                            onChange={e => setNewLink(e.target.value)}
+                            placeholder="https://zoom.us/j/... or Google Meet"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "2px solid #bfdbfe", fontSize: "13px", outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border 0.2s" }}
+                            onFocus={e => (e.target.style.borderColor = "#0050d5")}
+                            onBlur={e => (e.target.style.borderColor = "#bfdbfe")}
                           />
-                          {materialUrl ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: "#f0fdf4", borderRadius: "10px", border: "1.5px solid #86efac" }}>
-                              <span style={{ fontSize: "20px" }}>✅</span>
-                              <div style={{ flex: 1, overflow: "hidden" }}>
-                                <div style={{ fontSize: "12px", fontWeight: "700", color: "#15803d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Uploaded successfully!</div>
-                                <div style={{ fontSize: "11px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{materialUrl}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#64748b", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Session Time (Optional)</label>
+                          <input
+                            type="datetime-local"
+                            value={newTime}
+                            onChange={e => setNewTime(e.target.value)}
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "2px solid #bfdbfe", fontSize: "13px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                          />
+                        </div>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: "600", color: "#475569", cursor: "pointer", padding: "10px 14px", background: "#f8faff", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                          <input type="checkbox" checked={sendEmailOnSave} onChange={e => setSendEmailOnSave(e.target.checked)} style={{ width: "16px", height: "16px", accentColor: "#0050d5" }} />
+                          Email parent when session is ready
+                        </label>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button onClick={() => handleSaveLink(manageModal.id)} disabled={savingLink} style={{ flex: 1, padding: "10px", background: savingLink ? "#94a3b8" : "#10b981", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "13px", cursor: savingLink ? "not-allowed" : "pointer" }}>
+                            {savingLink ? "Saving…" : "✓ Save"}
+                          </button>
+                          <button onClick={() => setIsEditingLink(false)} style={{ flex: 1, padding: "10px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "12px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        {manageModal.virtualSessionLink ? (
+                          <div style={{ background: "#eff6ff", borderRadius: "16px", padding: "16px", border: "1.5px solid #bfdbfe", marginBottom: "12px" }}>
+                            <a href={manageModal.virtualSessionLink} target="_blank" rel="noreferrer" style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#0050d5", textDecoration: "none", wordBreak: "break-all", marginBottom: "6px" }}>
+                              🔗 {manageModal.virtualSessionLink}
+                            </a>
+                            {manageModal.virtualSessionTime && (
+                              <div style={{ fontSize: "12px", fontWeight: "600", color: "#475569" }}>
+                                🕒 {formatSessionTime(manageModal.virtualSessionTime)}
                               </div>
-                              <button onClick={() => { setMaterialUrl(""); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px" }}>✕</button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={uploadingFile}
-                              style={{ width: "100%", padding: "24px", borderRadius: "10px", border: "2px dashed #cbd5e1", background: uploadingFile ? "#f8faff" : "white", color: uploadingFile ? "#64748b" : "#0050d5", fontWeight: "700", fontSize: "13px", cursor: uploadingFile ? "not-allowed" : "pointer", textAlign: "center" }}
-                            >
-                              {uploadingFile ? "⏳ Uploading to Backblaze…" : "📤 Click to select file (PDF, DOC, MP4, etc.)"}
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ padding: "24px 16px", background: "#fffbeb", borderRadius: "16px", border: "2px dashed #fde68a", textAlign: "center", marginBottom: "12px" }}>
+                            <div style={{ fontSize: "28px", marginBottom: "6px" }}>⚠️</div>
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e" }}>No meeting link set yet</div>
+                            <div style={{ fontSize: "11px", color: "#a16207", marginTop: "3px" }}>Click Edit to add a link for this student</div>
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button onClick={() => setIsEditingLink(true)} style={{ flex: 1, padding: "9px 14px", background: "#eff6ff", color: "#0050d5", border: "1.5px solid #bfdbfe", borderRadius: "12px", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>
+                            ✏️ Edit Details
+                          </button>
+                          {manageModal.virtualSessionLink && (
+                            <button onClick={() => promptEndSession(manageModal.id)} disabled={endingSession} style={{ flex: 1, padding: "9px 14px", background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: "12px", fontWeight: "700", fontSize: "12px", cursor: endingSession ? "not-allowed" : "pointer" }}>
+                              {endingSession ? "Ending…" : "🛑 End Session"}
                             </button>
                           )}
                         </div>
+                        {linkSaveResult && (
+                          <div style={{ marginTop: "10px", fontSize: "12px", fontWeight: "700", color: linkSaveResult.ok ? "#15803d" : "#b91c1c", padding: "8px 12px", background: linkSaveResult.ok ? "#f0fdf4" : "#fef2f2", borderRadius: "10px" }}>
+                            {linkSaveResult.ok ? (linkSaveResult.isEnd ? "✅ Session ended and payment requested!" : "✅ Saved!" + (sendEmailOnSave ? " Email sent!" : "")) : (linkSaveResult.isEnd ? "❌ Failed to end session" : "❌ Failed to save")}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quick-add link section */}
+                    {!isEditingLink && !isAddingMaterial && (
+                      <div style={{ marginTop: "24px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                          <span style={{ width: "28px", height: "28px", background: "#fef3c7", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>▶️</span>
+                          <span style={{ fontSize: "12px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.8px" }}>Quick Send Link</span>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <input
+                            placeholder="Paste YouTube, Google Drive, or any URL…"
+                            id="quick-link-input"
+                            style={{ flex: 1, padding: "10px 14px", borderRadius: "12px", border: "2px solid #e2e8f0", fontSize: "12px", outline: "none", fontFamily: "inherit" }}
+                            onFocus={e => (e.target.style.borderColor = "#0050d5")}
+                            onBlur={e => (e.target.style.borderColor = "#e2e8f0")}
+                          />
+                          <button
+                            onClick={() => {
+                              const input = document.getElementById("quick-link-input") as HTMLInputElement;
+                              const url = input?.value?.trim();
+                              if (!url) return;
+                              setMaterialType("link");
+                              setMaterialUrl(url);
+                              setMaterialTitle(url.includes("youtube") ? "YouTube Video" : "Shared Link");
+                              setIsAddingMaterial(true);
+                            }}
+                            style={{ padding: "10px 16px", background: "#0050d5", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
+                          >
+                            Send →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RIGHT: Study Folder / Drop Zone */}
+                  <div style={{ padding: "24px 28px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ width: "28px", height: "28px", background: "#f0fdf4", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>📁</span>
+                        <span style={{ fontSize: "12px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.8px" }}>Study Folder</span>
+                        <span style={{ fontSize: "10px", fontWeight: "800", background: "#dbeafe", color: "#1d4ed8", padding: "2px 8px", borderRadius: "20px" }}>
+                          {(manageModal.studyMaterials || []).length} items
+                        </span>
+                      </div>
+                      {!isAddingMaterial && (
+                        <button onClick={() => { setIsAddingMaterial(true); setMaterialType("file"); setMaterialUrl(""); setMaterialTitle(""); setUploadedKey(""); }}
+                          style={{ display: "flex", alignItems: "center", gap: "5px", padding: "6px 14px", background: "#002f76", color: "white", border: "none", borderRadius: "10px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}>
+                          + Add
+                        </button>
                       )}
-
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button onClick={() => handleAddMaterial(manageModal.id)} disabled={!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile} style={{ flex: 1, padding: "10px", background: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "#cbd5e1" : "#10b981", color: "white", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "not-allowed" : "pointer" }}>Add to Folder</button>
-                        <button onClick={() => { setIsAddingMaterial(false); setMaterialUrl(""); setMaterialTitle(""); setUploadedKey(""); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ flex: 1, padding: "10px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>Cancel</button>
-                      </div>
                     </div>
-                  )}
 
-                  {/* ── Video & Links ── */}
-                  {(() => {
-                    const matLinks = (manageModal.studyMaterials || []).filter((m: any) => m.type === "link");
-                    const matFiles = (manageModal.studyMaterials || []).filter((m: any) => m.type === "file");
-                    const isEmpty = (!manageModal.studyMaterials || manageModal.studyMaterials.length === 0) && !isAddingMaterial;
-                    if (isEmpty) {
-                      return (
-                        <div style={{ textAlign: "center", padding: "24px", background: "#f8faff", borderRadius: "16px", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>
-                          Folder is empty. Add videos or files here.
-                        </div>
-                      );
-                    }
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-
-                        {/* Video & Links */}
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                            <span style={{ fontSize: "13px" }}>▶️</span>
-                            <span style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Video &amp; Links</span>
-                            <span style={{ fontSize: "10px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "1px 6px", borderRadius: "8px" }}>{matLinks.length}</span>
-                          </div>
-                          {matLinks.length === 0 ? (
-                            <div style={{ padding: "10px 14px", background: "#fffbeb", borderRadius: "10px", border: "1px dashed #fde68a", color: "#94a3b8", fontSize: "12px", textAlign: "center" }}>No video links yet.</div>
-                          ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                              {matLinks.map((m: any) => (
-                                <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px" }}>
-                                  <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "10px", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0, overflow: "hidden" }}>
-                                    <span style={{ fontSize: "18px", flexShrink: 0 }}>▶️</span>
-                                    <div style={{ overflow: "hidden" }}>
-                                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                                      <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
-                                    </div>
-                                  </button>
-                                  <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "8px", fontSize: "14px", flexShrink: 0 }} title="Remove">✕</button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Uploaded Files */}
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                            <span style={{ fontSize: "13px" }}>📄</span>
-                            <span style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Uploaded Files</span>
-                            <span style={{ fontSize: "10px", fontWeight: "700", color: "#94a3b8", background: "#f1f5f9", padding: "1px 6px", borderRadius: "8px" }}>{matFiles.length}</span>
-                          </div>
-                          {matFiles.length === 0 ? (
-                            <div style={{ padding: "10px 14px", background: "#eff6ff", borderRadius: "10px", border: "1px dashed #bfdbfe", color: "#94a3b8", fontSize: "12px", textAlign: "center" }}>No files uploaded yet.</div>
-                          ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                              {matFiles.map((m: any) => (
-                                <div key={m.id} style={{ border: "1px solid #bfdbfe", borderRadius: "10px", overflow: "hidden", background: "#eff6ff" }}>
-                                  {/* File row */}
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
-                                    <button onClick={() => openMaterial(manageModal.id, m)} style={{ display: "flex", alignItems: "center", gap: "10px", background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0, overflow: "hidden" }}>
-                                      <span style={{ fontSize: "18px", flexShrink: 0 }}>📄</span>
-                                      <div style={{ overflow: "hidden" }}>
-                                        <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e40af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
-                                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>Click to open</div>
-                                      </div>
-                                    </button>
-                                    <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px", marginLeft: "8px", fontSize: "14px", flexShrink: 0 }} title="Remove">✕</button>
-                                  </div>
-                                  {/* Submission row */}
-                                  {m.submission ? (
-                                    <div style={{ padding: "8px 14px", background: "#f0fdf4", borderTop: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: "8px" }}>
-                                      <span style={{ fontSize: "14px" }}>📬</span>
-                                      <div style={{ flex: 1, overflow: "hidden" }}>
-                                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#15803d" }}>Student Submitted</div>
-                                        <div style={{ fontSize: "10px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.submission.fileName} · {new Date(m.submission.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-                                      </div>
-                                      <button
-                                        onClick={async () => {
-                                          if (loadingFileId === m.id) return;
-                                          setLoadingFileId(m.id);
-                                          try {
-                                            const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(manageModal.id)}&submissionKey=${encodeURIComponent(m.submission.key)}`);
-                                            const data = await res.json();
-                                            if (data.success && data.url) {
-                                              setFileViewer({
-                                                title: m.submission.fileName,
-                                                url: data.url,
-                                                contentType: m.submission.fileType || "application/octet-stream",
-                                                uid: manageModal.id,
-                                                materialId: m.id,
-                                                fileKey: m.submission.key,
-                                              });
-                                            } else {
-                                              alert("Could not fetch view link.");
-                                            }
-                                          } finally {
-                                            setLoadingFileId(null);
-                                          }
-                                        }}
-                                        style={{ padding: "4px 10px", borderRadius: "8px", background: "#10b981", color: "white", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: "700", flexShrink: 0 }}
-                                      >
-                                        ⬇ View
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div style={{ padding: "6px 14px", background: "rgba(0,0,0,0.03)", borderTop: "1px solid #bfdbfe" }}>
-                                      <span style={{ fontSize: "11px", color: "#94a3b8", fontStyle: "italic" }}>No submission yet</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
+                    {/* Drag & Drop Zone */}
+                    {!isAddingMaterial && (
+                      <div
+                        onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.background = "#eff6ff"; (e.currentTarget as HTMLElement).style.borderColor = "#0050d5"; }}
+                        onDragLeave={e => { (e.currentTarget as HTMLElement).style.background = "#f8faff"; (e.currentTarget as HTMLElement).style.borderColor = "#cbd5e1"; }}
+                        onDrop={e => {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLElement).style.background = "#f8faff";
+                          (e.currentTarget as HTMLElement).style.borderColor = "#cbd5e1";
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) {
+                            setIsAddingMaterial(true);
+                            setMaterialType("file");
+                            setMaterialTitle(file.name.replace(/\.[^.]+$/, ""));
+                            handleFileUpload(file);
+                          }
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ padding: "28px 20px", borderRadius: "16px", border: "2.5px dashed #cbd5e1", background: "#f8faff", textAlign: "center", cursor: "pointer", transition: "all 0.2s", marginBottom: "16px" }}
+                      >
+                        <div style={{ fontSize: "32px", marginBottom: "8px" }}>📤</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", marginBottom: "4px" }}>Drag & drop files here</div>
+                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600" }}>or click to browse · PDF, DOC, MP4, IMG, ZIP</div>
+                        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp4,.mp3,.png,.jpg,.jpeg,.gif,.zip" style={{ display: "none" }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) {
+                              setIsAddingMaterial(true);
+                              setMaterialType("file");
+                              setMaterialTitle(f.name.replace(/\.[^.]+$/, ""));
+                              handleFileUpload(f);
+                            }
+                          }}
+                        />
                       </div>
-                    );
-                  })()}
+                    )}
+
+                    {/* Add Material Form */}
+                    {isAddingMaterial && (
+                      <div style={{ background: "#f8faff", padding: "16px", borderRadius: "16px", border: "2px solid #bfdbfe", marginBottom: "14px" }}>
+                        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                          {["link","file"].map(t => (
+                            <button key={t} onClick={() => { setMaterialType(t as any); setMaterialUrl(""); setUploadedKey(""); if(fileInputRef.current) fileInputRef.current.value=""; }}
+                              style={{ flex: 1, padding: "8px", borderRadius: "10px", border: materialType === t ? "none" : "1.5px solid #cbd5e1", background: materialType === t ? "#eff6ff" : "white", color: materialType === t ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>
+                              {t === "link" ? "▶️ Link / YouTube" : "📄 Upload File"}
+                            </button>
+                          ))}
+                        </div>
+                        <input value={materialTitle} onChange={e => setMaterialTitle(e.target.value)} placeholder="Title…" style={{ width: "100%", padding: "9px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "8px", boxSizing: "border-box", fontFamily: "inherit" }} />
+                        {materialType === "link" ? (
+                          <input value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="https://…" style={{ width: "100%", padding: "9px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", marginBottom: "10px", boxSizing: "border-box", fontFamily: "inherit" }} />
+                        ) : (
+                          <div style={{ marginBottom: "10px" }}>
+                            {materialUrl ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: "#f0fdf4", borderRadius: "10px", border: "1.5px solid #86efac" }}>
+                                <span style={{ fontSize: "18px" }}>✅</span>
+                                <div style={{ flex: 1, overflow: "hidden" }}>
+                                  <div style={{ fontSize: "12px", fontWeight: "700", color: "#15803d" }}>Uploaded!</div>
+                                  <div style={{ fontSize: "11px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{materialUrl}</div>
+                                </div>
+                                <button onClick={() => { setMaterialUrl(""); setUploadedKey(""); if(fileInputRef.current) fileInputRef.current.value=""; }} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px" }}>✕</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}
+                                style={{ width: "100%", padding: "18px", borderRadius: "10px", border: "2px dashed #cbd5e1", background: uploadingFile ? "#f8faff" : "white", color: uploadingFile ? "#64748b" : "#0050d5", fontWeight: "700", fontSize: "13px", cursor: uploadingFile ? "not-allowed" : "pointer", textAlign: "center" }}>
+                                {uploadingFile ? "⏳ Uploading…" : "📤 Click or drop a file"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button onClick={() => handleAddMaterial(manageModal.id)} disabled={!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile}
+                            style={{ flex: 1, padding: "10px", background: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "#cbd5e1" : "#002f76", color: "white", border: "none", borderRadius: "10px", fontWeight: "800", fontSize: "13px", cursor: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "not-allowed" : "pointer" }}>
+                            Add to Folder
+                          </button>
+                          <button onClick={() => { setIsAddingMaterial(false); setMaterialUrl(""); setMaterialTitle(""); setUploadedKey(""); if(fileInputRef.current) fileInputRef.current.value=""; }}
+                            style={{ flex: 1, padding: "10px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Material cards */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "300px", overflowY: "auto" }}>
+                      {(manageModal.studyMaterials || []).length === 0 && !isAddingMaterial ? (
+                        <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "12px", fontWeight: "600" }}>
+                          No materials yet. Drop files or paste a link above.
+                        </div>
+                      ) : (
+                        <>
+                          {matLinks.map((m: any) => (
+                            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: "12px" }}>
+                              <span style={{ fontSize: "18px", flexShrink: 0 }}>▶️</span>
+                              <button onClick={() => openMaterial(manageModal.id, m)} style={{ flex: 1, background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: 0, overflow: "hidden" }}>
+                                <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                <div style={{ fontSize: "11px", color: "#a16207", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.url}</div>
+                              </button>
+                              <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px", flexShrink: 0 }} title="Remove">✕</button>
+                            </div>
+                          ))}
+                          {matFiles.map((m: any) => (
+                            <div key={m.id} style={{ border: "1.5px solid #bfdbfe", borderRadius: "12px", overflow: "hidden", background: "#eff6ff" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px" }}>
+                                <span style={{ fontSize: "18px", flexShrink: 0 }}>📄</span>
+                                <button onClick={() => openMaterial(manageModal.id, m)} style={{ flex: 1, background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: 0, overflow: "hidden" }}>
+                                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e40af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                                  <div style={{ fontSize: "11px", color: "#64748b" }}>{loadingFileId === m.id ? "Opening…" : "Click to open"}</div>
+                                </button>
+                                <button onClick={() => handleDeleteMaterial(manageModal.id, m.id)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px", flexShrink: 0 }} title="Remove">✕</button>
+                              </div>
+                              {m.submission ? (
+                                <div style={{ padding: "8px 14px", background: "#f0fdf4", borderTop: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <span style={{ fontSize: "14px" }}>📬</span>
+                                  <div style={{ flex: 1, overflow: "hidden" }}>
+                                    <div style={{ fontSize: "11px", fontWeight: "700", color: "#15803d" }}>Student Submitted</div>
+                                    <div style={{ fontSize: "10px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.submission.fileName} · {new Date(m.submission.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      if (loadingFileId === m.id) return;
+                                      setLoadingFileId(m.id);
+                                      try {
+                                        const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(manageModal.id)}&submissionKey=${encodeURIComponent(m.submission.key)}`);
+                                        const data = await res.json();
+                                        if (data.success && data.url) {
+                                          setFileViewer({ title: m.submission.fileName, url: data.url, contentType: m.submission.fileType || "application/octet-stream", uid: manageModal.id, materialId: m.id, fileKey: m.submission.key });
+                                        } else { alert("Could not fetch view link."); }
+                                      } finally { setLoadingFileId(null); }
+                                    }}
+                                    style={{ padding: "4px 10px", borderRadius: "8px", background: "#10b981", color: "white", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: "700", flexShrink: 0 }}
+                                  >⬇ View</button>
+                                </div>
+                              ) : (
+                                <div style={{ padding: "6px 14px", background: "rgba(0,0,0,0.02)", borderTop: "1px solid #bfdbfe" }}>
+                                  <span style={{ fontSize: "11px", color: "#94a3b8", fontStyle: "italic" }}>No submission yet</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-
-
-              </div>
-            </m.div>
-          </div>
-        )}
+              </m.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
       {/* ── Confirm End Session Modal ── */}
       <AnimatePresence>
