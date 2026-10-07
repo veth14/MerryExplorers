@@ -3,10 +3,10 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import {
   getBreakMinutes,
-  BASE_SCHEDULE,
   type DayAbbr,
   computeLateDeduction,
   computeCreditedHours,
+  SCHEDULE,
 } from "@/lib/attendance-rules";
 import { computeContributions } from "@/lib/contributions";
 
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
 
           // Credited hours — tracked for reference and offset calculations
           if (rec.clockOutTime && abbr !== "Sun") {
-            const schedule = BASE_SCHEDULE[abbr as Exclude<DayAbbr, "Sun">];
+            const schedule = SCHEDULE[abbr as Exclude<DayAbbr, "Sun">];
             const breakMins = getBreakMinutes(dow);
             totalHours += computeCreditedHours(
               rec.clockInTime,

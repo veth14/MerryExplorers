@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import { m, AnimatePresence, type Variants  } from "framer-motion";
 import {
   getBreakMinutes,
-  BASE_SCHEDULE,
   type DayAbbr,
   computeLateDeduction,
   computeCreditedHours,
   type LateDeductionResult,
+  SCHEDULE,
 } from "@/lib/attendance-rules";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -256,7 +256,7 @@ function buildSheet(
 
     // Total Hours — schedule-clamped credited hours (ONLY for regular payroll).
     // Early arrivals and late departures are excluded. Does not affect OT/offset.
-    const schedule = abbr !== "Sun" ? BASE_SCHEDULE[abbr as Exclude<DayAbbr, "Sun">] : null;
+    const schedule = abbr !== "Sun" ? SCHEDULE[abbr as Exclude<DayAbbr, "Sun">] : null;
     const totalHours = clockOut && schedule
       ? computeCreditedHours(rec!.clockInTime!, rec!.clockOutTime!, schedule.start, schedule.normalEnd, breakMins)
       : 0;

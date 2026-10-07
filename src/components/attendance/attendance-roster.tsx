@@ -4,7 +4,7 @@ import { useState } from "react";
 import { StaffAttendance } from "@/data/attendance";
 import { Modal } from "@/components/ui/modal";
 import { CustomTimePicker } from "@/components/ui/custom-time-picker";
-import { NEW_SCHEDULE_EFFECTIVE_DATE } from "@/lib/attendance-rules";
+import { getBreakMinutes, getScheduleForDate } from "@/lib/attendance-rules";
 
 type AttendanceRosterProps = {
   data: StaffAttendance[];
@@ -31,10 +31,13 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
   const filteredData = data.filter(staff => filterStatus === "All" || staff.status === filterStatus);
 
   // Determine which shift label to show when no clock-in exists
-  const shiftFallbackLabel =
-    dateStr && dateStr >= NEW_SCHEDULE_EFFECTIVE_DATE
-      ? "9:30 AM (Shift)"
-      : "8:30 AM (Shift)";
+  const shiftFallbackLabel = (() => {
+    if (!dateStr) return "Shift";
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const dateObj = new Date(y, m - 1, d, 12);
+    const schedule = getScheduleForDate(dateObj);
+    return schedule ? `${schedule.start} (Shift)` : "Shift";
+  })();
 
   const getStatusBadge = (status: StaffAttendance["status"]) => {
     switch (status) {
