@@ -96,7 +96,7 @@ function generateCutOffs(): { label: string; value: string; start: Date; end: Da
     // Second half: 11–25
     const start2 = new Date(year, month, 11);
     const end2 = new Date(year, month, 25);
-    const pay2 = new Date(year, month, 31);
+    const pay2 = new Date(year, month + 1, 0);
     cutOffs.push({
       label: `${monthName} ${pay2.getDate()}, ${year} (${monthName.slice(0, 3)} 11–25)`,
       value: `${year}-${month}-2h`,
@@ -116,8 +116,8 @@ function generateCutOffs(): { label: string; value: string; start: Date; end: Da
     });
   }
 
-  // System began operation August 1, 2026. Earliest cutoff ends Aug 10.
-  const cutoffLimit = new Date(2026, 7, 10);
+  // Removed legacy cutoffs; earliest cutoff ends Sep 25.
+  const cutoffLimit = new Date(2026, 8, 25);
   return cutOffs.filter(c => c.end >= cutoffLimit).slice(0, 10);
 }
 
