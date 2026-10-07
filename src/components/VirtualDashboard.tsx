@@ -151,7 +151,7 @@ function Drop({ x, y, r, s = 1, fill }: { x: number; y: number; r: number; s?: n
 }
 
 const BANNER_SEGS: [string, string, string][] = [
-    ["DREAM", "#ffffff", "#dbe9ff"],
+    ["Dream", "#ffffff", "#dbe9ff"],
     [".", "#5cc8ff", "#ffffff"],
     ["Discover", SUN, "#ffffff"],
     [".", "#5cc8ff", "#ffffff"],
