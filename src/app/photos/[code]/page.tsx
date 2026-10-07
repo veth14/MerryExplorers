@@ -129,7 +129,7 @@ function Drop({ x, y, r, s = 1, fill }: { x: number; y: number; r: number; s?: n
   );
 }
 const BANNER_SEGS: [string, string][] = [
-  ["DREAM", "#ffffff"], [".", "#5cc8ff"], ["Discover", SUN], [".", "#5cc8ff"], ["Explore", "#ffffff"],
+  ["Dream", "#ffffff"], [".", "#5cc8ff"], ["Discover", SUN], [".", "#5cc8ff"], ["Explore", "#ffffff"],
 ];
 const BOUNCE = [-2, 3, -3, 2, -1, 3, -2];
 function BannerChars({ colored }: { colored: boolean }) {
