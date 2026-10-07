@@ -4,7 +4,7 @@ import { sendPaymentSubmittedEmail, sendPaymentVerifiedEmail } from "@/lib/virtu
 
 export const dynamic = "force-dynamic";
 
-// POST — Parent submits a session payment
+// POST — Parent submits a session payment (any amount, any time)
 export async function POST(request: Request) {
   try {
     const data = await request.json();
@@ -14,31 +14,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Parents can pay any amount, but it has to be a real positive number.
+    const amount = Math.round(Number(amountPaid) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: "Please enter a valid amount greater than zero." }, { status: 400 });
+    }
+
     const { db } = await connectToDatabase();
     const account = await db.collection("accounts").findOne({ _id: uid as any });
+    if (!account) {
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    }
 
     const payment = {
       id: crypto.randomUUID(),
       paymentMethod,
       receiptBase64,
       referenceNumber: referenceNumber || "",
-      amountPaid: Number(amountPaid) || 675,
+      amountPaid: amount,
       submittedAt: new Date().toISOString(),
       verified: false,
       rejected: false,
       adminNote: "",
     };
 
+    // Submitting a payment no longer touches needsSessionPayment: families are not blocked.
     await db.collection("accounts").updateOne(
       { _id: uid as any },
-      { 
-        $push: { sessionPayments: payment } as any,
-        $set: { needsSessionPayment: false }
-      }
+      { $push: { sessionPayments: payment } as any }
     );
 
     // Send confirmation email (non-fatal)
-    if (account?.email) {
+    if (account.email) {
       try {
         await sendPaymentSubmittedEmail(account.email, account.fullName || account.email, payment.amountPaid);
       } catch (emailErr: any) {
@@ -85,10 +92,13 @@ export async function PATCH(request: Request) {
     if (!uid || !paymentId || !action) {
       return NextResponse.json({ error: "uid, paymentId, and action are required" }, { status: 400 });
     }
+    if (action !== "verify" && action !== "reject") {
+      return NextResponse.json({ error: "action must be 'verify' or 'reject'" }, { status: 400 });
+    }
 
     const { db } = await connectToDatabase();
 
-    await db.collection("accounts").updateOne(
+    const result = await db.collection("accounts").updateOne(
       { _id: uid as any, "sessionPayments.id": paymentId },
       {
         $set: {
@@ -100,7 +110,11 @@ export async function PATCH(request: Request) {
       }
     );
 
-    // If verified, email parent that next session is unlocked
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    }
+
+    // If verified, email the parent
     if (action === "verify") {
       const account = await db.collection("accounts").findOne({ _id: uid as any });
       if (account?.email) {

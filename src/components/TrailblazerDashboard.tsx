@@ -3,6 +3,12 @@
 import { useState, useEffect, type ReactNode } from "react";
 import Image from "next/image";
 import { Fredoka } from "next/font/google";
+import { getCompletedSessionsCount } from "@/lib/sessions";
+import {
+    RESERVATION_RATE, WEEKLY_INTEREST_RATE, BALANCE_DUE_SESSION,
+    isRegistrationVerified, fmtPeso, fmtIsoDate,
+    getStudentSessionInfo, calcRegistrationTerms,
+} from "@/lib/payment-terms";
 
 const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -19,7 +25,7 @@ const TEXT_2 = "#3d5a99";
 const ERROR = "#b3261e";
 
 type ToastType = "success" | "error" | "info";
-type Tab = "session" | "virtual" | "photos" | "waiver" | "history" | "renewal" | "profile";
+type Tab = "session" | "virtual" | "photos" | "waiver" | "payments" | "renewal" | "profile";
 
 type Props = {
     profile: any; // ParentProfile
@@ -39,6 +45,8 @@ type Props = {
     loadingFileId?: string | null;
     agreement: ReactNode;
     setLightbox?: (lb: any) => void;
+    // Registration records for this family (must be filtered to the logged-in parent on the server).
+    registrations?: any[];
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -132,6 +140,19 @@ function fmtExpiry(str: string) {
     return new Date(str).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+// ─── Payments (rules + math live in @/lib/payment-terms, shared with Payment Tracking) ───
+// TEMP (testing only): when the parent page does not pass `registrations`, fetch them here and keep
+// only this parent's. This downloads EVERY family's registrations to the browser, so replace it with
+// a server route that returns only the logged-in parent's registration, then set this to false.
+const TEMP_FETCH_REGISTRATIONS = true;
+
+type LedgerRow = {
+    key: string; label: string; date: string; method: string; ref: string;
+    amount: number; verified: boolean; rejected: boolean; note?: string;
+};
+const ledgerStatus = (r: { verified: boolean; rejected: boolean }) =>
+    r.verified ? "Verified" : r.rejected ? "Rejected" : "Pending";
+
 // ─── Icons (rounded 2.2px stroke, lucide style) ──────────────────────────────
 const ICONS: Record<string, ReactNode> = {
     monitor: <><rect x="2" y="3" width="20" height="14" rx="3" /><path d="M8 21h8M12 17v4" /></>,
@@ -141,7 +162,8 @@ const ICONS: Record<string, ReactNode> = {
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     calendar: <><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
     refresh: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></>,
-    history: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></>,
+    check: <path d="m5 12 5 5 9-10" />,
+    card: <><rect x="2" y="5" width="20" height="14" rx="3" /><path d="M2 10h20M6 15h4" /></>,
 };
 function Icon({ name, size = 22 }: { name: string; size?: number }) {
     return (
@@ -361,10 +383,42 @@ function InfoBox({ label, value, bg = INPUT_BG }: { label: string; value: ReactN
     );
 }
 
+type StepState = "paid" | "pending" | "partial" | "due" | "late";
+const STEP_LABEL: Record<StepState, string> = {
+    paid: "Paid", pending: "Awaiting verification", partial: "Partially paid", due: "Not yet paid", late: "Overdue",
+};
+function Step({ state, title, amount, note }: { state: StepState; title: string; amount: string; note?: string }) {
+    return (
+        <div className={`vp-step ${state}`}>
+            <div className="vp-step-top">
+                <span className="vp-label">{title}</span>
+                <span className="vp-pill">{state === "paid" && <Icon name="check" size={14} />}{STEP_LABEL[state]}</span>
+            </div>
+            <strong className="vp-step-amt">{amount}</strong>
+            {note && <small className="vp-step-note">{note}</small>}
+        </div>
+    );
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function TrailblazerDashboard(p: Props) {
     const { profile } = p;
     const [tab, setTab] = useState<Tab>("session");
+
+    // Registration records for this family: from props, or (TEMP) fetched here
+    const [fetchedRegs, setFetchedRegs] = useState<any[] | null>(null);
+    useEffect(() => {
+        const mail = (profile.email || "").toLowerCase();
+        if (!TEMP_FETCH_REGISTRATIONS || p.registrations || !mail) return;
+        fetch("/api/registrations?status=all")
+            .then((r) => r.json())
+            .then((d) => {
+                const list: any[] = d?.success && Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : [];
+                setFetchedRegs(list.filter((r) => (r.parentInfo?.email || "").toLowerCase() === mail));
+            })
+            .catch(() => setFetchedRegs([]));
+    }, [p.registrations, profile.email]);
+    const registrations: any[] = p.registrations ?? fetchedRegs ?? [];
 
     const recentAlbum = profile.albums?.[0] ?? null;
     const [expandedAlbum, setExpandedAlbum] = useState<string | null>(recentAlbum?.id ?? null);
@@ -372,12 +426,20 @@ export default function TrailblazerDashboard(p: Props) {
     const childFavs = profile.studentInfo?.childInfo || profile.childInfo;
     const firstName = (profile.fullName || "").split(" ")[0] || "there";
 
+    // Sessions completed, counted the same way as the main parent dashboard and Payment Tracking
+    const TOTAL_SESSIONS = 18; // Trailblazer: Brave Explorer
+    const sessionsDone = getCompletedSessionsCount(
+        profile.studentInfo?.enrolledAt,
+        profile.schedule || profile.studentInfo?.schedule || "",
+        profile.classTime || profile.studentInfo?.classTime || ""
+    );
+
     const tabs: { id: Tab; label: string; icon: string }[] = [
         { id: "session", label: "Session", icon: "calendar" },
         { id: "virtual", label: "Virtual class", icon: "monitor" },
         { id: "photos", label: "Photos", icon: "camera" },
         { id: "waiver", label: "Waiver", icon: "shield" },
-        { id: "history", label: "History", icon: "history" },
+        { id: "payments", label: "Payments", icon: "card" },
         { id: "renewal", label: "Renewal", icon: "refresh" },
         { id: "profile", label: "Profile", icon: "user" },
     ];
@@ -540,27 +602,193 @@ export default function TrailblazerDashboard(p: Props) {
         );
     }
 
-    function HistoryPanel() {
-        const items: any[] = profile.history || [];
+    function PaymentsPanel() {
+        // Find this child's registration (same email, then same first name for siblings)
+        const email = (profile.email || "").toLowerCase();
+        const childName = (childFavs?.firstName || profile.childName || "").trim().toLowerCase();
+        const mine = registrations.filter((r: any) => (r.parentInfo?.email || "").toLowerCase() === email);
+        // handles multi-word first names like "Ian Angelo"; falls back to the first registration on this email
+        const registration: any =
+            mine.find((r: any) => {
+                const rn = (r.childInfo?.firstName || "").trim().toLowerCase();
+                return !!rn && !!childName && (rn === childName || childName.startsWith(rn) || rn.startsWith(childName));
+            }) ?? mine[0] ?? null;
+
+        // Ledger: registration + session payments (renewal downpayments belong to the Renewal tab, same as Payment Tracking's "Current Adventure" view)
+        const ledger: LedgerRow[] = [];
+        if (registration) {
+            ledger.push({
+                key: "reg", label: "Registration",
+                date: registration.submittedAt || "", method: registration.paymentMethod || "", ref: registration.referenceNumber || "",
+                amount: Number(registration.amountPaid || registration.amountDue || 0),
+                verified: isRegistrationVerified(registration.status), rejected: registration.status === "rejected",
+                note: registration.adminNote,
+            });
+        }
+        (p.sessionPayments || []).forEach((sp: any) =>
+            ledger.push({
+                key: "s-" + sp.id, label: "Virtual Session",
+                date: sp.submittedAt, method: sp.paymentMethod || "", ref: sp.referenceNumber || "",
+                amount: Number(sp.amountPaid || 0), verified: !!sp.verified, rejected: !!sp.rejected, note: sp.adminNote,
+            })
+        );
+        ledger.sort((x, y) => new Date(x.date || 0).getTime() - new Date(y.date || 0).getTime());
+
+        // Balance math: identical to Payment Tracking (only the verified registration payment counts)
+        const regLine = ledger.find((l) => l.key === "reg");
+        const paidVerified = regLine?.verified ? regLine.amount : 0;
+        const terms = registration
+            ? calcRegistrationTerms(registration, getStudentSessionInfo(registration, profile), paidVerified, registration.amountDue)
+            : null;
+        const fullyPaid = terms?.balance === 0;
+        const overdue = !!terms && terms.interest > 0;
+        const regPending = !!regLine && !regLine.verified && !regLine.rejected;
+        const pct = (n: number) => Math.round(n * 100);
+
+        // Which part of the schedule is covered by verified payments
+        const resAmt = terms?.reservation ?? 0;
+        const balAmt = terms?.balanceShare ?? 0;
+        const resPaid = !!terms && terms.paidVerified >= resAmt;
+        const balPaidAmt = terms ? Math.min(balAmt, Math.max(0, terms.paidVerified - resAmt)) : 0;
+        const balPaid = !!terms && balPaidAmt >= balAmt;
+        const balPartial = !balPaid && balPaidAmt > 0;
+
         return (
-            <Card tape>
-                <Heading icon="history" title="History" sub="View past registrations and sessions." />
-                {items.length > 0 ? (
-                    <div className="vp-list">
-                        {items.map((h: any, i: number) => (
-                            <div key={i} className="vp-pay">
-                                <div>
-                                    <strong>{h.program}</strong>
-                                    <small>{h.term}</small>
-                                </div>
-                                {h.status && <span className="vp-tag">{h.status}</span>}
+            <>
+                <Card tape>
+                    <Heading icon="card" title="Payment summary" sub="Your balance, due date and any interest." />
+                    {p.paymentsLoading ? (
+                        <Empty icon="card" title="Loading payments…" text="Please wait a moment." />
+                    ) : !registration || !terms || terms.due == null ? (
+                        <>
+                            <Empty icon="card" title="No payment details yet" text="Your fee and balance will appear here once your registration is on file." />
+                            {process.env.NODE_ENV !== "production" && (
+                                <p className="vp-sub" style={{ marginTop: 10 }}>
+                                    dev: {registrations.length} registration(s) received for {profile.email || "no email"}
+                                    {registration && terms?.due == null ? ` · registration found but no fee for program "${registration.program}"` : ""}
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <div className="vp-due" style={{ alignItems: "center", textAlign: "center" }}>
+                                <span className="vp-label" style={{ color: "#fff" }}>{fullyPaid ? "Balance" : "Total payable now"}</span>
+                                <strong className="vp-count-line" style={fullyPaid ? { color: "#b6f5c2" } : undefined}>
+                                    {fullyPaid ? "Fully paid" : fmtPeso(terms.totalPayable)}
+                                </strong>
+                                {overdue && (
+                                    <span style={{ fontSize: 14, color: SUN_LIGHT, fontWeight: 600 }}>
+                                        includes {fmtPeso(terms.interest)} interest ({pct(WEEKLY_INTEREST_RATE)}% × {terms.mondays} Monday{terms.mondays > 1 ? "s" : ""})
+                                    </span>
+                                )}
+                                {!fullyPaid && !overdue && terms.dueDate && (
+                                    <span style={{ fontSize: 14, color: SUN_LIGHT, fontWeight: 600 }}>
+                                        Balance due on {fmtIsoDate(terms.dueDate)}
+                                    </span>
+                                )}
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <Empty icon="history" title="No history found" text="Your previous enrollments will appear here." />
+
+                            {regPending && (
+                                <div className="vp-note-box">Your registration payment is awaiting verification, so it is not counted in the balance yet.</div>
+                            )}
+                            {regLine?.rejected && (
+                                <div className="vp-error" role="alert">
+                                    Your registration payment was rejected.{regLine.note ? ` Reason: ${regLine.note}` : ""} Please contact the center.
+                                </div>
+                            )}
+
+                            <h3 className="vp-h3" style={{ marginBottom: 14 }}>Payment schedule</h3>
+                            <div className="vp-grid">
+                                <Step
+                                    state={resPaid ? "paid" : regPending ? "pending" : "due"}
+                                    title={`Reservation (${pct(RESERVATION_RATE)}%)`}
+                                    amount={fmtPeso(terms.reservation)}
+                                    note={resPaid ? "Received and verified" : regPending ? "We are checking your payment" : "Non-refundable, paid upon registration"}
+                                />
+                                <Step
+                                    state={balPaid ? "paid" : overdue ? "late" : balPartial ? "partial" : "due"}
+                                    title={`Balance (${100 - pct(RESERVATION_RATE)}%) · session ${BALANCE_DUE_SESSION}`}
+                                    amount={fmtPeso(terms.balanceShare)}
+                                    note={
+                                        balPaid
+                                            ? "Received and verified"
+                                            : [
+                                                balPartial ? `${fmtPeso(balPaidAmt)} of ${fmtPeso(balAmt)} paid` : "",
+                                                terms.dueDate ? `Due ${fmtIsoDate(terms.dueDate)}` : "Due date not set",
+                                                overdue ? `+${fmtPeso(terms.interest)} interest so far` : "",
+                                            ].filter(Boolean).join(" · ")
+                                    }
+                                />
+                            </div>
+
+                            <details className="vp-more">
+                                <summary>See fee breakdown</summary>
+                                <div className="vp-receipt">
+                                    {terms.items.map((it) => (
+                                        <div key={it.key} className="vp-rrow"><span>{it.label}</span><span>{fmtPeso(it.amount)}</span></div>
+                                    ))}
+                                    <div className="vp-rrow total"><span>Total fee</span><span>{fmtPeso(terms.due)}</span></div>
+                                    <div className="vp-rrow"><span>Verified paid</span><span>− {fmtPeso(terms.paidVerified)}</span></div>
+                                    <div className="vp-rrow total"><span>Remaining balance</span><span>{fmtPeso(terms.balance)}</span></div>
+                                    {!fullyPaid && (
+                                        <>
+                                            <div className={`vp-rrow ${overdue ? "late" : ""}`}>
+                                                <span>
+                                                    {overdue
+                                                        ? `Interest (${pct(WEEKLY_INTEREST_RATE)}% × ${terms.mondays} Monday${terms.mondays > 1 ? "s" : ""})`
+                                                        : `Interest (${pct(WEEKLY_INTEREST_RATE)}% every Monday)`}
+                                                    {!overdue && (
+                                                        <small>
+                                                            {terms.interestStart ? `None yet. First charge Monday, ${fmtIsoDate(terms.interestStart)}` : "Starts the Monday after session 6"}
+                                                        </small>
+                                                    )}
+                                                </span>
+                                                <span>{overdue ? "+ " : ""}{fmtPeso(terms.interest)}</span>
+                                            </div>
+                                            <div className={`vp-rrow total ${overdue ? "late" : ""}`}><span>Total payable now</span><span>{fmtPeso(terms.totalPayable)}</span></div>
+                                        </>
+                                    )}
+                                </div>
+                            </details>
+
+                            {!fullyPaid && (
+                                <p className="vp-sub" style={{ marginTop: 14 }}>
+                                    📌 Unpaid balances after the due date are charged <b>{pct(WEEKLY_INTEREST_RATE)}% every Monday</b>. Only verified payments reduce your balance.
+                                </p>
+                            )}
+                        </>
+                    )}
+                </Card>
+
+                {!p.paymentsLoading && ledger.length > 0 && (
+                    <Card>
+                        <Heading icon="card" title="Payment history" sub="Every payment you have submitted." />
+                        <div className="vp-list">
+                            {ledger.map((l) => {
+                                const st = ledgerStatus(l);
+                                const bg = l.verified ? "#d8f5dc" : l.rejected ? "#fff1ee" : undefined;
+                                return (
+                                    <div key={l.key} className="vp-pay" style={bg ? { background: bg } : undefined}>
+                                        <div>
+                                            <strong>{l.label}</strong>
+                                            <small>
+                                                {l.date ? new Date(l.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
+                                                {l.method ? ` · ${l.method.toUpperCase()}` : ""}
+                                            </small>
+                                            {l.ref && <small>Ref: {l.ref}</small>}
+                                            {l.rejected && l.note && <small style={{ color: ERROR }}>Reason: {l.note}</small>}
+                                        </div>
+                                        <div style={{ textAlign: "right" }}>
+                                            <strong style={{ display: "block", fontSize: 18 }}>{fmtPeso(l.amount)}</strong>
+                                            <span className="vp-tag" style={l.rejected ? { color: ERROR, borderColor: "#ff6b57" } : undefined}>{st}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </Card>
                 )}
-            </Card>
+            </>
         );
     }
 
@@ -601,7 +829,7 @@ export default function TrailblazerDashboard(p: Props) {
 
     const panels: Record<Tab, () => ReactNode> = {
         session: SessionPanel, virtual: VirtualPanel, photos: PhotosPanel,
-        waiver: WaiverPanel, history: HistoryPanel, renewal: RenewalPanel, profile: ProfilePanel,
+        waiver: WaiverPanel, payments: PaymentsPanel, renewal: RenewalPanel, profile: ProfilePanel,
     };
 
     return (
@@ -638,7 +866,10 @@ export default function TrailblazerDashboard(p: Props) {
                                 )}
                             </div>
                         </div>
-                        <div className="vp-stat"><strong>{profile.albums?.length || 0}</strong><span>photo albums</span></div>
+                        <div className="vp-stats">
+                            <div className="vp-stat"><strong>{sessionsDone}<small> / {TOTAL_SESSIONS}</small></strong><span>sessions</span></div>
+                            <div className="vp-stat"><strong>{profile.albums?.length || 0}</strong><span>photo albums</span></div>
+                        </div>
                     </div>
                 </Card>
 
@@ -741,6 +972,8 @@ const CSS = `
 .vp-tag{display:inline-block;font-size:13px;font-weight:600;color:${NAVY};border:2.5px solid ${NAVY};border-radius:20px;padding:3px 12px;background:#fff6cf}
 .vp-stat{text-align:center;background:#fff6cf;border:3px solid ${NAVY};border-radius:20px;padding:12px 22px;box-shadow:0 5px 0 rgba(11,42,130,.2)}
 .vp-stat strong{display:block;font-size:32px;line-height:1.1}.vp-stat span{font-size:13px;color:${TEXT_2};font-weight:600}
+.vp-stat strong small{font-size:17px;color:${TEXT_2};font-weight:600}
+.vp-stats{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
 
 /* tabs */
 .vp-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;padding:4px 4px 8px}
@@ -784,6 +1017,33 @@ const CSS = `
 /* countdown (reuses the blue "due" panel) */
 .vp-due{background:linear-gradient(135deg,${BLUE},#2f8bf0);border:3px solid ${NAVY};border-radius:20px;padding:18px 20px;margin-bottom:22px;color:#fff;box-shadow:0 6px 0 ${NAVY};display:flex;flex-direction:column;gap:6px}
 .vp-count-line{display:flex;gap:14px;justify-content:center;font-size:34px;font-weight:700;line-height:1.2}
+
+/* collapsible fee breakdown */
+.vp-more{margin-top:18px;border:3px solid ${NAVY};border-radius:18px;background:${INPUT_BG};overflow:hidden}
+.vp-more summary{cursor:pointer;list-style:none;padding:12px 16px;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.vp-more summary::-webkit-details-marker{display:none}
+.vp-more summary::after{content:"▼";font-size:12px;color:${TEXT_2}}
+.vp-more[open] summary::after{content:"▲"}
+.vp-more summary:focus-visible{outline:none;box-shadow:inset 0 0 0 4px rgba(255,210,63,.9)}
+.vp-receipt{padding:0 16px 8px;background:#fff;border-top:3px dashed ${INPUT_BORDER}}
+.vp-rrow{display:flex;justify-content:space-between;gap:12px;padding:10px 0;font-size:14px;border-bottom:2px dashed ${INPUT_BORDER}}
+.vp-rrow:last-child{border-bottom:none}
+.vp-rrow.total{font-weight:700;font-size:16px}
+.vp-rrow.late{color:${ERROR};font-weight:700}
+.vp-rrow small{display:block;color:${TEXT_2};font-size:12px;font-weight:500;margin-top:2px}
+
+/* payment schedule steps */
+.vp-step{border:3px solid ${NAVY};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;background:#fff6cf;border-style:dashed}
+.vp-step-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.vp-step-amt{font-size:24px;line-height:1.1}
+.vp-step-note{font-size:13px;color:${TEXT_2};font-weight:600}
+.vp-pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;border:2.5px solid ${NAVY};background:#fff;white-space:nowrap}
+.vp-step.paid{background:#d8f5dc;border-style:solid;box-shadow:0 5px 0 rgba(11,42,130,.25)}
+.vp-step.paid .vp-pill{background:#2fa84f;border-color:${NAVY};color:#fff}
+.vp-step.pending .vp-pill,.vp-step.partial .vp-pill{background:${SUN_LIGHT}}
+.vp-step.late{background:#fff1ee;border-color:#ff6b57}
+.vp-step.late .vp-pill{background:#ff6b57;border-color:${ERROR};color:#fff}
+.vp-step.late .vp-step-note{color:${ERROR}}
 
 /* photos */
 .tb-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}

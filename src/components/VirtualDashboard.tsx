@@ -3,6 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Fredoka } from "next/font/google";
+import { getSessionBalance } from "@/lib/session-balance";
 
 const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -282,6 +283,11 @@ function Field({ label, id, children }: { label: string; id: string; children: R
     );
 }
 
+// Strips the "1791266045578_1791194143511__" style prefix added at upload time
+function cleanFileName(name: string) {
+    return (name || "").replace(/^\d+_\d+__?/, "") || name;
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function VirtualDashboard(p: Props) {
     const { profile, user, showToast } = p;
@@ -289,6 +295,23 @@ export default function VirtualDashboard(p: Props) {
     const childFavs = profile.studentInfo?.childInfo || profile.childInfo;
     const firstName = (profile.fullName || "").split(" ")[0] || "there";
     const due = profile.promoDiscount ? profile.promoDiscount.finalPrice : 675;
+
+    // ── Account balance (pay-when-you-can) ──────────────────────────────────────
+    // Each session the admin ends adds one session rate to what the family owes.
+    // Only verified payments reduce the balance. All rules live in @/lib/session-balance.
+    const {
+        rate,
+        sessionsDone,
+        billedSessions,
+        totalBilled,
+        verifiedPaid,
+        checking: checkingAmt,
+        balance,
+    } = getSessionBalance(profile, p.sessionPayments);
+
+    const prepaidSessions = sessionsDone - billedSessions; // 1 if registration already covers session 1
+    // Shows up only if the server's sessionBalance differs from sessions × rate − confirmed payments
+    const adjustment = balance - Math.max(0, totalBilled - verifiedPaid);
 
     const tabs: { id: Tab; label: string; icon: string }[] = [
         { id: "virtual", label: "Virtual class", icon: "monitor" },
@@ -302,6 +325,7 @@ export default function VirtualDashboard(p: Props) {
     const subRef = useRef<HTMLInputElement>(null);
     const [subFor, setSubFor] = useState<string | null>(null);
     const [uploadingId, setUploadingId] = useState<string | null>(null);
+    const [viewingId, setViewingId] = useState<string | null>(null);
 
     async function handleSubmissionFile(file?: File) {
         if (!file || !subFor) return;
@@ -332,6 +356,27 @@ export default function VirtualDashboard(p: Props) {
             setUploadingId(null);
             setSubFor(null);
             if (subRef.current) subRef.current.value = "";
+        }
+    }
+
+    // Opens the work the parent submitted, using a short-lived signed link
+    async function viewSubmission(m: any) {
+        if (!m.submission?.key) return;
+        setViewingId(m.id);
+        // Open the tab right away (inside the click) so popup blockers allow it
+        const win = window.open("", "_blank");
+        try {
+            // Reuses the same endpoint the file viewer's download button already uses for submissions
+            const res = await fetch(`/api/files/download-url?submissionKey=${encodeURIComponent(m.submission.key)}`);
+            const data = await res.json().catch(() => ({}));
+            if (!data.success || !data.url) throw new Error(data.error || "No link");
+            if (win) win.location.href = data.url;
+            else window.location.href = data.url;
+        } catch {
+            win?.close();
+            showToast("We couldn't open your work. Please try again.", "error");
+        } finally {
+            setViewingId(null);
         }
     }
 
@@ -374,7 +419,7 @@ export default function VirtualDashboard(p: Props) {
             const res = await fetch("/api/parents/session-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ uid: user.uid, paymentMethod: method, receiptBase64: receipt, referenceNumber: ref, amountPaid: Number(amount) || due }),
+                body: JSON.stringify({ uid: user.uid, paymentMethod: method, receiptBase64: receipt, referenceNumber: ref, amountPaid: Number(amount) || balance || due }),
             });
             const data = await res.json();
             if (data.success) {
@@ -443,16 +488,22 @@ export default function VirtualDashboard(p: Props) {
             <>
                 <Card tape>
                     <Heading icon="monitor" title="Virtual class" sub="Join your online session from here." />
-                    {profile.needsSessionPayment ? (
-                        <Empty icon="card" title="Time for the next session" text={`Your last session has ended. Send ₱${due.toLocaleString()} to unlock the next one.`}
-                            action={<button className="vp-btn" onClick={() => setTab("payments")}>Go to payments</button>} />
-                    ) : link ? (
+                    {link ? (
                         <Empty icon="play" title="Your class link is ready" text="Tap the button when it's time to join."
                             action={<a className="vp-btn" href={link} target="_blank" rel="noopener noreferrer">Join virtual class</a>} />
                     ) : pending ? (
-                        <Empty icon="clock" title="We're checking your payment" text="Your class link will show up here as soon as we confirm it." />
+                        <Empty icon="clock" title="We're checking your payment" text="Thank you! We'll confirm it soon. Your class link will show up here when your teacher posts it." />
                     ) : (
                         <Empty icon="monitor" title="No class link yet" text="Your teacher hasn't posted the link. Check back a little before class time." />
+                    )}
+                    {balance > 0 && (
+                        <div className="vp-balance-note">
+                            <span>
+                                Account balance: <strong>₱{balance.toLocaleString()}</strong>
+                                {checkingAmt > 0 && ` (₱${checkingAmt.toLocaleString()} being checked)`}
+                            </span>
+                            <button className="vp-btn small" onClick={() => setTab("payments")}>Pay now</button>
+                        </div>
                     )}
                 </Card>
 
@@ -503,6 +554,7 @@ export default function VirtualDashboard(p: Props) {
                             {files.map((m) => {
                                 const loading = p.loadingFileId === m.id;
                                 const uploading = uploadingId === m.id;
+                                const viewing = viewingId === m.id;
                                 return (
                                     <div key={m.id} className="vp-file">
                                         <button className="vp-item flat" onClick={() => p.onOpenMaterial(m)} disabled={!!p.loadingFileId}>
@@ -510,12 +562,24 @@ export default function VirtualDashboard(p: Props) {
                                             <span className="vp-item-text"><strong>{m.title}</strong><small>{loading ? "Opening…" : "Tap to view"}</small></span>
                                         </button>
                                         <div className="vp-row-between" style={{ padding: "10px 14px" }}>
-                                            <span className="vp-sub" style={{ margin: 0 }}>
-                                                {m.submission ? `Sent: ${m.submission.fileName}` : "No work sent yet"}
-                                            </span>
-                                            <button className={m.submission ? "vp-btn blue small" : "vp-btn small"} disabled={uploading} onClick={() => { setSubFor(m.id); subRef.current?.click(); }}>
-                                                {uploading ? "Sending…" : m.submission ? "Send again" : "Send my work"}
-                                            </button>
+                                            {m.submission ? (
+                                                <button className="vp-sent" onClick={() => viewSubmission(m)} disabled={viewing} title="Open the work you sent">
+                                                    <Icon name="check" size={16} />
+                                                    <span>{viewing ? "Opening…" : `Sent: ${cleanFileName(m.submission.fileName)}`}</span>
+                                                </button>
+                                            ) : (
+                                                <span className="vp-sub" style={{ margin: 0 }}>No work sent yet</span>
+                                            )}
+                                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                                {m.submission && (
+                                                    <button className="vp-btn ghost small" disabled={viewing} onClick={() => viewSubmission(m)}>
+                                                        {viewing ? "Opening…" : "View my work"}
+                                                    </button>
+                                                )}
+                                                <button className={m.submission ? "vp-btn blue small" : "vp-btn small"} disabled={uploading} onClick={() => { setSubFor(m.id); subRef.current?.click(); }}>
+                                                    {uploading ? "Sending…" : m.submission ? "Send again" : "Send my work"}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -537,16 +601,61 @@ export default function VirtualDashboard(p: Props) {
         const ready = !!method && !!receipt && !!amount && !sending;
         return (
             <>
-                <Card tape>
-                    <Heading icon="card" title="Send a payment" sub="Pay with a QR code, then upload your receipt." />
-                    <div className="vp-due">
-                        <span className="vp-label" style={{ color: "#fff" }}>Amount due per session</span>
-                        {profile.promoDiscount && (
-                            <span className="vp-due-small">
-                                <s>₱{profile.promoDiscount.originalPrice.toLocaleString()}</s> · {profile.promoCode} saves ₱{profile.promoDiscount.discountAmount.toLocaleString()}
-                            </span>
+                {/* Breakdown: how the balance is worked out */}
+                <Card>
+                    <Heading icon="card" title="Payment breakdown" sub="How your balance is worked out." />
+                    <div className="vp-break">
+                        <div className="vp-break-row">
+                            <span>Sessions ended</span>
+                            <strong>{sessionsDone}</strong>
+                        </div>
+                        {prepaidSessions > 0 && (
+                            <div className="vp-break-row">
+                                <span>Covered by registration</span>
+                                <strong>−{prepaidSessions}</strong>
+                            </div>
                         )}
-                        <strong className="vp-due-amt">₱{due.toLocaleString()}</strong>
+                        <div className="vp-break-row">
+                            <span>Rate per session{profile.promoDiscount ? ` (${profile.promoCode} applied)` : ""}</span>
+                            <strong>₱{rate.toLocaleString()}</strong>
+                        </div>
+                        <div className="vp-break-row sum">
+                            <span>{billedSessions} session{billedSessions === 1 ? "" : "s"} × ₱{rate.toLocaleString()}</span>
+                            <strong>₱{totalBilled.toLocaleString()}</strong>
+                        </div>
+                        <div className="vp-break-row">
+                            <span>Confirmed payments</span>
+                            <strong>−₱{verifiedPaid.toLocaleString()}</strong>
+                        </div>
+                        {adjustment !== 0 && (
+                            <div className="vp-break-row">
+                                <span>Adjustments</span>
+                                <strong>{adjustment > 0 ? "+" : "−"}₱{Math.abs(adjustment).toLocaleString()}</strong>
+                            </div>
+                        )}
+                        <div className={`vp-break-row total ${balance > 0 ? "owe" : "ok"}`}>
+                            <span>{balance > 0 ? "Balance to pay" : "All paid up"}</span>
+                            <strong>₱{balance.toLocaleString()}</strong>
+                        </div>
+                    </div>
+                    {checkingAmt > 0 && (
+                        <p className="vp-sub" style={{ margin: "10px 0 0" }}>
+                            ₱{checkingAmt.toLocaleString()} is still being checked. It comes off your balance once we confirm it.
+                        </p>
+                    )}
+                </Card>
+
+                <Card tape>
+                    <Heading icon="card" title="Send a payment" sub="Pay any amount, whenever you're ready." />
+                    <div className="vp-due">
+                        <span className="vp-label" style={{ color: "#fff" }}>Your account balance</span>
+                        <strong className="vp-due-amt">{balance > 0 ? `₱${balance.toLocaleString()}` : "All paid up!"}</strong>
+                        <span className="vp-due-small">
+                            {billedSessions} session{billedSessions === 1 ? "" : "s"} so far × ₱{rate.toLocaleString()} each
+                            {profile.promoDiscount && <> · {profile.promoCode} saves ₱{profile.promoDiscount.discountAmount.toLocaleString()} per session</>}
+                        </span>
+                        {verifiedPaid > 0 && <span className="vp-due-small">Confirmed payments: ₱{verifiedPaid.toLocaleString()}</span>}
+                        {checkingAmt > 0 && <span className="vp-due-small">Being checked: ₱{checkingAmt.toLocaleString()}</span>}
                     </div>
 
                     <h3 className="vp-h3">1. Pick how you'll pay</h3>
@@ -561,7 +670,7 @@ export default function VirtualDashboard(p: Props) {
                     {chosen && (
                         <div className="vp-qr">
                             <div className="vp-qr-img"><Image src={chosen.qr} alt={`${chosen.label} QR code`} fill style={{ objectFit: "contain", padding: 12 }} /></div>
-                            <p className="vp-sub" style={{ margin: 0 }}>Scan to send <strong>₱{due.toLocaleString()}</strong> (or more for several sessions), then upload the screenshot below.</p>
+                            <p className="vp-sub" style={{ margin: 0 }}>Scan to send your payment. You can pay any amount, whenever you're ready. Then upload the screenshot below.</p>
                         </div>
                     )}
 
@@ -587,7 +696,14 @@ export default function VirtualDashboard(p: Props) {
                     {receipt && (
                         <div style={{ marginTop: 18 }}>
                             <Field label="Reference number" id="vp-ref"><input id="vp-ref" className="vp-input plain" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. 10000000000" /></Field>
-                            <Field label="Amount sent (₱)" id="vp-amt"><input id="vp-amt" className="vp-input plain" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={`e.g. ${due}`} /></Field>
+                            <Field label="Amount sent (₱)" id="vp-amt">
+                                <input id="vp-amt" className="vp-input plain" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={`e.g. ${balance || due}`} />
+                                {balance > 0 && (
+                                    <button type="button" className="vp-link" style={{ color: BLUE }} onClick={() => setAmount(String(balance))}>
+                                        Pay full balance (₱{balance.toLocaleString()})
+                                    </button>
+                                )}
+                            </Field>
                         </div>
                     )}
 
@@ -606,7 +722,7 @@ export default function VirtualDashboard(p: Props) {
                                     return (
                                         <div key={x.id || i} className={`vp-pay ${state}`}>
                                             <div>
-                                                <strong>₱{(x.amountPaid || 675).toLocaleString()} via {String(x.paymentMethod || "").toUpperCase()}</strong>
+                                                <strong>₱{(x.amountPaid || due).toLocaleString()} via {String(x.paymentMethod || "").toUpperCase()}</strong>
                                                 <small>{new Date(x.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}{x.referenceNumber ? ` · Ref ${x.referenceNumber}` : ""}</small>
                                                 {x.adminNote && <small>Note: {x.adminNote}</small>}
                                             </div>
@@ -717,7 +833,7 @@ export default function VirtualDashboard(p: Props) {
                                 <span className="vp-tag" style={{ background: profile.status === "active" ? "#d8f5dc" : "#e6eaf2" }}>{profile.status === "active" ? "Active" : "Inactive"}</span>
                             </div>
                         </div>
-                        <div className="vp-stat"><strong>{profile.virtualSessionsCompleted || 0}</strong><span>sessions done</span></div>
+                        <div className="vp-stat"><strong>{sessionsDone}</strong><span>sessions done</span></div>
                     </div>
                 </Card>
 
@@ -804,6 +920,20 @@ const CSS = `
 .vp-empty{text-align:center;padding:24px 12px;border:3px dashed ${INPUT_BORDER};border-radius:20px;background:${INPUT_BG}}
 .vp-empty .vp-h3{justify-content:center}
 .vp-count{font-size:13px;font-weight:600;background:${INPUT_BG};border:2px solid ${INPUT_BORDER};border-radius:20px;padding:0 10px}
+.vp-balance-note{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;padding:12px 16px;background:#fff6cf;border:3px solid ${NAVY};border-radius:18px}
+
+/* payment breakdown */
+.vp-break{display:flex;flex-direction:column;gap:0;border:3px solid ${NAVY};border-radius:18px;overflow:hidden;background:#fff}
+.vp-break-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 16px;font-size:15px;border-bottom:2px dashed ${INPUT_BORDER}}
+.vp-break-row:last-of-type{border-bottom:none}
+.vp-break-row span{color:${TEXT_2};font-weight:500}
+.vp-break-row strong{font-weight:700;white-space:nowrap}
+.vp-break-row.sum{background:${INPUT_BG}}
+.vp-break-row.sum span{color:${NAVY};font-weight:600}
+.vp-break-row.total{background:#fff6cf;border-top:3px solid ${NAVY};border-bottom:none;font-size:17px}
+.vp-break-row.total span{color:${NAVY};font-weight:700}
+.vp-break-row.total.owe strong{color:${ERROR}}
+.vp-break-row.total.ok{background:#d8f5dc}
 
 /* hero */
 .vp-hero-card{margin-top:36px}
@@ -862,6 +992,9 @@ const CSS = `
 .vp-item-text small,.vp-pay small{color:${TEXT_2};font-size:13px;display:block;margin-top:2px}
 .vp-file{background:${INPUT_BG};border:3px solid ${NAVY};border-radius:18px;overflow:hidden}
 .vp-file .vp-row-between{border-top:3px dashed ${INPUT_BORDER}}
+.vp-sent{display:inline-flex;align-items:center;gap:6px;min-height:44px;max-width:100%;padding:0;background:none;border:none;font:inherit;font-size:14px;font-weight:600;color:${BLUE};text-decoration:underline;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.vp-sent svg{flex-shrink:0}
+.vp-sent:disabled{opacity:.6;cursor:wait}
 .vp-fav{border:3px solid ${NAVY};border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:4px}
 .vp-fav:nth-child(odd){transform:rotate(-1deg)}.vp-fav:nth-child(even){transform:rotate(1deg)}
 .vp-fav-val{font-size:16px;font-weight:700;overflow-wrap:anywhere}

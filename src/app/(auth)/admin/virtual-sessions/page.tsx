@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
+// One shared rule set for the balance, so admin and parent always show the same numbers.
+import { getSessionBalance } from "@/lib/session-balance";
 
 function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
@@ -22,6 +24,39 @@ function formatSessionTime(dt: string) {
   }
 }
 
+// ─── File type detection (so photos preview even when the title has no extension) ───
+const IMAGE_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"];
+const EXT_MIME: Record<string, string> = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
+  webp: "image/webp", bmp: "image/bmp", svg: "image/svg+xml", avif: "image/avif",
+  pdf: "application/pdf",
+};
+
+function extOf(name?: string): string {
+  const match = (name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match ? match[1] : "";
+}
+
+// Trust a real saved contentType, otherwise work it out from the file key, then the title
+function resolveContentType(mat: any): string {
+  const declared = String(mat?.contentType || "").toLowerCase();
+  if (declared && declared !== "application/octet-stream") return declared;
+  const ext = extOf(mat?.key) || extOf(mat?.title) || extOf(mat?.fileName);
+  return EXT_MIME[ext] || declared || "application/octet-stream";
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+// New payments are pushed to the END of the list, so sort by date to get newest first.
+function sortPayments(list: any[] | undefined): any[] {
+  return [...(list || [])].sort(
+    (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+  );
+}
+
+function hasPendingPayment(acc: any): boolean {
+  return (acc.sessionPayments || []).some((x: any) => !x.verified && !x.rejected);
+}
+
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#002f76,#0050d5)",
   "linear-gradient(135deg,#7c3aed,#a78bfa)",
@@ -35,6 +70,8 @@ const FILTERS = [
   { id: "all", label: "All Students" },
   { id: "no-link", label: "Needs Link" },
   { id: "has-link", label: "Link Set" },
+  { id: "owing", label: "Has Balance" },
+  { id: "to-review", label: "To Review" },
 ];
 
 type FileViewerState = {
@@ -61,9 +98,12 @@ if (typeof document !== "undefined" && !document.getElementById("me-spin-style")
 
 function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose: () => void }) {
   const { title, url, contentType, fileKey } = viewer;
-  const isImage = contentType.startsWith("image/");
   const lowerTitle = title.toLowerCase();
   const lowerKey = (fileKey || "").toLowerCase();
+  const isImage =
+    contentType.startsWith("image/") ||
+    IMAGE_EXTS.includes(extOf(lowerKey)) ||
+    IMAGE_EXTS.includes(extOf(lowerTitle));
 
   const isPdf = contentType === "application/pdf" || contentType.includes("pdf") || lowerTitle.endsWith(".pdf") || lowerKey.endsWith(".pdf");
   const isOffice =
@@ -133,24 +173,24 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
           >
             {isLandscape ? "Portrait" : "Landscape"}
           </button>
-          
+
           {/* Open in New Tab */}
           <button
             onClick={() => window.open(url, "_blank")}
             style={{
-              display:"flex", alignItems:"center", gap:"6px",
-              padding:"8px 14px",
-              background:"linear-gradient(135deg,#FFD700,#FFB300)",
-              border:"1.5px solid white",
-              borderRadius:"50px",
-              color:"#002f76", fontWeight:"800", fontSize:"12px",
-              cursor:"pointer", flexShrink:0,
-              boxShadow:"0 3px 10px rgba(0,0,0,0.2)",
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "8px 14px",
+              background: "linear-gradient(135deg,#FFD700,#FFB300)",
+              border: "1.5px solid white",
+              borderRadius: "50px",
+              color: "#002f76", fontWeight: "800", fontSize: "12px",
+              cursor: "pointer", flexShrink: 0,
+              boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
             }}
             title="Open in new tab"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
             </svg>
             Open File
           </button>
@@ -199,15 +239,20 @@ export default function AdminVirtualSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
-  
+
   const [fileViewer, setFileViewer] = useState<FileViewerState | null>(null);
   const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const [manageModal, setManageModal] = useState<any | null>(null);
   const [confirmEndModal, setConfirmEndModal] = useState<string | null>(null);
-  const [alertModal, setAlertModal] = useState<{ title: string; message: string; type?: "error"|"success"|"warning" } | null>(null);
+  const [alertModal, setAlertModal] = useState<{ title: string; message: string; type?: "error" | "success" | "warning" } | null>(null);
   const [confirmDeleteModal, setConfirmDeleteModal] = useState<{ uid: string; materialId: string; title: string } | null>(null);
 
-  function showAlert(message: string, title = "Notice", type: "error"|"success"|"warning" = "error") {
+  // Payment review (verify / reject)
+  const [reviewModal, setReviewModal] = useState<{ uid: string; payment: any } | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewing, setReviewing] = useState(false);
+
+  function showAlert(message: string, title = "Notice", type: "error" | "success" | "warning" = "error") {
     setAlertModal({ title, message, type });
   }
 
@@ -225,7 +270,7 @@ export default function AdminVirtualSessionsPage() {
   const [isAddingMaterial, setIsAddingMaterial] = useState(false);
   const [materialTitle, setMaterialTitle] = useState("");
   const [materialUrl, setMaterialUrl] = useState("");
-  const [materialType, setMaterialType] = useState<"link"|"file">("link");
+  const [materialType, setMaterialType] = useState<"link" | "file">("link");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedKey, setUploadedKey] = useState(""); // B2 key for file-type materials
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -240,8 +285,8 @@ export default function AdminVirtualSessionsPage() {
       const res = await fetch("/api/accounts");
       const data = await res.json();
       if (Array.isArray(data)) {
-        const virtual = data.filter(acc => 
-          acc.program === "Virtual Tutorial" || 
+        const virtual = data.filter(acc =>
+          acc.program === "Virtual Tutorial" ||
           acc.program === "virtual-session" ||
           (acc.role?.toLowerCase() === "parent" && acc.sessionPayments)
         );
@@ -266,19 +311,22 @@ export default function AdminVirtualSessionsPage() {
     const total = accounts.length;
     const noLink = accounts.filter(a => !a.virtualSessionLink).length;
     const totalMaterials = accounts.reduce((sum, a) => sum + (a.studyMaterials?.length || 0), 0);
-    return { total, noLink, totalMaterials };
+    const outstanding = accounts.reduce((sum, a) => sum + getSessionBalance(a).balance, 0);
+    return { total, noLink, totalMaterials, outstanding };
   }, [accounts]);
 
   const filtered = useMemo(() => {
     return accounts.filter(acc => {
-      const matchSearch = !search || 
-        (acc.fullName || "").toLowerCase().includes(search.toLowerCase()) || 
+      const matchSearch = !search ||
+        (acc.fullName || "").toLowerCase().includes(search.toLowerCase()) ||
         (acc.childName || "").toLowerCase().includes(search.toLowerCase());
-      
-      const matchFilter = 
-        activeFilter === "all" || 
+
+      const matchFilter =
+        activeFilter === "all" ||
         (activeFilter === "no-link" && !acc.virtualSessionLink) ||
-        (activeFilter === "has-link" && !!acc.virtualSessionLink);
+        (activeFilter === "has-link" && !!acc.virtualSessionLink) ||
+        (activeFilter === "owing" && getSessionBalance(acc).balance > 0) ||
+        (activeFilter === "to-review" && hasPendingPayment(acc));
 
       return matchSearch && matchFilter;
     });
@@ -326,13 +374,15 @@ export default function AdminVirtualSessionsPage() {
         body: JSON.stringify({ uid }),
       });
       if (res.ok) {
+        // Ending a session adds one session rate to the family's account balance.
+        // No payment lock: parents pay any amount, whenever they can.
         setAccounts(prev => prev.map(a => {
           if (a.id === uid) {
             return {
               ...a,
               virtualSessionLink: null,
               virtualSessionTime: null,
-              needsSessionPayment: true
+              virtualSessionsCompleted: (a.virtualSessionsCompleted || 0) + 1,
             };
           }
           return a;
@@ -347,6 +397,44 @@ export default function AdminVirtualSessionsPage() {
       showAlert("Failed to end session. Please try again.", "Error", "error");
     } finally {
       setEndingSession(false);
+    }
+  }
+
+  // ─── Payment review ───────────────────────────────────────────────────────
+  function openReview(uid: string, payment: any) {
+    setReviewNote(payment.adminNote || "");
+    setReviewModal({ uid, payment });
+  }
+
+  async function executeReview(action: "verify" | "reject") {
+    if (!reviewModal || reviewing) return;
+    const { uid, payment } = reviewModal;
+    const note = reviewNote.trim();
+    setReviewing(true);
+    try {
+      const res = await fetch("/api/parents/session-payment", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, paymentId: payment.id, action, adminNote: note }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to update the payment.");
+
+      const apply = (list: any[] = []) =>
+        list.map(x =>
+          x.id === payment.id
+            ? { ...x, verified: action === "verify", rejected: action === "reject", adminNote: note, reviewedAt: new Date().toISOString() }
+            : x
+        );
+      setAccounts(prev => prev.map(a => (a.id === uid ? { ...a, sessionPayments: apply(a.sessionPayments) } : a)));
+      setManageModal((prev: any) => (prev && prev.id === uid ? { ...prev, sessionPayments: apply(prev.sessionPayments) } : prev));
+      setReviewModal(null);
+      // Pull fresh data so the balance matches the server
+      refreshModalData(uid);
+    } catch (e: any) {
+      showAlert(e?.message || "Failed to update the payment. Please try again.", "Error", "error");
+    } finally {
+      setReviewing(false);
     }
   }
 
@@ -447,7 +535,7 @@ export default function AdminVirtualSessionsPage() {
         setFileViewer({
           title: m.title || "File",
           url: data.url,
-          contentType: m.contentType || "application/octet-stream",
+          contentType: resolveContentType(m),
           uid,
           materialId: m.id,
           fileKey: m.key,
@@ -505,11 +593,12 @@ export default function AdminVirtualSessionsPage() {
       `}</style>
 
       {/* ── Stats Row ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "16px", marginBottom: "24px" }}>
         {[
-          { label: "Total Students",  value: stats.total,    icon: "👥", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
-          { label: "Needs Link",      value: stats.noLink,   icon: "⚠️", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
+          { label: "Total Students", value: stats.total, icon: "👥", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
+          { label: "Needs Link", value: stats.noLink, icon: "⚠️", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
           { label: "Total Materials", value: stats.totalMaterials, icon: "📁", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+          { label: "Total Outstanding", value: `₱${stats.outstanding.toLocaleString()}`, icon: "💰", color: "#b91c1c", bg: "linear-gradient(135deg,#fef2f2,#fee2e2)" },
         ].map(s => (
           <div key={s.label} style={{ background: "white", borderRadius: "20px", padding: "20px 24px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", display: "flex", alignItems: "center", gap: "16px" }}>
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>{s.icon}</div>
@@ -535,8 +624,8 @@ export default function AdminVirtualSessionsPage() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
           {FILTERS.map(f => {
             const active = activeFilter === f.id;
-            const bgMap: Record<string, string> = { "no-link": "#fffbeb", "has-link": "#f0fdf4" };
-            const colorMap: Record<string, string> = { "no-link": "#b45309", "has-link": "#15803d" };
+            const bgMap: Record<string, string> = { "no-link": "#fffbeb", "has-link": "#f0fdf4", "owing": "#fef2f2", "to-review": "#fffbeb" };
+            const colorMap: Record<string, string> = { "no-link": "#b45309", "has-link": "#15803d", "owing": "#b91c1c", "to-review": "#b45309" };
             return (
               <button key={f.id} className="filter-pill" onClick={() => setActiveFilter(f.id)} style={{ padding: "8px 16px", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: active ? "none" : "1.5px solid #e2e8f0", background: active ? (bgMap[f.id] || "#eff6ff") : "white", color: active ? (colorMap[f.id] || "#0050d5") : "#64748b", boxShadow: active ? "0 2px 8px rgba(0,0,0,0.08)" : "none" }}>
                 {f.label}
@@ -563,15 +652,16 @@ export default function AdminVirtualSessionsPage() {
         </div>
       ) : (
         <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,47,118,0.06)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1.5fr 1fr 1.2fr 100px", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
-            {["Student / Parent", "Virtual Link", "Materials", "Latest Payment", "Actions"].map((h, i) => (
+          <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1.5fr 1fr 1.5fr 100px", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
+            {["Student / Parent", "Virtual Link", "Materials", "Balance / Payment", "Actions"].map((h, i) => (
               <div key={i} style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: h === "Actions" ? "right" : "left" }}>{h}</div>
             ))}
           </div>
 
           {filtered.map((acc, idx) => {
             const avatarGrad = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-            const latestPayment = (acc.sessionPayments || [])[0];
+            const latestPayment = sortPayments(acc.sessionPayments)[0];
+            const bal = getSessionBalance(acc);
 
             return (
               <m.div
@@ -581,7 +671,7 @@ export default function AdminVirtualSessionsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.025 }}
                 onClick={() => openManageModal(acc)}
-                style={{ display: "grid", gridTemplateColumns: "1.8fr 1.5fr 1fr 1.2fr 100px", padding: "15px 24px", borderBottom: idx < filtered.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white" }}
+                style={{ display: "grid", gridTemplateColumns: "1.8fr 1.5fr 1fr 1.5fr 100px", padding: "15px 24px", borderBottom: idx < filtered.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white" }}
               >
                 {/* Parent/Child col */}
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -627,12 +717,17 @@ export default function AdminVirtualSessionsPage() {
 
                 {/* Payment col */}
                 <div>
-                  {latestPayment ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 10px", background: latestPayment.verified ? "#f0fdf4" : latestPayment.rejected ? "#fef2f2" : "#fffbeb", color: latestPayment.verified ? "#15803d" : latestPayment.rejected ? "#b91c1c" : "#b45309", borderRadius: "20px", fontSize: "11px", fontWeight: "800" }}>
-                      {latestPayment.verified ? "VERIFIED" : latestPayment.rejected ? "REJECTED" : "PENDING"} (₱{latestPayment.amountPaid})
+                  <div style={{ fontSize: "14px", fontWeight: "800", color: bal.balance > 0 ? "#b91c1c" : "#15803d" }}>
+                    {bal.balance > 0 ? `Owes ₱${bal.balance.toLocaleString()}` : "Paid up"}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "600", marginTop: "2px" }}>
+                    {bal.billedSessions} session{bal.billedSessions === 1 ? "" : "s"} · ₱{bal.verifiedPaid.toLocaleString()} paid
+                    {bal.checking > 0 && ` · ₱${bal.checking.toLocaleString()} pending`}
+                  </div>
+                  {latestPayment && (
+                    <span style={{ display: "inline-flex", marginTop: "4px", padding: "2px 8px", background: latestPayment.verified ? "#f0fdf4" : latestPayment.rejected ? "#fef2f2" : "#fffbeb", color: latestPayment.verified ? "#15803d" : latestPayment.rejected ? "#b91c1c" : "#b45309", borderRadius: "20px", fontSize: "10px", fontWeight: "800" }}>
+                      Last: {latestPayment.verified ? "VERIFIED" : latestPayment.rejected ? "REJECTED" : "PENDING"} (₱{latestPayment.amountPaid})
                     </span>
-                  ) : (
-                    <span style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>None</span>
                   )}
                 </div>
 
@@ -653,6 +748,8 @@ export default function AdminVirtualSessionsPage() {
         {manageModal && (() => {
           const matLinks = (manageModal.studyMaterials || []).filter((m: any) => m.type === "link");
           const matFiles = (manageModal.studyMaterials || []).filter((m: any) => m.type === "file");
+          const bal = getSessionBalance(manageModal);
+          const payments = sortPayments(manageModal.sessionPayments);
 
           return (
             <div onClick={() => setManageModal(null)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,18,51,0.55)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px", overflowY: "auto" }}>
@@ -684,7 +781,7 @@ export default function AdminVirtualSessionsPage() {
                       style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.3)", color: "white", fontWeight: "700", fontSize: "12px", cursor: refreshingModal ? "not-allowed" : "pointer", transition: "all 0.2s" }}
                     >
                       <svg style={{ animation: refreshingModal ? "me-spin 0.7s linear infinite" : "none" }} xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                        <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
                       </svg>
                       {refreshingModal ? "Refreshing…" : "Refresh"}
                     </button>
@@ -769,7 +866,7 @@ export default function AdminVirtualSessionsPage() {
                         </div>
                         {linkSaveResult && (
                           <div style={{ marginTop: "10px", fontSize: "12px", fontWeight: "700", color: linkSaveResult.ok ? "#15803d" : "#b91c1c", padding: "8px 12px", background: linkSaveResult.ok ? "#f0fdf4" : "#fef2f2", borderRadius: "10px" }}>
-                            {linkSaveResult.ok ? (linkSaveResult.isEnd ? "✅ Session ended and payment requested!" : "✅ Saved!" + (sendEmailOnSave ? " Email sent!" : "")) : (linkSaveResult.isEnd ? "❌ Failed to end session" : "❌ Failed to save")}
+                            {linkSaveResult.ok ? (linkSaveResult.isEnd ? "✅ Session ended and added to the account balance!" : "✅ Saved!" + (sendEmailOnSave ? " Email sent!" : "")) : (linkSaveResult.isEnd ? "❌ Failed to end session" : "❌ Failed to save")}
                           </div>
                         )}
                       </div>
@@ -868,8 +965,8 @@ export default function AdminVirtualSessionsPage() {
                     {isAddingMaterial && (
                       <div style={{ background: "#f8faff", padding: "16px", borderRadius: "16px", border: "2px solid #bfdbfe", marginBottom: "14px" }}>
                         <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                          {["link","file"].map(t => (
-                            <button key={t} onClick={() => { setMaterialType(t as any); setMaterialUrl(""); setUploadedKey(""); if(fileInputRef.current) fileInputRef.current.value=""; }}
+                          {["link", "file"].map(t => (
+                            <button key={t} onClick={() => { setMaterialType(t as any); setMaterialUrl(""); setUploadedKey(""); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                               style={{ flex: 1, padding: "8px", borderRadius: "10px", border: materialType === t ? "none" : "1.5px solid #cbd5e1", background: materialType === t ? "#eff6ff" : "white", color: materialType === t ? "#0050d5" : "#64748b", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>
                               {t === "link" ? "▶️ Link / YouTube" : "📄 Upload File"}
                             </button>
@@ -887,7 +984,7 @@ export default function AdminVirtualSessionsPage() {
                                   <div style={{ fontSize: "12px", fontWeight: "700", color: "#15803d" }}>Uploaded!</div>
                                   <div style={{ fontSize: "11px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{materialUrl}</div>
                                 </div>
-                                <button onClick={() => { setMaterialUrl(""); setUploadedKey(""); if(fileInputRef.current) fileInputRef.current.value=""; }} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px" }}>✕</button>
+                                <button onClick={() => { setMaterialUrl(""); setUploadedKey(""); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px" }}>✕</button>
                               </div>
                             ) : (
                               <button onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}
@@ -902,7 +999,7 @@ export default function AdminVirtualSessionsPage() {
                             style={{ flex: 1, padding: "10px", background: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "#cbd5e1" : "#002f76", color: "white", border: "none", borderRadius: "10px", fontWeight: "800", fontSize: "13px", cursor: (!materialTitle || (!materialUrl && !uploadedKey) || uploadingFile) ? "not-allowed" : "pointer" }}>
                             Add to Folder
                           </button>
-                          <button onClick={() => { setIsAddingMaterial(false); setMaterialUrl(""); setMaterialTitle(""); setUploadedKey(""); if(fileInputRef.current) fileInputRef.current.value=""; }}
+                          <button onClick={() => { setIsAddingMaterial(false); setMaterialUrl(""); setMaterialTitle(""); setUploadedKey(""); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                             style={{ flex: 1, padding: "10px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
                             Cancel
                           </button>
@@ -953,7 +1050,14 @@ export default function AdminVirtualSessionsPage() {
                                         const res = await fetch(`/api/files/download-url?uid=${encodeURIComponent(manageModal.id)}&submissionKey=${encodeURIComponent(m.submission.key)}`);
                                         const data = await res.json();
                                         if (data.success && data.url) {
-                                          setFileViewer({ title: m.submission.fileName, url: data.url, contentType: m.submission.fileType || "application/octet-stream", uid: manageModal.id, materialId: m.id, fileKey: m.submission.key });
+                                          setFileViewer({
+                                            title: m.submission.fileName,
+                                            url: data.url,
+                                            contentType: resolveContentType({ contentType: m.submission.fileType, key: m.submission.key, title: m.submission.fileName }),
+                                            uid: manageModal.id,
+                                            materialId: m.id,
+                                            fileKey: m.submission.key,
+                                          });
                                         } else { alert("Could not fetch view link."); }
                                       } finally { setLoadingFileId(null); }
                                     }}
@@ -972,35 +1076,186 @@ export default function AdminVirtualSessionsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* ── Payments & Balance ── */}
+                <div style={{ padding: "24px 28px", borderTop: "1.5px solid #eef2ff" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                    <span style={{ width: "28px", height: "28px", background: "#fef2f2", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>💰</span>
+                    <span style={{ fontSize: "12px", fontWeight: "800", color: "#334155", textTransform: "uppercase", letterSpacing: "0.8px" }}>Payments & Balance</span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "10px", marginBottom: "16px" }}>
+                    {[
+                      { label: "Sessions ended", value: String(bal.billedSessions), color: "#334155", bg: "#f8faff" },
+                      { label: "Total billed", value: `₱${bal.totalBilled.toLocaleString()}`, color: "#334155", bg: "#f8faff" },
+                      { label: "Verified paid", value: `₱${bal.verifiedPaid.toLocaleString()}`, color: "#15803d", bg: "#f0fdf4" },
+                      { label: "Pending check", value: `₱${bal.checking.toLocaleString()}`, color: "#b45309", bg: "#fffbeb" },
+                      { label: "Balance owed", value: `₱${bal.balance.toLocaleString()}`, color: bal.balance > 0 ? "#b91c1c" : "#15803d", bg: bal.balance > 0 ? "#fef2f2" : "#f0fdf4" },
+                    ].map(t => (
+                      <div key={t.label} style={{ background: t.bg, borderRadius: "14px", padding: "12px 14px", border: "1px solid #e2e8f0" }}>
+                        <div style={{ fontSize: "18px", fontWeight: "800", color: t.color }}>{t.value}</div>
+                        <div style={{ fontSize: "11px", fontWeight: "600", color: "#64748b", marginTop: "2px" }}>{t.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600", marginBottom: "14px" }}>
+                    Rate: ₱{bal.rate.toLocaleString()} per session. Each ended session adds one rate; only verified payments reduce the balance.
+                  </div>
+
+                  {payments.length === 0 ? (
+                    <div style={{ padding: "16px", textAlign: "center", color: "#94a3b8", fontSize: "12px", fontWeight: "600", background: "#f8faff", borderRadius: "12px" }}>
+                      No payments submitted yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "280px", overflowY: "auto" }}>
+                      {payments.map((x: any, i: number) => {
+                        const state = x.verified ? { t: "VERIFIED", c: "#15803d", b: "#f0fdf4" } : x.rejected ? { t: "REJECTED", c: "#b91c1c", b: "#fef2f2" } : { t: "PENDING", c: "#b45309", b: "#fffbeb" };
+                        const pending = !x.verified && !x.rejected;
+                        return (
+                          <div key={x.id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", padding: "10px 14px", background: state.b, borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a" }}>
+                                ₱{Number(x.amountPaid || 0).toLocaleString()} via {String(x.paymentMethod || "").toUpperCase()}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#64748b" }}>
+                                {x.submittedAt ? new Date(x.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
+                                {x.referenceNumber ? ` · Ref ${x.referenceNumber}` : ""}
+                              </div>
+                              {x.adminNote && (
+                                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Note: {x.adminNote}</div>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                              <span style={{ fontSize: "10px", fontWeight: "800", color: state.c, background: "white", padding: "3px 10px", borderRadius: "20px" }}>{state.t}</span>
+                              <button
+                                onClick={() => openReview(manageModal.id, x)}
+                                style={{ padding: "6px 12px", borderRadius: "10px", border: pending ? "none" : "1.5px solid #cbd5e1", background: pending ? "#002f76" : "white", color: pending ? "white" : "#334155", fontWeight: "800", fontSize: "11px", cursor: "pointer" }}
+                              >
+                                {pending ? "Review" : "Change"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </m.div>
             </div>
           );
         })()}
       </AnimatePresence>
+
+      {/* ── Review Payment Modal ── */}
+      <AnimatePresence>
+        {reviewModal && (() => {
+          const pay = reviewModal.payment;
+          const canReview = !!pay.id;
+          const currentState = pay.verified ? "verified" : pay.rejected ? "rejected" : "pending";
+          return (
+            <div onClick={() => { if (!reviewing) setReviewModal(null); }} style={{ position: "fixed", inset: 0, zIndex: 250, background: "rgba(0,18,51,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px", overflowY: "auto" }}>
+              <m.div
+                initial={{ opacity: 0, scale: 0.94, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.94, y: 10 }}
+                onClick={e => e.stopPropagation()}
+                style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "480px", margin: "auto", boxShadow: "0 20px 40px rgba(0,47,118,0.2)", padding: "28px 24px" }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: 0 }}>Review payment</h2>
+                  <button onClick={() => setReviewModal(null)} disabled={reviewing} style={{ background: "none", border: "none", fontSize: "18px", color: "#64748b", cursor: "pointer", fontWeight: "700" }}>✕</button>
+                </div>
+
+                <div style={{ background: "#f8faff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px 16px", marginBottom: "14px" }}>
+                  <div style={{ fontSize: "24px", fontWeight: "800", color: "#002f76" }}>₱{Number(pay.amountPaid || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "600", marginTop: "4px" }}>
+                    via {String(pay.paymentMethod || "").toUpperCase()}
+                    {pay.referenceNumber ? ` · Ref ${pay.referenceNumber}` : " · No reference number"}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+                    {pay.submittedAt ? new Date(pay.submittedAt).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
+                  </div>
+                  <div style={{ fontSize: "11px", fontWeight: "800", marginTop: "8px", color: currentState === "verified" ? "#15803d" : currentState === "rejected" ? "#b91c1c" : "#b45309" }}>
+                    Currently: {currentState.toUpperCase()}
+                  </div>
+                </div>
+
+                {pay.receiptBase64 ? (
+                  <div style={{ textAlign: "center", marginBottom: "14px" }}>
+                    <img src={pay.receiptBase64} alt="Payment receipt" style={{ maxWidth: "100%", maxHeight: "320px", objectFit: "contain", borderRadius: "12px", border: "1.5px solid #e2e8f0" }} />
+                  </div>
+                ) : (
+                  <div style={{ padding: "16px", textAlign: "center", color: "#94a3b8", fontSize: "12px", fontWeight: "600", background: "#f8faff", borderRadius: "12px", marginBottom: "14px" }}>
+                    No receipt image available for this payment.
+                  </div>
+                )}
+
+                <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#64748b", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Note for the parent (optional)
+                </label>
+                <textarea
+                  value={reviewNote}
+                  onChange={e => setReviewNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Receipt is blurry, please send a clearer photo"
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "none", marginBottom: "6px" }}
+                />
+                <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600", marginBottom: "16px" }}>
+                  Verifying also emails the parent. Only verified payments reduce the balance.
+                </div>
+
+                {!canReview && (
+                  <div style={{ fontSize: "12px", fontWeight: "700", color: "#b91c1c", background: "#fef2f2", borderRadius: "10px", padding: "10px 12px", marginBottom: "12px" }}>
+                    This payment has no ID, so it can't be reviewed from here.
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onClick={() => executeReview("reject")}
+                    disabled={reviewing || !canReview || currentState === "rejected"}
+                    style={{ flex: 1, padding: "12px", background: (reviewing || !canReview || currentState === "rejected") ? "#f1f5f9" : "#fef2f2", color: (reviewing || !canReview || currentState === "rejected") ? "#94a3b8" : "#b91c1c", border: "1.5px solid #fca5a5", borderRadius: "12px", fontWeight: "800", fontSize: "13px", cursor: (reviewing || !canReview || currentState === "rejected") ? "not-allowed" : "pointer" }}
+                  >
+                    {currentState === "rejected" ? "Already rejected" : "Reject"}
+                  </button>
+                  <button
+                    onClick={() => executeReview("verify")}
+                    disabled={reviewing || !canReview || currentState === "verified"}
+                    style={{ flex: 1, padding: "12px", background: (reviewing || !canReview || currentState === "verified") ? "#cbd5e1" : "#10b981", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "13px", cursor: (reviewing || !canReview || currentState === "verified") ? "not-allowed" : "pointer" }}
+                  >
+                    {reviewing ? "Saving…" : currentState === "verified" ? "Already verified" : "Verify"}
+                  </button>
+                </div>
+              </m.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
       {/* ── Confirm End Session Modal ── */}
       <AnimatePresence>
         {confirmEndModal && (
           <div onClick={() => setConfirmEndModal(null)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,18,51,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyItems: "center", padding: "16px" }}>
-            <m.div 
+            <m.div
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              onClick={e => e.stopPropagation()} 
+              onClick={e => e.stopPropagation()}
               style={{ background: "white", borderRadius: "24px", width: "100%", maxWidth: "420px", margin: "auto", boxShadow: "0 20px 40px rgba(0,47,118,0.2)", overflow: "hidden", textAlign: "center", padding: "32px 24px" }}
             >
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>🛑</div>
               <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#0f172a", margin: "0 0 12px" }}>End Virtual Session?</h2>
               <p style={{ color: "#475569", fontSize: "14px", lineHeight: "1.6", margin: "0 0 24px" }}>
-                This will instantly clear the student's meeting link and trigger a <strong>session payment prompt</strong> in their Parent Portal for their next session.
+                This will clear the student's meeting link and add one session to their <strong>account balance</strong>. Parents can pay any amount, whenever they can.
               </p>
               <div style={{ display: "flex", gap: "12px" }}>
-                <button 
+                <button
                   onClick={() => executeEndSession(confirmEndModal)}
                   style={{ flex: 1, padding: "12px", background: "#ef4444", color: "white", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 12px rgba(239,68,68,0.3)" }}
                 >
                   Yes, End Session
                 </button>
-                <button 
+                <button
                   onClick={() => setConfirmEndModal(null)}
                   style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "12px", fontWeight: "800", fontSize: "14px", cursor: "pointer" }}
                 >

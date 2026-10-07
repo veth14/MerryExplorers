@@ -552,12 +552,12 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
         }}
       >
         {/* Tape Accent */}
-        <span style={{ 
-          position: "absolute", top: "-18px", left: "50%", width: "110px", height: "32px", marginLeft: "-55px", 
-          transform: "rotate(3deg)", 
-          background: `repeating-linear-gradient(45deg, ${SUN} 0 10px, ${SUN_LIGHT} 10px 20px)`, 
-          border: `2px solid rgba(11,42,130,0.15)`, 
-          borderRadius: "6px", 
+        <span style={{
+          position: "absolute", top: "-18px", left: "50%", width: "110px", height: "32px", marginLeft: "-55px",
+          transform: "rotate(3deg)",
+          background: `repeating-linear-gradient(45deg, ${SUN} 0 10px, ${SUN_LIGHT} 10px 20px)`,
+          border: `2px solid rgba(11,42,130,0.15)`,
+          borderRadius: "6px",
           zIndex: 100,
           boxShadow: "0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.4)",
           opacity: 0.95
@@ -575,193 +575,193 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
             transition: "border-radius 0.3s ease",
           }}
         >
-        {/* ── Header ── */}
-        <div style={{
-          flexShrink: 0,
-          background: "#fff",
-          padding: "16px 20px",
-          display: "flex", alignItems: "center", gap: "14px",
-          borderBottom: `4px solid #f1f5f9`,
-          position: "relative", zIndex: 5
-        }}>
-          {/* Icon badge */}
-          <div style={{ 
-            width: "48px", height: "48px", borderRadius: "14px",
-            background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
-            border: `3px solid ${NAVY}`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "24px", flexShrink: 0,
-            boxShadow: `0 4px 0 ${NAVY}`
+          {/* ── Header ── */}
+          <div style={{
+            flexShrink: 0,
+            background: "#fff",
+            padding: "16px 20px",
+            display: "flex", alignItems: "center", gap: "14px",
+            borderBottom: `4px solid #f1f5f9`,
+            position: "relative", zIndex: 5
           }}>
-            {icon}
-          </div>
-
-          {/* Title */}
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <div style={{ fontWeight: "800", fontSize: "20px", color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: "2px" }}>
-              {title}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "12px", fontWeight: "700", color: "#0050d5", background: "#e8f0fe", padding: "2px 10px", borderRadius: "12px", border: "1px solid #c2dcf6" }}>{label}</span>
-            </div>
-          </div>
-
-          {/* Landscape / Portrait toggle */}
-          <button
-            onClick={() => setIsLandscape(v => !v)}
-            title={isLandscape ? "Switch to portrait view" : "Switch to landscape (wide) view"}
-            style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "8px 14px",
-              background: "#fff",
-              border: `2px solid ${NAVY}`,
-              borderRadius: "12px",
-              color: NAVY, fontWeight: "700", fontSize: "13px",
-              cursor: "pointer", flexShrink: 0,
-              boxShadow: `0 3px 0 ${NAVY}`,
-              transition: "transform 0.1s, box-shadow 0.1s",
-            }}
-            onMouseOver={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 1px 0 ${NAVY}`; }}
-            onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
-          >
-            {isLandscape ? (
-              <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2" /></svg> Portrait</>
-            ) : (
-              <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2" /></svg> Landscape</>
-            )}
-          </button>
-
-          {/* Open in New Tab */}
-          <button
-            onClick={() => window.open(url, "_blank")}
-            style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "8px 16px",
+            {/* Icon badge */}
+            <div style={{
+              width: "48px", height: "48px", borderRadius: "14px",
               background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
-              border: `2px solid ${NAVY}`,
-              borderRadius: "12px",
-              color: NAVY, fontWeight: "700", fontSize: "13px",
-              cursor: "pointer", flexShrink: 0,
-              boxShadow: `0 3px 0 ${NAVY}`,
-              transition: "transform 0.1s, box-shadow 0.1s",
-            }}
-            onMouseOver={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 1px 0 ${NAVY}`; }}
-            onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
-            title="Open in new tab (Use this to edit/draw on iPad)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            Open to Edit
-          </button>
-
-          {/* Close */}
-          <button
-            onClick={onClose}
-            style={{ width: "38px", height: "38px", borderRadius: "12px", background: "#fff", border: `2px solid ${NAVY}`, color: NAVY, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: "700", boxShadow: `0 3px 0 ${NAVY}`, transition: "all 0.1s" }}
-            onMouseOver={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 1px 0 ${NAVY}`; e.currentTarget.style.background = "#fff0f0"; e.currentTarget.style.color = "#b3261e"; e.currentTarget.style.borderColor = "#b3261e"; }}
-            onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = NAVY; e.currentTarget.style.borderColor = NAVY; }}
-            title="Close (Esc)"
-          >✕</button>
-        </div>
-
-        {/* ── Viewer body ── */}
-        <div style={{ flex: 1, overflow: "hidden", position: "relative", background: isOffice ? "#f8fafc" : isPdf ? "#334155" : "#f1f5f9" }}>
-
-          {/* ── IMAGE ── */}
-          {isImage && (
-            <div style={{ width: "100%", height: "100%", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-              <img src={url} alt={title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "12px", boxShadow: "0 8px 32px rgba(0,0,0,0.1), 0 0 0 2px rgba(11,42,130,0.1)" }} />
+              border: `3px solid ${NAVY}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "24px", flexShrink: 0,
+              boxShadow: `0 4px 0 ${NAVY}`
+            }}>
+              {icon}
             </div>
-          )}
 
-          {/* ── PDF — browser renders natively ── */}
-          {!isImage && isPdf && (
-            <iframe
-              key={`${url}-${isLandscape}`}
-              src={url}
-              style={{ width: "100%", height: "100%", border: "none", display: "block" }}
-              title={title}
-            />
-          )}
+            {/* Title */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <div style={{ fontWeight: "800", fontSize: "20px", color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: "2px" }}>
+                {title}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "700", color: "#0050d5", background: "#e8f0fe", padding: "2px 10px", borderRadius: "12px", border: "1px solid #c2dcf6" }}>{label}</span>
+              </div>
+            </div>
 
-          {/* ── OFFICE (xlsx/docx/pptx) — external viewers can't reliably access B2
+            {/* Landscape / Portrait toggle */}
+            <button
+              onClick={() => setIsLandscape(v => !v)}
+              title={isLandscape ? "Switch to portrait view" : "Switch to landscape (wide) view"}
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "8px 14px",
+                background: "#fff",
+                border: `2px solid ${NAVY}`,
+                borderRadius: "12px",
+                color: NAVY, fontWeight: "700", fontSize: "13px",
+                cursor: "pointer", flexShrink: 0,
+                boxShadow: `0 3px 0 ${NAVY}`,
+                transition: "transform 0.1s, box-shadow 0.1s",
+              }}
+              onMouseOver={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 1px 0 ${NAVY}`; }}
+              onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
+            >
+              {isLandscape ? (
+                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2" /></svg> Portrait</>
+              ) : (
+                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2" /></svg> Landscape</>
+              )}
+            </button>
+
+            {/* Open in New Tab */}
+            <button
+              onClick={() => window.open(url, "_blank")}
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "8px 16px",
+                background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
+                border: `2px solid ${NAVY}`,
+                borderRadius: "12px",
+                color: NAVY, fontWeight: "700", fontSize: "13px",
+                cursor: "pointer", flexShrink: 0,
+                boxShadow: `0 3px 0 ${NAVY}`,
+                transition: "transform 0.1s, box-shadow 0.1s",
+              }}
+              onMouseOver={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 1px 0 ${NAVY}`; }}
+              onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
+              title="Open in new tab (Use this to edit/draw on iPad)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              Open to Edit
+            </button>
+
+            {/* Close */}
+            <button
+              onClick={onClose}
+              style={{ width: "38px", height: "38px", borderRadius: "12px", background: "#fff", border: `2px solid ${NAVY}`, color: NAVY, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: "700", boxShadow: `0 3px 0 ${NAVY}`, transition: "all 0.1s" }}
+              onMouseOver={e => { e.currentTarget.style.transform = "translateY(2px)"; e.currentTarget.style.boxShadow = `0 1px 0 ${NAVY}`; e.currentTarget.style.background = "#fff0f0"; e.currentTarget.style.color = "#b3261e"; e.currentTarget.style.borderColor = "#b3261e"; }}
+              onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = NAVY; e.currentTarget.style.borderColor = NAVY; }}
+              title="Close (Esc)"
+            >✕</button>
+          </div>
+
+          {/* ── Viewer body ── */}
+          <div style={{ flex: 1, overflow: "hidden", position: "relative", background: isOffice ? "#f8fafc" : isPdf ? "#334155" : "#f1f5f9" }}>
+
+            {/* ── IMAGE ── */}
+            {isImage && (
+              <div style={{ width: "100%", height: "100%", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+                <img src={url} alt={title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "12px", boxShadow: "0 8px 32px rgba(0,0,0,0.1), 0 0 0 2px rgba(11,42,130,0.1)" }} />
+              </div>
+            )}
+
+            {/* ── PDF — browser renders natively ── */}
+            {!isImage && isPdf && (
+              <iframe
+                key={`${url}-${isLandscape}`}
+                src={url}
+                style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+                title={title}
+              />
+            )}
+
+            {/* ── OFFICE (xlsx/docx/pptx) — external viewers can't reliably access B2
                presigned URLs, so show a kid-friendly download card ── */}
-          {!isImage && !isPdf && isOffice && (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-              <div style={{ textAlign: "center", maxWidth: "380px" }}>
-                {/* Big bouncy file icon */}
-                <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px", filter: "drop-shadow(0 8px 16px rgba(11,42,130,0.15))" }}>
-                  {icon}
+            {!isImage && !isPdf && isOffice && (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+                <div style={{ textAlign: "center", maxWidth: "380px" }}>
+                  {/* Big bouncy file icon */}
+                  <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px", filter: "drop-shadow(0 8px 16px rgba(11,42,130,0.15))" }}>
+                    {icon}
+                  </div>
+                  <div style={{ fontWeight: "700", fontSize: "20px", color: NAVY, marginBottom: "8px", letterSpacing: "-0.3px" }}>{title}</div>
+                  <div style={{ fontSize: "14px", color: "#3d5a99", marginBottom: "28px", lineHeight: "1.6", fontWeight: "500" }}>
+                    This file is ready to open in <strong>{label === "Spreadsheet" ? "Microsoft Excel or Google Sheets" : label === "Slides" ? "Microsoft PowerPoint or Google Slides" : "Microsoft Word or Google Docs"}</strong>.
+                    <br />Download it below and open it with your app! 🎉
+                  </div>
+                  {/* Big download button */}
+                  <button
+                    onClick={handleDownload}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "10px",
+                      padding: "14px 32px",
+                      background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
+                      border: `3px solid ${NAVY}`,
+                      borderRadius: "20px",
+                      color: NAVY, fontWeight: "700", fontSize: "16px",
+                      cursor: "pointer",
+                      boxShadow: `0 6px 0 ${NAVY}`,
+                      transition: "transform 0.1s, box-shadow 0.1s",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(3px)"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 6px 0 ${NAVY}`; }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download to Open
+                  </button>
+                  <div style={{ marginTop: "16px", fontSize: "12px", color: "#64748b", fontWeight: "500" }}>The file will download to your device 📥</div>
                 </div>
-                <div style={{ fontWeight: "700", fontSize: "20px", color: NAVY, marginBottom: "8px", letterSpacing: "-0.3px" }}>{title}</div>
-                <div style={{ fontSize: "14px", color: "#3d5a99", marginBottom: "28px", lineHeight: "1.6", fontWeight: "500" }}>
-                  This file is ready to open in <strong>{label === "Spreadsheet" ? "Microsoft Excel or Google Sheets" : label === "Slides" ? "Microsoft PowerPoint or Google Slides" : "Microsoft Word or Google Docs"}</strong>.
-                  <br />Download it below and open it with your app! 🎉
-                </div>
-                {/* Big download button */}
-                <button
-                  onClick={handleDownload}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: "10px",
-                    padding: "14px 32px",
-                    background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
-                    border: `3px solid ${NAVY}`,
-                    borderRadius: "20px",
-                    color: NAVY, fontWeight: "700", fontSize: "16px",
-                    cursor: "pointer",
-                    boxShadow: `0 6px 0 ${NAVY}`,
-                    transition: "transform 0.1s, box-shadow 0.1s",
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.transform = "translateY(3px)"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
-                  onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 6px 0 ${NAVY}`; }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Download to Open
-                </button>
-                <div style={{ marginTop: "16px", fontSize: "12px", color: "#64748b", fontWeight: "500" }}>The file will download to your device 📥</div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ── OTHER — show download card (avoids spurious iframe downloads) ── */}
-          {!isImage && !isPdf && !isOffice && (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-              <div style={{ textAlign: "center", maxWidth: "380px" }}>
-                <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px", filter: "drop-shadow(0 8px 16px rgba(11,42,130,0.15))" }}>{icon}</div>
-                <div style={{ fontWeight: "700", fontSize: "20px", color: NAVY, marginBottom: "8px" }}>{title}</div>
-                <div style={{ fontSize: "14px", color: "#3d5a99", marginBottom: "28px", lineHeight: "1.6", fontWeight: "500" }}>
-                  This file can’t be previewed in the browser.<br />Download it to open it on your device! 🎉
+            {/* ── OTHER — show download card (avoids spurious iframe downloads) ── */}
+            {!isImage && !isPdf && !isOffice && (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+                <div style={{ textAlign: "center", maxWidth: "380px" }}>
+                  <div style={{ fontSize: "80px", lineHeight: 1, marginBottom: "16px", filter: "drop-shadow(0 8px 16px rgba(11,42,130,0.15))" }}>{icon}</div>
+                  <div style={{ fontWeight: "700", fontSize: "20px", color: NAVY, marginBottom: "8px" }}>{title}</div>
+                  <div style={{ fontSize: "14px", color: "#3d5a99", marginBottom: "28px", lineHeight: "1.6", fontWeight: "500" }}>
+                    This file can’t be previewed in the browser.<br />Download it to open it on your device! 🎉
+                  </div>
+                  <button
+                    onClick={handleDownload}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "10px",
+                      padding: "14px 32px",
+                      background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
+                      border: `3px solid ${NAVY}`,
+                      borderRadius: "20px",
+                      color: NAVY, fontWeight: "700", fontSize: "16px",
+                      cursor: "pointer",
+                      boxShadow: `0 6px 0 ${NAVY}`,
+                      transition: "transform 0.1s, box-shadow 0.1s",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(3px)"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 6px 0 ${NAVY}`; }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download to Open
+                  </button>
+                  <div style={{ marginTop: "16px", fontSize: "12px", color: "#64748b", fontWeight: "500" }}>The file will download to your device 📥</div>
                 </div>
-                <button
-                  onClick={handleDownload}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: "10px",
-                    padding: "14px 32px",
-                    background: `linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP})`,
-                    border: `3px solid ${NAVY}`,
-                    borderRadius: "20px",
-                    color: NAVY, fontWeight: "700", fontSize: "16px",
-                    cursor: "pointer",
-                    boxShadow: `0 6px 0 ${NAVY}`,
-                    transition: "transform 0.1s, box-shadow 0.1s",
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.transform = "translateY(3px)"; e.currentTarget.style.boxShadow = `0 3px 0 ${NAVY}`; }}
-                  onMouseOut={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 6px 0 ${NAVY}`; }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Download to Open
-                </button>
-                <div style={{ marginTop: "16px", fontSize: "12px", color: "#64748b", fontWeight: "500" }}>The file will download to your device 📥</div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );
@@ -3412,7 +3412,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,15,40,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", animation: "fadeUp 0.2s ease" }}>
       <div style={{ position: "relative", background: "#fff", border: `4px solid ${NAVY}`, borderRadius: "28px", padding: "28px", width: "100%", maxWidth: "420px", boxShadow: `0 0 0 6px #fff, 0 12px 0 6px rgba(11,42,130,0.18)` }}>
-        
+
         {/* Tape Accent */}
         <span style={{ position: "absolute", top: "-17px", left: "50%", width: "92px", height: "28px", marginLeft: "-46px", transform: "rotate(6deg)", background: `repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px)`, border: `2px solid rgba(11,42,130,0.25)`, borderRadius: "4px" }} aria-hidden="true" />
 
@@ -3431,7 +3431,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            
+
             <div>
               <label style={{ display: "block", fontSize: "15px", fontWeight: "600", color: NAVY, marginBottom: "6px" }}>Current Password</label>
               <div style={{ position: "relative" }}>
