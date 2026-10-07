@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { notifications as initialNotifications, notificationMeta, AppNotification, NotificationType } from "@/data/notifications";
+import { useAuth } from "@/lib/auth-context";
 
 type TopbarProps = {
   title: string;
@@ -10,6 +11,7 @@ type TopbarProps = {
 };
 
 export function Topbar({ title, description, onMenuClick }: TopbarProps) {
+  const { user } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -17,7 +19,9 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
   useEffect(() => {
     async function fetchNotifs() {
       try {
-        const res = await fetch("/api/notifications");
+        const uid = user?.uid;
+        const url = uid ? `/api/notifications?userId=${uid}` : "/api/notifications";
+        const res = await fetch(url);
         const json = await res.json();
         if (json.success) setItems(json.data);
       } catch (err) {
@@ -25,7 +29,7 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
       }
     }
     fetchNotifs();
-  }, []);
+  }, [user?.uid]);
 
   const unreadCount = items.filter((n) => !n.read).length;
 
@@ -44,8 +48,21 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
     setNotifOpen((open) => !open);
   }
 
-  function markAllRead() {
+  async function markAllRead() {
+    const uid = user?.uid;
+    if (!uid) return;
+    // Optimistically update UI
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    // Persist to DB for this user only
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: uid }),
+      });
+    } catch (err) {
+      console.error("Failed to mark all read:", err);
+    }
   }
 
   const [clientDate, setClientDate] = useState<string | null>(null);
@@ -53,8 +70,21 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
     setClientDate(new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' }));
   }, []);
 
-  function markRead(id: string) {
+  async function markRead(id: string) {
+    const uid = user?.uid;
+    if (!uid) return;
+    // Optimistically update UI
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    // Persist to DB for this user only
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: uid, ids: [id] }),
+      });
+    } catch (err) {
+      console.error("Failed to mark read:", err);
+    }
   }
 
   return (
