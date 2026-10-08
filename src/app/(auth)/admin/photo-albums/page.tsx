@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { prepareImage, uploadAll, keepAwake, isSupportedImage } from "@/lib/photo-upload";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,9 @@ function fmtDateTime(d?: string | null) {
     hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila",
   });
 }
+
+// Accept list used by every file input (HEIC included for iPhone)
+const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 
 // ── General notes: one "All Programs" note + one optional note per program ──
 const GENERAL_SCOPE = "all";
@@ -633,8 +637,18 @@ function CreatePanel({
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [step, setStep] = useState<"select" | "upload" | "confirm">("select");
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep a live reference to photos so we can free blob URLs on unmount
+  const photosRef = useRef<PhotoPreview[]>([]);
+  photosRef.current = photos;
+  useEffect(() => {
+    return () => {
+      photosRef.current.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+    };
+  }, []);
 
   // Re-apply the default whenever it changes (e.g. a student from another
   // program is selected) — but only if the teacher hasn't typed their own.
@@ -658,61 +672,70 @@ function CreatePanel({
     );
   });
 
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
-    const remaining = 30 - photos.length;
-    const toProcess = Array.from(files).slice(0, remaining);
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const remaining = 30 - photos.length;
+      const picked = Array.from(files).filter(isSupportedImage).slice(0, Math.max(remaining, 0));
+      if (picked.length < files.length) {
+        setError("Some files were skipped (unsupported type or over the 30-photo limit).");
+      } else {
+        setError("");
+      }
 
-    const newPreviews: PhotoPreview[] = toProcess.map((f) => ({
-      id: `${f.name}-${Date.now()}-${Math.random()}`,
-      file: f,
-      previewUrl: URL.createObjectURL(f),
-      caption: "",
-      status: "ready" as const, // Skip compression to maintain quality
-    }));
+      const newPreviews: PhotoPreview[] = picked.map((f) => ({
+        id: `${f.name}-${Date.now()}-${Math.random()}`,
+        file: f,
+        previewUrl: "",
+        caption: "",
+        status: "compressing" as const,
+      }));
+      setPhotos((prev) => [...prev, ...newPreviews]);
 
-    setPhotos((prev) => [...prev, ...newPreviews]);
-  }, [photos.length]);
+      // Process one at a time so iOS never holds many full-res bitmaps in memory
+      (async () => {
+        for (const np of newPreviews) {
+          try {
+            const prepared = await prepareImage(np.file);
+            const previewUrl = URL.createObjectURL(prepared);
+            setPhotos((prev) =>
+              prev.map((x) => (x.id === np.id ? { ...x, file: prepared, previewUrl, status: "ready" } : x))
+            );
+          } catch (e: any) {
+            setError(e?.message || "Could not process a photo");
+            setPhotos((prev) => prev.map((x) => (x.id === np.id ? { ...x, status: "error" } : x)));
+          }
+        }
+      })();
+
+      // Lets iOS re-pick the same photo again
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [photos.length]
+  );
 
   async function handleSubmit() {
-    if (!selectedStudent || photos.filter((p) => p.status === "ready").length === 0) return;
+    const readyPhotos = photos.filter((p) => p.status === "ready");
+    if (!selectedStudent || readyPhotos.length === 0) return;
+
     setSubmitting(true);
     setError("");
+    setProgress({ done: 0, total: readyPhotos.length });
+    const release = await keepAwake(); // stop iOS from suspending the upload
+
     try {
       const prog = PROGRAMS.find((p) => p.id === selectedStudent.program);
-      const readyPhotos = photos.filter((p) => p.status === "ready");
-      const uploadedPhotos = [];
 
-      // Get signature first
-      const signRes = await fetch("/api/cloudinary-sign");
-      const signData = await signRes.json();
-      if (!signData.signature) throw new Error("Failed to get upload signature");
-
-      for (const p of readyPhotos) {
-        const formData = new FormData();
-        formData.append("file", p.file);
-        formData.append("api_key", signData.apiKey);
-        formData.append("timestamp", signData.timestamp);
-        formData.append("signature", signData.signature);
-        formData.append("folder", "merry_explorers_student_albums");
-
-        const upRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-        const upData = await upRes.json();
-        if (upData.error) {
-          throw new Error("Failed to upload one or more photos");
-        }
-        uploadedPhotos.push({
-          url: upData.secure_url,
-          cloudinaryPublicId: upData.public_id,
-          caption: p.caption,
-        });
-      }
+      // Resized files, limited concurrency, retries, fresh signature per file
+      const uploaded = await uploadAll(
+        readyPhotos.map((p) => p.file),
+        (done, total) => setProgress({ done, total })
+      );
+      const uploadedPhotos = uploaded.map((u, i) => ({
+        url: u.url,
+        cloudinaryPublicId: u.cloudinaryPublicId,
+        caption: readyPhotos[i].caption,
+      }));
 
       const res = await fetch("/api/photo-albums", {
         method: "POST",
@@ -737,8 +760,9 @@ function CreatePanel({
       onCreated(data.data);
       onClose();
     } catch (e: any) {
-      setError(e.message || "Network error");
+      setError(e?.message || "Network error");
     } finally {
+      release();
       setSubmitting(false);
     }
   }
@@ -748,9 +772,12 @@ function CreatePanel({
     ? isTrailblazerProgram(selectedStudent.program, prog?.name)
     : false;
 
+  const readyCount = photos.filter((p) => p.status === "ready").length;
+  const processing = photos.some((p) => p.status === "compressing");
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={submitting ? undefined : onClose} />
       <m.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
@@ -763,7 +790,11 @@ function CreatePanel({
             <p className="text-[10px] font-black uppercase tracking-widest text-[#0033A0]/50">Photo Albums</p>
             <h2 className="font-headline text-[20px] font-extrabold text-[#0f172a]">New Photo Album</h2>
           </div>
-          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[#64748b] hover:bg-slate-200 transition-colors">
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[#64748b] hover:bg-slate-200 transition-colors disabled:opacity-50"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -890,7 +921,8 @@ function CreatePanel({
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-bold text-[#64748b]">
-                  {photos.filter(p => p.status === "ready").length} / 30 photos ready
+                  {readyCount} / 30 photos ready
+                  {processing && <span className="ml-2 text-[#94a3b8] font-semibold">· processing…</span>}
                 </p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -902,12 +934,16 @@ function CreatePanel({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept={IMAGE_ACCEPT}
                   multiple
                   className="hidden"
                   onChange={(e) => handleFiles(e.target.files)}
                 />
               </div>
+
+              {error && (
+                <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-[13px] font-semibold text-red-600">{error}</div>
+              )}
 
               {photos.length === 0 ? (
                 <button
@@ -921,7 +957,7 @@ function CreatePanel({
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   <AnimatePresence>
-                    {photos.map((p, i) => (
+                    {photos.map((p) => (
                       <m.div
                         key={p.id}
                         layout
@@ -930,18 +966,25 @@ function CreatePanel({
                         exit={{ opacity: 0, scale: 0.8 }}
                         className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 group"
                       >
-                        <Image src={p.previewUrl} alt="" fill className="object-cover" sizes="180px" />
+                        {p.previewUrl && (
+                          <Image src={p.previewUrl} alt="" fill unoptimized className="object-cover" sizes="180px" />
+                        )}
                         {p.status === "compressing" && (
                           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                           </div>
                         )}
+                        {p.status === "error" && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-red-500/70 text-[11px] font-bold text-white">
+                            Failed
+                          </div>
+                        )}
                         <button
                           onClick={() => {
-                            URL.revokeObjectURL(p.previewUrl);
+                            if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
                             setPhotos((prev) => prev.filter((x) => x.id !== p.id));
                           }}
-                          className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-[10px] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         >✕</button>
                       </m.div>
                     ))}
@@ -971,7 +1014,7 @@ function CreatePanel({
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-[12px]">
                   <div><p className="text-[#94a3b8] font-semibold">Parent email</p><p className="font-bold text-[#0f172a]">{selectedStudent.parentInfo.email}</p></div>
-                  <div><p className="text-[#94a3b8] font-semibold">Photos</p><p className="font-bold text-[#0f172a]">{photos.filter(p => p.status === "ready").length} photos</p></div>
+                  <div><p className="text-[#94a3b8] font-semibold">Photos</p><p className="font-bold text-[#0f172a]">{readyCount} photos</p></div>
                   <div>
                     <p className="text-[#94a3b8] font-semibold">Expires</p>
                     <p className="font-bold text-amber-600">
@@ -995,14 +1038,14 @@ function CreatePanel({
 
               {/* Preview grid */}
               <div className="grid grid-cols-5 gap-1.5">
-                {photos.filter(p => p.status === "ready").slice(0, 10).map((p) => (
+                {photos.filter((p) => p.status === "ready" && p.previewUrl).slice(0, 10).map((p) => (
                   <div key={p.id} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
-                    <Image src={p.previewUrl} alt="" fill className="object-cover" sizes="80px" />
+                    <Image src={p.previewUrl} alt="" fill unoptimized className="object-cover" sizes="80px" />
                   </div>
                 ))}
-                {photos.filter(p => p.status === "ready").length > 10 && (
+                {readyCount > 10 && (
                   <div className="aspect-square rounded-lg bg-slate-100 flex items-center justify-center text-[12px] font-bold text-[#64748b]">
-                    +{photos.filter(p => p.status === "ready").length - 10}
+                    +{readyCount - 10}
                   </div>
                 )}
               </div>
@@ -1019,13 +1062,18 @@ function CreatePanel({
           {step !== "select" && (
             <button
               onClick={() => setStep(step === "confirm" ? "upload" : "select")}
-              className="flex items-center gap-1.5 text-[13px] font-bold text-[#64748b] hover:text-[#0033A0] transition-colors"
+              disabled={submitting}
+              className="flex items-center gap-1.5 text-[13px] font-bold text-[#64748b] hover:text-[#0033A0] transition-colors disabled:opacity-50"
             >
               ← Back
             </button>
           )}
           <div className="flex gap-2 ml-auto">
-            <button onClick={onClose} className="rounded-xl border border-slate-200 px-5 py-2.5 text-[13px] font-bold text-[#64748b] hover:bg-slate-50">
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="rounded-xl border border-slate-200 px-5 py-2.5 text-[13px] font-bold text-[#64748b] hover:bg-slate-50 disabled:opacity-50"
+            >
               Cancel
             </button>
             {step === "select" && (
@@ -1039,21 +1087,24 @@ function CreatePanel({
             )}
             {step === "upload" && (
               <button
-                disabled={photos.filter(p => p.status === "ready").length === 0}
-                onClick={() => setStep("confirm")}
+                disabled={processing || readyCount === 0}
+                onClick={() => { setError(""); setStep("confirm"); }}
                 className="rounded-xl bg-[#0033A0] px-5 py-2.5 text-[13px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002580] disabled:opacity-40"
               >
-                Next: Review →
+                {processing ? "Processing…" : "Next: Review →"}
               </button>
             )}
             {step === "confirm" && (
               <button
-                disabled={submitting || photos.filter(p => p.status === "ready").length === 0}
+                disabled={submitting || processing || readyCount === 0}
                 onClick={handleSubmit}
                 className="flex items-center gap-2 rounded-xl bg-[#FFC107] px-5 py-2.5 text-[13px] font-bold text-[#003399] shadow-md shadow-[#FFC107]/30 hover:bg-[#ffb800] disabled:opacity-50"
               >
                 {submitting ? (
-                  <><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#003399]/30 border-t-[#003399]" />Uploading…</>
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#003399]/30 border-t-[#003399]" />
+                    Uploading {progress.done}/{progress.total}…
+                  </>
                 ) : "✅ Create Album"}
               </button>
             )}
@@ -1104,8 +1155,18 @@ function EditPanel({
   const [removed, setRemoved] = useState<ExistingPhoto[]>([]);
   const [added, setAdded] = useState<NewPhoto[]>([]);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Free blob URLs when the panel closes
+  const addedRef = useRef<NewPhoto[]>([]);
+  addedRef.current = added;
+  useEffect(() => {
+    return () => {
+      addedRef.current.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+    };
+  }, []);
 
   const readyAdded = added.filter((p) => p.status === "ready");
   const totalCount = existing.length + added.length;
@@ -1124,18 +1185,39 @@ function EditPanel({
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
-      if (!files) return;
+      if (!files || files.length === 0) return;
       const remaining = MAX_PHOTOS - totalCount;
-      const toProcess = Array.from(files).slice(0, Math.max(remaining, 0));
+      const picked = Array.from(files).filter(isSupportedImage).slice(0, Math.max(remaining, 0));
+      if (picked.length < files.length) {
+        setError("Some files were skipped (unsupported type or over the 30-photo limit).");
+      } else {
+        setError("");
+      }
 
-      const previews: NewPhoto[] = toProcess.map((f) => ({
+      const previews: NewPhoto[] = picked.map((f) => ({
         id: `${f.name}-${Date.now()}-${Math.random()}`,
         file: f,
-        previewUrl: URL.createObjectURL(f),
+        previewUrl: "",
         caption: "",
-        status: "ready", // Skip compression to maintain quality
+        status: "compressing",
       }));
       setAdded((prev) => [...prev, ...previews]);
+
+      // One at a time to keep iOS memory low
+      (async () => {
+        for (const np of previews) {
+          try {
+            const prepared = await prepareImage(np.file);
+            const previewUrl = URL.createObjectURL(prepared);
+            setAdded((prev) =>
+              prev.map((x) => (x.id === np.id ? { ...x, file: prepared, previewUrl, status: "ready" } : x))
+            );
+          } catch (e: any) {
+            setError(e?.message || "Could not process a photo");
+            setAdded((prev) => prev.map((x) => (x.id === np.id ? { ...x, status: "error" } : x)));
+          }
+        }
+      })();
 
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
@@ -1155,7 +1237,7 @@ function EditPanel({
   function removeAdded(id: string) {
     setAdded((prev) => {
       const target = prev.find((p) => p.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
       return prev.filter((p) => p.id !== id);
     });
   }
@@ -1167,36 +1249,20 @@ function EditPanel({
     }
     setSaving(true);
     setError("");
+    setProgress({ done: 0, total: readyAdded.length });
+    const release = await keepAwake(); // stop iOS from suspending the upload
+
     try {
-      // 1. Upload any newly added photos
-      const uploaded: { url: string; cloudinaryPublicId: string; caption: string }[] = [];
-
-      let signData: any = null;
-      if (readyAdded.length > 0) {
-        const signRes = await fetch("/api/cloudinary-sign");
-        signData = await signRes.json();
-        if (!signData.signature) throw new Error("Failed to get upload signature");
-      }
-
-      for (const p of readyAdded) {
-        const formData = new FormData();
-        formData.append("file", p.file);
-        formData.append("api_key", signData.apiKey);
-        formData.append("timestamp", signData.timestamp);
-        formData.append("signature", signData.signature);
-        formData.append("folder", "merry_explorers_student_albums");
-
-        const upRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-        const data = await upRes.json();
-        if (data.error) throw new Error("Failed to upload one or more new photos");
-        uploaded.push({ url: data.secure_url, cloudinaryPublicId: data.public_id, caption: p.caption });
-      }
+      // 1. Upload newly added photos (resized, retried, fresh signature each)
+      const results = await uploadAll(
+        readyAdded.map((p) => p.file),
+        (done, total) => setProgress({ done, total })
+      );
+      const uploaded = results.map((u, i) => ({
+        url: u.url,
+        cloudinaryPublicId: u.cloudinaryPublicId,
+        caption: readyAdded[i].caption,
+      }));
 
       // 2. Save the album. Server deletes `removedPublicIds` from Cloudinary.
       const res = await fetch("/api/photo-albums", {
@@ -1227,8 +1293,9 @@ function EditPanel({
       onSaved(data.data);
       onClose();
     } catch (e: any) {
-      setError(e.message || "Network error");
+      setError(e?.message || "Network error");
     } finally {
+      release();
       setSaving(false);
     }
   }
@@ -1311,6 +1378,7 @@ function EditPanel({
             <div className="flex items-center justify-between mb-3">
               <p className="text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60">
                 Photos ({totalCount} / {MAX_PHOTOS})
+                {compressing && <span className="ml-2 normal-case tracking-normal text-[#94a3b8] font-semibold">· processing…</span>}
               </p>
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -1322,7 +1390,7 @@ function EditPanel({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={IMAGE_ACCEPT}
                 multiple
                 className="hidden"
                 onChange={(e) => handleFiles(e.target.files)}
@@ -1379,7 +1447,9 @@ function EditPanel({
                       className="space-y-1.5"
                     >
                       <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 border-[#FFC107] group">
-                        <Image src={p.previewUrl} alt="" fill className="object-cover" sizes="200px" />
+                        {p.previewUrl && (
+                          <Image src={p.previewUrl} alt="" fill unoptimized className="object-cover" sizes="200px" />
+                        )}
                         <span className="absolute bottom-1.5 left-1.5 rounded-full bg-[#FFC107] px-2 py-0.5 text-[9px] font-black text-[#003399]">
                           NEW
                         </span>
@@ -1463,7 +1533,7 @@ function EditPanel({
             {saving ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#003399]/30 border-t-[#003399]" />
-                Saving…
+                {progress.total > 0 ? `Uploading ${progress.done}/${progress.total}…` : "Saving…"}
               </>
             ) : (
               "💾 Save Changes"
@@ -1493,7 +1563,7 @@ export default function PhotoAlbumsPage() {
   const [timeFilter, setTimeFilter] = useState("ALL");
   const [activeTab, setActiveTab] = useState<"active" | "archive">("active");
 
-  // NEW: general note state
+  // General note state
   const [generalNotes, setGeneralNotes] = useState<NoteMap>({});
   const [showGeneralNote, setShowGeneralNote] = useState(false);
 
@@ -1505,7 +1575,7 @@ export default function PhotoAlbumsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // NEW: load the general note on mount
+  // Load the general note on mount
   useEffect(() => {
     fetch("/api/photo-albums/general-note")
       .then((r) => r.json())
@@ -1659,7 +1729,7 @@ export default function PhotoAlbumsPage() {
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-[13px] font-semibold text-[#94a3b8] hidden lg:inline">{albums.length} album{albums.length !== 1 ? "s" : ""}</span>
 
-            {/* NEW: General Note button
+            {/* General Note button
                 Optional: wrap with {userProfile?.role === "admin" && (...)} to restrict it to admins */}
             <button
               onClick={() => setShowGeneralNote(true)}
@@ -1761,7 +1831,7 @@ export default function PhotoAlbumsPage() {
         )}
       </AnimatePresence>
 
-      {/* NEW: General note modal */}
+      {/* General note modal */}
       <AnimatePresence>
         {showGeneralNote && (
           <GeneralNoteModal
