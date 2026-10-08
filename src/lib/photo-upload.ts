@@ -1,14 +1,10 @@
 // lib/photo-upload.ts
-// iPhone-safe photo prep + Cloudinary upload.
-// Quality-first: originals are uploaded untouched. Only HEIC (converted to JPEG at
-// near-lossless quality) and files over Cloudinary's size limit are ever re-encoded.
+// iPhone-safe photo prep + Cloudinary upload (resize, HEIC, EXIF, retries, fresh signatures)
 
+const MAX_EDGE = 2400;          // long edge in px — sharp enough for any screen/print at 4x6
+const JPEG_QUALITY = 0.9;
+const SKIP_BELOW_BYTES = 1.5 * 1024 * 1024; // small JPEG/PNG/WebP files are left untouched
 const CLOUDINARY_MAX_BYTES = 10 * 1024 * 1024; // free-plan per-image limit
-const TARGET_MAX_BYTES = 9.8 * 1024 * 1024;    // small safety margin under the limit
-const QUALITY_STEPS = [0.95, 0.92, 0.88];      // tried in order, only until the file fits
-const SCALE_STEP = 0.85;                       // last resort: shrink 15% per round
-const MAX_SCALE_ROUNDS = 6;
-const MAX_CANVAS_PIXELS = 16_777_216;          // iOS Safari canvas limit (4096 x 4096)
 const UPLOAD_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 3;
 
@@ -23,7 +19,7 @@ export function isSupportedImage(file: File): boolean {
     return /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
 }
 
-// ─── Decode ─────────────────────────────────────────────────────────────────────
+// ─── Client-side resize / normalize ─────────────────────────────────────────────
 
 async function decode(file: File): Promise<{ source: CanvasImageSource; width: number; height: number; close?: () => void }> {
     // createImageBitmap honours EXIF orientation and can decode HEIC on iOS Safari
@@ -47,25 +43,21 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
     }
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
-    return new Promise((res) => canvas.toBlob(res, "image/jpeg", quality));
-}
-
 /**
- * Encodes to JPEG at the highest quality that fits under the Cloudinary limit.
- * Starts at full resolution and 0.95 quality; only steps down if the file is too big.
+ * Resizes to MAX_EDGE and re-encodes as JPEG (this also converts HEIC → JPEG on Safari
+ * and bakes in EXIF rotation). Falls back to the original file if decoding fails.
  */
-async function encodeJpegUnderLimit(
-    source: CanvasImageSource,
-    width: number,
-    height: number
-): Promise<Blob> {
-    // Full resolution, unless the browser can't draw a canvas that large (old iOS)
-    let scale = Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / (width * height)));
+export async function prepareImage(file: File): Promise<File> {
+    const heic = isHeic(file);
+    const smallAndSafe =
+        !heic && file.size <= SKIP_BELOW_BYTES && /^image\/(jpeg|png|webp)$/i.test(file.type);
+    if (smallAndSafe) return file;
 
-    for (let round = 0; round < MAX_SCALE_ROUNDS; round++) {
-        const w = Math.max(1, Math.round(width * scale));
-        const h = Math.max(1, Math.round(height * scale));
+    try {
+        const { source, width, height, close } = await decode(file);
+        const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
+        const w = Math.round(width * scale);
+        const h = Math.round(height * scale);
 
         const canvas = document.createElement("canvas");
         canvas.width = w;
@@ -75,49 +67,18 @@ async function encodeJpegUnderLimit(
         ctx.fillStyle = "#fff"; // JPEG has no alpha
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(source, 0, 0, w, h);
+        close?.();
 
-        try {
-            for (const q of QUALITY_STEPS) {
-                const blob = await canvasToBlob(canvas, q);
-                if (!blob) throw new Error("toBlob failed");
-                if (blob.size <= TARGET_MAX_BYTES) return blob;
-            }
-        } finally {
-            // release canvas memory (important on iOS)
-            canvas.width = canvas.height = 0;
-        }
-        scale *= SCALE_STEP; // still too big at 0.88 — shrink a little and try again
-    }
-    throw new Error("could not fit under size limit");
-}
+        const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", JPEG_QUALITY));
+        // release canvas memory (important on iOS)
+        canvas.width = canvas.height = 0;
+        if (!blob) throw new Error("toBlob failed");
 
-/**
- * Quality-first prep:
- *  - JPEG / PNG / WebP under 10 MB → returned untouched (zero quality loss).
- *  - HEIC → converted to JPEG at full resolution, quality 0.95 (visually lossless).
- *  - Anything over ~10 MB → re-encoded at the highest quality that fits.
- */
-export async function prepareImage(file: File): Promise<File> {
-    const heic = isHeic(file);
-
-    // Untouched original: best possible quality
-    if (!heic && file.size <= TARGET_MAX_BYTES) return file;
-
-    try {
-        const { source, width, height, close } = await decode(file);
-        let blob: Blob;
-        try {
-            blob = await encodeJpegUnderLimit(source, width, height);
-        } finally {
-            close?.();
-        }
         const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
         return new File([blob], name, { type: "image/jpeg", lastModified: Date.now() });
     } catch {
-        if (heic) {
-            throw new Error(`"${file.name}" is a HEIC photo this browser can't convert. Please use Safari or export it as JPEG.`);
-        }
-        // Too big and couldn't be re-encoded: pass it through so upload reports a clear size error
+        // Couldn't decode (e.g. HEIC on a non-Safari browser). Let the caller decide.
+        if (heic) throw new Error(`"${file.name}" is a HEIC photo this browser can't convert. Please use Safari or export it as JPEG.`);
         return file;
     }
 }
