@@ -47,6 +47,22 @@ interface PhotoPreview {
   status: "pending" | "compressing" | "ready" | "error";
 }
 
+interface NoteHistoryItem {
+  note: string;
+  updatedAt: string | null;   // when this version was set
+  replacedAt?: string | null; // when it was replaced by a newer one
+  updatedBy: string;
+}
+
+interface NoteEntry {
+  note: string;
+  updatedAt: string | null;
+  updatedBy: string;
+  history: NoteHistoryItem[];
+}
+
+type NoteMap = Record<string, NoteEntry>;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PHT_OFFSET_MS = 8 * 60 * 60 * 1000; // Asia/Manila is UTC+8, no DST
@@ -104,7 +120,35 @@ function fmtDate(d: string) {
 
 const PROGRAMS = Object.values(PROGRAM_SLOTS);
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtDateTime(d?: string | null) {
+  if (!d) return "";
+  return new Date(d).toLocaleString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila",
+  });
+}
+
+// ── General notes: one "All Programs" note + one optional note per program ──
+const GENERAL_SCOPE = "all";
+const NOTE_PROGRAM_IDS = ["curious-explorer", "creative-explorer", "everyday-curious", "brave-explorer"];
+
+const NOTE_SCOPES = [
+  { id: GENERAL_SCOPE, label: "All Programs", accent: "#0033A0" },
+  ...NOTE_PROGRAM_IDS.map((id) => {
+    const p = PROGRAMS.find((x) => x.id === id);
+    const name = p?.name || id;
+    return {
+      id,
+      label: name.includes(":") ? name.split(":")[1].trim() : name,
+      accent: p?.accent || "#0033A0",
+    };
+  }),
+];
+
+// Program note wins; falls back to the "All Programs" note.
+function resolveNote(notes: NoteMap, programId?: string): string {
+  return (programId && notes[programId]?.note) || notes[GENERAL_SCOPE]?.note || "";
+}
 
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 
@@ -385,26 +429,218 @@ function ViewAlbumPanel({ album, onClose }: { album: PhotoAlbum; onClose: () => 
   );
 }
 
+// ─── General Note Modal ───────────────────────────────────────────────────────
+
+function GeneralNoteModal({
+  notes, onClose, onSaved, actorUid, actorName,
+}: {
+  notes: NoteMap;
+  onClose: () => void;
+  onSaved: (scope: string, entry: NoteEntry) => void;
+  actorUid?: string;
+  actorName?: string;
+}) {
+  const [scope, setScope] = useState<string>(GENERAL_SCOPE);
+  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(NOTE_SCOPES.map((s) => [s.id, notes[s.id]?.note || ""]))
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const current = NOTE_SCOPES.find((s) => s.id === scope)!;
+  const entry = notes[scope];
+  const draft = drafts[scope] ?? "";
+  const savedNote = entry?.note || "";
+  const dirty = draft.trim() !== savedNote;
+  const history = (entry?.history || []).slice(0, 3);
+
+  async function handleSave() {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/photo-albums/general-note", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, note: draft.trim(), actorUid, actorName }),
+      });
+      const data = await res.json();
+      if (!data.success) { setError(data.error || "Failed to save"); return; }
+      onSaved(scope, data.data);
+      setDrafts((p) => ({ ...p, [scope]: data.data.note || "" }));
+    } catch {
+      setError("Network error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={saving ? undefined : onClose} />
+      <m.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        className="relative z-10 w-full sm:max-w-xl max-h-[92vh] sm:max-h-[88vh] rounded-t-[2rem] sm:rounded-[2rem] bg-white shadow-2xl flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#0033A0]/50">Photo Albums</p>
+            <h2 className="font-headline text-[20px] font-extrabold text-[#0f172a]">General Teacher Notes</h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[#64748b] hover:bg-slate-200 transition-colors disabled:opacity-50"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <p className="text-[12px] text-[#64748b]">
+            These notes are auto-filled into every new album. Teachers can still edit them per album.
+          </p>
+
+          {/* Scope tabs */}
+          <div className="flex flex-wrap gap-2">
+            {NOTE_SCOPES.map((s) => {
+              const active = s.id === scope;
+              const has = !!notes[s.id]?.note;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => { setScope(s.id); setError(""); }}
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12px] font-bold transition-all ${active
+                    ? "text-white shadow-md"
+                    : "bg-white text-[#475569] border-slate-200 hover:bg-slate-50"
+                    }`}
+                  style={active ? { backgroundColor: s.accent, borderColor: s.accent } : undefined}
+                >
+                  {s.label}
+                  {has && <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : "bg-emerald-500"}`} />}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-[12px] font-medium text-[#64748b]">
+            {scope === GENERAL_SCOPE
+              ? "Used for any program that doesn't have its own note."
+              : `Used for new ${current.label} albums. If left empty, the "All Programs" note is used instead.`}
+          </p>
+
+          {/* Editor */}
+          <div>
+            <textarea
+              value={draft}
+              onChange={(e) => setDrafts((p) => ({ ...p, [scope]: e.target.value }))}
+              rows={6}
+              maxLength={1000}
+              placeholder={
+                scope === GENERAL_SCOPE
+                  ? "e.g. Thank you for being part of today's session! Here are some highlights…"
+                  : `Note for ${current.label} (leave empty to use the All Programs note)`
+              }
+              className="w-full rounded-xl border-2 border-slate-100 bg-white px-3 py-2 text-[13px] font-medium text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40 resize-none"
+            />
+            <div className="mt-1 flex items-center justify-between text-[11px] text-[#94a3b8]">
+              <span>
+                {entry?.updatedAt
+                  ? `Last updated ${fmtDateTime(entry.updatedAt)}${entry.updatedBy ? ` by ${entry.updatedBy}` : ""}`
+                  : "Not set yet"}
+              </span>
+              <span>{draft.length} / 1000</span>
+            </div>
+          </div>
+
+          {error && (
+            <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-[13px] font-semibold text-red-600">{error}</div>
+          )}
+
+          {/* History */}
+          <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+            <p className="text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60 mb-3">
+              Previous notes · {current.label} (last 3)
+            </p>
+            {history.length === 0 ? (
+              <p className="text-[12px] font-medium text-[#94a3b8]">No previous versions yet. Old notes appear here after you change them.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {history.map((h, i) => (
+                  <div key={`${h.updatedAt}-${i}`} className="rounded-xl bg-white border border-slate-200 p-3">
+                    <div className="flex items-start justify-between gap-3 mb-1.5">
+                      <p className="text-[11px] font-semibold text-[#64748b] leading-snug">
+                        {h.updatedAt ? `Set ${fmtDateTime(h.updatedAt)}` : "Earlier version"}
+                        {h.replacedAt && <> · replaced {fmtDateTime(h.replacedAt)}</>}
+                        {h.updatedBy && <> · by {h.updatedBy}</>}
+                      </p>
+                      <button
+                        onClick={() => setDrafts((p) => ({ ...p, [scope]: h.note }))}
+                        className="shrink-0 text-[11px] font-bold text-[#0033A0] hover:text-[#ffb800] transition-colors"
+                      >
+                        Use this
+                      </button>
+                    </div>
+                    <p className="text-[12px] text-[#334155] whitespace-pre-wrap line-clamp-4">{h.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-5 border-t border-slate-100 shrink-0 bg-white">
+          <button onClick={onClose} disabled={saving}
+            className="rounded-xl border border-slate-200 px-5 py-2.5 text-[13px] font-bold text-[#64748b] hover:bg-slate-50 disabled:opacity-50">
+            Close
+          </button>
+          <button onClick={handleSave} disabled={saving || !dirty}
+            className="rounded-xl bg-[#FFC107] px-5 py-2.5 text-[13px] font-bold text-[#003399] shadow-md shadow-[#FFC107]/30 hover:bg-[#ffb800] disabled:opacity-50">
+            {saving ? "Saving…" : "💾 Save Note"}
+          </button>
+        </div>
+      </m.div>
+    </div>
+  );
+}
+
 // ─── Create Panel ──────────────────────────────────────────────────────────────
 
 function CreatePanel({
-  onClose, onCreated, actorUid, actorName,
+  onClose, onCreated, actorUid, actorName, generalNotes,
 }: {
   onClose: () => void;
   onCreated: (album: PhotoAlbum) => void;
   actorUid?: string;
   actorName?: string;
+  generalNotes: NoteMap;
 }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split("T")[0]);
-  const [note, setNote] = useState("");
+  const noteTouched = useRef(false);
+  // Program-specific note if one exists, otherwise the "All Programs" note
+  const defaultNote = resolveNote(generalNotes, selectedStudent?.program);
+  const usingProgramNote = !!(selectedStudent && generalNotes[selectedStudent.program]?.note);
+  const [note, setNote] = useState(defaultNote);
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [step, setStep] = useState<"select" | "upload" | "confirm">("select");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Re-apply the default whenever it changes (e.g. a student from another
+  // program is selected) — but only if the teacher hasn't typed their own.
+  useEffect(() => {
+    if (!noteTouched.current) setNote(defaultNote);
+  }, [defaultNote]);
 
   useEffect(() => {
     fetch("/api/students")
@@ -615,15 +851,34 @@ function CreatePanel({
                     />
                   </div>
 
+                  {/* Teacher note — pre-filled from the General Note */}
                   <div>
-                    <label className="block text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60 mb-1.5">Teacher note (optional)</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60">
+                        Teacher note (optional)
+                      </label>
+                      {defaultNote && note !== defaultNote && (
+                        <button
+                          type="button"
+                          onClick={() => { noteTouched.current = false; setNote(defaultNote); }}
+                          className="text-[11px] font-bold text-[#0033A0] hover:text-[#ffb800] transition-colors"
+                        >
+                          Reset to default note
+                        </button>
+                      )}
+                    </div>
                     <textarea
                       value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      rows={2}
+                      onChange={(e) => { noteTouched.current = true; setNote(e.target.value); }}
+                      rows={3}
                       placeholder="Something special about today's session…"
                       className="w-full rounded-xl border-2 border-[#dbeafe] bg-white px-3 py-2 text-[13px] font-medium text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40 resize-none"
                     />
+                    {defaultNote && note === defaultNote && (
+                      <p className="mt-1 text-[11px] font-semibold text-[#94a3b8]">
+                        ✨ Using the {usingProgramNote ? "program note" : "general note"}. Edit it to customize for this student.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -733,7 +988,7 @@ function CreatePanel({
                 {note && (
                   <div className="rounded-xl bg-white border border-[#dbeafe] px-3 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-1">Teacher note</p>
-                    <p className="text-[13px] text-[#334155]">{note}</p>
+                    <p className="text-[13px] text-[#334155] whitespace-pre-wrap">{note}</p>
                   </div>
                 )}
               </div>
@@ -915,7 +1170,7 @@ function EditPanel({
     try {
       // 1. Upload any newly added photos
       const uploaded: { url: string; cloudinaryPublicId: string; caption: string }[] = [];
-      
+
       let signData: any = null;
       if (readyAdded.length > 0) {
         const signRes = await fetch("/api/cloudinary-sign");
@@ -1238,12 +1493,24 @@ export default function PhotoAlbumsPage() {
   const [timeFilter, setTimeFilter] = useState("ALL");
   const [activeTab, setActiveTab] = useState<"active" | "archive">("active");
 
+  // NEW: general note state
+  const [generalNotes, setGeneralNotes] = useState<NoteMap>({});
+  const [showGeneralNote, setShowGeneralNote] = useState(false);
+
   useEffect(() => {
     fetch("/api/photo-albums")
       .then((r) => r.json())
       .then((d) => { if (d.success) setAlbums(d.data); })
       .catch(() => { })
       .finally(() => setLoading(false));
+  }, []);
+
+  // NEW: load the general note on mount
+  useEffect(() => {
+    fetch("/api/photo-albums/general-note")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setGeneralNotes(d.data.notes || {}); })
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -1313,6 +1580,8 @@ export default function PhotoAlbumsPage() {
       setSendingId(null);
     }
   }
+
+  const hasAnyNote = Object.values(generalNotes).some((n) => n?.note);
 
   const filteredAlbums = albums.filter((a) => {
     const isExpired = new Date(a.expiresAt).getTime() <= Date.now();
@@ -1389,6 +1658,18 @@ export default function PhotoAlbumsPage() {
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-[13px] font-semibold text-[#94a3b8] hidden lg:inline">{albums.length} album{albums.length !== 1 ? "s" : ""}</span>
+
+            {/* NEW: General Note button
+                Optional: wrap with {userProfile?.role === "admin" && (...)} to restrict it to admins */}
+            <button
+              onClick={() => setShowGeneralNote(true)}
+              className="flex items-center gap-2 rounded-xl border border-[#dbeafe] bg-white px-4 py-2 sm:py-2.5 text-[14px] font-bold text-[#0033A0] shadow-sm hover:bg-[#f0f6ff] transition-colors"
+              title="Set a note that auto-fills into every new album"
+            >
+              📝 General Note
+              {hasAnyNote && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
+            </button>
+
             <button
               onClick={() => setShowCreate(true)}
               className="flex items-center gap-2 rounded-xl bg-[#0033A0] px-4 sm:px-5 py-2 sm:py-2.5 text-[14px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002580] transition-colors"
@@ -1459,6 +1740,7 @@ export default function PhotoAlbumsPage() {
             onCreated={(album) => setAlbums((prev) => [album, ...prev])}
             actorUid={user?.uid}
             actorName={userProfile?.fullName || user?.email || "Admin"}
+            generalNotes={generalNotes}
           />
         )}
       </AnimatePresence>
@@ -1472,6 +1754,23 @@ export default function PhotoAlbumsPage() {
             onSaved={(updated) => {
               setAlbums((prev) => prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a)));
               setToast({ msg: "Album updated ✏️", type: "success" });
+            }}
+            actorUid={user?.uid}
+            actorName={userProfile?.fullName || user?.email || "Admin"}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* NEW: General note modal */}
+      <AnimatePresence>
+        {showGeneralNote && (
+          <GeneralNoteModal
+            notes={generalNotes}
+            onClose={() => setShowGeneralNote(false)}
+            onSaved={(scope, entry) => {
+              setGeneralNotes((prev) => ({ ...prev, [scope]: entry }));
+              const label = NOTE_SCOPES.find((x) => x.id === scope)?.label || "General";
+              setToast({ msg: entry.note ? `${label} note saved 📝` : `${label} note cleared`, type: "success" });
             }}
             actorUid={user?.uid}
             actorName={userProfile?.fullName || user?.email || "Admin"}
