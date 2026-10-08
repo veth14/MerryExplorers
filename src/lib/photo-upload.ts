@@ -122,6 +122,37 @@ export async function prepareImage(file: File): Promise<File> {
     }
 }
 
+/**
+ * Small preview image (object URL) for the thumbnail grids. Showing full-size originals
+ * in 30 tiles would make iOS Safari decode ~30 huge bitmaps at once and can crash the tab.
+ * The uploaded file is NOT affected: this is only for on-screen previews.
+ * Remember to URL.revokeObjectURL() the result when the preview is removed.
+ */
+export async function makeThumbnail(file: File, maxEdge = 480): Promise<string> {
+    try {
+        const { source, width, height, close } = await decode(file);
+        try {
+            const scale = Math.min(1, maxEdge / Math.max(width, height));
+            const w = Math.max(1, Math.round(width * scale));
+            const h = Math.max(1, Math.round(height * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("no canvas context");
+            ctx.drawImage(source, 0, 0, w, h);
+            const blob = await canvasToBlob(canvas, 0.8);
+            canvas.width = canvas.height = 0;
+            if (!blob) throw new Error("toBlob failed");
+            return URL.createObjectURL(blob);
+        } finally {
+            close?.();
+        }
+    } catch {
+        return URL.createObjectURL(file); // preview only; fine if it can't be shrunk
+    }
+}
+
 // ─── Cloudinary upload ──────────────────────────────────────────────────────────
 
 export interface UploadedPhoto {
