@@ -149,9 +149,27 @@ const TEMP_FETCH_REGISTRATIONS = true;
 type LedgerRow = {
     key: string; label: string; date: string; method: string; ref: string;
     amount: number; verified: boolean; rejected: boolean; note?: string;
+    adv: "current" | "next"; // renewal downpayments belong to the NEXT adventure, everything else to the current one
+    order: number;           // keeps the 1st payment before its balance payments when the dates are equal
+    extra?: string;          // small extra line, e.g. "Interest waived: ₱120"
 };
 const ledgerStatus = (r: { verified: boolean; rejected: boolean }) =>
     r.verified ? "Verified" : r.rejected ? "Rejected" : "Pending";
+
+// Same date rules as Payment Tracking: "YYYY-MM-DD" is shown as-is (no timezone shifting),
+// full timestamps are shown in the parent's local time.
+function fmtDay(iso: string | undefined | null) {
+    if (!iso) return "—";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return fmtIsoDate(iso);
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+const dayTime = (iso: string | undefined | null) => {
+    if (!iso) return 0;
+    const t = new Date(iso).getTime();
+    return isNaN(t) ? 0 : t;
+};
 
 // ─── Icons (rounded 2.2px stroke, lucide style) ──────────────────────────────
 const ICONS: Record<string, ReactNode> = {
@@ -614,29 +632,66 @@ export default function TrailblazerDashboard(p: Props) {
                 return !!rn && !!childName && (rn === childName || childName.startsWith(rn) || rn.startsWith(childName));
             }) ?? mine[0] ?? null;
 
-        // Ledger: registration + session payments (renewal downpayments belong to the Renewal tab, same as Payment Tracking's "Current Adventure" view)
+        // ── Registration payments, exactly as Payment Tracking stores them ──
+        // `amountPaid` on a registration is the RUNNING TOTAL of the first payment + every later balance
+        // payment (`balancePayments`, entered by the admin). So the first payment on its own is the total
+        // minus the balance payments.
+        const balances: any[] =
+            registration && Array.isArray(registration.balancePayments)
+                ? [...registration.balancePayments].sort(
+                    (a: any, b: any) => dayTime(a.paidOn || a.recordedAt) - dayTime(b.paidOn || b.recordedAt)
+                )
+                : [];
+        const balancesTotal = balances.reduce((s: number, b: any) => s + (Number(b.amountPaid) || 0), 0);
+        const regTotalPaid = registration ? Number(registration.amountPaid || registration.amountDue || 0) : 0;
+        const firstAmount = Math.max(0, regTotalPaid - balancesTotal);
+        const regVerified = registration ? isRegistrationVerified(registration.status) : false;
+
+        // ── Ledger: registration (1st + balance payments) + virtual sessions + renewal downpayment ──
         const ledger: LedgerRow[] = [];
         if (registration) {
             ledger.push({
-                key: "reg", label: "Registration",
+                key: "reg", label: "Registration · 1st payment",
                 date: registration.submittedAt || "", method: registration.paymentMethod || "", ref: registration.referenceNumber || "",
-                amount: Number(registration.amountPaid || registration.amountDue || 0),
-                verified: isRegistrationVerified(registration.status), rejected: registration.status === "rejected",
-                note: registration.adminNote,
+                amount: firstAmount,
+                verified: regVerified, rejected: registration.status === "rejected",
+                note: registration.adminNote, adv: "current", order: 0,
             });
+            balances.forEach((b: any, i: number) =>
+                ledger.push({
+                    key: "bal-" + (b.id ?? i), label: "Registration · balance payment",
+                    date: b.paidOn || b.recordedAt || "", method: b.paymentMethod || "", ref: b.referenceNumber || "",
+                    amount: Number(b.amountPaid) || 0,
+                    verified: b.verified !== false, rejected: false,
+                    note: b.adminNote, adv: "current", order: i + 1,
+                    extra: Number(b.interestWaived) > 0 ? `Interest waived: ${fmtPeso(Number(b.interestWaived))}` : undefined,
+                })
+            );
         }
         (p.sessionPayments || []).forEach((sp: any) =>
             ledger.push({
                 key: "s-" + sp.id, label: "Virtual Session",
                 date: sp.submittedAt, method: sp.paymentMethod || "", ref: sp.referenceNumber || "",
                 amount: Number(sp.amountPaid || 0), verified: !!sp.verified, rejected: !!sp.rejected, note: sp.adminNote,
+                adv: "current", order: 100,
             })
         );
-        ledger.sort((x, y) => new Date(x.date || 0).getTime() - new Date(y.date || 0).getTime());
+        // Renewal downpayment is for the NEXT adventure (shown here so no payment the parent made is missing);
+        // it never counts toward the registration balance below.
+        const renewalDp = profile.renewalStatus?.downpayment;
+        if (renewalDp?.submitted) {
+            ledger.push({
+                key: "renewal", label: "Renewal downpayment",
+                date: renewalDp.submittedAt || "", method: renewalDp.paymentMethod || "", ref: renewalDp.referenceNumber || "",
+                amount: Number(renewalDp.amountPaid || 0), verified: !!renewalDp.verified, rejected: !!renewalDp.rejected,
+                note: renewalDp.adminNote, adv: "next", order: 200,
+            });
+        }
+        ledger.sort((x, y) => dayTime(x.date) - dayTime(y.date) || x.order - y.order);
 
-        // Balance math: identical to Payment Tracking (only the verified registration payment counts)
+        // Balance math: identical to Payment Tracking (running total of the registration, only when verified)
         const regLine = ledger.find((l) => l.key === "reg");
-        const paidVerified = regLine?.verified ? regLine.amount : 0;
+        const paidVerified = regVerified ? regTotalPaid : 0;
         const terms = registration
             ? calcRegistrationTerms(registration, getStudentSessionInfo(registration, profile), paidVerified, registration.amountDue)
             : null;
@@ -652,6 +707,22 @@ export default function TrailblazerDashboard(p: Props) {
         const balPaidAmt = terms ? Math.min(balAmt, Math.max(0, terms.paidVerified - resAmt)) : 0;
         const balPaid = !!terms && balPaidAmt >= balAmt;
         const balPartial = !balPaid && balPaidAmt > 0;
+
+        // ── Dates shown to the parent ──
+        // Reservation = the first payment. Balance = the date the verified payments reached the full amount.
+        const firstPaidDate = regLine?.verified && regLine.date ? fmtDay(regLine.date) : "";
+        const regRows = ledger.filter((l) => (l.key === "reg" || l.key.startsWith("bal-")) && l.verified);
+        let running = 0;
+        let coveredDate = "";
+        regRows.forEach((l) => {
+            running += l.amount;
+            if (!coveredDate && terms && running >= resAmt + balAmt && l.date) coveredDate = fmtDay(l.date);
+        });
+        const lastRegPayment = regRows.length ? regRows[regRows.length - 1] : null;
+
+        // Totals under the history (verified payments only)
+        const paidCurrent = ledger.filter((l) => l.verified && l.adv === "current").reduce((s, l) => s + l.amount, 0);
+        const paidNext = ledger.filter((l) => l.verified && l.adv === "next").reduce((s, l) => s + l.amount, 0);
 
         return (
             <>
@@ -676,6 +747,11 @@ export default function TrailblazerDashboard(p: Props) {
                                 <strong className="vp-count-line" style={fullyPaid ? { color: "#b6f5c2" } : undefined}>
                                     {fullyPaid ? "Fully paid" : fmtPeso(terms.totalPayable)}
                                 </strong>
+                                {fullyPaid && coveredDate && (
+                                    <span style={{ fontSize: 14, color: SUN_LIGHT, fontWeight: 600 }}>
+                                        Paid in full on {coveredDate}
+                                    </span>
+                                )}
                                 {overdue && (
                                     <span style={{ fontSize: 14, color: SUN_LIGHT, fontWeight: 600 }}>
                                         includes {fmtPeso(terms.interest)} interest ({pct(WEEKLY_INTEREST_RATE)}% × {terms.mondays} Monday{terms.mondays > 1 ? "s" : ""})
@@ -684,6 +760,11 @@ export default function TrailblazerDashboard(p: Props) {
                                 {!fullyPaid && !overdue && terms.dueDate && (
                                     <span style={{ fontSize: 14, color: SUN_LIGHT, fontWeight: 600 }}>
                                         Balance due on {fmtIsoDate(terms.dueDate)}
+                                    </span>
+                                )}
+                                {!fullyPaid && lastRegPayment && lastRegPayment.date && (
+                                    <span style={{ fontSize: 13, color: "#dff1ff", fontWeight: 600 }}>
+                                        Last payment received: {fmtPeso(lastRegPayment.amount)} on {fmtDay(lastRegPayment.date)}
                                     </span>
                                 )}
                             </div>
@@ -703,7 +784,11 @@ export default function TrailblazerDashboard(p: Props) {
                                     state={resPaid ? "paid" : regPending ? "pending" : "due"}
                                     title={`Reservation (${pct(RESERVATION_RATE)}%)`}
                                     amount={fmtPeso(terms.reservation)}
-                                    note={resPaid ? "Received and verified" : regPending ? "We are checking your payment" : "Non-refundable, paid upon registration"}
+                                    note={
+                                        resPaid
+                                            ? `Received and verified${firstPaidDate ? ` · paid ${firstPaidDate}` : ""}`
+                                            : regPending ? "We are checking your payment" : "Non-refundable, paid upon registration"
+                                    }
                                 />
                                 <Step
                                     state={balPaid ? "paid" : overdue ? "late" : balPartial ? "partial" : "due"}
@@ -711,7 +796,7 @@ export default function TrailblazerDashboard(p: Props) {
                                     amount={fmtPeso(terms.balanceShare)}
                                     note={
                                         balPaid
-                                            ? "Received and verified"
+                                            ? `Received and verified${coveredDate ? ` · paid ${coveredDate}` : ""}`
                                             : [
                                                 balPartial ? `${fmtPeso(balPaidAmt)} of ${fmtPeso(balAmt)} paid` : "",
                                                 terms.dueDate ? `Due ${fmtIsoDate(terms.dueDate)}` : "Due date not set",
@@ -762,7 +847,7 @@ export default function TrailblazerDashboard(p: Props) {
 
                 {!p.paymentsLoading && ledger.length > 0 && (
                     <Card>
-                        <Heading icon="card" title="Payment history" sub="Every payment you have submitted." />
+                        <Heading icon="card" title="Payment history" sub="Every payment you have submitted, with the date it was paid." />
                         <div className="vp-list">
                             {ledger.map((l) => {
                                 const st = ledgerStatus(l);
@@ -772,10 +857,12 @@ export default function TrailblazerDashboard(p: Props) {
                                         <div>
                                             <strong>{l.label}</strong>
                                             <small>
-                                                {l.date ? new Date(l.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
+                                                {fmtDay(l.date)}
                                                 {l.method ? ` · ${l.method.toUpperCase()}` : ""}
                                             </small>
                                             {l.ref && <small>Ref: {l.ref}</small>}
+                                            {l.extra && <small>{l.extra}</small>}
+                                            {l.adv === "next" && <small>For the Next Adventure</small>}
                                             {l.rejected && l.note && <small style={{ color: ERROR }}>Reason: {l.note}</small>}
                                         </div>
                                         <div style={{ textAlign: "right" }}>
@@ -785,6 +872,18 @@ export default function TrailblazerDashboard(p: Props) {
                                     </div>
                                 );
                             })}
+                        </div>
+
+                        <div className="vp-more" style={{ marginTop: 16 }}>
+                            <div className="vp-receipt" style={{ borderTop: "none", paddingTop: 6 }}>
+                                {paidNext > 0 && (
+                                    <>
+                                        <div className="vp-rrow"><span>Current Adventure (verified)</span><span>{fmtPeso(paidCurrent)}</span></div>
+                                        <div className="vp-rrow"><span>Next Adventure (verified)</span><span>{fmtPeso(paidNext)}</span></div>
+                                    </>
+                                )}
+                                <div className="vp-rrow total"><span>Total verified payments</span><span>{fmtPeso(paidCurrent + paidNext)}</span></div>
+                            </div>
                         </div>
                     </Card>
                 )}
