@@ -41,7 +41,7 @@ type AccountDoc = {
   assignedRoom?: string;
   avatarUrl?: string;
   avatarColor?: string;
-  position?: string;
+  dtrPosition?: string; // optional: title printed on the DTR (does not affect permissions)
   tags?: string[];
 };
 
@@ -87,11 +87,11 @@ const fmtHM = (mins: number) =>
   mins ? `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m` : "";
 
 // Picks what to print as the person's position on the DTR.
-// Order: explicit `position` field → real assigned room (ignores "Unassigned") → first tag → role
+// Order: `dtrPosition` field → real assigned room (ignores "Unassigned") → first tag → role
 const getPosition = (a?: AccountDoc) => {
   const room =
     a?.assignedRoom && a.assignedRoom.trim().toLowerCase() !== "unassigned" ? a.assignedRoom.trim() : "";
-  return a?.position?.trim() || room || a?.tags?.[0] || a?.role || "";
+  return a?.dtrPosition?.trim() || room || a?.tags?.[0] || a?.role || "";
 };
 
 type DtrDay = {
@@ -147,9 +147,9 @@ function buildDtrHtml(o: {
   @page{size:A4 portrait;margin:0;}
   @media print{body{padding:12mm 14mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
   .head{text-align:center;border-bottom:3px solid #002f76;padding-bottom:8px;margin-bottom:10px;}
-  .head img{width:46px;height:46px;object-fit:contain;}
-  .school{font-size:15px;font-weight:800;color:#002f76;margin-top:2px;}
-  .title{font-size:18px;font-weight:800;letter-spacing:3px;margin-top:6px;}
+  .head img{display:block;margin:0 auto -45px;height:180px;width:auto;max-width:600px;object-fit:contain;}
+.school{font-size:15px;font-weight:800;color:#002f76;margin-top:0;line-height:1.2;position:relative;}
+.title{font-size:18px;font-weight:800;letter-spacing:3px;margin-top:2px;line-height:1.2;position:relative;}
   .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:10px;}
   .info div{border-bottom:1px solid #111827;padding:2px 0;font-weight:600;}
   .info span{font-weight:400;color:#6b7280;font-size:9px;display:block;text-transform:uppercase;letter-spacing:.06em;}
