@@ -41,7 +41,181 @@ type AccountDoc = {
   assignedRoom?: string;
   avatarUrl?: string;
   avatarColor?: string;
+  position?: string;
+  tags?: string[];
 };
+
+type ExportRow = {
+  dateLabel: string;
+  name: string;
+  group: string;
+  timeIn: string;
+  timeOut: string;
+  status: string;
+  rowType: string;
+  hours?: string; // only filled for single-employee DTR exports
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DTR helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const fmtTime = (iso?: string | null) =>
+  iso
+    ? new Date(iso).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Manila",
+    })
+    : "";
+
+const minsBetween = (a?: string | null, b?: string | null) =>
+  a && b ? Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000)) : 0;
+
+// ── DTR hour rules ──────────────────────────────────────────────────────────
+const BREAK_MINS = 60;          // unpaid break, deducted from the day
+const BREAK_AFTER_MINS = 240;   // only deduct the break if they stayed longer than 4 hours
+const MAX_DAILY_MINS = 480;     // 8 hours maximum credited per day
+
+const workedMins = (a?: string | null, b?: string | null) => {
+  let m = minsBetween(a, b);
+  if (m > BREAK_AFTER_MINS) m -= BREAK_MINS;
+  return Math.min(m, MAX_DAILY_MINS);
+};
+
+const fmtHM = (mins: number) =>
+  mins ? `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m` : "";
+
+// Picks what to print as the person's position on the DTR.
+// Order: explicit `position` field → real assigned room (ignores "Unassigned") → first tag → role
+const getPosition = (a?: AccountDoc) => {
+  const room =
+    a?.assignedRoom && a.assignedRoom.trim().toLowerCase() !== "unassigned" ? a.assignedRoom.trim() : "";
+  return a?.position?.trim() || room || a?.tags?.[0] || a?.role || "";
+};
+
+type DtrDay = {
+  day: string;
+  weekday: string;
+  timeIn: string;
+  timeOut: string;
+  hours: string;
+  remarks: string;
+  off: boolean;
+};
+
+function buildDtrHtml(o: {
+  name: string;
+  room: string;
+  startDate: string;
+  endDate: string;
+  days: DtrDay[];
+  totals: { hours: string; present: number; late: number; absent: number };
+  logoSrc: string;
+  generatedAt: string;
+}) {
+  const fmt = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const s = new Date(`${o.startDate}T00:00:00`);
+  const e = new Date(`${o.endDate}T00:00:00`);
+  const period =
+    s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()
+      ? s.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      : `${fmt(o.startDate)} – ${fmt(o.endDate)}`;
+
+  const rows = o.days
+    .map(
+      (d) => `
+    <tr class="${d.off ? "off" : ""}">
+      <td class="c">${d.day}</td>
+      <td class="c">${d.weekday}</td>
+      <td class="c">${d.timeIn}</td>
+      <td class="c">${d.timeOut}</td>
+      <td class="c">${d.hours}</td>
+      <td class="c">${d.remarks}</td>
+    </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/>
+<title>DTR — ${o.name} — ${period}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;color:#111827;font-size:11px;padding:16px;}
+  @page{size:A4 portrait;margin:0;}
+  @media print{body{padding:12mm 14mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+  .head{text-align:center;border-bottom:3px solid #002f76;padding-bottom:8px;margin-bottom:10px;}
+  .head img{width:46px;height:46px;object-fit:contain;}
+  .school{font-size:15px;font-weight:800;color:#002f76;margin-top:2px;}
+  .title{font-size:18px;font-weight:800;letter-spacing:3px;margin-top:6px;}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:10px;}
+  .info div{border-bottom:1px solid #111827;padding:2px 0;font-weight:600;}
+  .info span{font-weight:400;color:#6b7280;font-size:9px;display:block;text-transform:uppercase;letter-spacing:.06em;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#002f76;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:6px 4px;border:1px solid #002f76;}
+  td{border:1px solid #9ca3af;padding:4px 6px;font-size:10px;}
+  td.c{text-align:center;}
+  tr.off td{background:#f3f4f6;color:#6b7280;}
+  tfoot td{font-weight:800;background:#f0f5ff;border-top:2px solid #002f76;}
+  .summary{margin-top:8px;font-size:10px;color:#374151;}
+  .cert{margin-top:14px;font-size:10px;font-style:italic;text-align:justify;}
+  .sigs{display:flex;justify-content:space-between;margin-top:36px;}
+  .sig{width:44%;text-align:center;}
+  .sig .line{border-top:1.5px solid #111827;padding-top:3px;font-weight:700;}
+  .sig .sub{font-size:9px;color:#6b7280;}
+  .gen{margin-top:18px;font-size:8px;color:#9ca3af;text-align:center;}
+  tr{page-break-inside:avoid;}
+</style></head>
+<body>
+  <div class="head">
+    <img src="${o.logoSrc}" alt="Logo"/>
+    <div class="school">Merry Explorers Playgroup Learning Center</div>
+    <div class="title">DAILY TIME RECORD</div>
+  </div>
+
+  <div class="info">
+    <div><span>Name</span>${o.name}</div>
+    <div><span>For the period of</span>${period}</div>
+    <div><span>Position / assigned room</span>${o.room}</div>
+    <div><span>Total hours rendered</span>${o.totals.hours || "0h 00m"}</div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th style="width:8%">Day</th>
+      <th style="width:10%">Weekday</th>
+      <th style="width:16%">Time In</th>
+      <th style="width:16%">Time Out</th>
+      <th style="width:16%">Hours</th>
+      <th>Remarks</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td colspan="4" style="text-align:right;">TOTAL</td>
+      <td class="c">${o.totals.hours || "—"}</td>
+      <td></td>
+    </tr></tfoot>
+  </table>
+
+  <div class="summary">
+    Days present: <b>${o.totals.present}</b> &nbsp;|&nbsp;
+    Late: <b>${o.totals.late}</b> &nbsp;|&nbsp;
+    Absent: <b>${o.totals.absent}</b>
+    <br/><span style="color:#6b7280;font-size:9px;">Hours exclude the ${BREAK_MINS / 60}-hour break and are capped at ${MAX_DAILY_MINS / 60} hours per day.</span>
+  </div>
+
+  <p class="cert">I certify on my honor that the above is a true and correct report of the hours of work performed, the record of which was made daily at the time of arrival and departure from the center.</p>
+
+  <div class="sigs">
+    <div class="sig"><div class="line">${o.name}</div><div class="sub">Employee Signature / Date</div></div>
+    <div class="sig"><div class="line">Merry Valmonte</div><div class="sub">Owner / Managing Director<br/>Verified by / Date</div></div>
+  </div>
+
+  <div class="gen">Generated ${o.generatedAt} (Philippine Time) · Merry Explorers Attendance Management System</div>
+</body></html>`;
+}
 
 export default function AttendancePage() {
   const { user, userProfile } = useAuth();
@@ -60,18 +234,19 @@ export default function AttendancePage() {
   const [suspendInput, setSuspendInput] = useState("");
   const [suspendLoading, setSuspendLoading] = useState(false);
 
-
-
   // Multi-date export state
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
   const [exportGroupBy, setExportGroupBy] = useState<"date" | "teacher" | "group">("date");
+  const [exportTeacherUid, setExportTeacherUid] = useState("all"); // "all" or a specific account id
+  const [exportPosition, setExportPosition] = useState(""); // position / room shown on the DTR
   const [exportLoading, setExportLoading] = useState(false);
 
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
   const [printHtml, setPrintHtml] = useState<string | null>(null);
-  const [exportRows, setExportRows] = useState<Array<{ dateLabel: string; name: string; group: string; timeIn: string; timeOut: string; status: string; rowType: string }>>([]);
+  const [exportRows, setExportRows] = useState<ExportRow[]>([]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Weekly navigation — start of current week (Monday)
   const [weekStart, setWeekStart] = useState(() => {
@@ -138,6 +313,15 @@ export default function AttendancePage() {
 
   const [suspendDateInput, setSuspendDateInput] = useState(todayStr);
   const [autoAnnounce, setAutoAnnounce] = useState(true);
+
+  // Employee options for the export dropdown
+  const employeeOptions = accounts
+    .map((a) => ({
+      uid: a.id || a._id || "",
+      name: a.fullName || `${a.firstName ?? ""} ${a.lastName ?? ""}`.trim() || "Unknown",
+    }))
+    .filter((o) => o.uid)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const handleMarkDayOff = async () => {
     setSuspendLoading(true);
@@ -238,6 +422,7 @@ export default function AttendancePage() {
   };
 
   // Multi-date range export — opens branded print-to-PDF window
+  // If a specific employee is chosen, builds a single-person DTR instead.
   const handleRangeExport = async () => {
     if (!exportStartDate || !exportEndDate) return;
     setExportLoading(true);
@@ -254,14 +439,109 @@ export default function AttendancePage() {
         }
       }
 
+      // Only keep the selected employee's records (or everyone's)
+      const selectedRecords = (json.data as AttendanceRecord[]).filter(
+        (r) => exportTeacherUid === "all" || r.teacherUid === exportTeacherUid
+      );
+
       // Build records map: dateStr → records[]
       const recMap = new Map<string, AttendanceRecord[]>();
-      for (const r of json.data as AttendanceRecord[]) {
+      for (const r of selectedRecords) {
         if (!recMap.has(r.dateStr)) recMap.set(r.dateStr, []);
         recMap.get(r.dateStr)!.push(r);
       }
 
-      // ── Build HTML rows ────────────────────────────────────────────────────
+      const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      const generatedAt = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+      const logoSrc = `${window.location.origin}/merry_explorers_transparent.png`;
+
+      // ── SINGLE EMPLOYEE → DTR ─────────────────────────────────────────────
+      if (exportTeacherUid !== "all") {
+        const acc = accounts.find((a) => (a.id || a._id) === exportTeacherUid);
+        const name =
+          acc?.fullName || `${acc?.firstName ?? ""} ${acc?.lastName ?? ""}`.trim() || "Unknown";
+        const room = exportPosition.trim() || getPosition(acc) || "—";
+        const workDays = acc?.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+        const days: DtrDay[] = [];
+        const dtrExcel: ExportRow[] = [];
+        let totalMins = 0;
+        let present = 0;
+        let late = 0;
+        let absent = 0;
+
+        const cur = new Date(`${exportStartDate}T00:00:00`);
+        const end = new Date(`${exportEndDate}T00:00:00`);
+
+        while (cur <= end) {
+          const dStr = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+          const weekday = cur.toLocaleDateString("en-US", { weekday: "short" });
+          const susp = suspMap.get(dStr);
+          const rec = (recMap.get(dStr) || [])[0];
+
+          let timeIn = "";
+          let timeOut = "";
+          let hours = "";
+          let remarks = "";
+          let off = false;
+
+          if (susp) {
+            const label = susp.type === "holiday" ? "Holiday" : "Suspended";
+            remarks = susp.reason ? `${label} — ${susp.reason}` : label;
+            off = true;
+          } else if (rec) {
+            timeIn = fmtTime(rec.clockInTime);
+            timeOut = fmtTime(rec.clockOutTime);
+            const m = workedMins(rec.clockInTime, rec.clockOutTime);
+            totalMins += m;
+            hours = fmtHM(m);
+            remarks = rec.status + (rec.clockOutTime ? "" : " (no clock-out)");
+            present++;
+            if (rec.status === "Late") late++;
+          } else if (workDays.includes(weekday)) {
+            // Only count as absent for days that already happened
+            if (dStr <= todayStr) {
+              remarks = "Absent";
+              absent++;
+            }
+          } else {
+            remarks = "Day off";
+            off = true;
+          }
+
+          days.push({ day: String(cur.getDate()), weekday, timeIn, timeOut, hours, remarks, off });
+          dtrExcel.push({
+            dateLabel: cur.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+            name,
+            group: room,
+            timeIn,
+            timeOut,
+            status: remarks,
+            rowType: "normal",
+            hours,
+          });
+
+          cur.setDate(cur.getDate() + 1);
+        }
+
+        const html = buildDtrHtml({
+          name,
+          room,
+          startDate: exportStartDate,
+          endDate: exportEndDate,
+          days,
+          totals: { hours: fmtHM(totalMins), present, late, absent },
+          logoSrc,
+          generatedAt,
+        });
+
+        setPrintHtml(html);
+        setExportRows(dtrExcel);
+        setShowExportModal(false);
+        return;
+      }
+
+      // ── ALL EMPLOYEES → original grouped report ────────────────────────────
       type RowData = {
         dateLabel: string;
         name: string;
@@ -275,8 +555,8 @@ export default function AttendancePage() {
 
       const tableRows: RowData[] = [];
       const start = new Date(`${exportStartDate}T00:00:00`);
-      const end   = new Date(`${exportEndDate}T00:00:00`);
-      const cur   = new Date(start);
+      const end = new Date(`${exportEndDate}T00:00:00`);
+      const cur = new Date(start);
 
       while (cur <= end) {
         const dStr = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
@@ -285,7 +565,8 @@ export default function AttendancePage() {
         const dayRecs = recMap.get(dStr) || [];
 
         if (susp) {
-          tableRows.push({ dateLabel, name: "—", group: "—", timeIn: "—", timeOut: "—",
+          tableRows.push({
+            dateLabel, name: "—", group: "—", timeIn: "—", timeOut: "—",
             status: susp.type === "holiday" ? "Holiday" : "Suspended",
             rowType: susp.type === "holiday" ? "holiday" : "suspension",
             dateStr: dStr
@@ -294,7 +575,7 @@ export default function AttendancePage() {
           tableRows.push({ dateLabel, name: "(No records)", group: "", timeIn: "", timeOut: "", status: "", rowType: "norecord", dateStr: dStr });
         } else {
           for (const r of dayRecs) {
-            const timeIn  = r.clockInTime  ? new Date(r.clockInTime).toLocaleTimeString("en-US",  { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
+            const timeIn = r.clockInTime ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
             const timeOut = r.clockOutTime ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
             tableRows.push({ dateLabel, name: r.name, group: r.group, timeIn, timeOut, status: r.status, rowType: "normal", dateStr: dStr });
           }
@@ -304,7 +585,7 @@ export default function AttendancePage() {
 
       // Grouping logic
       const groupedRows = new Map<string, RowData[]>();
-      
+
       if (exportGroupBy === "date") {
         groupedRows.set("Chronological", tableRows);
       } else if (exportGroupBy === "teacher") {
@@ -324,12 +605,12 @@ export default function AttendancePage() {
       // ── Generate row HTML ─────────────────────────────────────────────────
       const statusBadge = (status: string) => {
         const map: Record<string, string> = {
-          "On Time":   "background:#e8f4fd;color:#005cc8;border:1px solid #bfdbfe;",
-          "Late":      "background:#fffbeb;color:#d97706;border:1px solid #fde68a;",
-          "Absent":    "background:#fef2f2;color:#dc2626;border:1px solid #fecaca;",
+          "On Time": "background:#e8f4fd;color:#005cc8;border:1px solid #bfdbfe;",
+          "Late": "background:#fffbeb;color:#d97706;border:1px solid #fde68a;",
+          "Absent": "background:#fef2f2;color:#dc2626;border:1px solid #fecaca;",
           "Completed": "background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;",
           "Suspended": "background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;",
-          "Holiday":   "background:#fffbeb;color:#92400e;border:1px solid #fde68a;",
+          "Holiday": "background:#fffbeb;color:#92400e;border:1px solid #fde68a;",
           "Exempt (Flexible)": "background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;",
         };
         const style = map[status] || "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
@@ -339,9 +620,9 @@ export default function AttendancePage() {
       };
 
       const rowBg = (r: RowData, i: number) => {
-        if (r.rowType === "holiday")    return "#fffbeb";
+        if (r.rowType === "holiday") return "#fffbeb";
         if (r.rowType === "suspension") return "#fff7ed";
-        if (r.rowType === "norecord")   return "#f8fafc";
+        if (r.rowType === "norecord") return "#f8fafc";
         return i % 2 === 0 ? "#ffffff" : "#f8faff";
       };
 
@@ -375,10 +656,6 @@ export default function AttendancePage() {
           <br/>
         `;
       }
-
-      const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-      const generatedAt = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
-      const logoSrc = `${window.location.origin}/LOGO-noBG.png`;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -464,11 +741,8 @@ export default function AttendancePage() {
       <div class="sig-line">Authorized Signature &amp; Date</div>
     </div>
   </div>
-
-  <\/div>
-
-<\/body>
-<\/html>`;
+</body>
+</html>`;
 
       setPrintHtml(html);
       setExportRows(tableRows);
@@ -587,16 +861,16 @@ export default function AttendancePage() {
 
   const attendanceMetrics = isSuspended
     ? [
-        { label: "CAME IN", value: present.toString(), type: "present" as const },
-        { label: isHolidayDay ? "HOLIDAY" : "SUSPENDED", value: dayOffCount.toString(), type: "absent" as const },
-        { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
-      ]
+      { label: "CAME IN", value: present.toString(), type: "present" as const },
+      { label: isHolidayDay ? "HOLIDAY" : "SUSPENDED", value: dayOffCount.toString(), type: "absent" as const },
+      { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
+    ]
     : [
-        { label: "TOTAL PRESENT", value: present.toString(), type: "present" as const },
-        { label: "LATE ARRIVALS", value: late.toString(), type: "late" as const },
-        { label: "ABSENT", value: absent.toString(), type: "absent" as const },
-        { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
-      ];
+      { label: "TOTAL PRESENT", value: present.toString(), type: "present" as const },
+      { label: "LATE ARRIVALS", value: late.toString(), type: "late" as const },
+      { label: "ABSENT", value: absent.toString(), type: "absent" as const },
+      { label: "ON LEAVE", value: onLeave.toString(), type: "leave" as const },
+    ];
 
   // Build roster from accounts who are supposed to work today (or have a record)
   const rosterAccounts = accountStatuses.filter(
@@ -646,30 +920,46 @@ export default function AttendancePage() {
     const handleDownloadExcel = async () => {
       const XLSX = await import("xlsx");
 
-      const headers = ["Date", "Teacher Name", "Group", "Time In", "Time Out", "Status"];
-      const data = exportRows.map(r => ([
-        r.dateLabel,
-        r.name,
-        r.group,
-        r.timeIn,
-        r.timeOut,
-        r.status,
-      ]));
+      // Single-employee DTR exports carry an "Hours" column
+      const isDtr = exportRows.some((r) => r.hours !== undefined);
+
+      const headers = isDtr
+        ? ["Date", "Employee", "Room / Group", "Time In", "Time Out", "Hours", "Remarks"]
+        : ["Date", "Teacher Name", "Group", "Time In", "Time Out", "Status"];
+
+      const data = exportRows.map((r) =>
+        isDtr
+          ? [r.dateLabel, r.name, r.group, r.timeIn, r.timeOut, r.hours ?? "", r.status]
+          : [r.dateLabel, r.name, r.group, r.timeIn, r.timeOut, r.status]
+      );
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
 
       // Column widths
-      ws["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
+      ws["!cols"] = isDtr
+        ? [{ wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 28 }]
+        : [{ wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+      XLSX.utils.book_append_sheet(wb, ws, isDtr ? "DTR" : "Attendance");
 
-      XLSX.writeFile(wb, `Attendance_Report_${exportStartDate}_to_${exportEndDate}.xlsx`);
+      const safeName = (exportRows[0]?.name || "Employee").replace(/[^a-z0-9]+/gi, "_");
+      const fileName = isDtr
+        ? `DTR_${safeName}_${exportStartDate}_to_${exportEndDate}.xlsx`
+        : `Attendance_Report_${exportStartDate}_to_${exportEndDate}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+    };
+
+    const handlePrint = () => {
+      iframeRef.current?.contentWindow?.focus();
+      iframeRef.current?.contentWindow?.print();
     };
 
     return (
       <div className="fixed inset-0 z-[9999] bg-[#f8fafc]">
         <iframe
+          ref={iframeRef}
           srcDoc={printHtml}
           className="w-full h-full border-none pb-[80px]"
           title="Print Preview"
@@ -677,13 +967,21 @@ export default function AttendancePage() {
         {/* Floating Toolbar at the bottom center */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-[#e2e8f0]">
           <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 rounded-xl bg-[#002f76] px-6 py-2.5 text-[14px] font-black text-white hover:bg-[#001f52] shadow-md transition-all"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>print</span>
+            Print / Save as PDF
+          </button>
+
+          <button
             onClick={handleDownloadExcel}
             className="flex items-center gap-2 rounded-xl bg-[#0050d5] px-6 py-2.5 text-[14px] font-black text-white hover:bg-[#0042b3] shadow-md transition-all"
           >
             <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>download</span>
             Download Excel
           </button>
-          
+
           <div className="w-[2px] h-8 bg-[#e2e8f0]" />
 
           <button
@@ -697,6 +995,8 @@ export default function AttendancePage() {
       </div>
     );
   }
+
+  const isDtrExport = exportTeacherUid !== "all";
 
   return (
     <AppShell title="Attendance" description="Track daily check-ins and monitor staff availability.">
@@ -730,8 +1030,6 @@ export default function AttendancePage() {
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>download</span>
             Export Range
           </button>
-
-
 
           {/* Mark Day Off / Undo Button */}
           {isSuspended ? (
@@ -793,85 +1091,85 @@ export default function AttendancePage() {
       {viewMode === "daily" && (
         <>
           {/* Day-Off Banner */}
-      {isSuspended && (
-        isHolidayDay ? (
-          /* Holiday Banner — gold/green */
-          <div className="flex items-start gap-3 rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
-            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-amber-600" style={{ fontSize: "20px" }}>celebration</span>
-            </div>
-            <div>
-              <p className="font-black text-[13px] text-amber-800 uppercase tracking-wide">Public Holiday — No Classes Today</p>
-              {suspendReason && (
-                <p className="text-[12px] font-semibold text-amber-700 mt-0.5">
-                  {suspendReason}
-                </p>
-              )}
-              <p className="text-[11px] text-amber-600 mt-1">
-                This is a paid holiday for monthly staff. Daily-rate staff follow no-work-no-pay rules.
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* Suspension Banner — orange */
-          <div className="flex items-start gap-3 rounded-2xl border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm">
-            <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-orange-600" style={{ fontSize: "20px" }}>warning</span>
-            </div>
-            <div>
-              <p className="font-black text-[13px] text-orange-800 uppercase tracking-wide">Classes Suspended Today</p>
-              {suspendReason && (
-                <p className="text-[12px] font-semibold text-orange-700 mt-0.5">
-                  Reason: <span className="font-bold">{suspendReason}</span>
-                </p>
-              )}
-              <p className="text-[11px] text-orange-600 mt-1">
-                No staff will be marked Late or Absent for today. Teachers who came in can still clock out normally.
-              </p>
-            </div>
-          </div>
-        )
-      )}
-
-      {/* Metric cards */}
-      <section className={`grid gap-5 shrink-0 ${isSuspended ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
-        {attendanceMetrics.map((metric) => (
-          <AttendanceMetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            type={metric.type}
-          />
-        ))}
-      </section>
-
-      {/* Staff Roster Table */}
-      <section className="mt-2">
-        {loading ? (
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <Skeleton className="h-10 flex-1 rounded-2xl" />
+          {isSuspended && (
+            isHolidayDay ? (
+              /* Holiday Banner — gold/green */
+              <div className="flex items-start gap-3 rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 p-4 shadow-sm">
+                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-amber-600" style={{ fontSize: "20px" }}>celebration</span>
+                </div>
+                <div>
+                  <p className="font-black text-[13px] text-amber-800 uppercase tracking-wide">Public Holiday — No Classes Today</p>
+                  {suspendReason && (
+                    <p className="text-[12px] font-semibold text-amber-700 mt-0.5">
+                      {suspendReason}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    This is a paid holiday for monthly staff. Daily-rate staff follow no-work-no-pay rules.
+                  </p>
+                </div>
               </div>
+            ) : (
+              /* Suspension Banner — orange */
+              <div className="flex items-start gap-3 rounded-2xl border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm">
+                <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-orange-600" style={{ fontSize: "20px" }}>warning</span>
+                </div>
+                <div>
+                  <p className="font-black text-[13px] text-orange-800 uppercase tracking-wide">Classes Suspended Today</p>
+                  {suspendReason && (
+                    <p className="text-[12px] font-semibold text-orange-700 mt-0.5">
+                      Reason: <span className="font-bold">{suspendReason}</span>
+                    </p>
+                  )}
+                  <p className="text-[11px] text-orange-600 mt-1">
+                    No staff will be marked Late or Absent for today. Teachers who came in can still clock out normally.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
+
+          {/* Metric cards */}
+          <section className={`grid gap-5 shrink-0 ${isSuspended ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
+            {attendanceMetrics.map((metric) => (
+              <AttendanceMetricCard
+                key={metric.label}
+                label={metric.label}
+                value={metric.value}
+                type={metric.type}
+              />
             ))}
-          </div>
-        ) : roster.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-[#9aa3b2] gap-2">
-            <p className="font-bold text-sm">No staff scheduled today.</p>
-            <p className="text-xs">Teachers will appear here based on their work day schedule.</p>
-          </div>
-        ) : (
-          <AttendanceRoster
-            data={roster}
-            dateStr={viewDateStr}
-            onToggleExempt={handleToggleExempt}
-            exemptLoading={exemptLoading}
-            onCorrectTimes={handleCorrectTimes}
-          />
-        )}
-      </section>
-      </>
+          </section>
+
+          {/* Staff Roster Table */}
+          <section className="mt-2">
+            {loading ? (
+              <div className="flex flex-col gap-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <Skeleton className="h-10 flex-1 rounded-2xl" />
+                  </div>
+                ))}
+              </div>
+            ) : roster.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 text-[#9aa3b2] gap-2">
+                <p className="font-bold text-sm">No staff scheduled today.</p>
+                <p className="text-xs">Teachers will appear here based on their work day schedule.</p>
+              </div>
+            ) : (
+              <AttendanceRoster
+                data={roster}
+                dateStr={viewDateStr}
+                onToggleExempt={handleToggleExempt}
+                exemptLoading={exemptLoading}
+                onCorrectTimes={handleCorrectTimes}
+              />
+            )}
+          </section>
+        </>
       )}
 
       {/* ── Mark Day Off Modal ── */}
@@ -995,12 +1293,54 @@ export default function AttendancePage() {
           />
           <div className="relative bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4 z-10">
             <div className="w-14 h-14 rounded-2xl bg-[#f0f5ff] flex items-center justify-center mb-4 mx-auto">
-              <span className="material-symbols-outlined text-[#005cc8]" style={{ fontSize: "30px" }}>picture_as_pdf</span>
+              <span className="material-symbols-outlined text-[#005cc8]" style={{ fontSize: "30px" }}>
+                {isDtrExport ? "badge" : "picture_as_pdf"}
+              </span>
             </div>
-            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">Export Attendance as PDF</h2>
+            <h2 className="text-[18px] font-black text-[#002f76] text-center mb-1">
+              {isDtrExport ? "Export Employee DTR" : "Export Attendance as PDF"}
+            </h2>
             <p className="text-[12px] font-medium text-[#5a6e8c] text-center mb-5">
-              Opens a branded PDF preview with all attendance records between the selected dates. Print or save it as a file.
+              {isDtrExport
+                ? "Creates a Daily Time Record for one employee with a row for every day in the range. Best used for one month at a time."
+                : "Opens a branded PDF preview with all attendance records between the selected dates. Print or save it as a file."}
             </p>
+
+            {/* Employee */}
+            <div className="mb-4">
+              <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Employee</label>
+              <select
+                value={exportTeacherUid}
+                onChange={(e) => {
+                  const uid = e.target.value;
+                  setExportTeacherUid(uid);
+                  const acc = accounts.find((a) => (a.id || a._id) === uid);
+                  setExportPosition(getPosition(acc));
+                }}
+                className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all"
+              >
+                <option value="all">All Employees</option>
+                {employeeOptions.map((o) => (
+                  <option key={o.uid} value={o.uid}>{o.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Position (DTR only) */}
+            {isDtrExport && (
+              <div className="mb-4">
+                <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">
+                  Position / Room <span className="text-[#9aa3b2] font-normal normal-case tracking-normal">(shown on the DTR)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. IT Intern"
+                  value={exportPosition}
+                  onChange={(e) => setExportPosition(e.target.value)}
+                  className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -1021,10 +1361,11 @@ export default function AttendancePage() {
               </div>
             </div>
 
-            <div className="mb-5">
+            <div className={`mb-5 transition-opacity ${isDtrExport ? "opacity-40 pointer-events-none" : ""}`}>
               <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Group Records By</label>
               <select
                 value={exportGroupBy}
+                disabled={isDtrExport}
                 onChange={(e) => setExportGroupBy(e.target.value as any)}
                 className="w-full rounded-xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-2.5 text-[13px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all appearance-none"
                 style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23002f76%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem top 50%', backgroundSize: '0.65rem auto' }}
@@ -1054,9 +1395,11 @@ export default function AttendancePage() {
                     <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                 ) : (
-                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>picture_as_pdf</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+                    {isDtrExport ? "badge" : "picture_as_pdf"}
+                  </span>
                 )}
-                {exportLoading ? "Generating..." : "Generate PDF"}
+                {exportLoading ? "Generating..." : isDtrExport ? "Generate DTR" : "Generate PDF"}
               </button>
             </div>
           </div>
