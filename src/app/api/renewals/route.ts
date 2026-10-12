@@ -16,11 +16,28 @@ export async function GET(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // 1. Fetch renewal_families first
-    const families = await db
+    // Testing accounts to exclude from all KPI calculations
+    const TESTING_EMAILS = ["iangelovalmores@gmail.com", "ian.valmores@gmail.com"];
+    const TESTING_NAMES = ["ian angelo valmores"];
+
+    const isTestAccount = (email: string, name?: string) => {
+      const emailLower = (email || "").toLowerCase().trim();
+      const nameLower = (name || "").toLowerCase().trim();
+      return (
+        TESTING_EMAILS.includes(emailLower) ||
+        TESTING_NAMES.some((n) => nameLower.includes(n))
+      );
+    };
+
+    // 1. Fetch renewal_families first (excluding test accounts)
+    const allFamilies = await db
       .collection("renewal_families")
       .find({})
       .toArray();
+
+    const families = allFamilies.filter(
+      (f) => !isTestAccount(f.parentEmail, f.parentName)
+    );
 
     // Create lookup map for families by email+childName
     const familyMap = new Map<string, any>();
@@ -48,11 +65,16 @@ export async function GET(request: Request) {
       regQuery.program = program;
     }
 
-    const registrations = await db
+    const allRegistrations = await db
       .collection("student_registrations")
       .find(regQuery)
       .sort({ submittedAt: -1 })
       .toArray();
+
+    // Exclude testing accounts from registrations
+    const registrations = allRegistrations.filter(
+      (r) => !isTestAccount(r.parentInfo?.email || "", r.parentInfo?.name || "")
+    );
 
     // 3. Process each renewal record and determine exact renewal state and payment math
     const renewalRecords = registrations.map((r: any) => {

@@ -40,11 +40,24 @@ export async function GET(request: Request) {
       ];
     }
 
-    const families = await db
+    // Exclude testing accounts from families list
+    const TESTING_EMAILS = ["iangelovalmores@gmail.com", "ian.valmores@gmail.com"];
+    const TESTING_NAMES = ["ian angelo valmores"];
+
+    const allFamilies = await db
       .collection("renewal_families")
       .find(query)
       .sort({ createdAt: -1 })
       .toArray();
+
+    const families = allFamilies.filter((f) => {
+      const emailLower = (f.parentEmail || "").toLowerCase().trim();
+      const nameLower = (f.parentName || "").toLowerCase().trim();
+      return (
+        !TESTING_EMAILS.includes(emailLower) &&
+        !TESTING_NAMES.some((n) => nameLower.includes(n))
+      );
+    });
 
     return NextResponse.json({
       success: true,
