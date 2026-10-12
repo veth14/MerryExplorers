@@ -167,6 +167,9 @@ export default function RenewPage() {
           promoCode: "A1RENEWAL2026",
           isPromoRegistration: true,
           isNewFamily: false,
+          uniformOrdered,
+          lanyardOrdered,
+          welcomeKitOrdered: false, // Returning families never get welcome kit
         }),
       });
       const data = await res.json();

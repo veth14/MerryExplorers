@@ -32,6 +32,10 @@ export async function GET(
       reservedUntil: registration.reservedUntil,
       paymentDeadline: registration.paymentDeadline || null,
       earlyBirdBy: registration.earlyBirdBy || null,
+      isNewFamily: typeof registration.isNewFamily === "boolean" ? registration.isNewFamily : true,
+      uniformOrdered: registration.uniformOrdered || false,
+      lanyardOrdered: registration.lanyardOrdered || false,
+      welcomeKitOrdered: registration.welcomeKitOrdered || false,
     };
 
     return NextResponse.json({ success: true, data: publicData });

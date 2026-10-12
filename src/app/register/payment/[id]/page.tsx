@@ -62,6 +62,10 @@ export default function PaymentPage() {
             if (typeof data.data.isNewFamily === "boolean") {
               setIsNewFamily(data.data.isNewFamily);
             }
+            // Sync addon selections made during registration
+            if (typeof data.data.uniformOrdered === "boolean") setUniformOrdered(data.data.uniformOrdered);
+            if (typeof data.data.lanyardOrdered === "boolean") setLanyardOrdered(data.data.lanyardOrdered);
+            if (typeof data.data.welcomeKitOrdered === "boolean") setWelcomeKitOrdered(data.data.welcomeKitOrdered);
             if (data.data.status !== "reserved" && data.data.status !== "early-bird") {
               setError(
                 data.data.status === "expired"
