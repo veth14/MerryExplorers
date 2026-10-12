@@ -244,6 +244,13 @@ const fullChildName = (r: any) => `${r?.childInfo?.firstName ?? ""} ${r?.childIn
 
 const fmtShort = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
+// Check if account belongs to test account
+const isTestAccount = (acc?: Account | null) => {
+  if (!acc) return false;
+  const testPattern = /ian\s+angelo\s+valmores/i;
+  return testPattern.test(acc.fullName || "") || testPattern.test(acc.childName || "");
+};
+
 // Builders shared by the list AND the ledger, so a payment looks the same wherever it is opened from
 const regAccountOf = (r: any): Account => ({
   id: r.id,
@@ -507,11 +514,12 @@ export default function AdminPaymentsPage() {
   }, [accounts, registrations]);
 
   const stats = useMemo(() => {
-    const total = allPayments.length;
-    const pending = allPayments.filter(p => !p.payment.verified && !p.payment.rejected).length;
-    const verified = allPayments.filter(p => p.payment.verified).length;
-    const totalRevenue = allPayments.filter(p => p.payment.verified).reduce((s, p) => s + p.payment.amountPaid, 0);
-    const students = new Set(allPayments.map(p => `${p.type}-${p.uid}`)).size;
+    const statPayments = allPayments.filter((p) => !isTestAccount(p.acc));
+    const total = statPayments.length;
+    const pending = statPayments.filter((p) => !p.payment.verified && !p.payment.rejected).length;
+    const verified = statPayments.filter((p) => p.payment.verified).length;
+    const totalRevenue = statPayments.filter((p) => p.payment.verified).reduce((s, p) => s + p.payment.amountPaid, 0);
+    const students = new Set(statPayments.map((p) => `${p.type}-${p.uid}`)).size;
     return { total, pending, verified, totalRevenue, students };
   }, [allPayments]);
 
@@ -618,11 +626,12 @@ export default function AdminPaymentsPage() {
   }, [renewalRowsAll, search]);
 
   const nextStats = useMemo(() => {
-    const total = renewalRowsAll.length;
-    const renewed = renewalRowsAll.filter((r) => r.state === "renewed").length;
-    const awaiting = renewalRowsAll.filter((r) => r.state === "pending").length;
-    const notRenewed = renewalRowsAll.filter((r) => r.state === "not-renewed" || r.state === "intent").length;
-    const collected = renewalRowsAll.reduce((s, r) => s + r.paid, 0);
+    const statRows = renewalRowsAll.filter((r) => !isTestAccount(r.acc));
+    const total = statRows.length;
+    const renewed = statRows.filter((r) => r.state === "renewed").length;
+    const awaiting = statRows.filter((r) => r.state === "pending").length;
+    const notRenewed = statRows.filter((r) => r.state === "not-renewed" || r.state === "intent").length;
+    const collected = statRows.reduce((s, r) => s + r.paid, 0);
     return { total, renewed, awaiting, notRenewed, collected };
   }, [renewalRowsAll]);
 
@@ -1331,6 +1340,11 @@ export default function AdminPaymentsPage() {
                   <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{typeLabel}{seq && seqTotal && seqTotal > 1 ? ` · ${seqText}` : ""}{advThis ? ` · ${ADV_BADGE[advThis].label}` : ""}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {isTestAccount(acc) && (
+                    <span style={{ padding: "4px 10px", background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: "20px", fontSize: "11px", fontWeight: 800 }}>
+                      🧪 TESTING ACCOUNT
+                    </span>
+                  )}
                   <span style={{ padding: "4px 10px", background: st.bg, color: st.color, borderRadius: "20px", fontSize: "11px", fontWeight: 800 }}>{st.label}</span>
                   <button onClick={() => copyDetails(detail)} style={{ padding: "8px 12px", borderRadius: "10px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>📋 Copy for SOA</button>
                   <button onClick={() => setDetail(null)} style={{ padding: "8px", borderRadius: "12px", color: "#64748b", fontWeight: "bold", border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
@@ -2167,11 +2181,16 @@ export default function AdminPaymentsPage() {
                           🎓 {acc.childName || "Student not set"}{acc.program ? <span style={{ color: "#94a3b8", fontWeight: 500 }}> · {acc.program}</span> : null}
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "5px" }}>
+                          {isTestAccount(acc) && (
+                            <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", letterSpacing: "0.4px" }}>
+                              🧪 TESTING ACCOUNT
+                            </span>
+                          )}
                           {type === "session"
                             ? <span style={tagStyle("#ecfeff", "#0e7490")}>VIRTUAL SESSION</span>
                             : <span style={tagStyle("#eff6ff", "#0050d5")}>REGISTRATION</span>}
                           {items.length > 1 && <span style={tagStyle("#f1f5f9", "#475569")}>{items.length} payments</span>}
-                          {isTest && <span style={tagStyle("#f1f5f9", "#64748b")}>TEST</span>}
+                          {isTest && !isTestAccount(acc) && <span style={tagStyle("#f1f5f9", "#64748b")}>TEST</span>}
                         </div>
                       </div>
                     </div>
@@ -2305,6 +2324,13 @@ export default function AdminPaymentsPage() {
                     <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
                       {acc.childName ? `${acc.childName} · ` : ""}{acc.program || "—"}
                     </div>
+                    {isTestAccount(acc) && (
+                      <div style={{ marginTop: "4px" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", letterSpacing: "0.4px" }}>
+                          🧪 TESTING ACCOUNT
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
