@@ -163,6 +163,27 @@ export default function RenewPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Program renewal settings for dynamic Adventure cycle # & dates
+  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null }>>({});
+
+  useEffect(() => {
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.programs)) {
+          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null }> = {};
+          d.programs.forEach((p: any) => {
+            map[p.programKey] = {
+              currentAdventure: p.currentAdventure ?? 2,
+              nextAdventureStart: p.nextAdventureStart ?? null,
+            };
+          });
+          setRenewalSettings(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Fetch slot counts
   useEffect(() => {
     fetch("/api/registrations/slots")
@@ -530,39 +551,83 @@ export default function RenewPage() {
                 {/* Program Cards */}
                 <div className="space-y-4">
                   {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
+                    .filter(p => p.id !== "ballet" && (p.id as string) !== "virtual-session")
                     .filter(p => {
                       if (activeTab === "all") return true;
                       if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
                       if (activeTab === "trailblazer") return p.id === "brave-explorer";
-                      return ["saturday-playdate", "ballet"].includes(p.id);
+                      return ["saturday-playdate"].includes(p.id);
                     })
                     .map(p => {
                       const isSelected = selectedProgram === p.id;
                       const programSlotData = slots[p.id] || {};
+                      const progSettings = renewalSettings[p.name] || Object.values(renewalSettings)[0];
+                      const advNumber = progSettings?.currentAdventure ?? 2;
+                      const startDateStr = progSettings?.nextAdventureStart
+                        ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : null;
+
+                      const isPlaydate = p.id === "saturday-playdate";
+
                       return (
                         <div
                           key={p.id}
-                          onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
-                          className={`cursor-pointer rounded-[22px] border-3 p-5 transition-all ${isSelected
-                            ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_6px_0_#0b2a82]"
-                            : "bg-white border-[#b6dcf5] hover:border-[#0b2a82] shadow-sm"
-                            }`}
+                          onClick={() => {
+                            if (isPlaydate) return;
+                            setSelectedProgram(p.id as ProgramId);
+                            setSelectedClass("");
+                          }}
+                          className={`rounded-[22px] border-3 p-5 transition-all ${
+                            isPlaydate
+                              ? "opacity-60 bg-slate-100/80 border-slate-300 cursor-not-allowed select-none"
+                              : isSelected
+                              ? "cursor-pointer bg-[#fff6cf] border-[#0b2a82] shadow-[0_6px_0_#0b2a82]"
+                              : "cursor-pointer bg-white border-[#b6dcf5] hover:border-[#0b2a82] shadow-sm"
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-2xl">{p.icon}</span>
-                                <h3 className="text-[17px] font-black text-[#0b2a82]">{p.name}</h3>
+                                <h3 className={`text-[17px] font-black ${isPlaydate ? "text-slate-600" : "text-[#0b2a82]"}`}>{p.name}</h3>
+                                {isPlaydate ? (
+                                  <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10.5px] font-black uppercase text-amber-800">
+                                    Not Yet Available for Renewal
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span className="rounded-full bg-[#0b2a82]/10 border border-[#0b2a82]/20 px-2 py-0.5 text-[10.5px] font-black uppercase text-[#0b2a82]">
+                                      Adventure {advNumber}
+                                    </span>
+                                    {startDateStr && (
+                                      <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                                        Starts {startDateStr}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
                               </div>
                               <p className="text-[12.5px] font-medium text-[#3d5a99] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
-                              <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
+                              {isPlaydate ? (
+                                <p className="text-[12px] font-bold text-amber-700 bg-amber-50 rounded-lg p-2 mt-2 border border-amber-200/60">
+                                  Saturday Playdate is not yet open for renewal. For inquiries, please reach out via our Facebook page or inquiry form.
+                                </p>
+                              ) : (
+                                <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
+                              )}
                             </div>
-                            <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${isSelected ? "border-[#0b2a82] bg-[#ffd23f]" : "border-[#b6dcf5] bg-white"}`}>
-                              {isSelected && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
+                            <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${
+                              isPlaydate
+                                ? "border-slate-300 bg-slate-200 text-slate-400"
+                                : isSelected
+                                ? "border-[#0b2a82] bg-[#ffd23f]"
+                                : "border-[#b6dcf5] bg-white"
+                            }`}>
+                              {isSelected && !isPlaydate && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
                             </div>
                           </div>
 
-                          {isSelected && (
+                          {!isPlaydate && isSelected && (
                             <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
                               <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
                               <div className="grid gap-2.5 sm:grid-cols-2">

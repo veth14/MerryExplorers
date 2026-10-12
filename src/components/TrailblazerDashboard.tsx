@@ -25,7 +25,7 @@ const TEXT_2 = "#3d5a99";
 const ERROR = "#b3261e";
 
 type ToastType = "success" | "error" | "info";
-type Tab = "session" | "virtual" | "photos" | "waiver" | "payments" | "renewal" | "profile";
+type Tab = "session" | "virtual" | "photos" | "waiver" | "payments" | "profile";
 
 type Props = {
     profile: any; // ParentProfile
@@ -458,7 +458,6 @@ export default function TrailblazerDashboard(p: Props) {
         { id: "photos", label: "Photos", icon: "camera" },
         { id: "waiver", label: "Waiver", icon: "shield" },
         { id: "payments", label: "Payments", icon: "card" },
-        { id: "renewal", label: "Renewal", icon: "refresh" },
         { id: "profile", label: "Profile", icon: "user" },
     ];
 
@@ -891,15 +890,6 @@ export default function TrailblazerDashboard(p: Props) {
         );
     }
 
-    function RenewalPanel() {
-        return (
-            <Card tape>
-                <Heading icon="refresh" title="Renewal" sub="Renew your child's registration." />
-                <Empty icon="refresh" title="Coming soon" text="Renewal options for Trailblazer will be available shortly." />
-            </Card>
-        );
-    }
-
     function ProfilePanel() {
         return (
             <>
@@ -928,7 +918,7 @@ export default function TrailblazerDashboard(p: Props) {
 
     const panels: Record<Tab, () => ReactNode> = {
         session: SessionPanel, virtual: VirtualPanel, photos: PhotosPanel,
-        waiver: WaiverPanel, payments: PaymentsPanel, renewal: RenewalPanel, profile: ProfilePanel,
+        waiver: WaiverPanel, payments: PaymentsPanel, profile: ProfilePanel,
     };
 
     return (

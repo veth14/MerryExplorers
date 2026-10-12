@@ -9,6 +9,7 @@ const RENEWAL_PROGRAMS = [
   "Discovery Club: Creative Explorer",
   "Discovery Club: Everyday Curious",
   "Trailblazer: Brave Explorer",
+  "Saturday Playdate",
 ] as const;
 
 type ProgramKey = typeof RENEWAL_PROGRAMS[number];

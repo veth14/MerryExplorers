@@ -1517,8 +1517,25 @@ export default function AdminParentsPage() {
           </div>
         )}
 
-        {/* Renewal Settings Panel */}
-        <RenewalSettingsPanel />
+        {/* Link to Renewal Settings Hub */}
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🔄</span>
+            <div>
+              <p className="font-extrabold text-[13.5px] text-[#002f76]">Renewal &amp; Adventure Settings Moved</p>
+              <p className="text-[12px] text-[#475569]">
+                Adventure cycle numbers and start dates are now centrally configured in the Renewals Hub.
+              </p>
+            </div>
+          </div>
+          <a
+            href="/admin/renewals"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#0033a0] text-white text-[12px] font-bold hover:bg-[#002f76] transition-colors shrink-0 shadow-sm"
+          >
+            <span>Open Renewal Settings</span>
+            <span>→</span>
+          </a>
+        </div>
 
         {/* Trailblazer Virtual Class – full-width below renewal settings */}
         <TrailblazerVirtualSettings />

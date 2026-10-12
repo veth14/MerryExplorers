@@ -229,6 +229,27 @@ export default function RegisterPage() {
     }
   }, []);
 
+  // Program renewal settings for dynamic Adventure cycle # & dates
+  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null }>>({});
+
+  useEffect(() => {
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.programs)) {
+          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null }> = {};
+          d.programs.forEach((p: any) => {
+            map[p.programKey] = {
+              currentAdventure: p.currentAdventure ?? 2,
+              nextAdventureStart: p.nextAdventureStart ?? null,
+            };
+          });
+          setRenewalSettings(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Live slot counts
   useEffect(() => {
     fetch("/api/registrations/slots")
@@ -723,8 +744,69 @@ export default function RegisterPage() {
                       return true;
                     })
                     .map((p) => {
+                      const isUnavailable = p.id === "ballet" || (p.id as string) === "virtual-session" || p.id === "saturday-playdate";
                       const programSlots = slots[p.id] || {};
                       const isSelected = selectedProgram === p.id;
+
+                      if (isUnavailable) {
+                        return (
+                          <div
+                            key={p.id}
+                            className="relative rounded-[22px] border-3 border-dashed border-[#b6dcf5] bg-slate-50/80 p-5 opacity-75 shadow-sm overflow-hidden"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-2xl grayscale">{p.icon}</span>
+                                  <h3 className="text-[17px] font-black text-slate-700">{p.name}</h3>
+                                  <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10.5px] font-black uppercase text-amber-900 tracking-wider">
+                                    Not Yet Ready
+                                  </span>
+                                </div>
+                                <p className="text-[12.5px] font-medium text-slate-500 mb-1">
+                                  {p.ageRange} · {p.schedule} · {p.sessions} sessions
+                                </p>
+                                <p className="text-[15px] font-black text-slate-400">₱{p.rate.toLocaleString()}</p>
+                              </div>
+                              <div className="h-6 w-6 rounded-full border-2 border-slate-300 bg-slate-100 shrink-0 mt-1 flex items-center justify-center">
+                                <span className="text-[11px] font-black text-slate-400">✕</span>
+                              </div>
+                            </div>
+
+                            {/* Informational banner */}
+                            <div className="mt-4 pt-3.5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/70 -mx-5 -mb-5 p-4 rounded-b-[19px]">
+                              <p className="text-[12px] font-semibold text-slate-600 leading-snug">
+                                ⏳ Online registration for <strong>{p.name}</strong> is not yet ready. For questions or early slot reservations, please contact us:
+                              </p>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <a
+                                  href="https://www.facebook.com/profile.php?id=61588889372224"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1877F2] text-white text-[11.5px] font-black hover:bg-[#0c63d4] transition-all shadow-sm"
+                                >
+                                  <span>Facebook Page</span>
+                                  <span>↗</span>
+                                </a>
+                                <Link
+                                  href="/inquire"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0b2a82] text-white text-[11.5px] font-black hover:bg-[#1f7ae0] transition-all shadow-sm"
+                                >
+                                  <span>Inquiry Form</span>
+                                  <span>→</span>
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const progSettings = renewalSettings[p.name] || Object.values(renewalSettings)[0];
+                      const advNumber = progSettings?.currentAdventure ?? 2;
+                      const startDateStr = progSettings?.nextAdventureStart
+                        ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : null;
+
                       return (
                         <div
                           key={p.id}
@@ -736,9 +818,17 @@ export default function RegisterPage() {
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-2xl">{p.icon}</span>
                                 <h3 className="text-[17px] font-black text-[#0b2a82]">{p.name}</h3>
+                                <span className="rounded-full bg-[#0b2a82]/10 border border-[#0b2a82]/20 px-2 py-0.5 text-[10.5px] font-black uppercase text-[#0b2a82]">
+                                  Adventure {advNumber}
+                                </span>
+                                {startDateStr && (
+                                  <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                                    Starts {startDateStr}
+                                  </span>
+                                )}
                               </div>
                               <p className="text-[12.5px] font-medium text-[#3d5a99] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
                               <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>

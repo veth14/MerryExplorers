@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { AppShell } from "@/components/app-shell";
 import * as XLSX from "xlsx";
+import { RenewalSettingsManager } from "@/components/admin/RenewalSettingsManager";
 
 type Family = {
   _id: string;
@@ -86,7 +87,7 @@ type SlotInfo = {
 };
 
 export default function RenewalsPage() {
-  const [activeTab, setActiveTab] = useState<"renewals" | "families">("renewals");
+  const [activeTab, setActiveTab] = useState<"renewals" | "families" | "settings">("renewals");
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<any[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("adventure-1-renewal");
@@ -1005,6 +1006,16 @@ export default function RenewalsPage() {
           >
             <span>👨‍👩‍👧</span> Families Contact List ({filteredFamilies.length})
           </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${
+              activeTab === "settings"
+                ? "border-[#0033A0] text-[#0033A0]"
+                : "border-transparent text-[#64748b] hover:text-[#002f76]"
+            }`}
+          >
+            <span>⚙️</span> Renewal Settings
+          </button>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════ */}
@@ -1424,6 +1435,15 @@ export default function RenewalsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* TAB 3: RENEWAL SETTINGS                                                */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "settings" && (
+          <div className="pt-2">
+            <RenewalSettingsManager />
           </div>
         )}
 

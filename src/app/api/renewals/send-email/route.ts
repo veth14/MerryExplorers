@@ -31,6 +31,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Family does not have a valid email address" }, { status: 400 });
     }
 
+    // Fetch renewal settings to dynamically populate program Adventure # and start dates
+    const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+    
+    // Match the family's renewingTo or previousProgram
+    const targetProgramName = family.renewingTo || family.previousProgram || "Curious Explorer";
+    const matchedProgramEntry = storedPrograms.find((p) =>
+      p.programKey.toLowerCase().includes(targetProgramName.toLowerCase()) ||
+      targetProgramName.toLowerCase().includes(p.programKey.toLowerCase())
+    ) || storedPrograms[0];
+
+    const currentAdventureNum = matchedProgramEntry?.currentAdventure ?? 2;
+    const adventureLabel = `Adventure ${currentAdventureNum}`;
+    const formattedStartDate = matchedProgramEntry?.nextAdventureStart
+      ? new Date(matchedProgramEntry.nextAdventureStart).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      : null;
+
     // Default configuration
     const promoCode = "A1RENEWAL2026";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merry-explorers.vercel.app";
@@ -42,16 +59,16 @@ export async function POST(request: Request) {
     let htmlContent = "";
 
     if (emailType === "promo_code") {
-      subject = subject || `Priority Renewal & Slot Reservation Code for ${childName} 🌈`;
+      subject = subject || `Priority Renewal & Slot Reservation Code for ${childName} (${adventureLabel}) 🌈`;
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
           <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
             <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-            <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Priority Renewal Access</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Priority Renewal Access · ${adventureLabel}</p>
           </div>
           <div style="padding: 28px;">
             <p>Dear <strong>${parentName}</strong>,</p>
-            <p>We are excited to welcome back <strong>${childName}</strong> for our upcoming adventure!</p>
+            <p>We are excited to welcome back <strong>${childName}</strong> for <strong>${adventureLabel}</strong>${formattedStartDate ? ` (scheduled to start on <strong>${formattedStartDate}</strong>)` : ""}!</p>
             <p>As a valued returning family, you have priority access to reserve your slot before general registration:</p>
             
             <div style="background-color: #f8fafc; border: 2px dashed #0033a0; border-radius: 12px; padding: 18px; text-align: center; margin: 24px 0;">
@@ -75,9 +92,9 @@ export async function POST(request: Request) {
               </ul>
               <div style="border-top: 1px dashed #fcd34d; padding-top: 10px; margin-top: 10px;">
                 <p style="margin: 0 0 4px; font-weight: bold; color: #b45309;">⚠️ NOTE &amp; DISCLAIMER:</p>
-                <p style="margin: 0 0 6px;">Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+                <p style="margin: 0 0 6px;">Please ensure to settle your <strong>Adventure 1 Balance</strong> before you can proceed to the registration.</p>
                 <p style="margin: 0; font-style: italic; color: #78350f;">
-                  "In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1."
+                  "In the event that a family has unsettled balance, your downpayment for ${adventureLabel} will be credited as your balance payment for the previous cycle."
                 </p>
               </div>
             </div>
@@ -96,16 +113,16 @@ export async function POST(request: Request) {
     } else if (emailType === "payment_reminder") {
       const regId = family.registrationId || "";
       const paymentUrl = regId ? `${baseUrl}/register/payment/${regId}` : `${baseUrl}/renew?ref=${family._id.toString()}`;
-      subject = subject || `Payment Reminder & Slot Confirmation for ${childName} 🌈`;
+      subject = subject || `Payment Reminder & Slot Confirmation for ${childName} (${adventureLabel}) 🌈`;
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
           <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
             <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-            <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation · ${adventureLabel}</p>
           </div>
           <div style="padding: 28px;">
             <p>Dear <strong>${parentName}</strong>,</p>
-            <p>Thank you for submitting your priority renewal registration for <strong>${childName}</strong>! Your slot is currently on hold under reservation.</p>
+            <p>Thank you for submitting your priority renewal registration for <strong>${childName}</strong> for <strong>${adventureLabel}</strong>${formattedStartDate ? ` (starting <strong>${formattedStartDate}</strong>)` : ""}! Your slot is currently on hold under reservation.</p>
 
             <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
               <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold;">Ready to complete your payment?</p>
@@ -117,9 +134,9 @@ export async function POST(request: Request) {
 
             <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
               <p style="margin: 0 0 6px; font-weight: bold;">⚠️ IMPORTANT NOTE &amp; DISCLAIMER:</p>
-              <p style="margin: 0 0 8px;">Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+              <p style="margin: 0 0 8px;">Please ensure to settle your <strong>Adventure 1 Balance</strong> before you can proceed to the registration.</p>
               <p style="margin: 0; font-style: italic;">
-                "In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1."
+                "In the event that a family has unsettled balance, your downpayment for ${adventureLabel} will be credited as your balance payment for the previous cycle."
               </p>
             </div>
 
@@ -146,11 +163,11 @@ export async function POST(request: Request) {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
           <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
             <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-            <p style="margin: 4px 0 0; font-size: 13px; color: #f59e0b; font-weight: bold;">Adventure 2 Reservation Update</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #f59e0b; font-weight: bold;">${adventureLabel} Reservation Update</p>
           </div>
           <div style="padding: 28px;">
             <p>Dear <strong>${parentName}</strong>,</p>
-            <p>We are reaching out to inform you regarding your temporary reservation for <strong>${childName}</strong> for the upcoming <strong>2026 Adventure 2</strong> program.</p>
+            <p>We are reaching out to inform you regarding your temporary reservation for <strong>${childName}</strong> for the upcoming <strong>${adventureLabel}</strong> program.</p>
 
             <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
               <p style="margin: 0; font-size: 16px; color: #991b1b; font-weight: 800;">Notice of Released Slot</p>
@@ -160,7 +177,7 @@ export async function POST(request: Request) {
             </div>
 
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 20px 0; font-size: 13px;">
-              <p style="margin: 0 0 8px; font-weight: bold; color: #002f76;">Would you still like ${childName} to join us for Adventure 2?</p>
+              <p style="margin: 0 0 8px; font-weight: bold; color: #002f76;">Would you still like ${childName} to join us for ${adventureLabel}?</p>
               <p style="margin: 0 0 16px; color: #475569;">
                 Families who miss the payment deadline and still wish to secure a slot must submit a <strong>new registration form</strong> through our standard registration portal, subject to remaining program availability.
               </p>
@@ -172,9 +189,9 @@ export async function POST(request: Request) {
             </div>
 
             <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 20px 0; font-size: 12.5px; color: #92400e;">
-              <p style="margin: 0 0 4px; font-weight: bold;">⚠️ Reminder for Adventure 1 Balances:</p>
+              <p style="margin: 0 0 4px; font-weight: bold;">⚠️ Reminder for Account Balances:</p>
               <p style="margin: 0;">
-                If you have an unsettled Adventure 1 account balance, please remember that any new downpayments will be credited toward outstanding balances first.
+                If you have an unsettled account balance from a previous cycle, please remember that any new downpayments will be credited toward outstanding balances first.
               </p>
             </div>
 
