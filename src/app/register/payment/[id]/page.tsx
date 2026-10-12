@@ -315,6 +315,20 @@ export default function PaymentPage() {
                 )}
               </div>
 
+              {/* Note / Disclaimer Banner */}
+              <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-950 leading-relaxed shadow-xs">
+                <div className="flex items-center gap-2 font-extrabold text-amber-900 mb-1">
+                  <span>⚠️</span>
+                  <span>NOTE &amp; DISCLAIMER</span>
+                </div>
+                <p className="font-semibold text-amber-900">
+                  Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
+                </p>
+                <p className="mt-1.5 italic text-amber-800 text-[12px] bg-white/60 p-2.5 rounded-xl border border-amber-200/60">
+                  &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                </p>
+              </div>
+
               {/* Payment Type Toggle */}
               <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
                 <h3 className="mb-3 font-headline text-[16px] font-extrabold text-[#0033A0]">Payment Option</h3>

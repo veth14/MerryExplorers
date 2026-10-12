@@ -395,12 +395,26 @@ export default function RenewPage() {
                 </div>
 
                 {/* Previous program */}
-                <div className="mb-8 rounded-2xl bg-[#f0f4ff] border border-[#0033A0]/20 px-5 py-4 flex items-center gap-3 text-[13px] text-[#002f76]">
+                <div className="mb-6 rounded-2xl bg-[#f0f4ff] border border-[#0033A0]/20 px-5 py-4 flex items-center gap-3 text-[13px] text-[#002f76]">
                   <span className="text-xl">📚</span>
                   <div>
                     <p className="font-bold">Previous Adventure</p>
                     <p className="text-[#475569] mt-0.5">{previousProgram}</p>
                   </div>
+                </div>
+
+                {/* Important Note / Disclaimer */}
+                <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-950 leading-relaxed shadow-xs">
+                  <div className="flex items-center gap-2 font-extrabold text-amber-900 mb-1">
+                    <span>⚠️</span>
+                    <span>NOTE &amp; DISCLAIMER</span>
+                  </div>
+                  <p className="font-semibold text-amber-900">
+                    Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
+                  </p>
+                  <p className="mt-1.5 italic text-amber-800 text-[12px] bg-white/60 p-2.5 rounded-xl border border-amber-200/60">
+                    &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                  </p>
                 </div>
 
                 <p className="mb-6 text-[13px] text-[#64748b] leading-relaxed">

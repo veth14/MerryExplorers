@@ -67,12 +67,19 @@ export async function POST(request: Request) {
 
             <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-top: 24px; font-size: 13px; color: #92400e;">
               <p style="margin: 0 0 8px; font-weight: bold;">⚠️ Key Reminders Regarding Your Reservation:</p>
-              <ul style="margin: 0; padding-left: 20px;">
+              <ul style="margin: 0 0 12px; padding-left: 20px;">
                 <li>This code is <strong>not a discount voucher</strong>. It reserves your child's slot without upfront payment today.</li>
                 <li><strong>Code validity:</strong> Valid only until <strong>October 15, 2026</strong>.</li>
                 <li><strong>Slot release policy:</strong> All unpaid slots as of <strong>October 16, 2026 at 1:00 PM</strong> will be released.</li>
                 <li><strong>Confirmation:</strong> Your slot is officially confirmed upon receipt of the 60% non-refundable downpayment.</li>
               </ul>
+              <div style="border-top: 1px dashed #fcd34d; padding-top: 10px; margin-top: 10px;">
+                <p style="margin: 0 0 4px; font-weight: bold; color: #b45309;">⚠️ NOTE &amp; DISCLAIMER:</p>
+                <p style="margin: 0 0 6px;">Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+                <p style="margin: 0; font-style: italic; color: #78350f;">
+                  "In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1."
+                </p>
+              </div>
             </div>
 
             <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
