@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     // Fetch renewal settings to dynamically populate program Adventure # and start dates
     const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
-    
+
     // Match the family's renewingTo or previousProgram
     const targetProgramName = family.renewingTo || family.previousProgram || "Curious Explorer";
     const matchedProgramEntry = storedPrograms.find((p) =>
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
                 ${formattedStartDate ? `
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
-                  <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${formattedStartDate}</td>
+                  <td style="padding: 4px 0; font-weight: 800; color: #ffb800;">🚀 ${formattedStartDate}</td>
                 </tr>
                 ` : ""}
               </table>
@@ -314,10 +314,10 @@ export async function POST(request: Request) {
           lastEmailSent: emailType === "promo_code"
             ? "Promo Code Email Sent"
             : emailType === "payment_reminder"
-            ? "Payment Reminder Sent"
-            : emailType === "slot_released"
-            ? "Slot Released Notice Sent"
-            : "Message Sent",
+              ? "Payment Reminder Sent"
+              : emailType === "slot_released"
+                ? "Slot Released Notice Sent"
+                : "Message Sent",
           lastEmailDate: new Date(),
           updatedAt: new Date(),
         },

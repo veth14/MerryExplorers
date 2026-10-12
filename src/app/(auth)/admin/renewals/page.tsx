@@ -183,15 +183,23 @@ export default function RenewalsPage() {
     fetchData();
   }, [selectedPeriod]);
 
-  // Deadline countdown
-  const deadlineText = useMemo(() => {
-    const target = new Date("2026-10-16T13:00:00+08:00").getTime();
-    const diff = target - Date.now();
-    if (diff <= 0) return "Deadline has passed (Oct 16, 1:00 PM)";
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${days}d ${hours}h ${mins}m remaining until Oct 16, 1:00 PM`;
+  const [mounted, setMounted] = useState(false);
+  const [deadlineText, setDeadlineText] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+    const computeDeadline = () => {
+      const target = new Date("2026-10-16T13:00:00+08:00").getTime();
+      const diff = target - Date.now();
+      if (diff <= 0) return "Deadline has passed (Oct 16, 1:00 PM)";
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      return `${days}d ${hours}h ${mins}m remaining until Oct 16, 1:00 PM`;
+    };
+    setDeadlineText(computeDeadline());
+    const timer = setInterval(() => setDeadlineText(computeDeadline()), 60000);
+    return () => clearInterval(timer);
   }, []);
 
   // Filtered Renewals
@@ -819,7 +827,7 @@ export default function RenewalsPage() {
             </div>
           </div>
           <div className="rounded-xl bg-amber-500 text-white px-3.5 py-1.5 text-[12px] font-bold self-start sm:self-auto shrink-0 shadow-sm">
-            {deadlineText}
+            {mounted ? deadlineText : "Calculating remaining time..."}
           </div>
         </div>
 
