@@ -20,6 +20,7 @@ const navItems = [
   { label: "Announcements", href: "/admin/announcements" },
   { label: "Registrations", href: "/admin/registrations" },
   { label: "Students", href: "/admin/students" },
+  { label: "Renewals", href: "/admin/renewals" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Virtual Sessions", href: "/admin/virtual-sessions" },
   { label: "Gallery", href: "/admin/gallery" },
@@ -212,6 +213,14 @@ function DiscoveryDayIcon() {
   );
 }
 
+function RenewalsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+    </svg>
+  );
+}
+
 const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   Teachers: TeachersIcon,
@@ -226,6 +235,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Announcements: AnnouncementsIcon,
   Registrations: RegistrationsIcon,
   Students: StudentsIcon,
+  Renewals: RenewalsIcon,
   Payments: CreditCardIcon,
   "Virtual Sessions": VideoIcon,
   Gallery: GalleryIcon,
@@ -369,7 +379,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = [
     { title: "HR & People", items: ["Teachers", "Accounts", "Parents", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Programs & Finance", items: ["Registrations", "Students", "Payments", "Virtual Sessions", "Discovery Day"] },
+    { title: "Programs & Finance", items: ["Registrations", "Renewals", "Students", "Payments", "Virtual Sessions", "Discovery Day"] },
     { title: "Content & Logs", items: ["Inquiries", "Reports", "Announcements", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
     ...g,

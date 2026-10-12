@@ -64,6 +64,8 @@ export async function POST(request: Request) {
       creditBalance,
       referenceNumber,
       leadId, // NEW — sent by the register page after the Details step
+      promoCode,
+      isPromoRegistration,
     } = data;
 
     // Validate required fields
@@ -98,7 +100,8 @@ export async function POST(request: Request) {
     // Check slot availability
     const programConfig = {
       "curious-explorer": { classes: { "Morning Class": 4, "Afternoon Class": 4 } },
-      "creative-explorer": { classes: { "Morning Class": 6, "Mid-Day Class": 6, "Afternoon Class": 6 } },
+      "everyday-curious": { classes: { "Afternoon Class": 5 } },
+      "creative-explorer": { classes: { "Morning Class": 5, "Mid-Day Class": 5, "Afternoon Class": 5 } },
       "brave-explorer": { classes: { "Afternoon Class": 6 } },
     } as Record<string, { classes: Record<string, number> }>;
 
@@ -115,9 +118,15 @@ export async function POST(request: Request) {
       }
     }
 
+    const isPromo = Boolean(isPromoRegistration && promoCode === "A1RENEWAL2026");
+    // All unpaid slots as of October 16, 1:00 PM will be released for promo reservations; standard reservations get 1 hour
+    const reservedUntil = isPromo
+      ? new Date("2026-10-16T13:00:00+08:00")
+      : new Date(Date.now() + 60 * 60 * 1000);
+
     const newRegistration = {
       status: "reserved",
-      reservedUntil: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
+      reservedUntil,
       program,
       classTime,
       parentInfo,
@@ -135,12 +144,15 @@ export async function POST(request: Request) {
       signaturePublicId,
       photoConsent,
       uniformOrdered: uniformOrdered || false,
-      notes: "",
+      isNewFamily: typeof data.isNewFamily === "boolean" ? data.isNewFamily : true,
+      notes: isPromo ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)" : "",
       submittedAt: new Date(),
       approvedAt: null,
       approvedBy: null,
       confirmationEmailSent: false,
-      leadId: leadId || null, // NEW
+      leadId: leadId || null,
+      promoCode: isPromo ? promoCode : null,
+      isPromoRegistration: isPromo,
     };
 
     const result = await db.collection("student_registrations").insertOne(newRegistration);
@@ -163,6 +175,39 @@ export async function POST(request: Request) {
       } catch (err) {
         console.error("[registrations POST] Failed to mark lead as converted:", err);
       }
+    }
+
+    // Match against renewal_families list (Task 5: Auto-match email + child's name)
+    try {
+      const parentEmailClean = (parentInfo?.email || "").toLowerCase().trim();
+      const childNameClean = `${childInfo?.firstName || ""} ${childInfo?.lastName || ""}`.trim();
+      if (parentEmailClean && childNameClean) {
+        const familyMatch = await db.collection("renewal_families").findOne({
+          parentEmail: parentEmailClean,
+          childName: { $regex: new RegExp(`^${childNameClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        });
+
+        if (familyMatch) {
+          await db.collection("renewal_families").updateOne(
+            { _id: familyMatch._id },
+            {
+              $set: {
+                renewalStatus: isPromo ? "reserved" : (amountPaid > 0 ? "confirmed" : "reserved"),
+                registrationId: result.insertedId.toString(),
+                updatedAt: new Date(),
+              },
+            }
+          );
+        } else {
+          // Flag registration as unmatched so admin can review and link
+          await db.collection("student_registrations").updateOne(
+            { _id: result.insertedId },
+            { $set: { unmatchedFamily: true } }
+          );
+        }
+      }
+    } catch (familyMatchErr) {
+      console.error("[registrations POST] Failed to match renewal family:", familyMatchErr);
     }
 
     // Notifications and emails have been moved to the payment verification step

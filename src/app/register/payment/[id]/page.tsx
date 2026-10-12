@@ -59,6 +59,9 @@ export default function PaymentPage() {
         .then((data) => {
           if (data.success) {
             setRegData(data.data);
+            if (typeof data.data.isNewFamily === "boolean") {
+              setIsNewFamily(data.data.isNewFamily);
+            }
             if (data.data.status !== "reserved" && data.data.status !== "early-bird") {
               setError(
                 data.data.status === "expired"

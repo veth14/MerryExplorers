@@ -136,6 +136,82 @@ export default function RegisterPage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrDone, setOcrDone] = useState(false);
 
+  // ── Promo code state ──
+  const [promoCode, setPromoCode] = useState<string>(draft?.promoCode ?? "");
+  const [promoAccepted, setPromoAccepted] = useState<boolean>(draft?.promoAccepted ?? false);
+  const [promoError, setPromoError] = useState<string>("");
+  const [validatingPromo, setValidatingPromo] = useState<boolean>(false);
+
+  // ── Uniform day acknowledgment (Task 2) ──
+  const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState<boolean>(draft?.uniformDayAcknowledged ?? false);
+
+  // ── Auto Prefill for Returning Families ──
+  const [prefilledFamilyName, setPrefilledFamilyName] = useState<string>("");
+  const [prefillLoading, setPrefillLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get("ref");
+    const email = urlParams.get("email");
+
+    if (ref || email) {
+      setPrefillLoading(true);
+      const query = ref ? `ref=${encodeURIComponent(ref)}` : `email=${encodeURIComponent(email || "")}`;
+      fetch(`/api/registrations/prefill?${query}`)
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.success && result.data) {
+            const data = result.data;
+            if (data.childInfo) {
+              setChildInfo((prev: any) => ({
+                ...prev,
+                firstName: data.childInfo.firstName || prev.firstName,
+                lastName: data.childInfo.lastName || prev.lastName,
+                nickname: data.childInfo.nickname || prev.nickname,
+                dateOfBirth: data.childInfo.dateOfBirth || prev.dateOfBirth,
+                gender: data.childInfo.gender || prev.gender,
+                favoriteSong: data.childInfo.favoriteSong || prev.favoriteSong,
+                favoriteColor: data.childInfo.favoriteColor || prev.favoriteColor,
+                favoriteCharacter: data.childInfo.favoriteCharacter || prev.favoriteCharacter,
+                healthProfile: data.childInfo.healthProfile || prev.healthProfile,
+              }));
+            }
+            if (data.parentInfo) {
+              setParentInfo((prev: any) => ({
+                ...prev,
+                name: data.parentInfo.name || prev.name,
+                email: data.parentInfo.email || prev.email,
+                phone: data.parentInfo.phone || prev.phone,
+                relationship: data.parentInfo.relationship || prev.relationship || "Mother",
+              }));
+            }
+            if (data.emergencyContact) {
+              setEmergencyContact((prev: any) => ({
+                ...prev,
+                name: data.emergencyContact.name || prev.name,
+                phone: data.emergencyContact.phone || prev.phone,
+                relationship: data.emergencyContact.relationship || prev.relationship || "Mother",
+              }));
+            }
+            setIsNewFamily(false);
+            if (data.promoCode) {
+              setPromoCode(data.promoCode);
+              setPromoAccepted(true);
+            }
+            const displayName = data.childInfo?.firstName || data.childName || "Explorer";
+            setPrefilledFamilyName(displayName);
+          }
+        })
+        .catch((err) => {
+          console.error("Prefill fetch error:", err);
+        })
+        .finally(() => {
+          setPrefillLoading(false);
+        });
+    }
+  }, []);
+
   // ── Fetch live slot counts ──
   useEffect(() => {
     fetch("/api/registrations/slots")
@@ -156,6 +232,8 @@ export default function RegisterPage() {
       paymentMethod, receiptPreview, receiptBase64,
       isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
       leadId,
+      promoCode, promoAccepted,
+      uniformDayAcknowledged,
     });
   }, [
     step, selectedProgram, selectedClass,
@@ -163,7 +241,7 @@ export default function RegisterPage() {
     photoConsent, waiverRead, signatureBase64,
     paymentMethod, receiptPreview, receiptBase64,
     isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
-    leadId,
+    leadId, promoCode, promoAccepted, uniformDayAcknowledged,
   ]);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
@@ -236,7 +314,37 @@ export default function RegisterPage() {
     reader.readAsDataURL(file);
   }, [runOCR]);
 
-  const canProceedStep0 = selectedProgram !== "" && selectedClass !== "";
+  const canProceedStep0 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged;
+
+  async function applyPromoCode() {
+    const trimmed = promoCode.trim();
+    if (!trimmed) {
+      setPromoError("Please enter your promo code.");
+      return;
+    }
+    setValidatingPromo(true);
+    setPromoError("");
+    try {
+      const res = await fetch("/api/promos/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: trimmed }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setPromoAccepted(true);
+        setPromoError("");
+      } else {
+        setPromoAccepted(false);
+        setPromoError(data.error || "This code is not valid.");
+      }
+    } catch {
+      setPromoAccepted(false);
+      setPromoError("This code is not valid.");
+    } finally {
+      setValidatingPromo(false);
+    }
+  }
 
   const missingStep1: string[] = [
     ...(!childInfo.firstName ? ["Child's First Name"] : []),
@@ -295,6 +403,9 @@ export default function RegisterPage() {
           photoConsent,
           signatureBase64,
           leadId, // lets the API mark the lead as "converted"
+          promoCode: promoAccepted ? promoCode.trim().toUpperCase() : undefined,
+          isPromoRegistration: promoAccepted,
+          isNewFamily,
         }),
       });
       const data = await res.json();
@@ -557,6 +668,38 @@ export default function RegisterPage() {
                   <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Explorer Information</h2>
                   <p className="mb-6 text-[14px] text-[#64748b]">Tell us about your child and your contact details.</p>
 
+                  {prefillLoading && (
+                    <div className="mb-6 flex items-center gap-3 rounded-2xl bg-[#0033A0]/5 border border-[#0033A0]/20 p-4 text-[13px] text-[#0033A0] animate-pulse">
+                      <div className="h-4 w-4 rounded-full border-2 border-[#0033A0] border-t-transparent animate-spin shrink-0" />
+                      <span className="font-semibold">Loading your saved information from Adventure 1...</span>
+                    </div>
+                  )}
+
+                  {prefilledFamilyName && !prefillLoading && (
+                    <m.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-6 flex items-start gap-3.5 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/50 to-transparent border border-emerald-200/80 p-5 shadow-sm"
+                    >
+                      <div className="h-10 w-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md shadow-emerald-600/20">
+                        ✨
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-headline text-[15px] font-extrabold text-[#002f76]">
+                            Welcome back, {prefilledFamilyName}! 🌈
+                          </h4>
+                          <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wide">
+                            Adventure 1 Returning Family
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[13px] text-[#475569] leading-relaxed">
+                          We&apos;ve automatically filled in your information from Adventure 1 so you don&apos;t have to re-type it. Please review or update anything below if needed!
+                        </p>
+                      </div>
+                    </m.div>
+                  )}
+
                   {/* Child Info */}
                   <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
                     <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">🧒 Child Information</h3>
@@ -787,6 +930,108 @@ export default function RegisterPage() {
                     </AnimatePresence>
                   </m.div>
 
+                  {/* ── TASK 1: Class Size Disclaimer ── */}
+                  <div className="mt-8 rounded-3xl bg-amber-50/70 border border-amber-200/80 p-6 sm:p-7 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="text-2xl select-none">🌈</div>
+                      <div className="space-y-3 text-[#334155]">
+                        <h3 className="font-headline text-[16px] sm:text-[17px] font-extrabold text-[#002f76]">
+                          A Little Note About Our Class Schedules 🌈
+                        </h3>
+                        <p className="text-[13px] leading-relaxed">
+                          At Merry Explorers, we believe that little learners thrive best when they learn, play, and grow together! To ensure a meaningful and engaging group experience, each session requires a minimum of three (3) registered students to proceed.
+                        </p>
+                        <p className="text-[13px] leading-relaxed">
+                          Should your chosen session not meet the minimum class size, our team will personally reach out to you to explore alternative schedules that best suit your family.
+                        </p>
+                        <p className="text-[13px] font-medium leading-relaxed">
+                          Thank you for your understanding and flexibility as we create wonderful learning adventures for our little explorers. 💛
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── TASK 4: Promo Code Reservation Section ── */}
+                  <div className="mt-6 rounded-3xl bg-white border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🎟️</span>
+                        <h3 className="font-headline text-[15px] sm:text-[16px] font-extrabold text-[#002f76]">
+                          Have a Reservation Promo Code?
+                        </h3>
+                      </div>
+                      <p className="mt-1 text-[12.5px] text-[#64748b] leading-relaxed">
+                        <strong>Important:</strong> This promo code is <span className="underline decoration-amber-500 font-semibold text-[#0f172a]">not a discount voucher</span>. It only allows families to reserve a slot without immediate payment until <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released. A slot is confirmed only upon receipt of the 60% non-refundable downpayment.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={(e) => {
+                            setPromoCode(e.target.value.toUpperCase());
+                            setPromoError("");
+                          }}
+                          placeholder="Enter your promo code"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[14px] font-mono uppercase tracking-wider text-[#002f76] placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-[#0033A0] focus:outline-none focus:ring-2 focus:ring-[#0033A0]/10 transition-all"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={validatingPromo}
+                        onClick={applyPromoCode}
+                        className="rounded-2xl bg-[#002f76] hover:bg-[#0033A0] text-white px-6 py-3 text-[13px] font-bold shadow-sm transition-colors shrink-0 disabled:opacity-50"
+                      >
+                        {validatingPromo ? "Checking..." : "Apply Code"}
+                      </button>
+                    </div>
+
+                    {promoAccepted && (
+                      <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-start gap-2.5 text-emerald-800 text-[13px]">
+                        <span className="text-emerald-600 font-bold shrink-0">✓</span>
+                        <div>
+                          <p className="font-bold tracking-wide">
+                            THIS CODE HAS BEEN ACCEPTED…
+                          </p>
+                          <p className="text-[12px] text-emerald-700 mt-0.5">
+                            Your reservation code has been applied. You can proceed to reserve your slot without upfront payment today.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {promoError && (
+                      <p className="text-[12px] text-rose-600 font-medium flex items-center gap-1.5">
+                        <span>⚠️</span> {promoError}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── TASK 2: Uniform Day Acknowledgment ── */}
+                  <div className="mt-6 rounded-3xl bg-slate-50 border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-3">
+                    <p className="text-[13.5px] font-extrabold text-[#002f76] flex items-center gap-2">
+                      <span>👕</span> Every Wednesday &amp; Friday is Merry Explorers&apos; official uniform day.
+                    </p>
+                    <label className="flex items-start gap-3 cursor-pointer pt-1 group">
+                      <input
+                        type="checkbox"
+                        checked={uniformDayAcknowledged}
+                        onChange={(e) => setUniformDayAcknowledged(e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded-lg border-2 border-slate-300 text-[#0033A0] focus:ring-[#0033A0] focus:ring-offset-0 transition cursor-pointer"
+                      />
+                      <span className="text-[13px] text-[#334155] leading-snug group-hover:text-[#002f76] transition-colors">
+                        <strong className="text-red-500">*</strong> I understand that every Wednesday &amp; Friday is Merry Explorers&apos; official uniform day.
+                      </span>
+                    </label>
+                    {!uniformDayAcknowledged && (
+                      <p className="text-[11.5px] text-amber-700 font-medium pl-8">
+                        * Required to continue registration.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="mt-8 flex justify-between">
                     <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
                       ← Back
@@ -979,9 +1224,18 @@ export default function RegisterPage() {
                     </div>
                   ))}
 
-                  <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-[13px] text-blue-800">
-                    <p>⏱️ <strong>1-Hour Payment Window:</strong> Once you reserve your slot, you will have <strong>1 hour</strong> to complete your payment on the next page. Unpaid reservations are automatically released.</p>
-                  </div>
+                  {promoAccepted ? (
+                    <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 text-[13px] text-amber-900 space-y-1">
+                      <p>🎟️ <strong>Promo Reservation Applied:</strong></p>
+                      <p className="text-[12.5px] text-amber-800 leading-relaxed">
+                        Your slot is reserved without upfront payment today. To confirm your slot, a 60% non-refundable downpayment is required by <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released. You will receive an automated payment reminder with your payment link.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-[13px] text-blue-800">
+                      <p>⏱️ <strong>1-Hour Payment Window:</strong> Once you reserve your slot, you will have <strong>1 hour</strong> to complete your payment on the next page. Unpaid reservations are automatically released.</p>
+                    </div>
+                  )}
 
                   {error && (
                     <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-[13px] font-medium text-red-700">
@@ -1002,7 +1256,7 @@ export default function RegisterPage() {
                       onClick={handleSubmit}
                       className="inline-flex items-center gap-2 rounded-2xl bg-green-500 px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:bg-green-600 disabled:opacity-60"
                     >
-                      {submitting ? "Reserving..." : "Reserve Slot & Pay 🎉"}
+                      {submitting ? "Reserving..." : (promoAccepted ? "Complete Slot Reservation 🎉" : "Reserve Slot & Pay 🎉")}
                     </button>
                   </div>
                 </m.div>

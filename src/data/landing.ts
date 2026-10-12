@@ -224,7 +224,7 @@ export const PROGRAM_SLOTS = {
     ageRange: "Ages 1.5 – 4.11",
     schedule: "Monday – Friday",
     sessions: 14,
-    totalSlots: 4,
+    totalSlots: 5,
     rate: 7518,
     downpayment: 4511,
     balance: 3007,
@@ -233,7 +233,7 @@ export const PROGRAM_SLOTS = {
     icon: "🌈",
     prerequisite: null,
     classes: [
-      { name: "Afternoon Class", time: "4:25 PM – 5:25 PM", maxSlots: 4 },
+      { name: "Afternoon Class", time: "4:25 PM – 5:25 PM", maxSlots: 5 },
     ],
   },
   "creative-explorer": {
@@ -242,7 +242,7 @@ export const PROGRAM_SLOTS = {
     ageRange: "Ages 2.6 – 4.11",
     schedule: "Tuesday, Thursday & Friday",
     sessions: 12,
-    totalSlots: 18,
+    totalSlots: 15,
     rate: 4820,
     downpayment: 2892,
     balance: 1928,
@@ -251,9 +251,9 @@ export const PROGRAM_SLOTS = {
     icon: "🎨",
     prerequisite: "Child must be able to stay independently with Teacher during sessions without a guardian.",
     classes: [
-      { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 6 },
-      { name: "Mid-Day Class", time: "11:15 AM – 12:30 PM", maxSlots: 6 },
-      { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 6 },
+      { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 5 },
+      { name: "Mid-Day Class", time: "11:15 AM – 12:30 PM", maxSlots: 5 },
+      { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 5 },
     ],
   },
   "brave-explorer": {

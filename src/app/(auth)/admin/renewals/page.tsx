@@ -1,0 +1,1828 @@
+"use client";
+
+import { useEffect, useState, useMemo, useRef } from "react";
+import { AppShell } from "@/components/app-shell";
+import * as XLSX from "xlsx";
+
+type Family = {
+  _id: string;
+  parentName: string;
+  parentEmail: string;
+  phone: string;
+  childName: string;
+  previousProgram: string;
+  renewingTo: string;
+  adventures?: {
+    adventure: string;
+    program: string;
+    classTime?: string;
+    status?: string;
+    registeredAt?: string;
+  }[];
+  renewalStatus: "not_yet_submitted" | "reserved" | "confirmed" | "released";
+  lastEmailSent?: string | null;
+  lastEmailDate?: string | null;
+  emailHistory?: any[];
+  notes?: string;
+  renewalPeriod?: string;
+  registrationId?: string | null;
+  createdAt?: string;
+};
+
+type RenewalRecord = {
+  _id: string;
+  registrationId: string;
+  familyId?: string | null;
+  parentName: string;
+  parentEmail: string;
+  phone: string;
+  childName: string;
+  program: string;
+  classTime: string;
+  submittedAt: string;
+  reservationType: string;
+  isPromo: boolean;
+  promoCode?: string | null;
+  reservedOn: string;
+  reservedUntil: string;
+  renewalStatus: "reserved" | "confirmed" | "for_release" | "released";
+  paymentStatus: "unpaid" | "downpayment_received" | "fully_paid";
+  totalTuition: number;
+  expectedDownpayment: number;
+  amountPaid: number;
+  remainingBalance: number;
+  paymentMethod: string;
+  referenceNumber: string;
+  receiptUrl?: string;
+  isResubmission?: boolean;
+  matchedFamily?: boolean;
+};
+
+type Stats = {
+  totalFamilies: number;
+  submittedCount: number;
+  notYetSubmitted: number;
+  countReserved: number;
+  countConfirmed: number;
+  countForRelease: number;
+  countReleased: number;
+  promoReservations: number;
+  directPayments: number;
+  renewalRate: number;
+  conversionRate: number;
+  countExpiringSoon: number;
+  deadlineIso: string;
+  totalCollected: number;
+  totalExpectedDownpayment: number;
+  totalOutstandingBalance: number;
+  countDownpaymentReceived: number;
+  countFullyPaid: number;
+  countWithBalance: number;
+};
+
+type SlotInfo = {
+  totalMax: number;
+  sessions: Record<string, { max: number; taken: number; belowMin: boolean }>;
+};
+
+export default function RenewalsPage() {
+  const [activeTab, setActiveTab] = useState<"renewals" | "families">("renewals");
+  const [loading, setLoading] = useState(true);
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("adventure-1-renewal");
+
+  // Renewals tab state
+  const [renewalRecords, setRenewalRecords] = useState<RenewalRecord[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [slotOverview, setSlotOverview] = useState<Record<string, SlotInfo>>({});
+  const [renewalSearch, setRenewalSearch] = useState("");
+  const [renewalStatusFilter, setRenewalStatusFilter] = useState("all");
+  const [renewalProgramFilter, setRenewalProgramFilter] = useState("all");
+  const [renewalPaymentFilter, setRenewalPaymentFilter] = useState("all");
+
+  // Families tab state
+  const [families, setFamilies] = useState<Family[]>([]);
+  const [familySearch, setFamilySearch] = useState("");
+  const [familyStatusFilter, setFamilyStatusFilter] = useState("all");
+
+  // Modals
+  const [addFamilyModal, setAddFamilyModal] = useState(false);
+  const [editingFamily, setEditingFamily] = useState<Family | null>(null);
+  const [importModal, setImportModal] = useState(false);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importPreview, setImportPreview] = useState<{ total: number; valid: number; duplicates: number }>({ total: 0, valid: 0, duplicates: 0 });
+  const [importing, setImporting] = useState(false);
+  const [newPeriodModal, setNewPeriodModal] = useState(false);
+
+  // Payment Recording Modal
+  const [paymentModalRecord, setPaymentModalRecord] = useState<RenewalRecord | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("gcash");
+  const [paymentRef, setPaymentRef] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [recordingPayment, setRecordingPayment] = useState(false);
+
+  // Family form fields
+  const [formParentName, setFormParentName] = useState("");
+  const [formParentEmail, setFormParentEmail] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formChildName, setFormChildName] = useState("");
+  const [formPreviousProgram, setFormPreviousProgram] = useState("Curious Explorer");
+  const [formRenewingTo, setFormRenewingTo] = useState("Creative Explorer");
+  const [formNotes, setFormNotes] = useState("");
+  const [familyFormError, setFamilyFormError] = useState("");
+
+  // New Period form fields
+  const [periodName, setPeriodName] = useState("");
+  const [periodTarget, setPeriodTarget] = useState("Adventure 2");
+  const [periodPrev, setPeriodPrev] = useState("Adventure 1");
+  const [periodReset, setPeriodReset] = useState(false);
+
+  // Email Sending Modal state
+  const [emailModalFamily, setEmailModalFamily] = useState<Family | null>(null);
+  const [emailType, setEmailType] = useState<"promo_code" | "custom">("promo_code");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailCustomMessage, setEmailCustomMessage] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  // File import ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch renewals & families
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [pRes, rRes, fRes] = await Promise.all([
+        fetch("/api/renewals/periods"),
+        fetch(`/api/renewals?period=${selectedPeriod}`),
+        fetch(`/api/renewals/families?period=${selectedPeriod}`),
+      ]);
+
+      const [pData, rData, fData] = await Promise.all([pRes.json(), rRes.json(), fRes.json()]);
+
+      if (pData.success) setPeriods(pData.data);
+      if (rData.success) {
+        setRenewalRecords(rData.data.records);
+        setStats(rData.data.stats);
+        setSlotOverview(rData.data.slotOverview);
+      }
+      if (fData.success) setFamilies(fData.data);
+    } catch (err) {
+      console.error("Failed to load renewals data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedPeriod]);
+
+  // Deadline countdown
+  const deadlineText = useMemo(() => {
+    const target = new Date("2026-10-16T13:00:00+08:00").getTime();
+    const diff = target - Date.now();
+    if (diff <= 0) return "Deadline has passed (Oct 16, 1:00 PM)";
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${days}d ${hours}h ${mins}m remaining until Oct 16, 1:00 PM`;
+  }, []);
+
+  // Filtered Renewals
+  const filteredRenewals = useMemo(() => {
+    return renewalRecords.filter((r) => {
+      const q = renewalSearch.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        r.childName.toLowerCase().includes(q) ||
+        r.parentName.toLowerCase().includes(q) ||
+        r.parentEmail.toLowerCase().includes(q) ||
+        r.referenceNumber.toLowerCase().includes(q);
+
+      const matchStatus = renewalStatusFilter === "all" || r.renewalStatus === renewalStatusFilter;
+      const matchProgram = renewalProgramFilter === "all" || r.program === renewalProgramFilter;
+      const matchPayment = renewalPaymentFilter === "all" || r.paymentStatus === renewalPaymentFilter;
+
+      return matchSearch && matchStatus && matchProgram && matchPayment;
+    });
+  }, [renewalRecords, renewalSearch, renewalStatusFilter, renewalProgramFilter, renewalPaymentFilter]);
+
+  // Filtered Families
+  const filteredFamilies = useMemo(() => {
+    return families.filter((f) => {
+      const q = familySearch.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        f.childName.toLowerCase().includes(q) ||
+        f.parentName.toLowerCase().includes(q) ||
+        f.parentEmail.toLowerCase().includes(q) ||
+        f.phone.toLowerCase().includes(q);
+
+      const matchStatus = familyStatusFilter === "all" || f.renewalStatus === familyStatusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [families, familySearch, familyStatusFilter]);
+
+  // Custom Dialog Modal State (Replaces native browser alerts/confirms)
+  const [feedbackDialog, setFeedbackDialog] = useState<{
+    open: boolean;
+    type: "success" | "error" | "info" | "confirm";
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm?: () => void;
+  }>({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
+
+  const showModalNotice = (title: string, message: string, type: "success" | "error" | "info" = "info") => {
+    setFeedbackDialog({
+      open: true,
+      type,
+      title,
+      message,
+      confirmLabel: "Understood",
+      onConfirm: () => setFeedbackDialog((prev) => ({ ...prev, open: false })),
+    });
+  };
+
+  const showModalConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    confirmLabel = "Confirm",
+    cancelLabel = "Cancel"
+  ) => {
+    setFeedbackDialog({
+      open: true,
+      type: "confirm",
+      title,
+      message,
+      confirmLabel,
+      cancelLabel,
+      onConfirm: () => {
+        setFeedbackDialog((prev) => ({ ...prev, open: false }));
+        onConfirm();
+      },
+    });
+  };
+
+  // Actions on renewal items
+  const handleUpdateStatus = (id: string, newStatus: string) => {
+    showModalConfirm(
+      "Update Renewal Status",
+      `Are you sure you want to change this renewal status to "${newStatus}"?`,
+      async () => {
+        try {
+          const res = await fetch(`/api/renewals/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "update_status", newStatus }),
+          });
+          if (res.ok) {
+            showModalNotice("Status Updated", `Renewal status successfully changed to "${newStatus}".`, "success");
+            fetchData();
+          } else {
+            showModalNotice("Error", "Failed to update status. Please try again.", "error");
+          }
+        } catch {
+          showModalNotice("Error", "Failed to update status.", "error");
+        }
+      },
+      "Yes, Update Status"
+    );
+  };
+
+  const handleReleaseSlot = (id: string) => {
+    showModalConfirm(
+      "Release Student Slot",
+      "Are you sure you want to release this student's slot? This will mark the registration as released/expired and free up room in the class capacity.",
+      async () => {
+        try {
+          const res = await fetch(`/api/renewals/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "release_slot" }),
+          });
+          if (res.ok) {
+            showModalNotice("Slot Released", "The slot has been successfully released and freed up for waitlisted families.", "success");
+            fetchData();
+          } else {
+            showModalNotice("Error", "Failed to release slot.", "error");
+          }
+        } catch {
+          showModalNotice("Error", "Failed to release slot.", "error");
+        }
+      },
+      "Yes, Release Slot"
+    );
+  };
+
+  // Record payment submit
+  const handleRecordPaymentSubmit = async () => {
+    if (!paymentModalRecord) return;
+    const amount = parseFloat(paymentAmount);
+    if (!amount || amount <= 0) {
+      showModalNotice("Invalid Amount", "Please enter a valid positive payment amount.", "error");
+      return;
+    }
+
+    setRecordingPayment(true);
+    try {
+      const res = await fetch(`/api/renewals/${paymentModalRecord.registrationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "record_payment",
+          amountPaid: amount,
+          paymentMethod,
+          referenceNumber: paymentRef,
+          notes: paymentNotes,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPaymentModalRecord(null);
+        setPaymentAmount("");
+        setPaymentRef("");
+        setPaymentNotes("");
+        fetchData();
+        showModalNotice("Payment Synced", data.message || "Payment recorded and synced successfully!", "success");
+      } else {
+        showModalNotice("Error", data.error || "Failed to record payment", "error");
+      }
+    } catch {
+      showModalNotice("Error", "A network error occurred while recording the payment.", "error");
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
+
+  // Add / Edit Family submit
+  const handleSaveFamily = async () => {
+    if (!formParentEmail || !formChildName) {
+      setFamilyFormError("Parent email and child name are required.");
+      return;
+    }
+    setFamilyFormError("");
+
+    try {
+      if (editingFamily) {
+        const res = await fetch(`/api/renewals/families/${editingFamily._id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            parentName: formParentName,
+            parentEmail: formParentEmail,
+            phone: formPhone,
+            childName: formChildName,
+            previousProgram: formPreviousProgram,
+            renewingTo: formRenewingTo,
+            notes: formNotes,
+          }),
+        });
+        if (res.ok) {
+          setEditingFamily(null);
+          setAddFamilyModal(false);
+          fetchData();
+        } else {
+          const d = await res.json();
+          setFamilyFormError(d.error || "Failed to update family.");
+        }
+      } else {
+        const res = await fetch("/api/renewals/families", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            parentName: formParentName,
+            parentEmail: formParentEmail,
+            phone: formPhone,
+            childName: formChildName,
+            previousProgram: formPreviousProgram,
+            renewingTo: formRenewingTo,
+            notes: formNotes,
+            renewalPeriod: selectedPeriod,
+          }),
+        });
+        const d = await res.json();
+        if (d.success) {
+          setAddFamilyModal(false);
+          resetFamilyForm();
+          fetchData();
+        } else {
+          setFamilyFormError(d.error || "Failed to add family.");
+        }
+      }
+    } catch (err) {
+      setFamilyFormError("Network error occurred.");
+    }
+  };
+
+  const resetFamilyForm = () => {
+    setFormParentName("");
+    setFormParentEmail("");
+    setFormPhone("");
+    setFormChildName("");
+    setFormPreviousProgram("Curious Explorer");
+    setFormRenewingTo("Creative Explorer");
+    setFormNotes("");
+    setFamilyFormError("");
+  };
+
+  const handleDeleteFamily = (id: string, name: string) => {
+    showModalConfirm(
+      "Delete Family Record",
+      `Are you sure you want to permanently delete the family record for ${name}?`,
+      async () => {
+        try {
+          await fetch(`/api/renewals/families/${id}`, { method: "DELETE" });
+          showModalNotice("Record Deleted", `The family record for ${name} has been removed.`, "success");
+          fetchData();
+        } catch {
+          showModalNotice("Error", "Failed to delete family record.", "error");
+        }
+      },
+      "Yes, Delete Record"
+    );
+  };
+
+  // Download Import Template
+  const handleDownloadTemplate = () => {
+    const headers = [
+      ["Parent Name", "Parent Email", "Phone Number", "Child Name", "Previous Program", "Renewing To", "Notes"],
+      ["Maria Santos", "maria.santos@gmail.com", "09171234567", "Leo Santos", "Adventure 1", "Adventure 2", "Preferred afternoon class"],
+      ["Juan Dela Cruz", "juan.delacruz@yahoo.com", "09189876543", "Sofia Dela Cruz", "Adventure 1", "Adventure 2", "Returning explorer"],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Families Template");
+    XLSX.writeFile(wb, "MerryExplorers_Renewal_Families_Template.xlsx");
+  };
+
+  // Handle CSV/Excel File Parse
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const parsed = data.map((row) => ({
+          parentName: row["Parent Name"] || row["parentName"] || row["Parent/Guardian Name"] || "",
+          parentEmail: row["Parent Email"] || row["parentEmail"] || row["Email"] || "",
+          phone: row["Phone Number"] || row["Phone"] || row["phone"] || "",
+          childName: row["Child Name"] || row["childName"] || row["Explorer"] || "",
+          previousProgram: row["Previous Program"] || row["previousProgram"] || "Adventure 1",
+          renewingTo: row["Renewing To"] || row["renewingTo"] || "Adventure 2",
+          notes: row["Notes"] || row["notes"] || "",
+        }));
+
+        // check duplicates against current state
+        let dups = 0;
+        const validRows: any[] = [];
+        parsed.forEach((row) => {
+          const email = (row.parentEmail || "").trim().toLowerCase();
+          const child = (row.childName || "").trim().toLowerCase();
+          const isDup = families.some(
+            (f) => f.parentEmail.toLowerCase() === email && f.childName.toLowerCase() === child
+          );
+          if (isDup) dups++;
+          if (email && child) validRows.push(row);
+        });
+
+        setImportData(validRows);
+        setImportPreview({
+          total: parsed.length,
+          valid: validRows.length,
+          duplicates: dups,
+        });
+        setImportModal(true);
+      } catch {
+        showModalNotice("File Read Error", "Could not parse file. Please verify columns and that the file is a valid .xlsx or .csv document.", "error");
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // Commit Bulk Import
+  const handleCommitImport = async () => {
+    if (importData.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await fetch("/api/renewals/families", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          families: importData.map((d) => ({
+            ...d,
+            renewalPeriod: selectedPeriod,
+          })),
+        }),
+      });
+      const resData = await res.json();
+      if (resData.success) {
+        setImportModal(false);
+        setImportData([]);
+        fetchData();
+        showModalNotice(
+          "Import Successful",
+          `Successfully imported ${resData.data.inserted} families into the contact list! ${resData.data.duplicates.length} duplicate entries were automatically skipped.`,
+          "success"
+        );
+      } else {
+        showModalNotice("Import Error", resData.error || "Failed to import families.", "error");
+      }
+    } catch {
+      showModalNotice("Error", "Network error occurred during import.", "error");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Export Renewals to CSV / Excel
+  const handleExportRenewals = () => {
+    const rows = filteredRenewals.map((r) => ({
+      "Child Name": r.childName,
+      "Parent Name": r.parentName,
+      "Email": r.parentEmail,
+      "Phone": r.phone,
+      "Program": r.program,
+      "Session/Class": r.classTime,
+      "Reservation Type": r.reservationType,
+      "Promo Code": r.promoCode || "None",
+      "Renewal Status": r.renewalStatus,
+      "Payment Status": r.paymentStatus,
+      "Total Tuition": r.totalTuition,
+      "Expected 60% Downpayment": r.expectedDownpayment,
+      "Amount Paid": r.amountPaid,
+      "Remaining Balance": r.remainingBalance,
+      "Payment Method": r.paymentMethod,
+      "Reference Number": r.referenceNumber,
+      "Submitted At": new Date(r.submittedAt).toLocaleString(),
+      "Reserved Until": new Date(r.reservedUntil).toLocaleString(),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Renewals");
+    XLSX.writeFile(wb, `MerryExplorers_Renewals_${selectedPeriod}.xlsx`);
+  };
+
+  // Create New Period Submit
+  const handleCreatePeriod = async () => {
+    if (!periodName.trim()) {
+      showModalNotice("Required Field", "Please specify a name for the new renewal period.", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/renewals/periods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: periodName,
+          targetProgram: periodTarget,
+          previousProgram: periodPrev,
+          resetStatuses: periodReset,
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setNewPeriodModal(false);
+        setPeriodName("");
+        fetchData();
+        showModalNotice("Renewal Period Created", `"${periodName}" has been established as an active renewal cycle!`, "success");
+      } else {
+        showModalNotice("Error", d.error || "Failed to create period", "error");
+      }
+    } catch {
+      showModalNotice("Error", "Network error occurred.", "error");
+    }
+  };
+
+  // Handle Send Email
+  const handleSendEmailSubmit = async () => {
+    if (!emailModalFamily) return;
+    setSendingEmail(true);
+    try {
+      const res = await fetch("/api/renewals/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          familyId: emailModalFamily._id,
+          emailType,
+          customSubject: emailSubject || undefined,
+          customMessage: emailCustomMessage || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmailModalFamily(null);
+        setEmailCustomMessage("");
+        fetchData();
+        showModalNotice("Email Sent", data.message || "Email successfully sent to the parent!", "success");
+      } else {
+        showModalNotice("Failed to Send", data.error || "Email delivery failed", "error");
+      }
+    } catch {
+      showModalNotice("Network Error", "Unable to reach the email dispatch server.", "error");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  return (
+    <AppShell title="Renewals & Contact List" description="Track reservations, downpayments, and manage reusable family contact lists.">
+      <div className="space-y-6 pb-12">
+        {/* ── TOP HEADER & PERIOD SELECTOR ── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🔄</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-headline text-[22px] font-extrabold text-[#002f76]">Renewals Hub</h1>
+                <span className="rounded-full bg-blue-100 text-[#0033A0] px-3 py-0.5 text-[11px] font-bold tracking-wide">
+                  Admin Only
+                </span>
+              </div>
+              <p className="text-[13px] text-[#64748b]">
+                Manage reservation codes, payment sync, and family communications.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-2xl bg-slate-50 border border-slate-200 px-3.5 py-2">
+              <span className="text-[12px] font-bold text-[#64748b]">Period:</span>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="bg-transparent text-[13px] font-bold text-[#002f76] focus:outline-none cursor-pointer"
+              >
+                {periods.map((p) => (
+                  <option key={p.slug} value={p.slug}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={() => setNewPeriodModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-[#0033A0] px-4 py-2.5 text-[12.5px] font-bold text-white shadow-sm hover:bg-[#002f76] transition-colors"
+            >
+              <span>+</span> Start New Period
+            </button>
+          </div>
+        </div>
+
+        {/* ── DEADLINE & COUNTDOWN BANNER ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-amber-500/10 border border-amber-300 px-6 py-4 text-amber-900">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">⏳</span>
+            <div>
+              <p className="text-[13.5px] font-bold">
+                Promo Code Expiry &amp; Slot Release: <span className="underline">October 16, 2026 at 1:00 PM</span>
+              </p>
+              <p className="text-[12px] text-amber-800">
+                A slot is confirmed only upon receipt of 60% downpayment. Unpaid reservations are flagged for admin release after this deadline.
+              </p>
+            </div>
+          </div>
+          <div className="rounded-xl bg-amber-500 text-white px-3.5 py-1.5 text-[12px] font-bold self-start sm:self-auto shrink-0 shadow-sm">
+            {deadlineText}
+          </div>
+        </div>
+
+        {/* ── PART D: STATISTICS BANNER ── */}
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Total Families</p>
+              <p className="mt-1 text-2xl font-black text-[#002f76]">{stats.totalFamilies}</p>
+              <p className="text-[11px] text-slate-500 mt-1">In contact list</p>
+            </div>
+            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Renewals Submitted</p>
+              <p className="mt-1 text-2xl font-black text-emerald-600">{stats.submittedCount}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{stats.renewalRate}% renewal rate</p>
+            </div>
+            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Not Yet Submitted</p>
+              <p className="mt-1 text-2xl font-black text-rose-500">{stats.notYetSubmitted}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Eligible for follow-up</p>
+            </div>
+            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Reserved (Unpaid)</p>
+              <p className="mt-1 text-2xl font-black text-amber-600">{stats.countReserved}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{stats.promoReservations} via promo code</p>
+            </div>
+            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Confirmed (60%)</p>
+              <p className="mt-1 text-2xl font-black text-blue-600">{stats.countConfirmed}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{stats.conversionRate}% conversion</p>
+            </div>
+            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">For Release</p>
+              <p className="mt-1 text-2xl font-black text-orange-600">{stats.countForRelease}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{stats.countExpiringSoon} expiring &lt;24h</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── FINANCIAL OVERVIEW ROW ── */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div className="rounded-3xl bg-emerald-500/10 border border-emerald-200 p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-bold text-emerald-800 uppercase tracking-wider">Total Collected</p>
+                <p className="text-2xl font-black text-emerald-900 mt-1">₱{stats.totalCollected.toLocaleString()}</p>
+              </div>
+              <span className="text-3xl">💰</span>
+            </div>
+            <div className="rounded-3xl bg-blue-500/10 border border-blue-200 p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-bold text-blue-800 uppercase tracking-wider">Expected 60% Downpayments</p>
+                <p className="text-2xl font-black text-blue-900 mt-1">₱{stats.totalExpectedDownpayment.toLocaleString()}</p>
+              </div>
+              <span className="text-3xl">🧾</span>
+            </div>
+            <div className="rounded-3xl bg-amber-500/10 border border-amber-200 p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-bold text-amber-800 uppercase tracking-wider">Outstanding Balance</p>
+                <p className="text-2xl font-black text-amber-900 mt-1">₱{stats.totalOutstandingBalance.toLocaleString()}</p>
+              </div>
+              <span className="text-3xl">⚖️</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── PART E: SLOT OVERVIEW & MINIMUM CLASS SIZE MONITOR ── */}
+        <div className="rounded-3xl bg-white p-6 border border-slate-100 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-headline text-[16px] font-extrabold text-[#002f76] flex items-center gap-2">
+                <span>🏫</span> Class Size &amp; Session Tracker
+              </h2>
+              <p className="text-[12px] text-[#64748b]">
+                Minimum 3 students required to proceed. Sessions below minimum are highlighted in orange.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] font-bold">
+              <span className="flex items-center gap-1.5 text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-lg">
+                ⚠️ &lt; 3 Students (Below Minimum)
+              </span>
+              <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                ✓ 3+ Students (Proceeding)
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {Object.entries(slotOverview).map(([progKey, progData]) => (
+              <div key={progKey} className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
+                <p className="text-[13px] font-bold text-[#002f76] capitalize">
+                  {progKey.replace(/-/g, " ")}
+                </p>
+                <div className="space-y-2">
+                  {Object.entries(progData.sessions).map(([sessName, sessInfo]) => (
+                    <div
+                      key={sessName}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] ${
+                        sessInfo.belowMin
+                          ? "bg-orange-50/80 border-orange-200 text-orange-950 font-medium"
+                          : "bg-white border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-bold">{sessName}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Cap: {sessInfo.max} students
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${
+                            sessInfo.belowMin
+                              ? "bg-orange-200 text-orange-800"
+                              : sessInfo.taken >= sessInfo.max
+                              ? "bg-slate-200 text-slate-800"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {sessInfo.taken} / {sessInfo.max}
+                        </span>
+                        {sessInfo.belowMin && (
+                          <p className="text-[10px] text-orange-700 font-bold mt-0.5">Needs {3 - sessInfo.taken} more</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── TABS NAVIGATION ── */}
+        <div className="flex border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab("renewals")}
+            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${
+              activeTab === "renewals"
+                ? "border-[#0033A0] text-[#0033A0]"
+                : "border-transparent text-[#64748b] hover:text-[#002f76]"
+            }`}
+          >
+            <span>📋</span> Renewals &amp; Reservations ({filteredRenewals.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("families")}
+            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${
+              activeTab === "families"
+                ? "border-[#0033A0] text-[#0033A0]"
+                : "border-transparent text-[#64748b] hover:text-[#002f76]"
+            }`}
+          >
+            <span>👨‍👩‍👧</span> Families Contact List ({filteredFamilies.length})
+          </button>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* TAB 1: RENEWALS & RESERVATIONS                                         */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "renewals" && (
+          <div className="space-y-4">
+            {/* Controls & Filters */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 border border-slate-100 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                <input
+                  type="text"
+                  value={renewalSearch}
+                  onChange={(e) => setRenewalSearch(e.target.value)}
+                  placeholder="Search student, parent, email, ref #..."
+                  className="rounded-xl border border-slate-200 px-3.5 py-2 text-[13px] w-full sm:w-64 focus:outline-none focus:border-[#0033A0]"
+                />
+
+                <select
+                  value={renewalStatusFilter}
+                  onChange={(e) => setRenewalStatusFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-700"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="reserved">🟡 Reserved (Unpaid)</option>
+                  <option value="confirmed">🟢 Confirmed (60%+)</option>
+                  <option value="for_release">🟠 For Release</option>
+                  <option value="released">⚪ Released</option>
+                </select>
+
+                <select
+                  value={renewalPaymentFilter}
+                  onChange={(e) => setRenewalPaymentFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-700"
+                >
+                  <option value="all">All Payments</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="downpayment_received">Downpayment Received</option>
+                  <option value="fully_paid">Fully Paid</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportRenewals}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  <span>📥</span> Export to Excel
+                </button>
+              </div>
+            </div>
+
+            {/* Renewals Table */}
+            <div className="overflow-x-auto rounded-3xl bg-white border border-slate-100 shadow-sm">
+              <table className="w-full text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[11.5px] font-bold uppercase tracking-wider text-[#64748b]">
+                    <th className="py-3.5 px-4">Explorer &amp; Parent</th>
+                    <th className="py-3.5 px-4">Program &amp; Session</th>
+                    <th className="py-3.5 px-4">Reservation Type</th>
+                    <th className="py-3.5 px-4">Expiry Window</th>
+                    <th className="py-3.5 px-4">Renewal Status</th>
+                    <th className="py-3.5 px-4">Financials</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-[#334155]">
+                  {filteredRenewals.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                        No renewal submissions found matching your filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRenewals.map((r) => (
+                      <tr key={r._id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <p className="font-bold text-[#002f76]">{r.childName}</p>
+                          <p className="text-[11.5px] text-slate-500">{r.parentName}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">{r.parentEmail}</p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-medium capitalize text-slate-800">{r.program.replace(/-/g, " ")}</p>
+                          <p className="text-[11.5px] text-slate-500">{r.classTime}</p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              r.isPromo
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {r.reservationType}
+                          </span>
+                          {r.promoCode && (
+                            <p className="text-[10px] font-mono text-amber-700 mt-0.5">Code: {r.promoCode}</p>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="text-[11.5px] text-slate-700 font-medium">
+                            {new Date(r.reservedUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </p>
+                          <p className="text-[10.5px] text-slate-400">
+                            Sub: {new Date(r.submittedAt).toLocaleDateString()}
+                          </p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-full text-[11.5px] font-bold ${
+                              r.renewalStatus === "confirmed"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : r.renewalStatus === "for_release"
+                                ? "bg-orange-100 text-orange-800"
+                                : r.renewalStatus === "released"
+                                ? "bg-slate-200 text-slate-700"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {r.renewalStatus === "confirmed" && "🟢 Confirmed"}
+                            {r.renewalStatus === "reserved" && "🟡 Reserved (Unpaid)"}
+                            {r.renewalStatus === "for_release" && "🟠 For Release"}
+                            {r.renewalStatus === "released" && "⚪ Released"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="space-y-0.5 text-[11.5px]">
+                            <p>Due: <strong>₱{r.totalTuition.toLocaleString()}</strong></p>
+                            <p className="text-emerald-700 font-bold">Paid: ₱{r.amountPaid.toLocaleString()}</p>
+                            <p className="text-amber-700">Bal: ₱{r.remainingBalance.toLocaleString()}</p>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setPaymentModalRecord(r);
+                                setPaymentAmount(r.expectedDownpayment ? String(r.expectedDownpayment) : "");
+                              }}
+                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm"
+                            >
+                              💵 Record Payment
+                            </button>
+
+                            {r.renewalStatus === "for_release" && (
+                              <button
+                                onClick={() => handleReleaseSlot(r.registrationId)}
+                                className="rounded-lg bg-orange-600 hover:bg-orange-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm"
+                              >
+                                Release Slot
+                              </button>
+                            )}
+
+                            <select
+                              value={r.renewalStatus}
+                              onChange={(e) => handleUpdateStatus(r.registrationId, e.target.value)}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 cursor-pointer"
+                            >
+                              <option value="reserved">Reserved</option>
+                              <option value="confirmed">Confirmed</option>
+                              <option value="for_release">For Release</option>
+                              <option value="released">Released</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* TAB 2: FAMILIES MASTER CONTACT LIST                                    */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "families" && (
+          <div className="space-y-4">
+            {/* Hidden file input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+            />
+
+            {/* Actions Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 border border-slate-100 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                <input
+                  type="text"
+                  value={familySearch}
+                  onChange={(e) => setFamilySearch(e.target.value)}
+                  placeholder="Search family by parent, child, or email..."
+                  className="rounded-xl border border-slate-200 px-3.5 py-2 text-[13px] w-full sm:w-64 focus:outline-none focus:border-[#0033A0]"
+                />
+
+                <select
+                  value={familyStatusFilter}
+                  onChange={(e) => setFamilyStatusFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-700"
+                >
+                  <option value="all">All Renewal Statuses</option>
+                  <option value="not_yet_submitted">Not Yet Submitted</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="released">Released</option>
+                </select>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    resetFamilyForm();
+                    setEditingFamily(null);
+                    setAddFamilyModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0033A0] hover:bg-[#002f76] text-white px-3.5 py-2 text-[12.5px] font-bold shadow-sm transition-colors"
+                >
+                  <span>+</span> Add Family
+                </button>
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[#002f76] px-3.5 py-2 text-[12.5px] font-bold shadow-sm transition-colors"
+                >
+                  <span>📤</span> Import CSV / Excel
+                </button>
+
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 text-[12.5px] font-semibold transition-colors"
+                >
+                  <span>📄</span> Download Template
+                </button>
+              </div>
+            </div>
+
+            {/* Families Table */}
+            <div className="overflow-x-auto rounded-3xl bg-white border border-slate-100 shadow-sm">
+              <table className="w-full text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[11.5px] font-bold uppercase tracking-wider text-[#64748b]">
+                    <th className="py-3.5 px-4">Parent / Guardian</th>
+                    <th className="py-3.5 px-4">Contact Details</th>
+                    <th className="py-3.5 px-4">Explorer (Child)</th>
+                    <th className="py-3.5 px-4">Adventure History</th>
+                    <th className="py-3.5 px-4">Renewing To</th>
+                    <th className="py-3.5 px-4">Renewal Status</th>
+                    <th className="py-3.5 px-4">Email Logs</th>
+                    <th className="py-3.5 px-4">Notes</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-[#334155]">
+                  {filteredFamilies.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        No family records found. Click &quot;Add Family&quot; or &quot;Import CSV/Excel&quot; to populate your contact list.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredFamilies.map((f) => (
+                      <tr
+                        key={f._id}
+                        onClick={() => {
+                          setEmailModalFamily(f);
+                          setEmailType("promo_code");
+                          setEmailSubject(`Priority Renewal & Slot Reservation Code for ${f.childName} 🌈`);
+                          setEmailCustomMessage("");
+                        }}
+                        className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                      >
+                        <td className="py-3.5 px-4 font-bold text-[#002f76] group-hover:underline">
+                          {f.parentName || "—"}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-mono text-[11.5px] text-slate-700">{f.parentEmail}</p>
+                          {f.phone && <p className="text-[11px] text-slate-500">{f.phone}</p>}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900">
+                          {f.childName}
+                        </td>
+                        <td className="py-3.5 px-4 text-[12px]">
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {f.adventures && f.adventures.length > 0 ? (
+                              f.adventures.map((adv, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[11px] font-medium text-[#002f76]"
+                                  title={`Registered in ${adv.program}`}
+                                >
+                                  <strong>{adv.adventure}:</strong> {adv.program}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 font-medium">
+                                {f.previousProgram || "Adventure 1"}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-[12px]">
+                          <span className="inline-block rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                            {f.renewingTo || "Adventure 2"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                              f.renewalStatus === "confirmed"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : f.renewalStatus === "reserved"
+                                ? "bg-amber-100 text-amber-800"
+                                : f.renewalStatus === "released"
+                                ? "bg-slate-200 text-slate-700"
+                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                            }`}
+                          >
+                            {f.renewalStatus === "not_yet_submitted" && "Not Yet Submitted"}
+                            {f.renewalStatus === "reserved" && "Reserved"}
+                            {f.renewalStatus === "confirmed" && "Confirmed"}
+                            {f.renewalStatus === "released" && "Released"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-[11px] text-slate-500">
+                          {f.lastEmailSent ? (
+                            <div>
+                              <p className="font-semibold text-emerald-700 flex items-center gap-1">
+                                <span>✓</span> {f.lastEmailSent}
+                              </p>
+                              <p className="text-slate-400">{f.lastEmailDate ? new Date(f.lastEmailDate).toLocaleDateString() : ""}</p>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">None sent</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-[11.5px] text-slate-600 max-w-[140px] truncate">
+                          {f.notes || "—"}
+                        </td>
+                        <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setEmailModalFamily(f);
+                                setEmailType("promo_code");
+                                setEmailSubject(`Priority Renewal & Slot Reservation Code for ${f.childName} 🌈`);
+                                setEmailCustomMessage("");
+                              }}
+                              className="rounded-lg bg-blue-50 text-[#0033A0] hover:bg-[#0033A0] hover:text-white px-2.5 py-1 text-[11.5px] font-bold transition-all shadow-sm"
+                            >
+                              ✉️ Email
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingFamily(f);
+                                setFormParentName(f.parentName);
+                                setFormParentEmail(f.parentEmail);
+                                setFormPhone(f.phone || "");
+                                setFormChildName(f.childName);
+                                setFormPreviousProgram(f.previousProgram || "Curious Explorer");
+                                setFormRenewingTo(f.renewingTo || "Creative Explorer");
+                                setFormNotes(f.notes || "");
+                                setAddFamilyModal(true);
+                              }}
+                              className="text-[12px] font-bold text-[#0033A0] hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFamily(f._id, `${f.parentName} (${f.childName})`)}
+                              className="text-[12px] font-bold text-rose-500 hover:text-rose-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: RECORD PAYMENT ── */}
+        {paymentModalRecord && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
+                  Record Payment (2-Way Sync)
+                </h3>
+                <button
+                  onClick={() => setPaymentModalRecord(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-1 bg-slate-50 p-3 rounded-2xl text-[12.5px] text-slate-700">
+                <p><strong>Explorer:</strong> {paymentModalRecord.childName}</p>
+                <p><strong>Parent:</strong> {paymentModalRecord.parentName} ({paymentModalRecord.parentEmail})</p>
+                <p><strong>Total Tuition:</strong> ₱{paymentModalRecord.totalTuition.toLocaleString()}</p>
+                <p><strong>Expected 60% Downpayment:</strong> ₱{paymentModalRecord.expectedDownpayment.toLocaleString()}</p>
+                <p><strong>Current Paid:</strong> ₱{paymentModalRecord.amountPaid.toLocaleString()}</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
+                    Payment Amount (₱) *
+                  </label>
+                  <input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[14px] font-bold text-[#002f76]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800"
+                  >
+                    <option value="gcash">GCash</option>
+                    <option value="bpi">BPI Bank Transfer</option>
+                    <option value="mari-bank">Mari Bank</option>
+                    <option value="cash">Cash Onsite</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
+                    Reference / Transaction #
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentRef}
+                    onChange={(e) => setPaymentRef(e.target.value)}
+                    placeholder="e.g. 100029384729"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
+                    Admin Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="e.g. Paid onsite directly to admin"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setPaymentModalRecord(null)}
+                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={recordingPayment}
+                  onClick={handleRecordPaymentSubmit}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 text-[12.5px] font-bold shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {recordingPayment ? "Saving..." : "Save & Sync Payment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: ADD / EDIT FAMILY ── */}
+        {addFamilyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
+                  {editingFamily ? "Edit Family Record" : "Add Family to Contact List"}
+                </h3>
+                <button
+                  onClick={() => setAddFamilyModal(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {familyFormError && (
+                <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-[12px] text-rose-700 font-medium">
+                  ⚠️ {familyFormError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Parent Name</label>
+                  <input
+                    type="text"
+                    value={formParentName}
+                    onChange={(e) => setFormParentName(e.target.value)}
+                    placeholder="e.g. Maria Santos"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Parent Email *</label>
+                  <input
+                    type="email"
+                    value={formParentEmail}
+                    onChange={(e) => setFormParentEmail(e.target.value)}
+                    placeholder="maria.santos@gmail.com"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Phone Number</label>
+                  <input
+                    type="text"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    placeholder="09171234567"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Child Name *</label>
+                  <input
+                    type="text"
+                    value={formChildName}
+                    onChange={(e) => setFormChildName(e.target.value)}
+                    placeholder="Leo Santos"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Previous Program *</label>
+                  <select
+                    value={formPreviousProgram}
+                    onChange={(e) => setFormPreviousProgram(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:border-[#0033A0]"
+                  >
+                    <option value="Curious Explorer">Curious Explorer</option>
+                    <option value="Creative Explorer">Creative Explorer</option>
+                    <option value="Everyday Curious">Everyday Curious</option>
+                    <option value="Trailblazer (Brave Explorer)">Trailblazer (Brave Explorer)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Renewing To *</label>
+                  <select
+                    value={formRenewingTo}
+                    onChange={(e) => setFormRenewingTo(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:border-[#0033A0]"
+                  >
+                    <option value="Curious Explorer">Curious Explorer</option>
+                    <option value="Creative Explorer">Creative Explorer</option>
+                    <option value="Everyday Curious">Everyday Curious</option>
+                    <option value="Trailblazer (Brave Explorer)">Trailblazer (Brave Explorer)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-slate-600 mb-1">Notes</label>
+                <textarea
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                  placeholder="Optional parent preference or schedule notes..."
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAddFamilyModal(false)}
+                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveFamily}
+                  className="rounded-xl bg-[#0033A0] hover:bg-[#002f76] text-white px-5 py-2 text-[12.5px] font-bold shadow-sm transition-colors"
+                >
+                  {editingFamily ? "Save Changes" : "Add Family"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: BULK IMPORT PREVIEW ── */}
+        {importModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
+                  Bulk Import Preview
+                </h3>
+                <button
+                  onClick={() => setImportModal(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-2 text-[13px] text-slate-700">
+                <p>We found <strong>{importPreview.total}</strong> rows in your uploaded file:</p>
+                <ul className="list-disc pl-5 space-y-1 text-[12.5px]">
+                  <li className="text-emerald-700"><strong>{importPreview.valid}</strong> valid records ready to be added</li>
+                  {importPreview.duplicates > 0 && (
+                    <li className="text-amber-700"><strong>{importPreview.duplicates}</strong> duplicate records will be skipped automatically</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 p-2 text-[11.5px] bg-slate-50 space-y-1">
+                {importData.slice(0, 10).map((row, idx) => (
+                  <div key={idx} className="flex justify-between border-b border-slate-200/60 pb-1">
+                    <span>{row.childName} ({row.parentName})</span>
+                    <span className="font-mono text-slate-500">{row.parentEmail}</span>
+                  </div>
+                ))}
+                {importData.length > 10 && (
+                  <p className="text-center text-slate-400 py-1">...and {importData.length - 10} more</p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setImportModal(false)}
+                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={importing || importPreview.valid === 0}
+                  onClick={handleCommitImport}
+                  className="rounded-xl bg-[#0033A0] hover:bg-[#002f76] text-white px-5 py-2 text-[12.5px] font-bold shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {importing ? "Importing..." : `Confirm Import (${importPreview.valid})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: START NEW RENEWAL PERIOD ── */}
+        {newPeriodModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
+                  Start New Renewal Period
+                </h3>
+                <button
+                  onClick={() => setNewPeriodModal(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-[12.5px] text-[#64748b]">
+                Create a new period to keep historical data intact while starting fresh notifications.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Period Name *</label>
+                  <input
+                    type="text"
+                    value={periodName}
+                    onChange={(e) => setPeriodName(e.target.value)}
+                    placeholder="e.g. Adventure 2 Renewal"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Target Program</label>
+                  <input
+                    type="text"
+                    value={periodTarget}
+                    onChange={(e) => setPeriodTarget(e.target.value)}
+                    placeholder="e.g. Adventure 2"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                  />
+                </div>
+
+                <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={periodReset}
+                    onChange={(e) => setPeriodReset(e.target.checked)}
+                    className="mt-0.5 rounded text-[#0033A0]"
+                  />
+                  <span className="text-[12px] text-slate-700 leading-snug">
+                    Reset existing families&apos; status to &quot;Not yet submitted&quot; for this new period (reusable contact list).
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setNewPeriodModal(false)}
+                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreatePeriod}
+                  className="rounded-xl bg-[#0033A0] hover:bg-[#002f76] text-white px-5 py-2 text-[12.5px] font-bold shadow-sm transition-colors"
+                >
+                  Create Period
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: SEND EMAIL TO FAMILY (Triggered by clicking row) ── */}
+        {emailModalFamily && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-xl rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">✉️</span>
+                  <div>
+                    <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
+                      Send Email to Family
+                    </h3>
+                    <p className="text-[12px] text-slate-500">
+                      To: <strong>{emailModalFamily.parentName}</strong> ({emailModalFamily.parentEmail})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEmailModalFamily(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Email Type Selection */}
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailType("promo_code");
+                    setEmailSubject(`Priority Renewal & Slot Reservation Code for ${emailModalFamily.childName} 🌈`);
+                  }}
+                  className={`flex-1 py-2 text-[12.5px] font-bold rounded-xl transition-all ${
+                    emailType === "promo_code"
+                      ? "bg-white text-[#0033A0] shadow-sm"
+                      : "text-slate-600 hover:text-[#002f76]"
+                  }`}
+                >
+                  🎟️ Priority Promo Code Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailType("custom");
+                    setEmailSubject(`Merry Explorers: Message regarding ${emailModalFamily.childName}`);
+                  }}
+                  className={`flex-1 py-2 text-[12.5px] font-bold rounded-xl transition-all ${
+                    emailType === "custom"
+                      ? "bg-white text-[#0033A0] shadow-sm"
+                      : "text-slate-600 hover:text-[#002f76]"
+                  }`}
+                >
+                  📝 Custom Notice
+                </button>
+              </div>
+
+              {/* Email Content Preview */}
+              {emailType === "promo_code" ? (
+                <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
+                  <div className="border-b border-slate-200 pb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
+                    <p className="font-bold text-[#002f76] mt-0.5">
+                      Priority Renewal &amp; Slot Reservation Code for {emailModalFamily.childName} 🌈
+                    </p>
+                  </div>
+                  <div className="space-y-2 text-slate-600 text-[12px] leading-relaxed">
+                    <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
+                    <p>
+                      We are delighted to welcome back <strong>{emailModalFamily.childName}</strong> for our upcoming adventure with Merry Explorers!
+                    </p>
+                    <div className="rounded-xl bg-white border border-dashed border-[#0033A0] p-3 text-center my-2">
+                      <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">Your Priority Reservation Code</p>
+                      <p className="text-xl font-mono font-black text-[#002f76] mt-0.5 tracking-wider">A1RENEWAL2026</p>
+                    </div>
+                    <ul className="list-disc pl-5 space-y-1 text-slate-600 text-[11.5px]">
+                      <li><strong>Not a discount voucher:</strong> Allows reserving without upfront payment today.</li>
+                      <li><strong>Valid until:</strong> October 15, 2026.</li>
+                      <li><strong>Release deadline:</strong> Unpaid slots released October 16, 1:00 PM.</li>
+                      <li><strong>Confirmation:</strong> Confirmed upon receipt of 60% downpayment.</li>
+                      <li>Need help? Ask Teacher Kyle or Teacher Angel onsite.</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[12px] font-bold text-slate-600 mb-1">Subject</label>
+                    <input
+                      type="text"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-bold text-slate-600 mb-1">Message Body</label>
+                    <textarea
+                      value={emailCustomMessage}
+                      onChange={(e) => setEmailCustomMessage(e.target.value)}
+                      placeholder="Type your message here..."
+                      rows={5}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Status Note */}
+              {emailModalFamily.lastEmailSent && (
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11.5px] text-emerald-800">
+                  <span>✓</span>
+                  <span>
+                    Previously sent: <strong>{emailModalFamily.lastEmailSent}</strong> on{" "}
+                    {emailModalFamily.lastEmailDate ? new Date(emailModalFamily.lastEmailDate).toLocaleString() : ""}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEmailModalFamily(null)}
+                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={sendingEmail}
+                  onClick={handleSendEmailSubmit}
+                  className="rounded-xl bg-[#0033A0] hover:bg-[#002f76] text-white px-5 py-2 text-[12.5px] font-bold shadow-md shadow-[#0033A0]/20 transition-all disabled:opacity-50"
+                >
+                  {sendingEmail ? "Dispatching Email..." : "Send Email Now 🚀"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CUSTOM FEEDBACK & CONFIRMATION DIALOG (No native browser alerts) ── */}
+        {feedbackDialog.open && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-200">
+            <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+              {/* Decorative top color bar */}
+              <div
+                className={`absolute top-0 left-0 right-0 h-2 ${
+                  feedbackDialog.type === "success"
+                    ? "bg-emerald-500"
+                    : feedbackDialog.type === "error"
+                    ? "bg-rose-500"
+                    : feedbackDialog.type === "confirm"
+                    ? "bg-amber-500"
+                    : "bg-[#0033A0]"
+                }`}
+              />
+
+              <div className="flex items-start gap-4 pt-1">
+                <div
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl shadow-sm ${
+                    feedbackDialog.type === "success"
+                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200/80"
+                      : feedbackDialog.type === "error"
+                      ? "bg-rose-50 text-rose-600 border border-rose-200/80"
+                      : feedbackDialog.type === "confirm"
+                      ? "bg-amber-50 text-amber-600 border border-amber-200/80"
+                      : "bg-blue-50 text-[#0033A0] border border-blue-200/80"
+                  }`}
+                >
+                  {feedbackDialog.type === "success" && "✓"}
+                  {feedbackDialog.type === "error" && "✕"}
+                  {feedbackDialog.type === "confirm" && "⚠️"}
+                  {feedbackDialog.type === "info" && "ℹ️"}
+                </div>
+
+                <div className="flex-1 space-y-1.5">
+                  <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
+                    {feedbackDialog.title}
+                  </h3>
+                  <p className="text-[13px] text-[#475569] leading-relaxed">
+                    {feedbackDialog.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                {feedbackDialog.type === "confirm" && (
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackDialog((prev) => ({ ...prev, open: false }))}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors"
+                  >
+                    {feedbackDialog.cancelLabel || "Cancel"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={feedbackDialog.onConfirm}
+                  className={`rounded-xl px-5 py-2 text-[13px] font-bold text-white shadow-md transition-all ${
+                    feedbackDialog.type === "error"
+                      ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20"
+                      : feedbackDialog.type === "confirm"
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                      : feedbackDialog.type === "success"
+                      ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+                      : "bg-[#0033A0] hover:bg-[#002f76] shadow-[#0033A0]/20"
+                  }`}
+                >
+                  {feedbackDialog.confirmLabel || "OK"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}
