@@ -795,30 +795,64 @@ export default function RegisterPage() {
                     <h3 className="vp-h3 text-[15px] text-[#0b2a82] mb-0">Have a Reservation Promo Code?</h3>
                   </div>
                   <p className="text-[12px] font-medium text-[#3d5a99] leading-relaxed">
-                    This code reserves your slot today without immediate payment until <strong>October 15</strong>. All unpaid slots will be released on <strong>October 16, 1:00 PM</strong>.
+                    If you received a priority reservation code, enter it below and click <strong>Apply Code</strong> to unlock slot reservation without immediate payment.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2 pt-1">
                     <input
                       type="text"
                       value={promoCode}
-                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); }}
-                      placeholder="ENTER PROMO CODE"
-                      className="flex-1 rounded-xl border-2 border-[#b6dcf5] bg-white px-4 py-2.5 text-[14px] font-mono font-black text-[#0b2a82] uppercase tracking-wider focus:border-[#0b2a82] focus:outline-none"
+                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); setPromoAccepted(false); }}
+                      placeholder="Enter your promo code"
+                      disabled={promoAccepted}
+                      className={`flex-1 rounded-xl border-2 bg-white px-4 py-2.5 text-[14px] font-mono font-black text-[#0b2a82] uppercase tracking-wider focus:border-[#0b2a82] focus:outline-none transition-all ${promoAccepted ? "border-emerald-400 bg-emerald-50 cursor-not-allowed opacity-70" : "border-[#b6dcf5]"}`}
                     />
-                    <button
-                      type="button"
-                      disabled={validatingPromo}
-                      onClick={applyPromoCode}
-                      className="vp-btn small"
-                    >
-                      {validatingPromo ? "Checking..." : "Apply Code"}
-                    </button>
+                    {!promoAccepted ? (
+                      <button
+                        type="button"
+                        disabled={validatingPromo || !promoCode.trim()}
+                        onClick={applyPromoCode}
+                        className="vp-btn small"
+                      >
+                        {validatingPromo ? "Checking..." : "Apply Code"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setPromoAccepted(false); setPromoCode(""); setPromoError(""); }}
+                        className="rounded-xl border-2 border-[#b6dcf5] bg-white px-4 py-2.5 text-[12px] font-extrabold text-[#3d5a99] hover:border-red-300 hover:text-red-500 transition-all shrink-0"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
+
                   {promoAccepted && (
-                    <div className="rounded-xl bg-emerald-100 border-2 border-emerald-400 p-2.5 text-[12px] font-extrabold text-emerald-900">
-                      ✓ Promo code accepted! Upfront payment waived for today.
+                    <div className="rounded-[18px] border-3 border-emerald-400 bg-emerald-50 shadow-[0_4px_0_rgba(16,185,129,0.20)] overflow-hidden">
+                      {/* Accepted header strip */}
+                      <div className="bg-emerald-500 px-4 py-2.5 flex items-center gap-2">
+                        <span className="text-lg">✅</span>
+                        <span className="text-[13px] font-black text-white uppercase tracking-wider">THIS CODE HAS BEEN ACCEPTED</span>
+                      </div>
+                      {/* Note body */}
+                      <div className="p-4 space-y-2.5 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
+                        <p>
+                          The code allows parents to submit the registration form and reserve a slot for their little one
+                          without immediate payment until <strong>October 15</strong>.
+                        </p>
+                        <p>
+                          However, <strong>using the code does not guarantee a confirmed reservation</strong>; slots will only
+                          be confirmed upon submission of payment.
+                        </p>
+                        <p>
+                          All families who use the code will receive a <strong>payment reminder via email</strong> by October 15.
+                        </p>
+                        <div className="mt-1 rounded-xl bg-amber-100 border border-amber-300 px-3 py-2.5 text-amber-900 font-bold text-[12px] leading-snug">
+                          ⚠️ Any unpaid reservations by <strong>October 16 at 1:00 PM</strong> will be released. Families who miss the payment deadline must submit a new registration form to reserve a slot again.
+                        </div>
+                      </div>
                     </div>
                   )}
+
                   {promoError && (
                     <div className="rounded-xl bg-red-100 border-2 border-red-300 p-2.5 text-[12px] font-extrabold text-red-900">
                       ⚠️ {promoError}
