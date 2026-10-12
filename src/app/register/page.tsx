@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
-import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
-import { SiteFooter } from "@/components/landing/site-footer";
+import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
+import { DreamBanner } from "@/components/DreamBanner";
 import Tesseract from "tesseract.js";
 import SignatureCanvas from "react-signature-canvas";
 
@@ -443,19 +443,35 @@ export default function RegisterPage() {
       )}
 
       {/* ── Top Header ────────────────────────────────────────────────────── */}
-      <header className="relative z-20 bg-white/80 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
-        <div className="mx-auto flex h-[72px] w-full max-w-[1000px] items-center justify-between px-6">
+      <header className="relative z-20 bg-white/85 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
+        <div className="mx-auto flex h-[76px] w-full max-w-[1200px] items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
             <div className="relative h-11 w-11 overflow-hidden rounded-2xl border-2 border-[#0b2a82] bg-white p-1 shadow-[0_3px_0_#0b2a82]">
               <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" />
             </div>
             <span className="flex flex-col leading-none">
               <span className="text-[18px] font-black tracking-tight text-[#0b2a82]">Merry Explorers</span>
-              <span className="text-[11px] font-extrabold tracking-widest text-[#ff8a1f]">PARENT PORTAL</span>
+              <span className="text-[11px] font-black tracking-wider text-[#0b2a82] bg-[#ffd23f] px-1.5 py-0.5 rounded-md border border-[#0b2a82] mt-0.5 inline-block w-fit">
+                PARENT PORTAL
+              </span>
             </span>
           </Link>
+
+          {/* Navigation Links */}
+          <nav className="hidden md:flex items-center gap-1.5">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="rounded-full px-4 py-2 text-[13px] font-extrabold text-[#0b2a82] hover:bg-[#fff6cf] hover:text-[#0b2a82] transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
           <div className="flex items-center gap-2">
-            <span className="vp-tag text-[12px] font-black uppercase">
+            <span className="vp-tag text-[11px] sm:text-[12px] font-black uppercase">
               🌟 2026 ADVENTURE 2
             </span>
           </div>
@@ -1035,9 +1051,8 @@ export default function RegisterPage() {
         <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
           Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
+        <DreamBanner />
       </main>
-
-      <SiteFooter />
 
       <style jsx global>{`
         .vp-root {

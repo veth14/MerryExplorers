@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
-import { SiteFooter } from "@/components/landing/site-footer";
+import { DreamBanner } from "@/components/DreamBanner";
 import SignatureCanvas from "react-signature-canvas";
 
 type ProgramId = keyof typeof PROGRAM_SLOTS;
@@ -322,25 +322,6 @@ export default function RenewPage() {
         </div>
       )}
 
-      {/* ── Top Header ────────────────────────────────────────────────────── */}
-      <header className="relative z-20 bg-white/80 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
-        <div className="mx-auto flex h-[72px] w-full max-w-[1000px] items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border-2 border-[#0b2a82] bg-white p-1 shadow-[0_3px_0_#0b2a82]">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" />
-            </div>
-            <span className="flex flex-col leading-none">
-              <span className="text-[18px] font-black tracking-tight text-[#0b2a82]">Merry Explorers</span>
-              <span className="text-[11px] font-extrabold tracking-widest text-[#ff8a1f]">PARENT PORTAL</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="vp-tag text-[12px] font-black uppercase">
-              🌟 2026 ADVENTURE 2
-            </span>
-          </div>
-        </div>
-      </header>
 
       {/* ── Main Content Area ────────────────────────────────────────────── */}
       <main className="vp-main">
@@ -828,9 +809,8 @@ export default function RenewPage() {
         <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
           Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
+        <DreamBanner />
       </main>
-
-      <SiteFooter />
 
       {/* Embedded CSS for exact Parent Portal aesthetic */}
       <style jsx global>{`
