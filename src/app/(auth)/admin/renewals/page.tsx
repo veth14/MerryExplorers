@@ -91,6 +91,7 @@ export default function RenewalsPage() {
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<any[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("adventure-1-renewal");
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   // Renewals tab state
   const [renewalRecords, setRenewalRecords] = useState<RenewalRecord[]>([]);
@@ -220,6 +221,16 @@ export default function RenewalsPage() {
       return matchSearch && matchStatus && matchProgram && matchPayment;
     });
   }, [renewalRecords, renewalSearch, renewalStatusFilter, renewalProgramFilter, renewalPaymentFilter]);
+
+  // Split into active vs archived (released)
+  const activeRenewals = useMemo(
+    () => filteredRenewals.filter((r) => r.renewalStatus !== "released"),
+    [filteredRenewals]
+  );
+  const archivedRenewals = useMemo(
+    () => filteredRenewals.filter((r) => r.renewalStatus === "released"),
+    [filteredRenewals]
+  );
 
   // Filtered Families
   const filteredFamilies = useMemo(() => {
@@ -1002,7 +1013,12 @@ export default function RenewalsPage() {
                 : "border-transparent text-[#64748b] hover:text-[#002f76]"
             }`}
           >
-            <span>📋</span> Renewals &amp; Reservations ({filteredRenewals.length})
+            <span>📋</span> Active Renewals ({activeRenewals.length})
+            {archivedRenewals.length > 0 && (
+              <span className="ml-1 rounded-full bg-slate-200 text-slate-600 px-2 py-0.5 text-[10px] font-bold">
+                +{archivedRenewals.length} archived
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("families")}
@@ -1096,7 +1112,7 @@ export default function RenewalsPage() {
               </div>
             </div>
 
-            {/* Renewals Table */}
+            {/* Renewals Table — Active Only */}
             <div className="overflow-x-auto rounded-3xl bg-white border border-slate-100 shadow-sm">
               <table className="w-full text-left border-collapse text-[13px]">
                 <thead>
@@ -1111,14 +1127,14 @@ export default function RenewalsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[#334155]">
-                  {filteredRenewals.length === 0 ? (
+                  {activeRenewals.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-8 text-center text-slate-400">
-                        No renewal submissions found matching your filters.
+                        No active renewal submissions found matching your filters.
                       </td>
                     </tr>
                   ) : (
-                    filteredRenewals.map((r) => (
+                    activeRenewals.map((r) => (
                       <tr key={r._id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3.5 px-4">
                           <p className="font-bold text-[#002f76]">{r.childName}</p>
@@ -1158,15 +1174,12 @@ export default function RenewalsPage() {
                                 ? "bg-emerald-100 text-emerald-800"
                                 : r.renewalStatus === "for_release"
                                 ? "bg-orange-100 text-orange-800"
-                                : r.renewalStatus === "released"
-                                ? "bg-slate-200 text-slate-700"
                                 : "bg-amber-100 text-amber-800"
                             }`}
                           >
                             {r.renewalStatus === "confirmed" && "🟢 Confirmed"}
                             {r.renewalStatus === "reserved" && "🟡 Reserved (Unpaid)"}
                             {r.renewalStatus === "for_release" && "🟠 For Release"}
-                            {r.renewalStatus === "released" && "⚪ Released"}
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
@@ -1214,6 +1227,126 @@ export default function RenewalsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── ARCHIVE: Released / Expired Slots ── */}
+            <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+              <button
+                type="button"
+                onClick={() => setArchiveOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 transition-colors select-none"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 text-base">
+                    🗄️
+                  </div>
+                  <div className="text-left">
+                    <p className="font-headline text-[14.5px] font-extrabold text-slate-700">
+                      Released / Expired Archive
+                    </p>
+                    <p className="text-[11.5px] text-slate-400">
+                      {archivedRenewals.length === 0
+                        ? "No released slots yet"
+                        : `${archivedRenewals.length} slot${archivedRenewals.length !== 1 ? "s" : ""} released — kept for payment record-keeping`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {archivedRenewals.length > 0 && (
+                    <span className="rounded-full bg-slate-200 text-slate-700 px-3 py-0.5 text-[11px] font-bold">
+                      {archivedRenewals.length}
+                    </span>
+                  )}
+                  <span className="text-slate-400 text-[12px] font-bold">
+                    {archiveOpen ? "▲ Collapse" : "▼ Expand"}
+                  </span>
+                </div>
+              </button>
+
+              {archiveOpen && (
+                <div className="border-t border-slate-100">
+                  {archivedRenewals.length === 0 ? (
+                    <p className="py-8 text-center text-[13px] text-slate-400">
+                      No released entries match your current filters.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-[12.5px]">
+                        <thead>
+                          <tr className="bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                            <th className="py-3 px-4">Explorer &amp; Parent</th>
+                            <th className="py-3 px-4">Program &amp; Session</th>
+                            <th className="py-3 px-4">Type</th>
+                            <th className="py-3 px-4">Submitted</th>
+                            <th className="py-3 px-4">Payment Record</th>
+                            <th className="py-3 px-4 text-right">Restore</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {archivedRenewals.map((r) => (
+                            <tr key={r._id} className="opacity-70 bg-slate-50/30 hover:opacity-100 hover:bg-slate-50 transition-all">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-block rounded-full bg-slate-200 text-slate-500 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wide">Archived</span>
+                                </div>
+                                <p className="font-bold text-slate-600 mt-0.5">{r.childName}</p>
+                                <p className="text-[11px] text-slate-400">{r.parentName}</p>
+                                <p className="text-[10.5px] text-slate-400 font-mono">{r.parentEmail}</p>
+                              </td>
+                              <td className="py-3 px-4">
+                                <p className="font-medium capitalize text-slate-600">{r.program.replace(/-/g, " ")}</p>
+                                <p className="text-[11px] text-slate-400">{r.classTime}</p>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
+                                  r.isPromo ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}>
+                                  {r.isPromo ? "Promo" : "Direct"}
+                                </span>
+                                {r.promoCode && (
+                                  <p className="text-[9.5px] font-mono text-amber-600 mt-0.5">{r.promoCode}</p>
+                                )}
+                              </td>
+                              <td className="py-3 px-4">
+                                <p className="text-[11px] text-slate-500">
+                                  {new Date(r.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </p>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5 text-[11px]">
+                                  <p className="text-slate-500">Total Due: <span className="font-bold text-slate-700">₱{r.totalTuition.toLocaleString()}</span></p>
+                                  <p className={r.amountPaid > 0 ? "text-emerald-600 font-bold" : "text-slate-400"}>
+                                    Paid: ₱{r.amountPaid.toLocaleString()}
+                                  </p>
+                                  {r.amountPaid > 0 && r.remainingBalance > 0 && (
+                                    <p className="text-rose-500 text-[10.5px]">Bal: ₱{r.remainingBalance.toLocaleString()} (unpaid at release)</p>
+                                  )}
+                                  {r.amountPaid === 0 && (
+                                    <span className="inline-block rounded bg-rose-100 text-rose-700 px-1.5 py-0.5 text-[9.5px] font-bold">No Payment Made</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <select
+                                  value="released"
+                                  onChange={(e) => handleUpdateStatus(r.registrationId, e.target.value)}
+                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 cursor-pointer hover:border-blue-300"
+                                  title="Restore this record to active renewals"
+                                >
+                                  <option value="released">Released</option>
+                                  <option value="reserved">↩ Restore: Reserved</option>
+                                  <option value="confirmed">↩ Restore: Confirmed</option>
+                                  <option value="for_release">↩ Restore: For Release</option>
+                                </select>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
