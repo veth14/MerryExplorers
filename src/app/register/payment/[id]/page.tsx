@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
-import Tesseract from "tesseract.js";
+import { readReceipt } from "@/lib/receipt-ocr";
 
 type ProgramId = keyof typeof PROGRAM_SLOTS;
 
@@ -124,57 +124,41 @@ export default function PaymentPage() {
   const creditBalance = parsedAmountPaid > 0 && parsedAmountPaid > amountDue ? +(parsedAmountPaid - amountDue).toFixed(2) : 0;
   const amountShort = parsedAmountPaid > 0 && parsedAmountPaid < amountDue ? +(amountDue - parsedAmountPaid).toFixed(2) : 0;
 
-  const runOCR = useCallback(async (imageDataUrl: string) => {
-    setOcrLoading(true);
-    setOcrDone(false);
-    try {
-      const result = await Tesseract.recognize(imageDataUrl, "eng");
-      const text = result.data.text;
-
-      const patterns = [
-        /\b(ITO\d{12,20})\b/i,
-        /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i,
-        /\b(\d{13})\b/,
-        /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i,
-        /\b(\d{10,20})\b/,
-      ];
-
-      let extractedRef = "";
-      for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match && match[1]) {
-          extractedRef = match[1].replace(/\s+/g, "");
-          break;
-        }
-      }
-
-      if (extractedRef) setReferenceNumber(extractedRef);
-    } catch {
-      // OCR failed silently
-    } finally {
-      setOcrLoading(false);
-      setOcrDone(true);
-    }
-  }, []);
-
   const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const result = reader.result as string;
         setReceiptPreview(result);
         setReceiptBase64(result);
-        setReferenceNumber("");
         setOcrDone(false);
-        runOCR(result);
+        setOcrLoading(true);
+
+        try {
+          const parsed = await readReceipt(file, result);
+          if (parsed.reference) {
+            setReferenceNumber(parsed.reference);
+          }
+          if (parsed.amount && parsed.amount > 0) {
+            setAmountPaid(String(parsed.amount));
+          }
+          if (parsed.method) {
+            setPaymentMethod(parsed.method);
+          }
+        } catch {
+          // fallback gracefully
+        } finally {
+          setOcrLoading(false);
+          setOcrDone(true);
+        }
       };
       reader.readAsDataURL(file);
-      // allow re-selecting the same file after removing it
       e.target.value = "";
     },
-    [runOCR]
+    []
   );
 
   const canProceed = paymentMethod !== "" && receiptBase64 !== "" && amountPaid !== "" && amountShort === 0;

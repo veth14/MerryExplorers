@@ -99,6 +99,29 @@ export async function POST(
       }
     );
 
+    // Sync payment details into renewal_families
+    try {
+      const childFull = `${registration.childInfo?.firstName || ""} ${registration.childInfo?.lastName || ""}`.trim();
+      const parentEmailClean = (registration.parentInfo?.email || "").toLowerCase().trim();
+      if (parentEmailClean && childFull) {
+        await db.collection("renewal_families").updateOne(
+          {
+            parentEmail: parentEmailClean,
+            childName: { $regex: new RegExp(`^${childFull.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+          },
+          {
+            $set: {
+              renewalStatus: "confirmed",
+              registrationId: id,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      }
+    } catch (syncErr) {
+      console.error("[payment POST] Failed to sync to renewal_families:", syncErr);
+    }
+
     // Create admin notification
     await db.collection("notifications").insertOne({
       title: "New Student Registration (Payment Uploaded)",
