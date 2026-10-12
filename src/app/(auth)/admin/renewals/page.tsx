@@ -1336,32 +1336,42 @@ export default function RenewalsPage() {
                           {f.childName}
                         </td>
                         <td className="py-3.5 px-4 text-[12px]">
-                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          <div className="flex flex-wrap gap-1 min-w-[160px]">
                             {f.adventures && f.adventures.length > 0 ? (
                               f.adventures.map((adv, idx) => (
                                 <span
                                   key={idx}
-                                  className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[11px] font-medium text-[#002f76]"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-200/70 px-2.5 py-1 text-[11.5px] font-medium text-[#002f76] whitespace-nowrap shadow-xs"
                                   title={`Registered in ${adv.program}`}
                                 >
-                                  <strong>{adv.adventure}:</strong> {adv.program}
+                                  <strong className="font-extrabold text-[#0033a0]">{adv.adventure}:</strong> {adv.program}
                                 </span>
                               ))
                             ) : f.previousProgram ? (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[11px] font-medium text-[#002f76]">
-                                <strong>Adventure 1:</strong> {f.previousProgram}
+                              <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-200/70 px-2.5 py-1 text-[11.5px] font-medium text-[#002f76] whitespace-nowrap shadow-xs">
+                                <strong className="font-extrabold text-[#0033a0]">Adventure 1:</strong> {f.previousProgram}
                               </span>
                             ) : (
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 font-medium">
+                              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500 font-medium whitespace-nowrap">
                                 Adventure 1
                               </span>
                             )}
                           </div>
                         </td>
                         <td className="py-3.5 px-4 text-[12px]">
-                          <span className="inline-block rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                            {f.renewingTo || "Adventure 2"}
-                          </span>
+                          {f.renewingTo && f.renewingTo.toLowerCase().includes("adventure") ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
+                              {f.renewingTo}
+                            </span>
+                          ) : f.renewingTo ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
+                              <strong className="font-extrabold text-amber-950">Adventure 2:</strong> {f.renewingTo}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
+                              Adventure 2
+                            </span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
                           <span
