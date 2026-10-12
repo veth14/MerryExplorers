@@ -18,9 +18,16 @@ export async function GET(request: Request) {
     if (status && status !== "all") {
       query.renewalStatus = status;
     }
-    if (period && period !== "all") {
-      // either current period or all
-      query.$or = [{ renewalPeriod: period }, { lastRenewalPeriod: period }, { renewalPeriod: { $exists: false } }];
+    // General families contact list is persistent across renewal cycles
+    // (A family is a master contact record, not locked to only one period)
+    if (period && period !== "all" && period !== "all-periods") {
+      query.$or = [
+        { renewalPeriod: period },
+        { lastRenewalPeriod: period },
+        { renewalPeriod: { $exists: false } },
+        { renewalPeriod: null },
+        { _id: { $exists: true } }, // Keep families available across cycles
+      ];
     }
     if (search) {
       const reg = new RegExp(search.trim(), "i");

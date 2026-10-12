@@ -104,6 +104,10 @@ export default function RenewalsPage() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [familySearch, setFamilySearch] = useState("");
   const [familyStatusFilter, setFamilyStatusFilter] = useState("all");
+  const [familyProgramFilter, setFamilyProgramFilter] = useState("all");
+
+  // UI display toggles
+  const [showClassTracker, setShowClassTracker] = useState(false);
 
   // Modals
   const [addFamilyModal, setAddFamilyModal] = useState(false);
@@ -140,7 +144,7 @@ export default function RenewalsPage() {
 
   // Email Sending Modal state
   const [emailModalFamily, setEmailModalFamily] = useState<Family | null>(null);
-  const [emailType, setEmailType] = useState<"promo_code" | "custom">("promo_code");
+  const [emailType, setEmailType] = useState<"promo_code" | "payment_reminder" | "custom">("promo_code");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailCustomMessage, setEmailCustomMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -220,9 +224,20 @@ export default function RenewalsPage() {
         f.phone.toLowerCase().includes(q);
 
       const matchStatus = familyStatusFilter === "all" || f.renewalStatus === familyStatusFilter;
-      return matchSearch && matchStatus;
+
+      // Match program category (either from adventures history, previousProgram, or renewingTo)
+      let matchProgram = true;
+      if (familyProgramFilter !== "all") {
+        const pf = familyProgramFilter.toLowerCase();
+        const inAdventures = f.adventures?.some((a) => (a.program || "").toLowerCase().includes(pf));
+        const inPrev = (f.previousProgram || "").toLowerCase().includes(pf);
+        const inRenewing = (f.renewingTo || "").toLowerCase().includes(pf);
+        matchProgram = Boolean(inAdventures || inPrev || inRenewing);
+      }
+
+      return matchSearch && matchStatus && matchProgram;
     });
-  }, [families, familySearch, familyStatusFilter]);
+  }, [families, familySearch, familyStatusFilter, familyProgramFilter]);
 
   // Custom Dialog Modal State (Replaces native browser alerts/confirms)
   const [feedbackDialog, setFeedbackDialog] = useState<{
@@ -611,6 +626,54 @@ export default function RenewalsPage() {
     }
   };
 
+  // Remind All Unpaid Families
+  const [remindingAll, setRemindingAll] = useState(false);
+  const handleRemindAllUnpaid = async () => {
+    const unpaidList = renewalRecords.filter(
+      (r) => (r.renewalStatus === "reserved" || r.renewalStatus === "for_release") && r.amountPaid === 0 && r.parentEmail
+    );
+    if (unpaidList.length === 0) {
+      showModalNotice("All Set", "There are currently no unpaid reservations to remind.", "info");
+      return;
+    }
+
+    setFeedbackDialog({
+      open: true,
+      type: "confirm",
+      title: "Remind All Unpaid Families?",
+      message: `Send an automated Payment Reminder email with direct payment links & Adventure 1 balance disclaimer to ${unpaidList.length} family/families currently holding unpaid reserved slots?`,
+      confirmLabel: `Send Reminders (${unpaidList.length})`,
+      cancelLabel: "Cancel",
+      onConfirm: async () => {
+        setFeedbackDialog((prev) => ({ ...prev, open: false }));
+        setRemindingAll(true);
+        let sentCount = 0;
+        try {
+          for (const item of unpaidList) {
+            // Find family record or send via familyId
+            if (item.familyId) {
+              await fetch("/api/renewals/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  familyId: item.familyId,
+                  emailType: "payment_reminder",
+                }),
+              });
+              sentCount++;
+            }
+          }
+          fetchData();
+          showModalNotice("Reminders Dispatched", `Successfully delivered payment reminders to ${sentCount} reserved family/families!`, "success");
+        } catch {
+          showModalNotice("Error", "An issue occurred while sending some email reminders.", "error");
+        } finally {
+          setRemindingAll(false);
+        }
+      },
+    });
+  };
+
   // Handle Send Email
   const handleSendEmailSubmit = async () => {
     if (!emailModalFamily) return;
@@ -705,134 +768,165 @@ export default function RenewalsPage() {
           </div>
         </div>
 
-        {/* ── PART D: STATISTICS BANNER ── */}
+        {/* ── STREAMLINED EXECUTIVE KPIS & FINANCIAL METRICS ── */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Total Families</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Total Families */}
+            <div className="rounded-2xl bg-white p-4 border border-slate-200/70 shadow-xs hover:border-blue-200 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Master Families</span>
+                <span className="text-sm">👨‍👩‍👧</span>
+              </div>
               <p className="mt-1 text-2xl font-black text-[#002f76]">{stats.totalFamilies}</p>
-              <p className="text-[11px] text-slate-500 mt-1">In contact list</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">In contact directory</p>
             </div>
-            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Renewals Submitted</p>
+
+            {/* Submitted */}
+            <div className="rounded-2xl bg-white p-4 border border-slate-200/70 shadow-xs hover:border-emerald-200 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Submitted</span>
+                <span className="text-sm">📝</span>
+              </div>
               <p className="mt-1 text-2xl font-black text-emerald-600">{stats.submittedCount}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{stats.renewalRate}% renewal rate</p>
+              <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">{stats.renewalRate}% renewal rate</p>
             </div>
-            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Not Yet Submitted</p>
-              <p className="mt-1 text-2xl font-black text-rose-500">{stats.notYetSubmitted}</p>
-              <p className="text-[11px] text-slate-500 mt-1">Eligible for follow-up</p>
-            </div>
-            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Reserved (Unpaid)</p>
+
+            {/* Reserved Unpaid */}
+            <div className="rounded-2xl bg-white p-4 border border-slate-200/70 shadow-xs hover:border-amber-200 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserved (Hold)</span>
+                <span className="text-sm">⏳</span>
+              </div>
               <p className="mt-1 text-2xl font-black text-amber-600">{stats.countReserved}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{stats.promoReservations} via promo code</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">{stats.promoReservations} via promo code</p>
             </div>
-            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">Confirmed (60%)</p>
+
+            {/* Confirmed (60% Downpayment) */}
+            <div className="rounded-2xl bg-white p-4 border border-slate-200/70 shadow-xs hover:border-blue-200 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Confirmed (60%)</span>
+                <span className="text-sm">✅</span>
+              </div>
               <p className="mt-1 text-2xl font-black text-blue-600">{stats.countConfirmed}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{stats.conversionRate}% conversion</p>
+              <p className="text-[11px] text-blue-700 mt-0.5">{stats.conversionRate}% converted</p>
             </div>
-            <div className="rounded-3xl bg-white p-5 border border-slate-100 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#64748b]">For Release</p>
-              <p className="mt-1 text-2xl font-black text-orange-600">{stats.countForRelease}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{stats.countExpiringSoon} expiring &lt;24h</p>
+
+            {/* Total Collected */}
+            <div className="rounded-2xl bg-emerald-50/70 p-4 border border-emerald-200/80 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Collected</span>
+                <span className="text-sm">💰</span>
+              </div>
+              <p className="mt-1 text-2xl font-black text-emerald-900">₱{stats.totalCollected.toLocaleString()}</p>
+              <p className="text-[11px] text-emerald-700 mt-0.5">Expected: ₱{stats.totalExpectedDownpayment.toLocaleString()}</p>
+            </div>
+
+            {/* Outstanding Balance */}
+            <div className="rounded-2xl bg-amber-50/70 p-4 border border-amber-200/80 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Balance Due</span>
+                <span className="text-sm">⚖️</span>
+              </div>
+              <p className="mt-1 text-2xl font-black text-amber-900">₱{stats.totalOutstandingBalance.toLocaleString()}</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">Remaining tuition</p>
             </div>
           </div>
         )}
 
-        {/* ── FINANCIAL OVERVIEW ROW ── */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            <div className="rounded-3xl bg-emerald-500/10 border border-emerald-200 p-5 flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-bold text-emerald-800 uppercase tracking-wider">Total Collected</p>
-                <p className="text-2xl font-black text-emerald-900 mt-1">₱{stats.totalCollected.toLocaleString()}</p>
+        {/* ── PART E: SLOT OVERVIEW & MINIMUM CLASS SIZE MONITOR (Collapsible) ── */}
+        <div className="rounded-3xl bg-white border border-slate-100 shadow-sm overflow-hidden transition-all">
+          <div
+            onClick={() => setShowClassTracker(!showClassTracker)}
+            className="flex flex-wrap items-center justify-between p-5 cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 font-bold text-lg">
+                🏫
               </div>
-              <span className="text-3xl">💰</span>
-            </div>
-            <div className="rounded-3xl bg-blue-500/10 border border-blue-200 p-5 flex items-center justify-between">
               <div>
-                <p className="text-[12px] font-bold text-blue-800 uppercase tracking-wider">Expected 60% Downpayments</p>
-                <p className="text-2xl font-black text-blue-900 mt-1">₱{stats.totalExpectedDownpayment.toLocaleString()}</p>
-              </div>
-              <span className="text-3xl">🧾</span>
-            </div>
-            <div className="rounded-3xl bg-amber-500/10 border border-amber-200 p-5 flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-bold text-amber-800 uppercase tracking-wider">Outstanding Balance</p>
-                <p className="text-2xl font-black text-amber-900 mt-1">₱{stats.totalOutstandingBalance.toLocaleString()}</p>
-              </div>
-              <span className="text-3xl">⚖️</span>
-            </div>
-          </div>
-        )}
-
-        {/* ── PART E: SLOT OVERVIEW & MINIMUM CLASS SIZE MONITOR ── */}
-        <div className="rounded-3xl bg-white p-6 border border-slate-100 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-headline text-[16px] font-extrabold text-[#002f76] flex items-center gap-2">
-                <span>🏫</span> Class Size &amp; Session Tracker
-              </h2>
-              <p className="text-[12px] text-[#64748b]">
-                Minimum 3 students required to proceed. Sessions below minimum are highlighted in orange.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-[11px] font-bold">
-              <span className="flex items-center gap-1.5 text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-lg">
-                ⚠️ &lt; 3 Students (Below Minimum)
-              </span>
-              <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                ✓ 3+ Students (Proceeding)
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            {Object.entries(slotOverview).map(([progKey, progData]) => (
-              <div key={progKey} className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
-                <p className="text-[13px] font-bold text-[#002f76] capitalize">
-                  {progKey.replace(/-/g, " ")}
+                <div className="flex items-center gap-2">
+                  <h2 className="font-headline text-[15px] font-extrabold text-[#002f76]">
+                    Class Size &amp; Session Tracker
+                  </h2>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                    Min. 3 students rule
+                  </span>
+                </div>
+                <p className="text-[12px] text-[#64748b]">
+                  {showClassTracker
+                    ? "Click to collapse session breakdown"
+                    : "Click to expand live class capacity and see sessions needing students"}
                 </p>
-                <div className="space-y-2">
-                  {Object.entries(progData.sessions).map(([sessName, sessInfo]) => (
-                    <div
-                      key={sessName}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] ${
-                        sessInfo.belowMin
-                          ? "bg-orange-50/80 border-orange-200 text-orange-950 font-medium"
-                          : "bg-white border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-bold">{sessName}</p>
-                        <p className="text-[11px] text-slate-500">
-                          Cap: {sessInfo.max} students
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 mt-2 sm:mt-0">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                <span className="flex items-center gap-1 text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-xl">
+                  ⚠️ Below Min (&lt;3)
+                </span>
+                <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
+                  ✓ Proceeding (3+)
+                </span>
+              </div>
+              <button
+                type="button"
+                className="ml-2 rounded-xl p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors text-sm font-bold"
+              >
+                {showClassTracker ? "▲ Hide" : "▼ Show"}
+              </button>
+            </div>
+          </div>
+
+          {showClassTracker && (
+            <div className="p-6 pt-2 border-t border-slate-100 bg-slate-50/30">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {Object.entries(slotOverview).map(([progKey, progData]) => (
+                  <div key={progKey} className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-3 shadow-xs">
+                    <p className="text-[13px] font-bold text-[#002f76] capitalize flex items-center justify-between">
+                      <span>{progKey.replace(/-/g, " ")}</span>
+                      <span className="text-[11px] font-normal text-slate-500">Cap: {progData.totalMax}</span>
+                    </p>
+                    <div className="space-y-2">
+                      {Object.entries(progData.sessions).map(([sessName, sessInfo]) => (
+                        <div
+                          key={sessName}
+                          className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] transition-all ${
                             sessInfo.belowMin
-                              ? "bg-orange-200 text-orange-800"
-                              : sessInfo.taken >= sessInfo.max
-                              ? "bg-slate-200 text-slate-800"
-                              : "bg-emerald-100 text-emerald-800"
+                              ? "bg-orange-50/70 border-orange-200 text-orange-950 font-medium"
+                              : "bg-emerald-50/40 border-emerald-200/60 text-slate-700"
                           }`}
                         >
-                          {sessInfo.taken} / {sessInfo.max}
-                        </span>
-                        {sessInfo.belowMin && (
-                          <p className="text-[10px] text-orange-700 font-bold mt-0.5">Needs {3 - sessInfo.taken} more</p>
-                        )}
-                      </div>
+                          <div>
+                            <p className="font-bold text-[12px]">{sessName}</p>
+                            <p className="text-[10.5px] text-slate-500">
+                              Max: {sessInfo.max} students
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${
+                                sessInfo.belowMin
+                                  ? "bg-orange-200 text-orange-800"
+                                  : sessInfo.taken >= sessInfo.max
+                                  ? "bg-slate-200 text-slate-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              {sessInfo.taken} / {sessInfo.max}
+                            </span>
+                            {sessInfo.belowMin && (
+                              <p className="text-[10px] text-orange-700 font-bold mt-0.5">Needs {3 - sessInfo.taken} more</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── TABS NAVIGATION ── */}
@@ -899,7 +993,17 @@ export default function RenewalsPage() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  disabled={remindingAll}
+                  onClick={handleRemindAllUnpaid}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-[12.5px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                  title="Send payment reminder email with payment link to all unpaid reserved families"
+                >
+                  <span>📢</span>
+                  <span>{remindingAll ? "Sending Reminders..." : "Remind All Unpaid"}</span>
+                </button>
+
                 <button
                   onClick={handleExportRenewals}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-slate-50 transition-colors shadow-sm"
@@ -1066,6 +1170,20 @@ export default function RenewalsPage() {
                   <option value="reserved">Reserved</option>
                   <option value="confirmed">Confirmed</option>
                   <option value="released">Released</option>
+                </select>
+
+                <select
+                  value={familyProgramFilter}
+                  onChange={(e) => setFamilyProgramFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-700"
+                >
+                  <option value="all">All Program Categories</option>
+                  <option value="brave">Brave Explorer (Trailblazer)</option>
+                  <option value="creative">Creative Explorer</option>
+                  <option value="curious">Curious Explorer</option>
+                  <option value="everyday">Everyday Curious</option>
+                  <option value="ballet">Ballet (Baby/Basic)</option>
+                  <option value="playdate">Saturday Playdate</option>
                 </select>
               </div>
 
@@ -1641,13 +1759,27 @@ export default function RenewalsPage() {
                     setEmailType("promo_code");
                     setEmailSubject(`Priority Renewal & Slot Reservation Code for ${emailModalFamily.childName} 🌈`);
                   }}
-                  className={`flex-1 py-2 text-[12.5px] font-bold rounded-xl transition-all ${
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
                     emailType === "promo_code"
                       ? "bg-white text-[#0033A0] shadow-sm"
                       : "text-slate-600 hover:text-[#002f76]"
                   }`}
                 >
-                  🎟️ Priority Promo Code Email
+                  🎟️ Priority Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailType("payment_reminder");
+                    setEmailSubject(`Payment Reminder & Slot Confirmation for ${emailModalFamily.childName} 🌈`);
+                  }}
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
+                    emailType === "payment_reminder"
+                      ? "bg-white text-[#0033A0] shadow-sm"
+                      : "text-slate-600 hover:text-[#002f76]"
+                  }`}
+                >
+                  ⏰ Payment Reminder
                 </button>
                 <button
                   type="button"
@@ -1655,7 +1787,7 @@ export default function RenewalsPage() {
                     setEmailType("custom");
                     setEmailSubject(`Merry Explorers: Message regarding ${emailModalFamily.childName}`);
                   }}
-                  className={`flex-1 py-2 text-[12.5px] font-bold rounded-xl transition-all ${
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
                     emailType === "custom"
                       ? "bg-white text-[#0033A0] shadow-sm"
                       : "text-slate-600 hover:text-[#002f76]"
@@ -1690,6 +1822,36 @@ export default function RenewalsPage() {
                       <li><strong>Confirmation:</strong> Confirmed upon receipt of 60% downpayment.</li>
                       <li>Need help? Ask Teacher Kyle or Teacher Angel onsite.</li>
                     </ul>
+                  </div>
+                </div>
+              ) : emailType === "payment_reminder" ? (
+                <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
+                  <div className="border-b border-slate-200 pb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
+                    <p className="font-bold text-[#002f76] mt-0.5">
+                      Payment Reminder &amp; Slot Confirmation for {emailModalFamily.childName} 🌈
+                    </p>
+                  </div>
+                  <div className="space-y-2.5 text-slate-600 text-[12px] leading-relaxed">
+                    <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
+                    <p>
+                      Thank you for submitting your priority renewal registration for <strong>{emailModalFamily.childName}</strong>! Your slot is currently on hold under reservation.
+                    </p>
+                    <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center my-2">
+                      <p className="text-[11px] font-bold text-blue-900">Direct Payment Link Included:</p>
+                      <p className="text-[11px] text-blue-700 mt-0.5 font-mono">
+                        {emailModalFamily.registrationId
+                          ? `/register/payment/${emailModalFamily.registrationId}`
+                          : `/renew?ref=${emailModalFamily._id}`}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-amber-900 text-[11.5px]">
+                      <p className="font-bold">⚠️ NOTE &amp; DISCLAIMER:</p>
+                      <p className="mt-0.5">Please ensure to settle your 2026 Adventure 1 Balance before you can proceed to the registration.</p>
+                      <p className="italic mt-1">
+                        &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (

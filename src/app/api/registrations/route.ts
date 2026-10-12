@@ -117,7 +117,6 @@ export async function POST(request: Request) {
         classTime,
         status: { $in: ["pending", "approved", "reserved"] },
         submittedAt: { $gte: ADVENTURE_2_START },
-        "parentInfo.name": { $not: /ian angelo valmores/i },
       });
       if (takenSlots >= maxSlots) {
         return NextResponse.json({ error: `Sorry, ${classTime} for this program is now full.` }, { status: 409 });
@@ -219,9 +218,83 @@ export async function POST(request: Request) {
       console.error("[registrations POST] Failed to match renewal family:", familyMatchErr);
     }
 
-    // Notifications and emails have been moved to the payment verification step
+    // Send instant confirmation and payment reminder email to returning / reserving families
+    if (parentInfo?.email) {
+      try {
+        const auth = process.env.GMAIL_CLIENT_ID
+          ? {
+            type: "OAuth2",
+            user: "merryexplorerscenter@gmail.com",
+            clientId: process.env.GMAIL_CLIENT_ID,
+            clientSecret: process.env.GMAIL_CLIENT_SECRET,
+            refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+          }
+          : {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          };
 
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: auth as any,
+        });
 
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://merry-explorers.vercel.app";
+        const paymentUrl = `${baseUrl}/register/payment/${result.insertedId.toString()}`;
+        const parentName = parentInfo.name || "Parent / Guardian";
+        const childName = childInfo?.firstName || "Explorer";
+
+        await transporter.sendMail({
+          from: `"Merry Explorers" <merryexplorerscenter@gmail.com>`,
+          to: parentInfo.email,
+          subject: `Payment Reminder & Slot Confirmation for ${childName} 🌈`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+              <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
+                <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation</p>
+              </div>
+              <div style="padding: 28px;">
+                <p>Dear <strong>${parentName}</strong>,</p>
+                <p>Thank you for submitting your renewal registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.</p>
+
+                <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
+                  <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold;">Ready to complete your payment?</p>
+                  <p style="margin: 8px 0 16px; font-size: 13px; color: #3b82f6;">Click the button below to upload your payment receipt and confirm your child's slot:</p>
+                  <a href="${paymentUrl}" style="background-color: #0033a0; color: white; padding: 13px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">
+                    Proceed to Payment Page →
+                  </a>
+                </div>
+
+                <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
+                  <p style="margin: 0 0 6px; font-weight: bold;">⚠️ IMPORTANT NOTE &amp; DISCLAIMER:</p>
+                  <p style="margin: 0 0 8px;">Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+                  <p style="margin: 0; font-style: italic;">
+                    "In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1."
+                  </p>
+                </div>
+
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
+                  <p style="margin: 0 0 4px; font-weight: bold;">⏰ Deadline Reminder:</p>
+                  <p style="margin: 0;">Unpaid reservations will be held until <strong>October 16, 2026 at 1:00 PM</strong>, after which unpaid slots will be released to the waitlist.</p>
+                </div>
+
+                <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
+                  Need help? Feel free to approach Teacher Kyle or Teacher Angel onsite, or reply directly to this email.
+                </p>
+                
+                <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">
+                  Warm regards,<br />
+                  The Merry Explorers Team 💛
+                </p>
+              </div>
+            </div>
+          `,
+        });
+      } catch (emailErr) {
+        console.error("[registrations POST] Failed to send instant payment reminder email:", emailErr);
+      }
+    }
 
     return NextResponse.json({ success: true, data: { id: result.insertedId.toString() } });
   } catch (error: any) {

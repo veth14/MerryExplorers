@@ -86,6 +86,52 @@ export async function POST(request: Request) {
           </div>
         </div>
       `;
+    } else if (emailType === "payment_reminder") {
+      const regId = family.registrationId || "";
+      const paymentUrl = regId ? `${baseUrl}/register/payment/${regId}` : `${baseUrl}/renew?ref=${family._id.toString()}`;
+      subject = subject || `Payment Reminder & Slot Confirmation for ${childName} 🌈`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+          <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation</p>
+          </div>
+          <div style="padding: 28px;">
+            <p>Dear <strong>${parentName}</strong>,</p>
+            <p>Thank you for submitting your priority renewal registration for <strong>${childName}</strong>! Your slot is currently on hold under reservation.</p>
+
+            <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
+              <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold;">Ready to complete your payment?</p>
+              <p style="margin: 8px 0 16px; font-size: 13px; color: #3b82f6;">Click the button below to upload your payment receipt and confirm your child's slot:</p>
+              <a href="${paymentUrl}" style="background-color: #0033a0; color: white; padding: 13px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">
+                Proceed to Payment Page →
+              </a>
+            </div>
+
+            <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
+              <p style="margin: 0 0 6px; font-weight: bold;">⚠️ IMPORTANT NOTE &amp; DISCLAIMER:</p>
+              <p style="margin: 0 0 8px;">Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+              <p style="margin: 0; font-style: italic;">
+                "In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1."
+              </p>
+            </div>
+
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
+              <p style="margin: 0 0 4px; font-weight: bold;">⏰ Deadline Reminder:</p>
+              <p style="margin: 0;">Unpaid reservations will be held until <strong>October 16, 2026 at 1:00 PM</strong>, after which unpaid slots will be released to the waitlist.</p>
+            </div>
+
+            <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
+              Need help? Feel free to approach Teacher Kyle or Teacher Angel onsite, or reply directly to this email.
+            </p>
+            
+            <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">
+              Warm regards,<br />
+              The Merry Explorers Team 💛
+            </p>
+          </div>
+        </div>
+      `;
     } else {
       subject = subject || `Merry Explorers: Message regarding ${childName}`;
       htmlContent = `
@@ -139,7 +185,11 @@ export async function POST(request: Request) {
       { _id: new ObjectId(familyId) },
       {
         $set: {
-          lastEmailSent: emailType === "promo_code" ? "Promo Code Email Sent" : "Message Sent",
+          lastEmailSent: emailType === "promo_code"
+            ? "Promo Code Email Sent"
+            : emailType === "payment_reminder"
+            ? "Payment Reminder Sent"
+            : "Message Sent",
           lastEmailDate: new Date(),
           updatedAt: new Date(),
         },

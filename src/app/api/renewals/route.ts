@@ -42,7 +42,6 @@ export async function GET(request: Request) {
         { "parentInfo.isRenewal": true },
         { renewalPeriod: period },
       ],
-      "parentInfo.name": { $not: /ian angelo valmores/i }, // exclude test data
     };
 
     if (program && program !== "all") {
@@ -177,6 +176,8 @@ export async function GET(request: Request) {
     const slotOverview: Record<string, { totalMax: number; sessions: Record<string, { max: number; taken: number; belowMin: boolean }> }> = {};
 
     for (const [progKey, progData] of Object.entries(PROGRAM_SLOTS)) {
+      // Exclude virtual session / virtual tutorial from on-site class tracker
+      if (progKey === "virtual-session" || progKey.includes("virtual")) continue;
       slotOverview[progKey] = {
         totalMax: 0,
         sessions: {},

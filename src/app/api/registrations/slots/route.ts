@@ -22,7 +22,6 @@ export async function GET() {
           classTime: cls.name,
           status: { $in: ["pending", "approved", "reserved"] },
           submittedAt: { $gte: ADVENTURE_2_START },
-          "parentInfo.name": { $not: /ian angelo valmores/i },
         });
         result[programId][cls.name] = {
           maxSlots: cls.maxSlots,
