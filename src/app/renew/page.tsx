@@ -11,41 +11,67 @@ import SignatureCanvas from "react-signature-canvas";
 type ProgramId = keyof typeof PROGRAM_SLOTS;
 type SlotData = Record<string, Record<string, { maxSlots: number; taken: number; available: number }>>;
 
-// Steps: 0 = Welcome/Confirm, 1 = Program, 2 = Consents, 3 = Review
-const STEPS = ["Confirm", "Program", "Consents", "Review"];
+// ─── Design Tokens (aligned with Parent Portal / TrailblazerDashboard) ───────
+const NAVY = "#0b2a82";
+const BLUE = "#1f7ae0";
+const SUN = "#ffd23f";
+const SUN_LIGHT = "#ffe066";
+const SUN_DEEP = "#ffb82e";
+const ORANGE = "#ff8a1f";
+const INPUT_BG = "#f2faff";
+const INPUT_BORDER = "#b6dcf5";
+const TEXT_2 = "#3d5a99";
 
-const inputCls =
-  "w-full bg-[#f8fafc] border-2 border-transparent rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-[#002f76] placeholder:text-[#94a3b8] placeholder:font-medium focus:outline-none focus:border-[#0033A0]/30 focus:bg-white transition-all";
-const labelCls = "block text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-1.5";
+const STEPS = ["Confirm Info", "Choose Program", "Consents", "Review"];
 
-function StepDot({ label, index, current }: { label: string; index: number; current: number }) {
-  const done = index < current;
-  const active = index === current;
+// ─── Playful Background Scene ───────────────────────────────────────────────
+function Cloud({ className }: { className: string }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div
-        className={[
-          "flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-extrabold transition-all duration-300",
-          done
-            ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
-            : active
-              ? "bg-[#0033A0] text-white shadow-lg shadow-[#0033A0]/30 scale-110"
-              : "bg-slate-100 text-[#94a3b8]",
-        ].join(" ")}
-      >
-        {done ? "✓" : index + 1}
-      </div>
-      <span className={`text-[10px] font-bold ${active ? "text-[#0033A0]" : "text-[#94a3b8]"}`}>{label}</span>
+    <svg className={`vp-cloud vp-sticker ${className}`} viewBox="-4 -16 124 78" aria-hidden="true">
+      <path d="M26 52a18 18 0 0 1-2-35 24 24 0 0 1 46-6 20 20 0 0 1 28 18 14 14 0 0 1-4 23z" fill="#fff" stroke="#cfeaff" strokeWidth="3" />
+    </svg>
+  );
+}
+
+function Star({ style, far = false }: { style: React.CSSProperties; far?: boolean }) {
+  return (
+    <svg className={`vp-star vp-sticker ${far ? "far" : ""}`} style={style} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 2 3 6.5 7 .9-5.2 4.8 1.4 7L12 17.7 5.8 21.2l1.4-7L2 9.4l7-.9z" fill={SUN} stroke={SUN_DEEP} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PortalScene() {
+  return (
+    <div className="vp-scene" aria-hidden="true">
+      <svg className="vp-sun vp-sticker" viewBox="0 0 140 140">
+        <g className="vp-rays">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <ellipse key={i} cx="70" cy="16" rx="6" ry="12" fill={SUN} stroke={SUN_DEEP} strokeWidth="2" transform={`rotate(${i * 30} 70 70)`} />
+          ))}
+        </g>
+        <circle cx="70" cy="70" r="36" fill={SUN_LIGHT} stroke={SUN_DEEP} strokeWidth="5" />
+        <circle cx="52" cy="77" r="6" fill="#ffa9c4" opacity=".85" /><circle cx="88" cy="77" r="6" fill="#ffa9c4" opacity=".85" />
+        <circle cx="58" cy="64" r="3.5" fill={NAVY} /><circle cx="82" cy="64" r="3.5" fill={NAVY} />
+        <path d="M58 76q12 11 24 0" fill="none" stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" />
+      </svg>
+      <Cloud className="c1" /><Cloud className="c2" /><Cloud className="c3" />
+      <Star style={{ top: "18%", left: "5%" }} />
+      <Star far style={{ top: "10%", left: "68%" }} />
+      <Star style={{ top: "45%", left: "92%" }} />
+      <Star far style={{ top: "68%", left: "6%" }} />
     </div>
   );
 }
 
 function SlotPill({ available, max }: { available: number; max: number }) {
-  if (max >= 900) return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-green-100 text-green-700">Available</span>;
+  if (max >= 900) {
+    return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">Available</span>;
+  }
   const pct = available / max;
-  const color = pct === 0 ? "bg-red-100 text-red-600" : pct <= 0.3 ? "bg-orange-100 text-orange-600" : "bg-green-100 text-green-700";
+  const color = pct === 0 ? "bg-red-100 text-red-700 border border-red-300" : pct <= 0.3 ? "bg-amber-100 text-amber-800 border border-amber-300" : "bg-emerald-100 text-emerald-800 border border-emerald-300";
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${color}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${color}`}>
       {available === 0 ? "Full" : `${available} slot${available !== 1 ? "s" : ""} left`}
     </span>
   );
@@ -53,9 +79,9 @@ function SlotPill({ available, max }: { available: number; max: number }) {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between py-2.5 border-b border-slate-100 last:border-0">
-      <span className="text-[12px] font-bold uppercase tracking-wider text-[#94a3b8]">{label}</span>
-      <span className="text-[14px] font-semibold text-[#002f76] text-right max-w-[60%]">{value || "—"}</span>
+    <div className="flex items-start justify-between py-2 border-b border-[#b6dcf5]/40 last:border-0">
+      <span className="text-[12px] font-bold uppercase tracking-wider text-[#3d5a99]">{label}</span>
+      <span className="text-[14px] font-extrabold text-[#0b2a82] text-right max-w-[62%]">{value || "—"}</span>
     </div>
   );
 }
@@ -107,7 +133,7 @@ export default function RenewPage() {
     const email = urlParams.get("email");
 
     if (!ref && !email) {
-      setLoadError("Invalid link. Please use the link from your priority email.");
+      setLoadError("Invalid link. Please use the link from your priority renewal email.");
       setLoading(false);
       return;
     }
@@ -140,7 +166,6 @@ export default function RenewPage() {
   }, []);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
-  const programSlots = prog && slots[prog.id] ? slots[prog.id] : {};
 
   const addonCost = (uniformOrdered ? UNIFORM_KIT.price : 0) + (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0);
   const amountDue = prog ? prog.downpayment + addonCost : 0;
@@ -169,7 +194,7 @@ export default function RenewPage() {
           isNewFamily: false,
           uniformOrdered,
           lanyardOrdered,
-          welcomeKitOrdered: false, // Returning families never get welcome kit
+          welcomeKitOrdered: false,
         }),
       });
       const data = await res.json();
@@ -190,10 +215,13 @@ export default function RenewPage() {
   // ── Loading / Error ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#f0f4ff] to-[#fff8e7] flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 rounded-full border-4 border-[#0033A0] border-t-transparent animate-spin mx-auto" />
-          <p className="text-[15px] font-semibold text-[#0033A0]">Loading your registration details…</p>
+      <div className="vp-root min-h-screen flex items-center justify-center p-6">
+        <PortalScene />
+        <div className="relative z-10 text-center flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-[#ffe066] to-[#ffb82e] border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-3xl mb-4 animate-bounce">
+            🚀
+          </div>
+          <p className="text-[18px] font-extrabold text-[#0b2a82]">Loading your renewal details…</p>
         </div>
       </div>
     );
@@ -201,12 +229,13 @@ export default function RenewPage() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#f0f4ff] to-[#fff8e7] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl text-center space-y-4">
-          <div className="text-5xl">😔</div>
-          <h2 className="font-bold text-[20px] text-[#002f76]">Link Not Found</h2>
-          <p className="text-[14px] text-[#64748b] leading-relaxed">{loadError}</p>
-          <p className="text-[13px] text-[#94a3b8]">Need help? Ask <strong>Teacher Kyle</strong> or <strong>Teacher Angel</strong> onsite.</p>
+      <div className="vp-root min-h-screen flex items-center justify-center p-6">
+        <PortalScene />
+        <div className="relative z-10 max-w-md w-full bg-white rounded-[28px] border-4 border-[#0b2a82] p-8 shadow-[0_0_0_6px_#fff,0_12px_0_6px_rgba(11,42,130,0.18)] text-center space-y-4">
+          <div className="text-5xl">🧭</div>
+          <h2 className="font-extrabold text-[22px] text-[#0b2a82]">Renewal Link Not Found</h2>
+          <p className="text-[14px] text-[#3d5a99] font-medium leading-relaxed">{loadError}</p>
+          <p className="text-[13px] text-[#3d5a99]">Need help? Ask <strong>Teacher Kyle</strong> or <strong>Teacher Angel</strong> onsite.</p>
         </div>
       </div>
     );
@@ -216,37 +245,41 @@ export default function RenewPage() {
   const childNick = childInfo?.nickname || childInfo?.firstName || "Explorer";
 
   return (
-    <m.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-[#f0f4ff] via-white to-[#fff8e7]"
-    >
-      {/* Waiver Modal */}
+    <div className="vp-root min-h-screen relative overflow-x-hidden">
+      <PortalScene />
+
+      {/* ── Waiver Modal ──────────────────────────────────────────────────── */}
       {waiverModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="px-8 py-5 border-b border-slate-100 shrink-0 flex items-center justify-between">
-              <h3 className="font-bold text-[16px] text-[#002f76]">Parent/Guardian Acknowledgment & Agreement</h3>
-              <button onClick={() => setWaiverModalOpen(false)} className="text-[#94a3b8] hover:text-slate-600 text-[20px]">×</button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="relative bg-white rounded-[28px] border-4 border-[#0b2a82] shadow-[0_0_0_6px_#fff,0_16px_0_rgba(11,42,130,0.25)] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b-2 border-[#b6dcf5] shrink-0 flex items-center justify-between bg-[#f2faff]">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#3d5a99]">Official Waiver</span>
+                  <h3 className="font-extrabold text-[16px] text-[#0b2a82] leading-none">Parent/Guardian Acknowledgment & Agreement</h3>
+                </div>
+              </div>
+              <button onClick={() => setWaiverModalOpen(false)} className="w-8 h-8 rounded-full border-2 border-[#0b2a82] bg-white text-[#0b2a82] font-black text-[16px] hover:bg-red-50 hover:text-red-600 transition-colors">✕</button>
             </div>
             <div
               ref={waiverScrollRef}
-              className="flex-1 overflow-y-auto px-8 py-6 text-[13px] text-[#334155] leading-[1.8] space-y-5"
+              className="flex-1 overflow-y-auto px-6 py-5 text-[13px] text-[#27407f] leading-[1.8] space-y-4"
               onScroll={(e) => {
                 const el = e.currentTarget;
                 if (el.scrollHeight - el.scrollTop <= el.clientHeight + 60) setWaiverScrolled(true);
               }}
             >
-              <p className="font-extrabold text-[15px] text-[#002f76] text-center border-b border-slate-100 pb-4">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</p>
-              <p className="text-center font-bold text-[13px] text-[#0033A0]">PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
-              <p className="text-[12px] text-[#64748b] italic text-center">By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
+              <p className="font-extrabold text-[15px] text-[#0b2a82] text-center border-b-2 border-[#b6dcf5] pb-3">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</p>
+              <p className="text-center font-bold text-[13px] text-[#1f7ae0]">PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
+              <p className="text-[12px] text-[#3d5a99] italic text-center">By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
               <div className="space-y-1">
-                <p className="font-extrabold text-[#002f76]">1. ADVENTURE / CYCLE</p>
+                <p className="font-extrabold text-[#0b2a82]">1. ADVENTURE / CYCLE</p>
                 <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program.</p>
               </div>
               <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">2. REGISTRATION & PAYMENT</p>
-                <ul className="list-disc pl-5 space-y-1">
+                <p className="font-extrabold text-[#0b2a82]">2. REGISTRATION & PAYMENT</p>
+                <ul className="list-disc pl-5 space-y-1 font-medium">
                   <li>60% reservation payment is required upon registration to secure the child&apos;s slot.</li>
                   <li>The 60% reservation payment is non-refundable once the slot is confirmed.</li>
                   <li>The remaining 40% balance is due on the 6th session.</li>
@@ -255,10 +288,10 @@ export default function RenewPage() {
                 </ul>
               </div>
               <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">3. ATTENDANCE & MAKE-UP SESSIONS</p>
+                <p className="font-extrabold text-[#0b2a82]">3. ATTENDANCE & MAKE-UP SESSIONS</p>
                 <p>We know that schedules can sometimes change, so we&apos;ve made each program&apos;s make-up arrangement as simple and predictable as possible.</p>
                 <p>💡 <strong>Trailblazer: Brave Explorer</strong> — A suspended face-to-face session will shift online.</p>
-                <ul className="list-disc pl-5 space-y-1">
+                <ul className="list-disc pl-5 space-y-1 font-medium">
                   <li>Online session: 45 minutes</li>
                   <li>Practice worksheets will be provided</li>
                   <li>The online shift is considered a consumed session</li>
@@ -266,22 +299,21 @@ export default function RenewPage() {
                 <p>💛 <strong>Complimentary Free Session for All Explorers</strong> — For an excused missed session (sickness or other valid reasons), each child receives 1 complimentary session per Adventure.</p>
               </div>
               <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">4. UNIFORMS</p>
+                <p className="font-extrabold text-[#0b2a82]">4. UNIFORMS</p>
                 <p>The Merry Explorers uniform is the <strong>SAME uniform</strong>. If your child already has a Merry Explorers uniform, you are <strong>NOT required</strong> to purchase a new set.</p>
                 <p><strong>Uniform Days:</strong> Wednesday & Friday.</p>
               </div>
-              <div className="rounded-2xl bg-[#f8fafc] border border-slate-200 p-5 space-y-2">
-                <p className="font-extrabold text-[#002f76] text-[14px]">PARENT/GUARDIAN ACKNOWLEDGMENT</p>
-                <p>I, the undersigned Parent/Guardian, confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement.</p>
+              <div className="rounded-2xl bg-[#f2faff] border-2 border-[#b6dcf5] p-4 space-y-2">
+                <p className="font-extrabold text-[#0b2a82] text-[14px]">PARENT/GUARDIAN ACKNOWLEDGMENT</p>
+                <p className="font-medium text-[13px]">I, the undersigned Parent/Guardian, confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement.</p>
               </div>
-              <div className="h-4" />
             </div>
-            <div className="px-8 py-5 border-t border-slate-100 shrink-0 flex items-center gap-3">
-              <button onClick={() => setWaiverModalOpen(false)} className="flex-1 rounded-2xl border border-slate-200 py-3 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">Close</button>
+            <div className="px-6 py-4 border-t-2 border-[#b6dcf5] shrink-0 flex items-center gap-3 bg-[#f2faff]">
+              <button onClick={() => setWaiverModalOpen(false)} className="flex-1 rounded-2xl border-2 border-[#0b2a82] bg-white py-3 text-[14px] font-extrabold text-[#0b2a82] hover:bg-slate-50 transition-colors">Close</button>
               <button
                 disabled={!waiverScrolled}
                 onClick={() => { setWaiverRead(true); setWaiverModalOpen(false); }}
-                className={`flex-1 rounded-2xl py-3 text-[14px] font-bold text-white transition-all ${waiverScrolled ? "bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20" : "bg-slate-300 cursor-not-allowed"}`}
+                className={`flex-1 rounded-2xl border-2 border-[#0b2a82] py-3 text-[14px] font-extrabold transition-all ${waiverScrolled ? "bg-gradient-to-r from-[#ffe066] to-[#ffd23f] text-[#0b2a82] shadow-[0_4px_0_#0b2a82]" : "bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed"}`}
               >
                 {waiverScrolled ? "✓ I Accept the Waiver" : "↓ Scroll to Accept"}
               </button>
@@ -290,85 +322,93 @@ export default function RenewPage() {
         </div>
       )}
 
-      {/* Background Orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]" />
-        <div aria-hidden className="absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1]" />
-      </div>
-
-      {/* Header */}
-      <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] w-full max-w-[900px] items-center justify-between px-6">
+      {/* ── Top Header ────────────────────────────────────────────────────── */}
+      <header className="relative z-20 bg-white/80 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1000px] items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="40px" className="object-contain" />
+            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border-2 border-[#0b2a82] bg-white p-1 shadow-[0_3px_0_#0b2a82]">
+              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" />
             </div>
             <span className="flex flex-col leading-none">
-              <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">Merry</span>
-              <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">Explorers</span>
+              <span className="text-[18px] font-black tracking-tight text-[#0b2a82]">Merry Explorers</span>
+              <span className="text-[11px] font-extrabold tracking-widest text-[#ff8a1f]">PARENT PORTAL</span>
             </span>
           </Link>
-          <div className="text-right">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#0033A0]/50">Priority Renewal</p>
-            <p className="text-[13px] font-extrabold text-[#002f76]">Adventure 2 Registration</p>
+          <div className="flex items-center gap-2">
+            <span className="vp-tag text-[12px] font-black uppercase">
+              🌟 2026 ADVENTURE 2
+            </span>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-[900px] px-4 sm:px-6 py-8 sm:py-12">
-        {/* Step Indicator */}
-        {step < 4 && (
-          <div className="mb-8 bg-white/70 backdrop-blur-xl rounded-3xl p-5 shadow-sm border border-white">
-            <div className="flex items-center justify-between px-2">
-              {STEPS.map((label, i) => (
-                <div key={label} className={`flex items-center ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
-                  <StepDot label={label} index={i} current={step} />
-                  {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-500 ${i < step ? "bg-green-400" : "bg-slate-200"}`} />}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* ── Main Content Area ────────────────────────────────────────────── */}
+      <main className="vp-main">
 
-        <m.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
-        >
+        {/* Hero Card */}
+        <div className="text-center flex flex-col items-center gap-2 -mb-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+            <span>✨</span> PRIORITY RENEWAL ACCESS
+          </div>
+          <h1 className="vp-title text-[32px] sm:text-[42px]">
+            Adventure 2 Renewal
+          </h1>
+          <p className="vp-sub text-[15px] max-w-md">
+            Welcome back! Secure <strong>{childNick}&apos;s</strong> slot for 2026 Adventure 2 in a few quick steps.
+          </p>
+        </div>
+
+        {/* Step Tabs Indicator */}
+        <nav className="vp-tabs">
+          {STEPS.map((label, i) => {
+            const isDone = i < step;
+            const isActive = i === step;
+            return (
+              <button
+                key={label}
+                type="button"
+                disabled={i > step}
+                onClick={() => i < step && setStep(i)}
+                className={`vp-tab ${isActive ? "on" : ""} ${i > step ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span>{isDone ? "✓" : i + 1}</span>
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Main Card with Playful Tape */}
+        <div className="vp-card">
+          <div className="vp-tape" />
+
           <AnimatePresence mode="wait">
 
-            {/* ── STEP 0: Welcome & Confirm ────────────────────────────────── */}
+            {/* ── STEP 0: Welcome & Confirm Details ──────────────────────── */}
             {step === 0 && (
-              <m.div key="step0" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+              <m.div key="step0" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
 
-                {/* Welcome banner */}
-                <div className="mb-8 rounded-3xl bg-gradient-to-r from-[#002f76] to-[#0050d5] p-6 sm:p-8 text-white relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#FFB800]/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+                {/* Hero Greeting Box */}
+                <div className="mb-6 rounded-[22px] bg-gradient-to-r from-[#0b2a82] to-[#1f7ae0] p-6 text-white border-3 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] relative overflow-hidden">
                   <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="rounded-full bg-[#FFB800] text-[#002f76] px-3 py-0.5 text-[11px] font-black uppercase tracking-wider">
-                        🌟 2026 ADVENTURE 2
-                      </span>
-                      <p className="text-[12px] font-bold uppercase tracking-widest text-[#FFB800]">Priority Renewal Access</p>
+                    <div className="inline-block px-3 py-1 rounded-full bg-[#ffd23f] text-[#0b2a82] text-[11px] font-black uppercase tracking-wider mb-2">
+                      🌟 2026 ADVENTURE 2
                     </div>
-                    <h1 className="font-headline text-[28px] sm:text-[32px] font-extrabold leading-tight mb-2">
+                    <h2 className="text-[26px] sm:text-[30px] font-black leading-tight mb-2">
                       Hello, {childNick}!
-                    </h1>
-                    <p className="text-[14px] text-white/90 leading-relaxed">
-                      We&apos;re so excited to welcome you to <strong>Adventure 2</strong>! Your details from <strong>Adventure 1</strong> are already verified below — simply review and choose your <strong>Adventure 2</strong> schedule.
+                    </h2>
+                    <p className="text-[14px] text-white/95 font-medium leading-relaxed">
+                      We are thrilled to welcome you to <strong>Adventure 2</strong>! Your details from <strong>Adventure 1</strong> are already verified below — simply review and choose your preferred schedule.
                     </p>
-                    <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[12px] font-bold">
-                      <span className="h-2 w-2 rounded-full bg-[#FFB800] shrink-0" />
-                      Adventure 2 Priority Reservation Code: Already Applied ✓
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/20 px-3 py-1.5 text-[12px] font-extrabold">
+                      <span>✓</span> Adventure 2 Priority Reservation Active
                     </div>
                   </div>
                 </div>
 
                 {/* Child info summary */}
-                <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                  <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0] mb-4">🧒 Explorer Details</h3>
+                <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-3">🧒 Explorer Details</h3>
                   <div className="space-y-0.5">
                     <InfoRow label="Full Name" value={childName} />
                     <InfoRow label="Nickname" value={childInfo?.nickname || childInfo?.firstName || "—"} />
@@ -379,8 +419,8 @@ export default function RenewPage() {
                 </div>
 
                 {/* Parent info summary */}
-                <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                  <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0] mb-4">👨‍👩‍👧 Parent / Guardian</h3>
+                <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-3">👨‍👩‍👧 Parent / Guardian</h3>
                   <div className="space-y-0.5">
                     <InfoRow label="Name" value={parentInfo?.name || "—"} />
                     <InfoRow label="Email" value={parentInfo?.email || "—"} />
@@ -390,8 +430,8 @@ export default function RenewPage() {
                 </div>
 
                 {/* Emergency contact summary */}
-                <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                  <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0] mb-4">🚨 Emergency Contact</h3>
+                <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-3">🚨 Emergency Contact</h3>
                   <div className="space-y-0.5">
                     <InfoRow label="Name" value={emergencyContact?.name || "—"} />
                     <InfoRow label="Phone" value={emergencyContact?.phone || "—"} />
@@ -400,36 +440,36 @@ export default function RenewPage() {
                 </div>
 
                 {/* Previous program */}
-                <div className="mb-6 rounded-2xl bg-[#f0f4ff] border border-[#0033A0]/20 px-5 py-4 flex items-center gap-3 text-[13px] text-[#002f76]">
-                  <span className="text-xl">📚</span>
+                <div className="mb-5 rounded-[18px] bg-[#fff6cf] border-3 border-[#0b2a82] px-5 py-4 flex items-center gap-3 text-[13px] text-[#0b2a82] shadow-[0_4px_0_rgba(11,42,130,0.18)]">
+                  <span className="text-2xl">📚</span>
                   <div>
-                    <p className="font-bold">Previous Adventure</p>
-                    <p className="text-[#475569] mt-0.5">{previousProgram}</p>
+                    <p className="font-extrabold text-[12px] uppercase tracking-wider text-[#3d5a99]">Previous Adventure</p>
+                    <p className="font-extrabold text-[15px] text-[#0b2a82]">{previousProgram}</p>
                   </div>
                 </div>
 
                 {/* Important Note / Disclaimer */}
-                <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-950 leading-relaxed shadow-xs">
-                  <div className="flex items-center gap-2 font-extrabold text-amber-900 mb-1">
+                <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
+                  <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
                     <span>⚠️</span>
                     <span>NOTE &amp; DISCLAIMER</span>
                   </div>
-                  <p className="font-semibold text-amber-900">
+                  <p className="font-bold text-[#0b2a82] leading-snug">
                     Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
                   </p>
-                  <p className="mt-1.5 italic text-amber-800 text-[12px] bg-white/60 p-2.5 rounded-xl border border-amber-200/60">
+                  <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
                     &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
                   </p>
                 </div>
 
-                <p className="mb-6 text-[13px] text-[#64748b] leading-relaxed">
-                  If any of the information above has changed, please let <strong>Teacher Kyle</strong> or <strong>Teacher Angel</strong> know onsite and they can update it for you.
+                <p className="mb-6 text-[13px] text-[#3d5a99] font-medium leading-relaxed">
+                  If any details need updates, please let <strong>Teacher Kyle</strong> or <strong>Teacher Angel</strong> know onsite.
                 </p>
 
                 <div className="flex justify-end">
                   <button
                     onClick={() => setStep(1)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-10 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76]"
+                    className="vp-btn"
                   >
                     Looks Good — Choose Program →
                   </button>
@@ -437,19 +477,19 @@ export default function RenewPage() {
               </m.div>
             )}
 
-            {/* ── STEP 1: Choose Program ────────────────────────────────────── */}
+            {/* ── STEP 1: Choose Program ────────────────────────────────── */}
             {step === 1 && (
-              <m.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                <div className="mb-2">
-                  <span className="inline-block rounded-full bg-blue-100 text-[#0033A0] px-3 py-0.5 text-[11px] font-black uppercase tracking-wider">
-                    2026 Adventure 2
+              <m.div key="step1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <div className="mb-3">
+                  <span className="vp-tag text-[12px] font-black uppercase">
+                    🌟 2026 Adventure 2
                   </span>
                 </div>
-                <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose an Adventure 2 Program</h2>
-                <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time for {childNick}&apos;s Adventure 2 journey.</p>
+                <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure 2 Program</h2>
+                <p className="vp-sub mb-6">Select the program and class time for {childNick}&apos;s Adventure 2 journey.</p>
 
-                {/* Tab filter */}
-                <div className="mb-8 flex flex-wrap justify-center gap-3">
+                {/* Tab filter styled like portal tabs */}
+                <div className="mb-6 flex flex-wrap justify-center gap-2.5">
                   {[
                     { id: "discovery", label: "Discovery Club" },
                     { id: "trailblazer", label: "Trailblazer" },
@@ -459,116 +499,114 @@ export default function RenewPage() {
                     return (
                       <button
                         key={tab.id}
+                        type="button"
                         onClick={() => setActiveTab(tab.id)}
-                        className={`relative overflow-hidden rounded-full px-5 py-2.5 text-[13px] font-bold transition-all duration-300 ${isActive ? "text-white shadow-md shadow-[#0033A0]/20" : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0]"}`}
+                        className={`vp-tab ${isActive ? "on" : ""}`}
                       >
-                        {isActive && (
-                          <m.div layoutId="renewActiveTabIndicator" className="absolute inset-0 bg-[#0033A0]" transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
-                        )}
-                        <span className="relative z-10">{tab.label}</span>
+                        {tab.label}
                       </button>
                     );
                   })}
                 </div>
 
-                <m.div layout className="space-y-5">
-                  <AnimatePresence mode="popLayout">
-                    {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
-                      .filter(p => {
-                        if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
-                        if (activeTab === "trailblazer") return p.id === "brave-explorer";
-                        return ["saturday-playdate", "ballet"].includes(p.id);
-                      })
-                      .map(p => {
-                        const isSelected = selectedProgram === p.id;
-                        const programSlotData = slots[p.id] || {};
-                        return (
-                          <m.div
-                            key={p.id}
-                            layout
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -12 }}
-                            transition={{ duration: 0.25 }}
-                            onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
-                            style={{ borderColor: isSelected ? p.accent : "transparent", background: isSelected ? p.accentSoft : "white" }}
-                            className="cursor-pointer rounded-3xl border-2 bg-white p-5 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2.5 mb-1">
-                                  <span className="text-xl">{p.icon}</span>
-                                  <h3 className="font-headline text-[15px] font-extrabold" style={{ color: p.accent }}>{p.name}</h3>
-                                </div>
-                                <p className="text-[12px] text-[#64748b] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
-                                <p className="text-[14px] font-bold text-[#002f76]">₱{p.rate.toLocaleString()}</p>
+                {/* Program Cards */}
+                <div className="space-y-4">
+                  {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
+                    .filter(p => {
+                      if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
+                      if (activeTab === "trailblazer") return p.id === "brave-explorer";
+                      return ["saturday-playdate", "ballet"].includes(p.id);
+                    })
+                    .map(p => {
+                      const isSelected = selectedProgram === p.id;
+                      const programSlotData = slots[p.id] || {};
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
+                          className={`cursor-pointer rounded-[22px] border-3 p-5 transition-all ${isSelected
+                            ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_6px_0_#0b2a82]"
+                            : "bg-white border-[#b6dcf5] hover:border-[#0b2a82] shadow-sm"
+                            }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-2xl">{p.icon}</span>
+                                <h3 className="text-[17px] font-black text-[#0b2a82]">{p.name}</h3>
                               </div>
-                              <div className={`h-5 w-5 rounded-full border-2 shrink-0 mt-1 transition-all ${isSelected ? "border-current bg-current" : "border-slate-300"}`} style={isSelected ? { color: p.accent } : {}} />
+                              <p className="text-[12.5px] font-medium text-[#3d5a99] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
+                              <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
                             </div>
+                            <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${isSelected ? "border-[#0b2a82] bg-[#ffd23f]" : "border-[#b6dcf5] bg-white"}`}>
+                              {isSelected && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
+                            </div>
+                          </div>
 
-                            {isSelected && (
-                              <m.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4 pt-4 border-t border-black/5">
-                                <p className="text-[12px] font-bold uppercase tracking-widest text-[#64748b] mb-3">Select Class Time</p>
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                  {p.classes.map((cls) => {
-                                    const slotInfo = programSlotData[cls.name];
-                                    const isFull = slotInfo ? slotInfo.available === 0 : false;
-                                    const isClassSelected = selectedClass === cls.name;
-                                    return (
-                                      <button
-                                        key={cls.name}
-                                        disabled={isFull}
-                                        onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
-                                        className={[
-                                          "flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150",
-                                          isFull ? "opacity-40 cursor-not-allowed border-slate-200 bg-white" :
-                                            isClassSelected ? "border-[#0033A0] bg-[#0033A0]/5 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300",
-                                        ].join(" ")}
-                                      >
-                                        <div>
-                                          <p className="text-[13px] font-bold text-[#002f76]">{cls.name}</p>
-                                          <p className="text-[11px] text-[#64748b]">{cls.time}</p>
-                                        </div>
-                                        {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </m.div>
-                            )}
-                          </m.div>
-                        );
-                      })}
-                  </AnimatePresence>
-                </m.div>
+                          {isSelected && (
+                            <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
+                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
+                              <div className="grid gap-2.5 sm:grid-cols-2">
+                                {p.classes.map((cls) => {
+                                  const slotInfo = programSlotData[cls.name];
+                                  const isFull = slotInfo ? slotInfo.available === 0 : false;
+                                  const isClassSelected = selectedClass === cls.name;
+                                  return (
+                                    <button
+                                      key={cls.name}
+                                      type="button"
+                                      disabled={isFull}
+                                      onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
+                                      className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${isFull
+                                        ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50"
+                                        : isClassSelected
+                                          ? "border-[#0b2a82] bg-white shadow-[0_3px_0_#0b2a82]"
+                                          : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"
+                                        }`}
+                                    >
+                                      <div>
+                                        <p className="text-[13px] font-black text-[#0b2a82]">{cls.name}</p>
+                                        <p className="text-[11px] font-semibold text-[#3d5a99]">{cls.time}</p>
+                                      </div>
+                                      {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
 
-                {/* Uniform add-ons for returning families */}
+                {/* Optional Uniform Add-ons for Returning Families */}
                 {selectedProgram && (
-                  <m.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-6 rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm space-y-4">
-                    <h3 className="font-headline text-[15px] font-extrabold text-[#002f76]">👕 Optional Uniform Add-ons</h3>
-                    <p className="text-[13px] text-[#64748b]">As a returning family, you already have the Welcome Kit. These add-ons are completely optional.</p>
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-3 cursor-pointer rounded-2xl border-2 border-slate-200 p-4 hover:border-[#0033A0]/30 transition-colors">
-                        <input type="checkbox" checked={uniformOrdered} onChange={e => setUniformOrdered(e.target.checked)} className="h-5 w-5 accent-[#0033A0]" />
+                  <div className="mt-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-3">
+                    <h3 className="vp-h3 text-[15px] text-[#0b2a82]">👕 Optional Uniform Add-ons</h3>
+                    <p className="text-[12.5px] font-medium text-[#3d5a99]">As a returning family, you already have the Welcome Kit. These add-ons are completely optional.</p>
+                    <div className="space-y-2.5 pt-1">
+                      <label className="flex items-center gap-3 cursor-pointer rounded-xl border-2 border-[#b6dcf5] bg-white p-3.5 hover:border-[#0b2a82] transition-colors">
+                        <input type="checkbox" checked={uniformOrdered} onChange={e => setUniformOrdered(e.target.checked)} className="h-5 w-5 accent-[#0b2a82]" />
                         <div className="flex-1">
-                          <p className="font-bold text-[14px] text-[#002f76]">Uniform Set — ₱{UNIFORM_KIT.price.toLocaleString()}</p>
-                          <p className="text-[12px] text-[#64748b]">Polo shirt + jogging pants (no lanyard)</p>
+                          <p className="font-extrabold text-[13.5px] text-[#0b2a82]">Uniform Set — ₱{UNIFORM_KIT.price.toLocaleString()}</p>
+                          <p className="text-[11.5px] font-medium text-[#3d5a99]">Polo shirt + jogging pants (no lanyard)</p>
                         </div>
                       </label>
-                      <label className="flex items-center gap-3 cursor-pointer rounded-2xl border-2 border-slate-200 p-4 hover:border-[#0033A0]/30 transition-colors">
-                        <input type="checkbox" checked={lanyardOrdered} onChange={e => setLanyardOrdered(e.target.checked)} className="h-5 w-5 accent-[#0033A0]" />
+                      <label className="flex items-center gap-3 cursor-pointer rounded-xl border-2 border-[#b6dcf5] bg-white p-3.5 hover:border-[#0b2a82] transition-colors">
+                        <input type="checkbox" checked={lanyardOrdered} onChange={e => setLanyardOrdered(e.target.checked)} className="h-5 w-5 accent-[#0b2a82]" />
                         <div className="flex-1">
-                          <p className="font-bold text-[14px] text-[#002f76]">Lanyard & Name Tag — ₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</p>
-                          <p className="text-[12px] text-[#64748b]">Merry Explorers lanyard with name tag</p>
+                          <p className="font-extrabold text-[13.5px] text-[#0b2a82]">Lanyard & Name Tag — ₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</p>
+                          <p className="text-[11.5px] font-medium text-[#3d5a99]">Merry Explorers lanyard with name tag</p>
                         </div>
                       </label>
                     </div>
-                  </m.div>
+                  </div>
                 )}
 
-                {/* Uniform day acknowledgment */}
-                <div className="mt-6 rounded-3xl bg-slate-50 border border-slate-200/80 p-6 shadow-sm space-y-3">
-                  <p className="text-[13.5px] font-extrabold text-[#002f76] flex items-center gap-2">
+                {/* Uniform Day Acknowledgment */}
+                <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
+                  <p className="text-[13.5px] font-black text-[#0b2a82] flex items-center gap-2">
                     <span>👕</span> Every Wednesday & Friday is Merry Explorers&apos; official uniform day.
                   </p>
                   <label className="flex items-start gap-3 cursor-pointer pt-1 group">
@@ -576,47 +614,47 @@ export default function RenewPage() {
                       type="checkbox"
                       checked={uniformDayAcknowledged}
                       onChange={e => setUniformDayAcknowledged(e.target.checked)}
-                      className="mt-1 h-5 w-5 rounded-lg border-2 border-slate-300 text-[#0033A0] focus:ring-[#0033A0] focus:ring-offset-0 transition cursor-pointer"
+                      className="mt-1 h-5 w-5 rounded-md border-2 border-[#0b2a82] accent-[#0b2a82] cursor-pointer"
                     />
-                    <span className="text-[13px] text-[#334155] leading-snug group-hover:text-[#002f76] transition-colors">
+                    <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
                       <strong className="text-red-500">*</strong> I understand that every Wednesday & Friday is Merry Explorers&apos; official uniform day.
                     </span>
                   </label>
                 </div>
 
-                <div className="mt-8 flex justify-between">
-                  <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">← Back</button>
+                <div className="mt-8 flex justify-between items-center">
+                  <button onClick={() => setStep(0)} className="vp-btn ghost small">← Back</button>
                   <button
                     disabled={!canProceedStep1}
                     onClick={() => setStep(2)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="vp-btn"
                   >
-                    Continue →
+                    Continue to Consents →
                   </button>
                 </div>
               </m.div>
             )}
 
-            {/* ── STEP 2: Consents ─────────────────────────────────────────── */}
+            {/* ── STEP 2: Consents & Waivers ────────────────────────────── */}
             {step === 2 && (
-              <m.div key="step2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Consents & Waivers</h2>
-                <p className="mb-6 text-[14px] text-[#64748b]">Please read and agree to the following before proceeding.</p>
+              <m.div key="step2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <h2 className="vp-h2 text-[24px] mb-1">Consents & Waivers</h2>
+                <p className="vp-sub mb-6">Please read and agree to the following before proceeding.</p>
 
                 {/* Photo consent */}
-                <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                  <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">📷 Photo & Video Consent</h3>
-                  <p className="text-[13px] text-[#334155] leading-relaxed">
+                <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-3">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82]">📷 Photo & Video Consent</h3>
+                  <p className="text-[13px] text-[#3d5a99] font-medium leading-relaxed">
                     We&apos;d love to feature your little one in session highlights on our official Facebook page! In compliance with <strong>R.A. 10173 (Data Privacy Act of 2012)</strong>, we ask your consent first. No full names, addresses, or birthdays will be disclosed.
                   </p>
-                  <div className="space-y-3 mt-2">
+                  <div className="space-y-2.5 pt-1">
                     {[
                       { value: "yes", label: "Yes, I happily consent — please feature my child in Facebook highlights." },
                       { value: "no", label: "Not at this time — please exclude my child from any posted content." },
                     ].map((opt) => (
-                      <label key={opt.value} className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition-all ${photoConsent === opt.value ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"}`}>
-                        <input type="radio" name="photoConsent" value={opt.value} checked={photoConsent === opt.value} onChange={() => setPhotoConsent(opt.value)} className="mt-0.5 accent-[#0033A0] shrink-0" />
-                        <span className="text-[13px] font-medium text-[#334155]">{opt.label}</span>
+                      <label key={opt.value} className={`flex items-start gap-3 cursor-pointer rounded-xl border-2 p-3.5 transition-all ${photoConsent === opt.value ? "border-[#0b2a82] bg-[#fff6cf] shadow-[0_3px_0_#0b2a82]" : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"}`}>
+                        <input type="radio" name="photoConsent" value={opt.value} checked={photoConsent === opt.value} onChange={() => setPhotoConsent(opt.value)} className="mt-0.5 accent-[#0b2a82] shrink-0" />
+                        <span className="text-[13px] font-bold text-[#0b2a82]">{opt.label}</span>
                       </label>
                     ))}
                   </div>
@@ -624,76 +662,81 @@ export default function RenewPage() {
 
                 {/* Program Waiver (not required for Brave Explorer) */}
                 {selectedProgram !== "brave-explorer" && (
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl transition-all ${waiverRead ? "bg-green-100" : "bg-[#0033A0]/10"}`}>
+                  <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl border-2 border-[#0b2a82] ${waiverRead ? "bg-[#ffd23f]" : "bg-white"}`}>
                         {waiverRead ? "✅" : "📋"}
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">Parent/Guardian Acknowledgment & Agreement</h3>
-                        <p className="text-[13px] text-[#64748b] mt-1">
+                        <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-0.5">Parent/Guardian Acknowledgment & Agreement</h3>
+                        <p className="text-[12.5px] font-medium text-[#3d5a99]">
                           {waiverRead ? "You have read and accepted the program waiver." : "You must read and accept the full waiver before signing."}
                         </p>
                       </div>
                     </div>
 
                     {waiverRead ? (
-                      <div className="flex items-center gap-2 rounded-2xl bg-green-50 border border-green-200 px-4 py-3">
-                        <span className="text-green-600 font-bold text-[13px]">✓ Waiver accepted</span>
-                        <button onClick={() => setWaiverModalOpen(true)} className="ml-auto text-[12px] text-[#0033A0] hover:underline font-semibold">Re-read</button>
+                      <div className="flex items-center gap-2 rounded-xl bg-[#fff6cf] border-2 border-[#0b2a82] px-4 py-3 shadow-[0_3px_0_rgba(11,42,130,0.18)]">
+                        <span className="text-[#0b2a82] font-black text-[13px]">✓ Official Waiver accepted</span>
+                        <button onClick={() => setWaiverModalOpen(true)} className="ml-auto text-[12px] text-[#1f7ae0] hover:underline font-extrabold">Re-read</button>
                       </div>
                     ) : (
-                      <button onClick={() => setWaiverModalOpen(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0033A0] py-4 text-[14px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002f76] transition-colors">
-                        📄 Read & Accept Waiver
+                      <button onClick={() => setWaiverModalOpen(true)} className="w-full vp-btn small">
+                        📄 Read & Accept Official Waiver
                       </button>
                     )}
 
                     {waiverRead && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-2">Signature over Printed Name of Parent/Guardian</p>
-                        <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-[#f8fafc] overflow-hidden">
+                      <div className="pt-2 border-t-2 border-[#b6dcf5]">
+                        <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-2">Signature of Parent / Guardian</p>
+                        <div className="rounded-2xl border-3 border-dashed border-[#0b2a82] bg-white overflow-hidden shadow-inner">
                           <SignatureCanvas
                             ref={sigCanvas}
-                            penColor="#0033A0"
+                            penColor="#0b2a82"
                             canvasProps={{ className: "w-full", height: 160 }}
                             onEnd={() => { if (sigCanvas.current) setSignatureBase64(sigCanvas.current.toDataURL("image/png")); }}
                           />
                         </div>
                         <div className="mt-3 flex items-center justify-between">
-                          <div className="text-[12px] text-[#64748b]">
-                            <span className="font-semibold text-[#334155]">{parentInfo?.name || "Parent/Guardian Name"}</span>
-                            <span className="ml-3 text-[#94a3b8]">{new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</span>
+                          <div className="text-[12px] text-[#3d5a99] font-medium">
+                            <span className="font-extrabold text-[#0b2a82]">{parentInfo?.name || "Parent/Guardian Name"}</span>
+                            <span className="ml-3 text-[#3d5a99]">{new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</span>
                           </div>
-                          <button onClick={() => { sigCanvas.current?.clear(); setSignatureBase64(""); }} className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors">Clear</button>
+                          <button onClick={() => { sigCanvas.current?.clear(); setSignatureBase64(""); }} className="text-[12px] font-black text-red-500 hover:text-red-700 transition-colors">Clear</button>
                         </div>
-                        {!signatureBase64 && <p className="mt-2 text-[11px] text-amber-600 font-medium">✏️ Please sign in the box above to proceed.</p>}
+                        {!signatureBase64 && <p className="mt-2 text-[12px] text-amber-700 font-bold">✏️ Please draw your signature in the box above to continue.</p>}
                       </div>
                     )}
                   </div>
                 )}
 
-                <div className="mt-8 flex justify-between">
-                  <button onClick={() => setStep(1)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">← Back</button>
+                <div className="mt-8 flex justify-between items-center">
+                  <button onClick={() => setStep(1)} className="vp-btn ghost small">← Back</button>
                   <button
                     disabled={!canProceedStep2}
                     onClick={() => setStep(3)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="vp-btn"
                   >
-                    Review →
+                    Review Details →
                   </button>
                 </div>
               </m.div>
             )}
 
-            {/* ── STEP 3: Review & Confirm ──────────────────────────────────── */}
+            {/* ── STEP 3: Review & Confirm ──────────────────────────────── */}
             {step === 3 && prog && (
-              <m.div key="step3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Review & Confirm</h2>
-                <p className="mb-6 text-[14px] text-[#64748b]">Please double-check all details before reserving your slot. You will complete payment on the next page.</p>
+              <m.div key="step3" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <div className="mb-3">
+                  <span className="vp-tag text-[12px] font-black uppercase">
+                    🌟 2026 ADVENTURE 2
+                  </span>
+                </div>
+                <h2 className="vp-h2 text-[24px] mb-1">Review & Confirm</h2>
+                <p className="vp-sub mb-6">Please double-check all details before reserving your slot. Payment is completed on the next page.</p>
 
                 {[
                   {
-                    title: "Program", emoji: "📚", rows: [
+                    title: "Program Selection", emoji: "📚", rows: [
                       ["Program", prog.name],
                       ["Class Time", selectedClass],
                       ["Schedule", prog.schedule],
@@ -704,7 +747,7 @@ export default function RenewPage() {
                     ],
                   },
                   {
-                    title: "Explorer", emoji: "🧒", rows: [
+                    title: "Explorer Information", emoji: "🧒", rows: [
                       ["Name", `${childInfo?.firstName} ${childInfo?.lastName}${childInfo?.nickname ? ` (${childInfo.nickname})` : ""}`],
                       ["Date of Birth", childInfo?.dateOfBirth || "—"],
                       ["Gender", childInfo?.gender || "—"],
@@ -719,20 +762,20 @@ export default function RenewPage() {
                     ],
                   },
                   {
-                    title: "Consents", emoji: "📝", rows: [
+                    title: "Consents & Waivers", emoji: "📝", rows: [
                       ["Photo/Video Consent", photoConsent === "yes" ? "Yes" : "No"],
-                      ...(selectedProgram !== "brave-explorer" ? [["Program Waiver", "Digitally Signed"]] : []),
+                      ...(selectedProgram !== "brave-explorer" ? [["Official Program Waiver", "Digitally Signed ✓"]] : []),
                     ],
                   },
                 ].map((section) => (
-                  <div key={section.title} className="mb-4 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                    <h3 className="mb-4 font-headline text-[15px] font-extrabold text-[#0033A0]">{section.emoji} {section.title}</h3>
+                  <div key={section.title} className="mb-4 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                    <h3 className="mb-3 vp-h3 text-[15px] text-[#0b2a82]">{section.emoji} {section.title}</h3>
                     <table className="w-full text-[13px]">
                       <tbody>
                         {section.rows.map(([label, value]) => (
-                          <tr key={label} className="border-b border-slate-50 last:border-0">
-                            <td className="py-2 pr-4 text-[#94a3b8] font-semibold w-[45%]">{label}</td>
-                            <td className="py-2 text-[#334155] font-bold">{value}</td>
+                          <tr key={label} className="border-b border-[#b6dcf5]/40 last:border-0">
+                            <td className="py-1.5 pr-4 text-[#3d5a99] font-bold w-[45%]">{label}</td>
+                            <td className="py-1.5 text-[#0b2a82] font-black">{value}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -742,56 +785,224 @@ export default function RenewPage() {
 
                 {/* Uniform add-ons */}
                 {(uniformOrdered || lanyardOrdered) && (
-                  <div className="mb-4 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                    <h3 className="mb-4 font-headline text-[15px] font-extrabold text-[#0033A0]">👕 Uniform Add-ons</h3>
+                  <div className="mb-4 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                    <h3 className="mb-3 vp-h3 text-[15px] text-[#0b2a82]">👕 Uniform Add-ons</h3>
                     <table className="w-full text-[13px]">
                       <tbody>
-                        {uniformOrdered && <tr className="border-b border-slate-50"><td className="py-2 pr-4 text-[#94a3b8] font-semibold">Uniform Set</td><td className="py-2 text-[#334155] font-bold">₱{UNIFORM_KIT.price.toLocaleString()}</td></tr>}
-                        {lanyardOrdered && <tr className="border-b border-slate-50"><td className="py-2 pr-4 text-[#94a3b8] font-semibold">Lanyard & Name Tag</td><td className="py-2 text-[#334155] font-bold">₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</td></tr>}
-                        <tr><td className="py-2 pr-4 text-[#94a3b8] font-semibold">Add-ons Subtotal</td><td className="py-2 text-[#334155] font-bold">₱{addonCost.toLocaleString()}</td></tr>
+                        {uniformOrdered && <tr className="border-b border-[#b6dcf5]/40"><td className="py-1.5 pr-4 text-[#3d5a99] font-bold">Uniform Set</td><td className="py-1.5 text-[#0b2a82] font-black">₱{UNIFORM_KIT.price.toLocaleString()}</td></tr>}
+                        {lanyardOrdered && <tr className="border-b border-[#b6dcf5]/40"><td className="py-1.5 pr-4 text-[#3d5a99] font-bold">Lanyard & Name Tag</td><td className="py-1.5 text-[#0b2a82] font-black">₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</td></tr>}
+                        <tr><td className="py-1.5 pr-4 text-[#3d5a99] font-bold">Add-ons Subtotal</td><td className="py-1.5 text-[#0b2a82] font-black">₱{addonCost.toLocaleString()}</td></tr>
                       </tbody>
                     </table>
                   </div>
                 )}
 
-                {/* Priority reservation notice */}
-                <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 text-[13px] text-amber-900 space-y-1">
-                  <p>🎟️ <strong>Priority Reservation Applied:</strong></p>
-                  <p className="text-[12.5px] text-amber-800 leading-relaxed">
-                    Your slot is reserved without upfront payment today. To confirm your slot, a 60% non-refundable downpayment of <strong>₱{amountDue.toLocaleString()}</strong> is required by <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released.
+                {/* Priority Reservation Notice */}
+                <div className="mb-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] px-5 py-4 text-[13px] text-[#0b2a82] shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-1">
+                  <p className="font-black text-[14px]">🎟️ Priority Reservation Applied:</p>
+                  <p className="text-[12.5px] font-medium text-[#3d5a99] leading-relaxed">
+                    Your slot is held today. To confirm your slot, a 60% non-refundable downpayment of <strong>₱{amountDue.toLocaleString()}</strong> is required by <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released.
                   </p>
                 </div>
 
                 {submitError && (
-                  <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-[13px] font-medium text-red-700">❌ {submitError}</div>
+                  <div className="vp-error mb-4">❌ {submitError}</div>
                 )}
 
-                <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 text-[12px] text-amber-800">
-                  <p><strong>Payment Terms:</strong> The 60% downpayment is non-refundable. The 40% balance is due on the 6th session. A 4% weekly interest applies to overdue balances (charged every Monday).</p>
-                </div>
-
-                <div className="mt-8 flex justify-between">
-                  <button onClick={() => setStep(2)} disabled={submitting} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors disabled:opacity-50">← Back</button>
+                <div className="mt-8 flex justify-between items-center">
+                  <button onClick={() => setStep(2)} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
                   <button
                     disabled={submitting}
                     onClick={handleSubmit}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-green-500 px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:bg-green-600 disabled:opacity-60"
+                    className="vp-btn"
                   >
-                    {submitting ? "Reserving..." : "Complete Slot Reservation 🎉"}
+                    {submitting ? "Reserving Slot..." : "Complete Slot Reservation 🎉"}
                   </button>
                 </div>
               </m.div>
             )}
 
           </AnimatePresence>
-        </m.div>
+        </div>
 
-        <p className="mt-8 text-center text-[12px] text-[#94a3b8]">
-          Need help? Ask <strong className="text-[#64748b]">Teacher Kyle</strong> or <strong className="text-[#64748b]">Teacher Angel</strong> onsite.
+        <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
+          Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
       </main>
 
       <SiteFooter />
-    </m.div>
+
+      {/* Embedded CSS for exact Parent Portal aesthetic */}
+      <style jsx global>{`
+        .vp-root {
+          color: ${NAVY};
+          font-family: inherit;
+          background: radial-gradient(ellipse at 50% 0%, #b9e5fb 0%, #8fd3f7 55%, #74c3f1 100%);
+          background-attachment: fixed;
+        }
+        .vp-root * { box-sizing: border-box; }
+        .vp-main {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 28px 20px 100px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; }
+        .vp-h2 { margin: 0; font-size: 22px; font-weight: 800; color: ${NAVY}; }
+        .vp-h3 { margin: 0 0 10px; font-size: 16px; font-weight: 800; color: ${NAVY}; display: flex; align-items: center; gap: 8px; }
+        .vp-title {
+          margin: 0;
+          font-size: 38px;
+          font-weight: 800;
+          line-height: 1.15;
+          color: ${BLUE};
+          -webkit-text-stroke: 6px ${NAVY};
+          paint-order: stroke fill;
+          text-shadow: 0 4px 0 ${NAVY};
+          filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff);
+        }
+        .vp-sticker {
+          filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff);
+        }
+        .vp-scene {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        .vp-sun {
+          position: absolute;
+          top: 12px;
+          right: 24px;
+          width: 130px;
+          animation: vp-bob 5s ease-in-out infinite;
+        }
+        .vp-rays { transform-origin: 70px 70px; animation: vp-rot 40s linear infinite; }
+        .vp-cloud {
+          position: absolute;
+          left: 0;
+          width: 130px;
+          overflow: visible;
+          animation: vp-drift linear infinite;
+        }
+        .vp-cloud.c1 { top: 16%; animation-duration: 70s; }
+        .vp-cloud.c2 { top: 46%; width: 104px; animation-duration: 90s; animation-delay: -40s; }
+        .vp-cloud.c3 { top: 72%; width: 140px; animation-duration: 60s; animation-delay: -20s; }
+        .vp-star { position: absolute; width: 26px; animation: vp-twinkle 2.6s ease-in-out infinite; }
+        @keyframes vp-bob { 50% { transform: translateY(10px); } }
+        @keyframes vp-rot { to { transform: rotate(360deg); } }
+        @keyframes vp-drift { from { transform: translateX(-200px); } to { transform: translateX(110vw); } }
+        @keyframes vp-twinkle { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.5; } }
+        .vp-card {
+          position: relative;
+          background: #fff;
+          border: 4px solid ${NAVY};
+          border-radius: 28px;
+          padding: 28px;
+          box-shadow: 0 0 0 6px #fff, 0 12px 0 6px rgba(11,42,130,0.18);
+        }
+        @media(max-width: 640px) {
+          .vp-card { padding: 20px 16px; border-radius: 24px; }
+        }
+        .vp-tape {
+          position: absolute;
+          top: -16px;
+          left: 50%;
+          width: 92px;
+          height: 26px;
+          margin-left: -46px;
+          transform: rotate(4deg);
+          background: repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px);
+          border: 2px solid rgba(11,42,130,0.25);
+          border-radius: 4px;
+        }
+        .vp-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 10px;
+          padding: 4px;
+        }
+        .vp-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+          min-height: 44px;
+          padding: 0 18px;
+          font: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          color: ${NAVY};
+          background: #fff;
+          border: 3px solid ${NAVY};
+          border-radius: 18px;
+          box-shadow: 0 4px 0 rgba(11,42,130,0.25);
+          cursor: pointer;
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .vp-tab:hover:not(:disabled) { transform: translateY(-2px); }
+        .vp-tab.on {
+          background: linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP});
+          box-shadow: 0 4px 0 ${NAVY};
+        }
+        .vp-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          min-height: 48px;
+          padding: 0 24px;
+          font: inherit;
+          font-size: 16px;
+          font-weight: 800;
+          color: ${NAVY};
+          text-decoration: none;
+          cursor: pointer;
+          background: linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP});
+          border: 3px solid ${NAVY};
+          border-radius: 18px;
+          box-shadow: 0 6px 0 ${NAVY};
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .vp-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 ${NAVY}; }
+        .vp-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 ${NAVY}; }
+        .vp-btn:disabled {
+          background: #fff3c4;
+          color: #8c9bc9;
+          border-color: #8c9bc9;
+          box-shadow: 0 5px 0 #c3cce6;
+          cursor: not-allowed;
+        }
+        .vp-btn.ghost { background: #fff; }
+        .vp-btn.small { min-height: 42px; font-size: 14px; padding: 0 16px; box-shadow: 0 4px 0 ${NAVY}; }
+        .vp-tag {
+          display: inline-block;
+          font-size: 12px;
+          font-weight: 800;
+          color: ${NAVY};
+          border: 2.5px solid ${NAVY};
+          border-radius: 20px;
+          padding: 3px 12px;
+          background: #fff6cf;
+        }
+        .vp-error {
+          margin: 12px 0;
+          padding: 10px 14px;
+          border: 3px solid #ff6b57;
+          background: #fff1ee;
+          color: #b3261e;
+          border-radius: 16px;
+          font-weight: 700;
+          font-size: 14px;
+        }
+      `}</style>
+    </div>
   );
 }

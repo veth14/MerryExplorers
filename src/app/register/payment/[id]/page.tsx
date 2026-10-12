@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { m, AnimatePresence } from "framer-motion";
-import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
+import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { readReceipt } from "@/lib/receipt-ocr";
 
@@ -18,9 +18,54 @@ type RegData = {
   paymentDeadline?: string;
 };
 
-const inputCls =
-  "w-full bg-[#f8fafc] border-2 border-transparent rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-[#002f76] placeholder:text-[#94a3b8] placeholder:font-medium focus:outline-none focus:border-[#0033A0]/30 focus:bg-white transition-all";
-const labelCls = "block text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-1.5";
+// ─── Design Tokens (aligned with Parent Portal / TrailblazerDashboard) ───────
+const NAVY = "#0b2a82";
+const BLUE = "#1f7ae0";
+const SUN = "#ffd23f";
+const SUN_LIGHT = "#ffe066";
+const SUN_DEEP = "#ffb82e";
+const INPUT_BG = "#f2faff";
+const INPUT_BORDER = "#b6dcf5";
+const TEXT_2 = "#3d5a99";
+
+function Cloud({ className }: { className: string }) {
+  return (
+    <svg className={`vp-cloud vp-sticker ${className}`} viewBox="-4 -16 124 78" aria-hidden="true">
+      <path d="M26 52a18 18 0 0 1-2-35 24 24 0 0 1 46-6 20 20 0 0 1 28 18 14 14 0 0 1-4 23z" fill="#fff" stroke="#cfeaff" strokeWidth="3" />
+    </svg>
+  );
+}
+
+function Star({ style, far = false }: { style: React.CSSProperties; far?: boolean }) {
+  return (
+    <svg className={`vp-star vp-sticker ${far ? "far" : ""}`} style={style} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 2 3 6.5 7 .9-5.2 4.8 1.4 7L12 17.7 5.8 21.2l1.4-7L2 9.4l7-.9z" fill={SUN} stroke={SUN_DEEP} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PortalScene() {
+  return (
+    <div className="vp-scene" aria-hidden="true">
+      <svg className="vp-sun vp-sticker" viewBox="0 0 140 140">
+        <g className="vp-rays">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <ellipse key={i} cx="70" cy="16" rx="6" ry="12" fill={SUN} stroke={SUN_DEEP} strokeWidth="2" transform={`rotate(${i * 30} 70 70)`} />
+          ))}
+        </g>
+        <circle cx="70" cy="70" r="36" fill={SUN_LIGHT} stroke={SUN_DEEP} strokeWidth="5" />
+        <circle cx="52" cy="77" r="6" fill="#ffa9c4" opacity=".85" /><circle cx="88" cy="77" r="6" fill="#ffa9c4" opacity=".85" />
+        <circle cx="58" cy="64" r="3.5" fill={NAVY} /><circle cx="82" cy="64" r="3.5" fill={NAVY} />
+        <path d="M58 76q12 11 24 0" fill="none" stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" />
+      </svg>
+      <Cloud className="c1" /><Cloud className="c2" /><Cloud className="c3" />
+      <Star style={{ top: "18%", left: "5%" }} />
+      <Star far style={{ top: "10%", left: "68%" }} />
+      <Star style={{ top: "45%", left: "92%" }} />
+      <Star far style={{ top: "68%", left: "6%" }} />
+    </div>
+  );
+}
 
 export default function PaymentPage() {
   const params = useParams();
@@ -34,7 +79,7 @@ export default function PaymentPage() {
 
   const [regData, setRegData] = useState<RegData | null>(null);
 
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("gcash");
   const [receiptPreview, setReceiptPreview] = useState("");
   const [receiptBase64, setReceiptBase64] = useState("");
   const [isNewFamily, setIsNewFamily] = useState(true);
@@ -62,7 +107,6 @@ export default function PaymentPage() {
             if (typeof data.data.isNewFamily === "boolean") {
               setIsNewFamily(data.data.isNewFamily);
             }
-            // Sync addon selections made during registration
             if (typeof data.data.uniformOrdered === "boolean") setUniformOrdered(data.data.uniformOrdered);
             if (typeof data.data.lanyardOrdered === "boolean") setLanyardOrdered(data.data.lanyardOrdered);
             if (typeof data.data.welcomeKitOrdered === "boolean") setWelcomeKitOrdered(data.data.welcomeKitOrdered);
@@ -201,319 +245,518 @@ export default function PaymentPage() {
   if (!mounted) return null;
 
   const isExpired = timeLeft === "00:00";
-  const showErrorScreen =
-    !!error && (!regData || regData.status !== "reserved" || isExpired);
+  const showErrorScreen = !!error && (!regData || regData.status !== "reserved" || isExpired);
 
   return (
-    <div className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]"></div>
-        <div aria-hidden className="absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1]"></div>
-      </div>
+    <div className="vp-root min-h-screen relative overflow-x-hidden">
+      <PortalScene />
 
-      <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">
-        <div className="mx-auto flex h-[80px] w-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
+      {/* ── Top Header ────────────────────────────────────────────────────── */}
+      <header className="relative z-20 bg-white/80 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1000px] items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="40px" className="object-contain" />
+            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border-2 border-[#0b2a82] bg-white p-1 shadow-[0_3px_0_#0b2a82]">
+              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" />
             </div>
             <span className="flex flex-col leading-none">
-              <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">Merry</span>
-              <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">Explorers</span>
+              <span className="text-[18px] font-black tracking-tight text-[#0b2a82]">Merry Explorers</span>
+              <span className="text-[11px] font-extrabold tracking-widest text-[#ff8a1f]">PARENT PORTAL</span>
             </span>
           </Link>
-          <nav className="hidden md:flex items-center gap-2">
-            {NAV_LINKS.map((link) => (
-              <Link key={link.label} href={link.href} className="rounded-full px-6 py-2.5 text-[15px] font-bold transition-all text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]">
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex items-center gap-2">
+            <span className="vp-tag text-[12px] font-black uppercase">
+              🌟 2026 ADVENTURE 2
+            </span>
+          </div>
         </div>
       </header>
 
-      <main className="relative z-10 flex-grow flex flex-col items-center justify-start px-5 py-12 sm:py-16">
-        <div className="w-full max-w-[800px]">
-          {loading ? (
-            <div className="text-center py-20 text-[#0033A0] animate-pulse font-bold">Loading...</div>
-          ) : success ? (
-            <m.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8 bg-white rounded-3xl p-8 shadow-xl">
-              <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-5xl shadow-xl shadow-green-500/20">🎉</div>
-              <h2 className="font-headline text-[30px] font-extrabold text-[#002f76]">Payment Received!</h2>
-              <p className="mt-3 text-[16px] font-medium text-[#64748b] max-w-md mx-auto leading-relaxed">
-                Your payment has been successfully submitted. Our team will review and verify it within 1–2 business days. You will receive an email confirmation once verified.
-              </p>
-              <div className="mt-8 flex justify-center">
-                <Link href="/" className="rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 hover:bg-[#002f76] transition-colors">
-                  Back to Home
-                </Link>
-              </div>
-            </m.div>
-          ) : regData?.status === "early-bird" ? (
-            <m.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-3xl bg-white p-10 shadow-[0_8px_40px_rgba(234,88,12,0.1)] text-center border-t-8 border-orange-500 relative overflow-hidden">
-              <div aria-hidden className="absolute -top-20 -right-20 w-40 h-40 bg-orange-400 rounded-full blur-[80px] opacity-20 pointer-events-none"></div>
-              <span className="text-6xl mb-6 block drop-shadow-sm">🐣</span>
-              <h2 className="font-headline text-[32px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-amber-500 mb-3 tracking-tight">Slot Secured!</h2>
-              <div className="text-[16px] font-medium text-[#64748b] mb-8 max-w-[400px] mx-auto leading-relaxed">
-                <p>
-                  You are registered as an <strong className="text-orange-600">Early Bird</strong>! Your slot is guaranteed and no payment is required right now.
-                </p>
-                {regData.paymentDeadline && (
-                  <span className="block mt-3 px-4 py-2 bg-orange-50 rounded-xl text-orange-700 font-bold border border-orange-100 text-[14px]">
-                    Payment is due by {new Date(regData.paymentDeadline).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
-                  </span>
-                )}
-                <span className="block mt-4 text-[14px]">We will send you an email reminder when it&apos;s time to open your payment portal!</span>
-              </div>
-              <div className="mt-8 flex justify-center">
-                <Link href="/" className="rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-orange-500/25 hover:from-orange-600 hover:to-amber-600 transition-colors">
-                  Back to Home
-                </Link>
-              </div>
-            </m.div>
-          ) : showErrorScreen || !prog ? (
-            <div className="rounded-3xl bg-white p-8 shadow-xl text-center">
-              <span className="text-4xl mb-4 block">⚠️</span>
-              <h2 className="font-headline text-[24px] font-extrabold text-red-600 mb-2">
-                {error || "We couldn't find this registration."}
-              </h2>
-              <p className="text-[#64748b] mb-6">If you believe this is a mistake, please contact us.</p>
-              <Link href="/" className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50">Back to Home</Link>
+      {/* ── Main Content Area ────────────────────────────────────────────── */}
+      <main className="vp-main">
+
+        {/* Hero title */}
+        <div className="text-center flex flex-col items-center gap-2 -mb-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+            <span>💳</span> REGISTRATION PAYMENT
+          </div>
+          <h1 className="vp-title text-[32px] sm:text-[42px]">
+            Finalize Your Slot
+          </h1>
+          <p className="vp-sub text-[15px] max-w-md">
+            Submit your receipt below to confirm enrollment for <strong>2026 Adventure 2</strong>.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="vp-card text-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-[#ffe066] to-[#ffb82e] border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-3xl mx-auto mb-4 animate-bounce">
+              ⏳
             </div>
-          ) : (
-            <m.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white">
-
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-100 pb-4">
-                <div>
-                  <h2 className="font-headline text-[24px] font-extrabold text-[#002f76]">Secure Your Slot</h2>
-                  <p className="text-[14px] text-[#64748b]">Complete your payment to finalize registration.</p>
-                </div>
-                {timeLeft && (
-                  <div className="mt-4 sm:mt-0 flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-2">
-                    <span className="text-amber-500 animate-pulse text-lg">⏳</span>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700/70">Time Remaining</span>
-                      <span className="text-[16px] font-extrabold text-amber-700 font-mono leading-none">{timeLeft}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Note / Disclaimer Banner */}
-              <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-950 leading-relaxed shadow-xs">
-                <div className="flex items-center gap-2 font-extrabold text-amber-900 mb-1">
-                  <span>⚠️</span>
-                  <span>NOTE &amp; DISCLAIMER</span>
-                </div>
-                <p className="font-semibold text-amber-900">
-                  Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
-                </p>
-                <p className="mt-1.5 italic text-amber-800 text-[12px] bg-white/60 p-2.5 rounded-xl border border-amber-200/60">
-                  &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
-                </p>
-              </div>
-
-              {/* Payment Type Toggle */}
-              <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                <h3 className="mb-3 font-headline text-[16px] font-extrabold text-[#0033A0]">Payment Option</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setPaymentType("downpayment")}
-                    className={[
-                      "flex flex-col items-center gap-2 rounded-2xl border-2 p-5 transition-all duration-200",
-                      paymentType === "downpayment" ? "border-[#0033A0] bg-[#0033A0]/5 shadow-md" : "border-slate-200 hover:border-slate-300 bg-white",
-                    ].join(" ")}
-                  >
-                    <span className="text-2xl">💳</span>
-                    <p className="text-[14px] font-extrabold text-[#002f76]">Downpayment</p>
-                    <p className="text-[18px] font-extrabold text-[#0033A0]">₱{(prog.downpayment + addonCost).toLocaleString()}</p>
-                    {paymentType === "downpayment" && <span className="mt-1 inline-flex rounded-full bg-[#0033A0] px-3 py-0.5 text-[10px] font-bold text-white">✓ Selected</span>}
-                  </button>
-                  <button
-                    onClick={() => setPaymentType("full")}
-                    className={[
-                      "flex flex-col items-center gap-2 rounded-2xl border-2 p-5 transition-all duration-200",
-                      paymentType === "full" ? "border-green-500 bg-green-50 shadow-md" : "border-slate-200 hover:border-slate-300 bg-white",
-                    ].join(" ")}
-                  >
-                    <span className="text-2xl">🏆</span>
-                    <p className="text-[14px] font-extrabold text-[#002f76]">Full Payment</p>
-                    <p className="text-[18px] font-extrabold text-green-600">₱{(prog.rate + addonCost).toLocaleString()}</p>
-                    {paymentType === "full" && <span className="mt-1 inline-flex rounded-full bg-green-500 px-3 py-0.5 text-[10px] font-bold text-white">✓ Selected</span>}
-                  </button>
-                </div>
-              </div>
-
-              {/* Amount card */}
-              <div className={`mb-6 rounded-3xl p-6 text-white shadow-xl ${paymentType === "full" ? "bg-gradient-to-br from-green-600 to-green-500" : "bg-gradient-to-br from-[#0033A0] to-[#0066CC]"}`}>
-                <p className="text-[12px] font-bold uppercase tracking-widest opacity-70">Amount Due Today</p>
-                <p className="mt-1 text-[40px] font-extrabold leading-none">₱{amountDue.toLocaleString()}</p>
-                <div className="mt-4 space-y-1.5 bg-white/10 rounded-2xl px-4 py-3 text-[13px]">
-                  <div className="flex justify-between">
-                    <span className="opacity-80">{paymentType === "full" ? "Program Rate" : "Downpayment"}</span>
-                    <span className="font-bold">₱{(paymentType === "full" ? prog.rate : prog.downpayment).toLocaleString()}</span>
-                  </div>
-                  {isBallet && recitalKitOrdered && (
-                    <div className="flex justify-between">
-                      <span className="opacity-80">Recital Kit (Preorder)</span>
-                      <span className="font-bold">₱1,500</span>
-                    </div>
-                  )}
-                  {!isBallet && isNewFamily && (
-                    <div className="flex justify-between">
-                      <span className="opacity-80">Welcome Kit</span>
-                      <span className="font-bold">₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {!isBallet && !isNewFamily && uniformOrdered && (
-                    <div className="flex justify-between">
-                      <span className="opacity-80">Uniform Set</span>
-                      <span className="font-bold">₱{UNIFORM_KIT.price.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between border-t border-white/20 pt-2 mt-1 font-extrabold">
-                    <span>Total Due Now</span>
-                    <span>₱{amountDue.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment method */}
-              <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                <h3 className="mb-4 font-headline text-[16px] font-extrabold text-[#0033A0]">Select Payment Method</h3>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    { id: "gcash", label: "GCash", logo: "/gcash-logo.svg" },
-                    { id: "bpi", label: "BPI", logo: "/bpi-logo.svg" },
-                    { id: "mari-bank", label: "Mari Bank", logo: "/maribank-logo.svg" },
-                  ].map((method) => (
-                    <button
-                      key={method.id}
-                      onClick={() => setPaymentMethod(method.id)}
-                      className={["flex flex-col items-center justify-center gap-3 rounded-2xl border-2 py-5 px-3", paymentMethod === method.id ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"].join(" ")}
-                    >
-                      <div className="relative h-8 w-24"><Image src={method.logo} alt={method.label} fill className="object-contain" /></div>
-                      <span className="text-[13px] font-bold">{method.label}</span>
-                    </button>
-                  ))}
-                </div>
-                {paymentMethod && (
-                  <div className="mt-5">
-                    {[
-                      { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
-                      { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
-                      { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
-                    ].filter((pm) => pm.id === paymentMethod).map((pm) => (
-                      <div key={pm.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center text-center gap-5">
-                        <div className="relative w-full max-w-[320px] aspect-square rounded-2xl border-2 bg-white shadow-md">
-                          <Image src={pm.qr} alt="QR" fill className="object-contain p-4" />
-                        </div>
-                        <div className="max-w-sm">
-                          <p className="text-[16px] font-extrabold text-[#002f76] mb-2">📲 Scan to Pay via {pm.label}</p>
-                          <a href={pm.qr} download={`${pm.label}QR.png`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0033A0]/10 px-4 py-2 text-[12px] font-bold text-[#0033A0] mb-3">⬇️ Download QR Code</a>
-                          <p className="text-[12px] text-[#64748b]">Scan the QR code to send <strong>₱{amountDue.toLocaleString()}</strong>. Then upload the screenshot below.</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Add-ons */}
-              {isBallet ? (
-                <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                  <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">🩰 Recital Kit (Optional Preorder)</h3>
-                  <p className="mb-4 text-[13px] text-[#64748b]">Recital kit preorder starts on October 3. Inclusive of 2 guest passes, 1 mini bouquet, and 1 set of costume. Recital kit is required to participate in the group themed performance.</p>
-                  <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 ${recitalKitOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"}`}>
-                    <input type="checkbox" checked={recitalKitOrdered} onChange={(e) => setRecitalKitOrdered(e.target.checked)} className="mt-1" />
-                    <div>
-                      <p className="text-[14px] font-bold text-[#002f76]">Include Recital Kit — ₱1,500</p>
-                      <p className="text-[12px] text-[#64748b]">Added to your total due today.</p>
-                    </div>
-                  </label>
-                </div>
-              ) : (
-                <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                  <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">👕 Uniform & Add-ons</h3>
-                  <p className="mb-4 text-[13px] text-[#64748b]">{UNIFORM_KIT.note}</p>
-                  <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 mb-4 ${isNewFamily ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"}`}>
-                    <input
-                      type="checkbox"
-                      checked={isNewFamily}
-                      onChange={(e) => {
-                        setIsNewFamily(e.target.checked);
-                        if (e.target.checked) setUniformOrdered(false);
-                      }}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-[14px] font-bold text-[#002f76]">We are a New Family</p>
-                      <p className="text-[12px] text-[#64748b]">Welcome Kit (₱{UNIFORM_KIT.welcomeKitPrice}) is required.</p>
-                    </div>
-                  </label>
-                  {!isNewFamily && (
-                    <label className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 ${uniformOrdered ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200"}`}>
-                      <input type="checkbox" checked={uniformOrdered} onChange={(e) => setUniformOrdered(e.target.checked)} className="mt-1" />
-                      <div><p className="text-[14px] font-bold text-[#002f76]">Uniform Set only — ₱{UNIFORM_KIT.price.toLocaleString()}</p></div>
-                    </label>
-                  )}
+            <p className="text-[18px] font-extrabold text-[#0b2a82]">Loading registration payment details…</p>
+          </div>
+        ) : success ? (
+          <div className="vp-card text-center py-12">
+            <div className="vp-tape" />
+            <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+              🎉
+            </div>
+            <h2 className="vp-h2 text-[28px] mb-2">Payment Submitted!</h2>
+            <p className="vp-sub max-w-md mx-auto text-[15px] mb-8 leading-relaxed">
+              Your receipt has been successfully recorded! Our administrative team will verify your payment shortly. An email confirmation has been sent to your email.
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link href="/parent/dashboard" className="vp-btn">
+                Go to Parent Dashboard 🚀
+              </Link>
+            </div>
+          </div>
+        ) : regData?.status === "early-bird" ? (
+          <div className="vp-card text-center py-12">
+            <div className="vp-tape" />
+            <div className="w-20 h-20 rounded-full bg-amber-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+              🐣
+            </div>
+            <h2 className="vp-h2 text-[28px] mb-2">Early Bird Slot Secured!</h2>
+            <div className="vp-sub max-w-md mx-auto text-[15px] mb-8 space-y-2 leading-relaxed">
+              <p>You are officially registered as an <strong>Early Bird</strong>! Your slot is guaranteed and no upfront payment is needed right now.</p>
+              {regData.paymentDeadline && (
+                <div className="rounded-2xl bg-[#fff6cf] border-2 border-[#0b2a82] p-3 text-[13px] font-extrabold text-[#0b2a82]">
+                  Payment is due by {new Date(regData.paymentDeadline).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
                 </div>
               )}
+            </div>
+            <div className="flex justify-center">
+              <Link href="/" className="vp-btn">
+                Return to Home
+              </Link>
+            </div>
+          </div>
+        ) : showErrorScreen || !prog ? (
+          <div className="vp-card text-center py-12">
+            <div className="vp-tape" />
+            <div className="w-20 h-20 rounded-full bg-red-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+              ⚠️
+            </div>
+            <h2 className="vp-h2 text-[24px] text-red-600 mb-2">
+              {error || "We couldn't find this registration."}
+            </h2>
+            <p className="vp-sub mb-6">If you believe this is an error, please contact Teacher Kyle or Teacher Angel.</p>
+            <Link href="/" className="vp-btn ghost small">Back to Home</Link>
+          </div>
+        ) : (
+          <div className="vp-card">
+            <div className="vp-tape" />
 
-              {/* Receipt upload */}
-              <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                <h3 className="mb-1 font-headline text-[16px] font-extrabold text-[#0033A0]">Upload Payment Receipt *</h3>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-                {receiptPreview ? (
-                  <div className="relative">
-                    <div className="relative aspect-[4/3] w-full max-w-sm mx-auto rounded-2xl border border-slate-200 overflow-hidden"><Image src={receiptPreview} alt="Preview" fill className="object-contain" /></div>
-                    <button
-                      onClick={() => {
-                        setReceiptPreview("");
-                        setReceiptBase64("");
-                        setReferenceNumber("");
-                        setOcrDone(false);
-                      }}
-                      className="mt-3 text-[13px] text-red-500"
-                    >
-                      Remove
-                    </button>
+            {/* Countdown Banner */}
+            {timeLeft && (
+              <div className="vp-due mb-6">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">⏳</span>
+                    <span className="text-[13px] font-extrabold uppercase tracking-wider text-white">RESERVATION TIME REMAINING</span>
                   </div>
-                ) : (
-                  <button onClick={() => fileInputRef.current?.click()} className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 px-6 text-center hover:bg-[#f0f5ff]"><span className="text-4xl">📸</span><p className="text-[14px] font-bold text-[#002f76]">Upload receipt</p></button>
-                )}
+                  <div className="font-mono text-[22px] font-black bg-white/20 px-3 py-0.5 rounded-xl border border-white/30 text-white">
+                    {timeLeft}
+                  </div>
+                </div>
+              </div>
+            )}
 
-                {receiptBase64 && (
-                  <div className="mt-5 border-t border-slate-100 pt-5">
-                    <label className={labelCls}>Reference Number</label>
-                    <input className={inputCls} value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
-                    {ocrLoading && <p className="text-[12px] text-[#64748b] mt-1 animate-pulse">Reading receipt…</p>}
-                    {ocrDone && !ocrLoading && !referenceNumber && (
-                      <p className="text-[12px] text-[#64748b] mt-1">Couldn&apos;t detect the reference number — please enter it manually.</p>
-                    )}
+            {/* Note / Disclaimer Banner */}
+            <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
+              <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
+                <span>⚠️</span>
+                <span>NOTE &amp; DISCLAIMER</span>
+              </div>
+              <p className="font-bold text-[#0b2a82] leading-snug">
+                Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
+              </p>
+              <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
+                &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+              </p>
+            </div>
 
-                    <label className={`${labelCls} mt-4`}>Amount Sent</label>
-                    <input className={inputCls} value={amountPaid} onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))} />
-                    {amountShort > 0 && <p className="text-red-500 text-[12px] mt-1 font-bold">Short by ₱{amountShort.toLocaleString()}</p>}
+            {/* Payment Option Selector */}
+            <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+              <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-3">Choose Payment Option</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentType("downpayment")}
+                  className={`flex flex-col items-center gap-1.5 rounded-2xl border-3 p-4 transition-all text-center ${paymentType === "downpayment"
+                    ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_5px_0_#0b2a82]"
+                    : "bg-white border-[#b6dcf5] hover:border-[#0b2a82]"
+                    }`}
+                >
+                  <span className="text-2xl">💳</span>
+                  <p className="text-[13px] font-extrabold text-[#0b2a82]">Downpayment (60%)</p>
+                  <p className="text-[18px] font-black text-[#1f7ae0]">₱{(prog.downpayment + addonCost).toLocaleString()}</p>
+                  {paymentType === "downpayment" && <span className="vp-tag text-[10px] py-0.5">✓ Selected</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentType("full")}
+                  className={`flex flex-col items-center gap-1.5 rounded-2xl border-3 p-4 transition-all text-center ${paymentType === "full"
+                    ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_5px_0_#0b2a82]"
+                    : "bg-white border-[#b6dcf5] hover:border-[#0b2a82]"
+                    }`}
+                >
+                  <span className="text-2xl">🏆</span>
+                  <p className="text-[13px] font-extrabold text-[#0b2a82]">Full Payment (100%)</p>
+                  <p className="text-[18px] font-black text-emerald-600">₱{(prog.rate + addonCost).toLocaleString()}</p>
+                  {paymentType === "full" && <span className="vp-tag text-[10px] py-0.5 bg-emerald-100 text-emerald-800 border-emerald-400">✓ Selected</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Total Due Breakdown Card */}
+            <div className="mb-6 rounded-[22px] bg-gradient-to-r from-[#0b2a82] to-[#1f7ae0] p-6 text-white border-3 border-[#0b2a82] shadow-[0_6px_0_#0b2a82]">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/80">Total Due Today</p>
+                  <p className="text-[36px] font-black leading-none mt-1">₱{amountDue.toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <span className="rounded-full bg-[#ffd23f] text-[#0b2a82] px-3 py-1 text-[11px] font-black uppercase">
+                    {prog.name}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1.5 bg-white/15 rounded-xl p-3.5 text-[13px] border border-white/20">
+                <div className="flex justify-between">
+                  <span className="text-white/80">{paymentType === "full" ? "Full Program Rate" : "Downpayment (60%)"}</span>
+                  <span className="font-extrabold">₱{(paymentType === "full" ? prog.rate : prog.downpayment).toLocaleString()}</span>
+                </div>
+                {isBallet && recitalKitOrdered && (
+                  <div className="flex justify-between">
+                    <span className="text-white/80">Recital Kit (Preorder)</span>
+                    <span className="font-extrabold">₱1,500</span>
                   </div>
                 )}
+                {!isBallet && isNewFamily && (
+                  <div className="flex justify-between">
+                    <span className="text-white/80">Welcome Kit</span>
+                    <span className="font-extrabold">₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</span>
+                  </div>
+                )}
+                {!isBallet && !isNewFamily && uniformOrdered && (
+                  <div className="flex justify-between">
+                    <span className="text-white/80">Uniform Set</span>
+                    <span className="font-extrabold">₱{UNIFORM_KIT.price.toLocaleString()}</span>
+                  </div>
+                )}
+                {!isBallet && !isNewFamily && lanyardOrdered && (
+                  <div className="flex justify-between">
+                    <span className="text-white/80">Lanyard & Name Tag</span>
+                    <span className="font-extrabold">₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-white/30 pt-2 font-black text-[14px]">
+                  <span>Total Due Now</span>
+                  <span className="text-[#ffd23f]">₱{amountDue.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method Selector */}
+            <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+              <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-3">Select Payment Method</h3>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  { id: "gcash", label: "GCash", logo: "/gcash-logo.svg" },
+                  { id: "bpi", label: "BPI", logo: "/bpi-logo.svg" },
+                  { id: "mari-bank", label: "Mari Bank", logo: "/maribank-logo.svg" },
+                ].map((method) => (
+                  <button
+                    key={method.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(method.id)}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-3 py-4 px-3 transition-all ${paymentMethod === method.id
+                      ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_5px_0_#0b2a82]"
+                      : "bg-white border-[#b6dcf5] hover:border-[#0b2a82]"
+                      }`}
+                  >
+                    <div className="relative h-7 w-20"><Image src={method.logo} alt={method.label} fill className="object-contain" /></div>
+                    <span className="text-[13px] font-extrabold text-[#0b2a82]">{method.label}</span>
+                  </button>
+                ))}
               </div>
 
-              {error && <div className="mb-4 bg-red-50 text-red-700 px-4 py-3 rounded-xl text-[13px] font-bold">{error}</div>}
+              {/* QR Code Card */}
+              {paymentMethod && (
+                <div className="mt-5">
+                  {[
+                    { id: "gcash", label: "GCash", qr: "/GCASHQRONLY.png" },
+                    { id: "bpi", label: "BPI", qr: "/BPIQRONLY.png" },
+                    { id: "mari-bank", label: "Mari Bank", qr: "/MARIBANKQRONLY.png" },
+                  ].filter((pm) => pm.id === paymentMethod).map((pm) => (
+                    <div key={pm.id} className="rounded-2xl border-2 border-[#b6dcf5] bg-white p-5 flex flex-col items-center text-center gap-4">
+                      <div className="relative w-full max-w-[280px] aspect-square rounded-2xl border-3 border-[#0b2a82] bg-white shadow-[0_4px_0_#0b2a82] overflow-hidden">
+                        <Image src={pm.qr} alt="QR" fill className="object-contain p-3" />
+                      </div>
+                      <div className="max-w-sm">
+                        <p className="text-[15px] font-black text-[#0b2a82] mb-1">📲 Scan QR to Pay via {pm.label}</p>
+                        <a href={pm.qr} download={`${pm.label}QR.png`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#f2faff] border-2 border-[#0b2a82] px-3.5 py-1.5 text-[12px] font-black text-[#0b2a82] shadow-[0_2px_0_#0b2a82] mb-2 hover:bg-[#ffe066] transition-colors">
+                          ⬇️ Download QR Code
+                        </a>
+                        <p className="text-[12px] font-medium text-[#3d5a99]">Scan to transfer <strong>₱{amountDue.toLocaleString()}</strong>, then upload the receipt screenshot below.</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-              <button
-                disabled={!canProceed || submitting}
-                onClick={handleSubmit}
-                className="w-full rounded-2xl bg-green-500 py-4 text-[16px] font-bold text-white hover:bg-green-600 disabled:opacity-50"
-              >
-                {submitting ? "Submitting..." : "Complete Registration"}
-              </button>
+            {/* Receipt Upload & OCR Scanner */}
+            <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+              <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-1">Upload Payment Receipt *</h3>
+              <p className="text-[12.5px] font-medium text-[#3d5a99] mb-4">Our automatic receipt reader will read your Reference Number and Amount sent.</p>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-            </m.div>
-          )}
-        </div>
+              {receiptPreview ? (
+                <div className="relative text-center">
+                  <div className="relative aspect-[4/3] w-full max-w-sm mx-auto rounded-2xl border-3 border-[#0b2a82] bg-white shadow-[0_4px_0_#0b2a82] overflow-hidden">
+                    <Image src={receiptPreview} alt="Receipt Preview" fill className="object-contain" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptPreview("");
+                      setReceiptBase64("");
+                      setReferenceNumber("");
+                      setOcrDone(false);
+                    }}
+                    className="mt-3 text-[13px] font-black text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    ✕ Remove &amp; Re-upload
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full flex-col items-center gap-3 rounded-2xl border-3 border-dashed border-[#0b2a82] bg-white py-8 px-6 text-center hover:bg-[#fff6cf] transition-all cursor-pointer"
+                >
+                  <span className="text-4xl animate-bounce">📸</span>
+                  <div>
+                    <p className="text-[15px] font-black text-[#0b2a82]">Click to upload screenshot</p>
+                    <p className="text-[12px] font-medium text-[#3d5a99]">JPG, PNG, or screenshot from GCash / Banking App</p>
+                  </div>
+                </button>
+              )}
+
+              {receiptBase64 && (
+                <div className="mt-5 border-t-2 border-[#b6dcf5] pt-4 space-y-3">
+                  {ocrLoading && (
+                    <div className="flex items-center gap-2 rounded-xl bg-[#fff6cf] border-2 border-[#0b2a82] p-3 text-[12px] font-extrabold text-[#0b2a82] animate-pulse">
+                      <span>🔍</span> Reading receipt with automatic OCR…
+                    </div>
+                  )}
+                  {ocrDone && !ocrLoading && (
+                    <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border-2 border-emerald-400 p-2.5 text-[12px] font-extrabold text-emerald-800">
+                      <span>✓</span> Receipt scanned. Please verify the detected values below.
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-1">Reference Number</label>
+                    <input
+                      className="w-full bg-white border-3 border-[#b6dcf5] rounded-xl px-4 py-3 text-[14px] font-extrabold text-[#0b2a82] focus:border-[#0b2a82] focus:outline-none"
+                      value={referenceNumber}
+                      onChange={(e) => setReferenceNumber(e.target.value)}
+                      placeholder="e.g. 100234857291"
+                    />
+                    {ocrDone && !ocrLoading && !referenceNumber && (
+                      <p className="text-[11px] font-bold text-amber-700 mt-1">Couldn&apos;t detect the reference number automatically — please enter it manually.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-1">Amount Sent (₱)</label>
+                    <input
+                      className="w-full bg-white border-3 border-[#b6dcf5] rounded-xl px-4 py-3 text-[14px] font-extrabold text-[#0b2a82] focus:border-[#0b2a82] focus:outline-none"
+                      value={amountPaid}
+                      onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder={`e.g. ${amountDue}`}
+                    />
+                    {amountShort > 0 && (
+                      <p className="text-red-600 text-[12px] mt-1 font-black">⚠️ Amount entered is short by ₱{amountShort.toLocaleString()}</p>
+                    )}
+                    {creditBalance > 0 && (
+                      <p className="text-emerald-700 text-[12px] mt-1 font-bold">✨ Overpayment of ₱{creditBalance.toLocaleString()} will be credited to balance.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {error && <div className="vp-error mb-4">❌ {error}</div>}
+
+            <button
+              disabled={!canProceed || submitting}
+              onClick={handleSubmit}
+              className="w-full vp-btn"
+            >
+              {submitting ? "Submitting Payment..." : "Submit Payment Receipt 🎉"}
+            </button>
+          </div>
+        )}
+
+        <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
+          Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
+        </p>
       </main>
+
       <SiteFooter />
+
+      <style jsx global>{`
+        .vp-root {
+          color: ${NAVY};
+          font-family: inherit;
+          background: radial-gradient(ellipse at 50% 0%, #b9e5fb 0%, #8fd3f7 55%, #74c3f1 100%);
+          background-attachment: fixed;
+        }
+        .vp-root * { box-sizing: border-box; }
+        .vp-main {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 28px 20px 100px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; }
+        .vp-h2 { margin: 0; font-size: 22px; font-weight: 800; color: ${NAVY}; }
+        .vp-h3 { margin: 0 0 10px; font-size: 16px; font-weight: 800; color: ${NAVY}; display: flex; align-items: center; gap: 8px; }
+        .vp-title {
+          margin: 0;
+          font-size: 38px;
+          font-weight: 800;
+          line-height: 1.15;
+          color: ${BLUE};
+          -webkit-text-stroke: 6px ${NAVY};
+          paint-order: stroke fill;
+          text-shadow: 0 4px 0 ${NAVY};
+          filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff);
+        }
+        .vp-sticker {
+          filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff);
+        }
+        .vp-scene {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        .vp-sun {
+          position: absolute;
+          top: 12px;
+          right: 24px;
+          width: 130px;
+          animation: vp-bob 5s ease-in-out infinite;
+        }
+        .vp-rays { transform-origin: 70px 70px; animation: vp-rot 40s linear infinite; }
+        .vp-cloud {
+          position: absolute;
+          left: 0;
+          width: 130px;
+          overflow: visible;
+          animation: vp-drift linear infinite;
+        }
+        .vp-cloud.c1 { top: 16%; animation-duration: 70s; }
+        .vp-cloud.c2 { top: 46%; width: 104px; animation-duration: 90s; animation-delay: -40s; }
+        .vp-cloud.c3 { top: 72%; width: 140px; animation-duration: 60s; animation-delay: -20s; }
+        .vp-star { position: absolute; width: 26px; animation: vp-twinkle 2.6s ease-in-out infinite; }
+        @keyframes vp-bob { 50% { transform: translateY(10px); } }
+        @keyframes vp-rot { to { transform: rotate(360deg); } }
+        @keyframes vp-drift { from { transform: translateX(-200px); } to { transform: translateX(110vw); } }
+        @keyframes vp-twinkle { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.5; } }
+        .vp-card {
+          position: relative;
+          background: #fff;
+          border: 4px solid ${NAVY};
+          border-radius: 28px;
+          padding: 28px;
+          box-shadow: 0 0 0 6px #fff, 0 12px 0 6px rgba(11,42,130,0.18);
+        }
+        @media(max-width: 640px) {
+          .vp-card { padding: 20px 16px; border-radius: 24px; }
+        }
+        .vp-tape {
+          position: absolute;
+          top: -16px;
+          left: 50%;
+          width: 92px;
+          height: 26px;
+          margin-left: -46px;
+          transform: rotate(4deg);
+          background: repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px);
+          border: 2px solid rgba(11,42,130,0.25);
+          border-radius: 4px;
+        }
+        .vp-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          min-height: 48px;
+          padding: 0 24px;
+          font: inherit;
+          font-size: 16px;
+          font-weight: 800;
+          color: ${NAVY};
+          text-decoration: none;
+          cursor: pointer;
+          background: linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP});
+          border: 3px solid ${NAVY};
+          border-radius: 18px;
+          box-shadow: 0 6px 0 ${NAVY};
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .vp-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 ${NAVY}; }
+        .vp-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 ${NAVY}; }
+        .vp-btn:disabled {
+          background: #fff3c4;
+          color: #8c9bc9;
+          border-color: #8c9bc9;
+          box-shadow: 0 5px 0 #c3cce6;
+          cursor: not-allowed;
+        }
+        .vp-btn.ghost { background: #fff; }
+        .vp-btn.small { min-height: 42px; font-size: 14px; padding: 0 16px; box-shadow: 0 4px 0 ${NAVY}; }
+        .vp-due {
+          background: linear-gradient(135deg, ${BLUE}, #2f8bf0);
+          border: 3px solid ${NAVY};
+          border-radius: 20px;
+          padding: 14px 18px;
+          color: #fff;
+          box-shadow: 0 5px 0 ${NAVY};
+        }
+        .vp-tag {
+          display: inline-block;
+          font-size: 12px;
+          font-weight: 800;
+          color: ${NAVY};
+          border: 2.5px solid ${NAVY};
+          border-radius: 20px;
+          padding: 3px 12px;
+          background: #fff6cf;
+        }
+        .vp-error {
+          margin: 12px 0;
+          padding: 10px 14px;
+          border: 3px solid #ff6b57;
+          background: #fff1ee;
+          color: #b3261e;
+          border-radius: 16px;
+          font-weight: 700;
+          font-size: 14px;
+        }
+      `}</style>
     </div>
   );
 }

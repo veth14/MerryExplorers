@@ -6,39 +6,63 @@ import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { SiteFooter } from "@/components/landing/site-footer";
-import { NAV_LINKS } from "@/data/landing";
 import Tesseract from "tesseract.js";
-
 import SignatureCanvas from "react-signature-canvas";
 
 type ProgramId = keyof typeof PROGRAM_SLOTS;
 type SlotData = Record<string, Record<string, { maxSlots: number; taken: number; available: number }>>;
 
-// Step order: 0 = Details, 1 = Program, 2 = Consents, 3 = Review
+// ─── Design Tokens (aligned with Parent Portal / TrailblazerDashboard) ───────
+const NAVY = "#0b2a82";
+const BLUE = "#1f7ae0";
+const SUN = "#ffd23f";
+const SUN_LIGHT = "#ffe066";
+const SUN_DEEP = "#ffb82e";
+const INPUT_BG = "#f2faff";
+const INPUT_BORDER = "#b6dcf5";
+const TEXT_2 = "#3d5a99";
+
 const STEPS = ["Details", "Program", "Consents", "Review"];
 
 const inputCls =
-  "w-full bg-[#f8fafc] border-2 border-transparent rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-[#002f76] placeholder:text-[#94a3b8] placeholder:font-medium focus:outline-none focus:border-[#0033A0]/30 focus:bg-white transition-all";
-const labelCls = "block text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-1.5";
+  "w-full bg-[#f2faff] border-3 border-[#b6dcf5] rounded-xl px-4 py-3 text-[14px] font-extrabold text-[#0b2a82] placeholder:text-[#3d5a99]/50 placeholder:font-semibold focus:outline-none focus:border-[#0b2a82] focus:bg-white transition-all";
+const labelCls = "block text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-1.5";
 
-function StepDot({ label, index, current }: { label: string; index: number; current: number }) {
-  const done = index < current;
-  const active = index === current;
+function Cloud({ className }: { className: string }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div
-        className={[
-          "flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-extrabold transition-all duration-300",
-          done
-            ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
-            : active
-              ? "bg-[#0033A0] text-white shadow-lg shadow-[#0033A0]/30 scale-110"
-              : "bg-slate-100 text-[#94a3b8]",
-        ].join(" ")}
-      >
-        {done ? "✓" : index + 1}
-      </div>
-      <span className={`text-[10px] font-bold ${active ? "text-[#0033A0]" : "text-[#94a3b8]"}`}>{label}</span>
+    <svg className={`vp-cloud vp-sticker ${className}`} viewBox="-4 -16 124 78" aria-hidden="true">
+      <path d="M26 52a18 18 0 0 1-2-35 24 24 0 0 1 46-6 20 20 0 0 1 28 18 14 14 0 0 1-4 23z" fill="#fff" stroke="#cfeaff" strokeWidth="3" />
+    </svg>
+  );
+}
+
+function Star({ style, far = false }: { style: React.CSSProperties; far?: boolean }) {
+  return (
+    <svg className={`vp-star vp-sticker ${far ? "far" : ""}`} style={style} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 2 3 6.5 7 .9-5.2 4.8 1.4 7L12 17.7 5.8 21.2l1.4-7L2 9.4l7-.9z" fill={SUN} stroke={SUN_DEEP} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PortalScene() {
+  return (
+    <div className="vp-scene" aria-hidden="true">
+      <svg className="vp-sun vp-sticker" viewBox="0 0 140 140">
+        <g className="vp-rays">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <ellipse key={i} cx="70" cy="16" rx="6" ry="12" fill={SUN} stroke={SUN_DEEP} strokeWidth="2" transform={`rotate(${i * 30} 70 70)`} />
+          ))}
+        </g>
+        <circle cx="70" cy="70" r="36" fill={SUN_LIGHT} stroke={SUN_DEEP} strokeWidth="5" />
+        <circle cx="52" cy="77" r="6" fill="#ffa9c4" opacity=".85" /><circle cx="88" cy="77" r="6" fill="#ffa9c4" opacity=".85" />
+        <circle cx="58" cy="64" r="3.5" fill={NAVY} /><circle cx="82" cy="64" r="3.5" fill={NAVY} />
+        <path d="M58 76q12 11 24 0" fill="none" stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" />
+      </svg>
+      <Cloud className="c1" /><Cloud className="c2" /><Cloud className="c3" />
+      <Star style={{ top: "18%", left: "5%" }} />
+      <Star far style={{ top: "10%", left: "68%" }} />
+      <Star style={{ top: "45%", left: "92%" }} />
+      <Star far style={{ top: "68%", left: "6%" }} />
     </div>
   );
 }
@@ -54,18 +78,17 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 
 function SlotPill({ available, max }: { available: number; max: number }) {
   if (max >= 900) {
-    return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-green-100 text-green-700">Available</span>;
+    return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">Available</span>;
   }
   const pct = available / max;
-  const color = pct === 0 ? "bg-red-100 text-red-600" : pct <= 0.3 ? "bg-orange-100 text-orange-600" : "bg-green-100 text-green-700";
+  const color = pct === 0 ? "bg-red-100 text-red-700 border border-red-300" : pct <= 0.3 ? "bg-amber-100 text-amber-800 border border-amber-300" : "bg-emerald-100 text-emerald-800 border border-emerald-300";
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${color}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${color}`}>
       {available === 0 ? "Full" : `${available} slot${available !== 1 ? "s" : ""} left`}
     </span>
   );
 }
 
-// New key so drafts saved with the old step order are ignored
 const STORAGE_KEY = "me_register_draft_v2";
 
 function loadDraft() {
@@ -74,7 +97,7 @@ function loadDraft() {
 }
 
 function saveDraft(data: object) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* quota exceeded – ignore */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* ignore */ }
 }
 
 function clearDraft() {
@@ -95,14 +118,13 @@ export default function RegisterPage() {
   const [slots, setSlots] = useState<SlotData>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [registrationId, setRegistrationId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Lead capture (created when the parent continues from Details)
+  // Lead capture
   const [leadId, setLeadId] = useState<string>(draft?.leadId ?? "");
   const [savingLead, setSavingLead] = useState(false);
 
-  // Form state — all hydrated from localStorage draft on first render
+  // Form state
   const [selectedProgram, setSelectedProgram] = useState<ProgramId | "">(draft?.selectedProgram ?? "");
   const [selectedClass, setSelectedClass] = useState<string>(draft?.selectedClass ?? "");
   const [childInfo, setChildInfo] = useState(draft?.childInfo ?? {
@@ -123,9 +145,6 @@ export default function RegisterPage() {
   const sigCanvas = useRef<SignatureCanvas>(null);
   const waiverScrollRef = useRef<HTMLDivElement>(null);
 
-  const [paymentMethod, setPaymentMethod] = useState<string>(draft?.paymentMethod ?? "");
-  const [receiptPreview, setReceiptPreview] = useState<string>(draft?.receiptPreview ?? "");
-  const [receiptBase64, setReceiptBase64] = useState<string>(draft?.receiptBase64 ?? "");
   const [isNewFamily, setIsNewFamily] = useState<boolean>(draft?.isNewFamily ?? true);
   const [uniformOrdered, setUniformOrdered] = useState<boolean>(draft?.uniformOrdered ?? false);
   const [lanyardOrdered, setLanyardOrdered] = useState<boolean>(draft?.lanyardOrdered ?? false);
@@ -133,19 +152,17 @@ export default function RegisterPage() {
   const [paymentType, setPaymentType] = useState<"downpayment" | "full">(draft?.paymentType ?? "downpayment");
   const [amountPaid, setAmountPaid] = useState<string>(draft?.amountPaid ?? "");
   const [referenceNumber, setReferenceNumber] = useState<string>(draft?.referenceNumber ?? "");
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrDone, setOcrDone] = useState(false);
 
-  // ── Promo code state ──
+  // Promo code state
   const [promoCode, setPromoCode] = useState<string>(draft?.promoCode ?? "");
   const [promoAccepted, setPromoAccepted] = useState<boolean>(draft?.promoAccepted ?? false);
   const [promoError, setPromoError] = useState<string>("");
   const [validatingPromo, setValidatingPromo] = useState<boolean>(false);
 
-  // ── Uniform day acknowledgment (Task 2) ──
+  // Uniform day acknowledgment
   const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState<boolean>(draft?.uniformDayAcknowledged ?? false);
 
-  // ── Auto Prefill for Returning Families ──
+  // Auto Prefill
   const [prefilledFamilyName, setPrefilledFamilyName] = useState<string>("");
   const [prefillLoading, setPrefillLoading] = useState<boolean>(false);
 
@@ -212,7 +229,7 @@ export default function RegisterPage() {
     }
   }, []);
 
-  // ── Fetch live slot counts ──
+  // Live slot counts
   useEffect(() => {
     fetch("/api/registrations/slots")
       .then((r) => r.json())
@@ -220,16 +237,14 @@ export default function RegisterPage() {
       .catch(() => { });
   }, []);
 
-  // ── Persist form state to localStorage on every change ──
+  // Save to localStorage draft
   useEffect(() => {
-    // Don't save if on the Done step (step 5) — data was submitted
     if (step === 5) return;
     saveDraft({
       step,
       selectedProgram, selectedClass,
       childInfo, parentInfo, emergencyContact,
       photoConsent, waiverRead, signatureBase64,
-      paymentMethod, receiptPreview, receiptBase64,
       isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
       leadId,
       promoCode, promoAccepted,
@@ -239,80 +254,11 @@ export default function RegisterPage() {
     step, selectedProgram, selectedClass,
     childInfo, parentInfo, emergencyContact,
     photoConsent, waiverRead, signatureBase64,
-    paymentMethod, receiptPreview, receiptBase64,
     isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
     leadId, promoCode, promoAccepted, uniformDayAcknowledged,
   ]);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
-
-  // ── Computed payment amounts ──
-  // New families: Welcome Kit (₱750) is mandatory — includes polo, pants, lanyard & name tag
-  // Returning families: optional Uniform Set (₱550, no lanyard), or Lanyard & Name Tag only (₱200)
-  const addonCost = isNewFamily
-    ? UNIFORM_KIT.welcomeKitPrice
-    : (welcomeKitOrdered ? UNIFORM_KIT.welcomeKitPrice : 0) +
-    (uniformOrdered ? UNIFORM_KIT.price : 0) +
-    (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0);
-  const amountDue = prog
-    ? (paymentType === "full" ? prog.rate : prog.downpayment) + addonCost
-    : 0;
-  const parsedAmountPaid = parseFloat(amountPaid.replace(/,/g, "")) || 0;
-  const creditBalance = parsedAmountPaid > 0 && parsedAmountPaid > amountDue ? +(parsedAmountPaid - amountDue).toFixed(2) : 0;
-  const amountShort = parsedAmountPaid > 0 && parsedAmountPaid < amountDue ? +(amountDue - parsedAmountPaid).toFixed(2) : 0;
-  const amountExact = parsedAmountPaid > 0 && parsedAmountPaid === amountDue;
-
-  // ── Run Tesseract OCR on uploaded receipt to extract reference number and amount ──
-  const runOCR = useCallback(async (imageDataUrl: string) => {
-    setOcrLoading(true);
-    setOcrDone(false);
-    try {
-      const result = await Tesseract.recognize(imageDataUrl, "eng");
-      const text = result.data.text;
-
-      // Strict patterns for PH Bank/E-Wallet reference numbers to avoid capturing random words
-      const patterns = [
-        /\b(ITO\d{12,20})\b/i, // GoTyme (e.g. ITO260901176054010)
-        /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i, // Maya (e.g. 8CE9 48D1 B76E)
-        /\b(\d{13})\b/, // GCash (e.g. 1000000000000)
-        /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i, // Generic alphanumeric after label
-        /\b(\d{10,20})\b/ // Any purely numeric 10-20 digit string (fallback)
-      ];
-
-      let extractedRef = "";
-      for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match && match[1]) {
-          extractedRef = match[1].replace(/\s+/g, ""); // strip spaces (e.g. Maya)
-          break;
-        }
-      }
-
-      if (extractedRef) {
-        setReferenceNumber(extractedRef);
-      }
-    } catch {
-      // OCR failed silently — user fills in manually
-    } finally {
-      setOcrLoading(false);
-      setOcrDone(true);
-    }
-  }, []);
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setReceiptPreview(result);
-      setReceiptBase64(result);
-      setReferenceNumber(""); // reset on new upload
-      setOcrDone(false);
-      runOCR(result);
-    };
-    reader.readAsDataURL(file);
-  }, [runOCR]);
 
   const canProceedStep0 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged;
 
@@ -362,7 +308,6 @@ export default function RegisterPage() {
 
   const canProceedStep1 = missingStep1.length === 0;
 
-  // ── Save the Details as a lead, then move on to Program ──
   async function handleDetailsContinue() {
     setSavingLead(true);
     try {
@@ -380,7 +325,7 @@ export default function RegisterPage() {
       const data = await res.json();
       if (data.success && data.data?.id) setLeadId(data.data.id);
     } catch {
-      // Don't block the parent if lead capture fails
+      // Don't block
     } finally {
       setSavingLead(false);
       setStep(1);
@@ -402,7 +347,7 @@ export default function RegisterPage() {
           emergencyContact,
           photoConsent,
           signatureBase64,
-          leadId, // lets the API mark the lead as "converted"
+          leadId,
           promoCode: promoAccepted ? promoCode.trim().toUpperCase() : undefined,
           isPromoRegistration: promoAccepted,
           isNewFamily,
@@ -410,7 +355,7 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (data.success) {
-        clearDraft(); // ✅ wipe saved progress after successful submit
+        clearDraft();
         window.location.href = `/register/payment/${data.data.id}`;
       } else {
         setError(data.error || "Submission failed. Please try again.");
@@ -425,140 +370,70 @@ export default function RegisterPage() {
   if (!mounted) return null;
 
   return (
-    <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
+    <div className="vp-root min-h-screen relative overflow-x-hidden">
+      <PortalScene />
 
-      {/* ── Waiver Modal ── */}
+      {/* ── Waiver Modal ──────────────────────────────────────────────────── */}
       {waiverModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setWaiverModalOpen(false)} />
-          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] rounded-[2rem] bg-white shadow-2xl flex flex-col overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-8 py-6 border-b border-slate-100 shrink-0">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-[#0033A0]/50 mb-1">Official Document</p>
-              <h2 className="font-headline text-[20px] font-extrabold text-[#002f76]">Parent/Guardian Acknowledgment & Agreement</h2>
-              <p className="text-[13px] text-[#64748b] mt-1">Merry Explorers Playgroup Learning Center</p>
-              {!waiverScrolled && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-                  <span className="text-amber-600 text-[12px] font-bold">👇 Please scroll to the bottom to accept</span>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="relative bg-white rounded-[28px] border-4 border-[#0b2a82] shadow-[0_0_0_6px_#fff,0_16px_0_rgba(11,42,130,0.25)] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b-2 border-[#b6dcf5] shrink-0 flex items-center justify-between bg-[#f2faff]">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#3d5a99]">Official Waiver</span>
+                  <h3 className="font-extrabold text-[16px] text-[#0b2a82] leading-none">Parent/Guardian Acknowledgment & Agreement</h3>
                 </div>
-              )}
+              </div>
+              <button onClick={() => setWaiverModalOpen(false)} className="w-8 h-8 rounded-full border-2 border-[#0b2a82] bg-white text-[#0b2a82] font-black text-[16px] hover:bg-red-50 hover:text-red-600 transition-colors">✕</button>
             </div>
-
-            {/* Scrollable Content */}
             <div
               ref={waiverScrollRef}
-              className="flex-1 overflow-y-auto px-8 py-6 text-[13px] text-[#334155] leading-[1.8] space-y-5"
+              className="flex-1 overflow-y-auto px-6 py-5 text-[13px] text-[#27407f] leading-[1.8] space-y-4"
               onScroll={(e) => {
                 const el = e.currentTarget;
-                const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 60;
-                if (atBottom) setWaiverScrolled(true);
+                if (el.scrollHeight - el.scrollTop <= el.clientHeight + 60) setWaiverScrolled(true);
               }}
             >
-              <p className="font-extrabold text-[15px] text-[#002f76] text-center border-b border-slate-100 pb-4">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</p>
-              <p className="text-center font-bold text-[13px] text-[#0033A0]">PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
-              <p className="text-[12px] text-[#64748b] italic text-center">By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
-
+              <p className="font-extrabold text-[15px] text-[#0b2a82] text-center border-b-2 border-[#b6dcf5] pb-3">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</p>
+              <p className="text-center font-bold text-[13px] text-[#1f7ae0]">PARENT/GUARDIAN ACKNOWLEDGMENT & AGREEMENT</p>
+              <p className="text-[12px] text-[#3d5a99] italic text-center">By registering my child with Merry Explorers Playgroup Learning Center, I confirm that I have read, understood, and agree to the following program terms and policies:</p>
               <div className="space-y-1">
-                <p className="font-extrabold text-[#002f76]">1. ADVENTURE / CYCLE</p>
+                <p className="font-extrabold text-[#0b2a82]">1. ADVENTURE / CYCLE</p>
                 <p>For Merry Explorers, &quot;Adventure&quot; means &quot;Cycle.&quot; Adventure 1, Adventure 2, Adventure 3, and so on refer to the succeeding stages of the program.</p>
-                <p>An Adventure is not tied to a calendar month. A child progresses to the next Adventure once the required sessions for their program have been completed, including applicable make-up sessions. Adventure dates may therefore differ between programs.</p>
               </div>
-
               <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">2. PROGRAMS</p>
-                <p className="font-semibold text-[#334155]">Discovery Club — Discover Through Play</p>
-                <p>🔎 <strong>Discovery Club: Curious Explorer</strong> — Ages 1.5–4.11 | ₱4,295 | 8 sessions | 1 hr/session</p>
-                <p>🎨 <strong>Discovery Club: Creative Explorer</strong> — Ages 2.6–4.11 | ₱4,820 | 12 sessions | 1 hr 15 mins/session</p>
-                <p>🌟 <strong>Discovery Club: Everyday Curious</strong> — Ages 1.5–4.11 | ₱7,518 | 14 sessions | 1 hr/session | Mon–Fri 4:25–5:25 PM</p>
-                <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building. It may also be a suitable starting point for children who are not yet using verbal communication.</p>
-                <p>💡 <strong>Trailblazer: Brave Explorer</strong> — Prepare for What&apos;s Next</p>
-                <p>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</p>
-                <p><em>Milestone Checkpoint:</em> The 12th session includes the Exploration Diary presentation, review of the child&apos;s learning and discoveries, and milestone recognition through a Certificate of Recognition/Completion.</p>
-                <p><em>Little Trailblazer Prerequisites:</em> The child should be able to comfortably grip age-appropriate materials, participate independently with teachers, and sit still independently for at least 3 minutes.</p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">3. REGISTRATION & PAYMENT</p>
-                <ul className="list-disc pl-5 space-y-1">
+                <p className="font-extrabold text-[#0b2a82]">2. REGISTRATION & PAYMENT</p>
+                <ul className="list-disc pl-5 space-y-1 font-medium">
                   <li>60% reservation payment is required upon registration to secure the child&apos;s slot.</li>
                   <li>The 60% reservation payment is non-refundable once the slot is confirmed.</li>
                   <li>The remaining 40% balance is due on the 6th session.</li>
-                  <li>A 4% interest charge will apply to overdue outstanding balances beginning September 10, 2026. Interest is on a <strong>weekly basis applied every Monday</strong>.</li>
+                  <li>A 4% weekly interest charge applies to overdue outstanding balances beginning September 10, 2026.</li>
                   <li>We will only accept Bank Transfer and GCash payments.</li>
                 </ul>
               </div>
-
               <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">4. ATTENDANCE & MAKE-UP SESSIONS</p>
+                <p className="font-extrabold text-[#0b2a82]">3. ATTENDANCE & MAKE-UP SESSIONS</p>
                 <p>We know that schedules can sometimes change, so we&apos;ve made each program&apos;s make-up arrangement as simple and predictable as possible.</p>
-                <p>🎨 <strong>Discovery Club: Curious Explorer</strong> — If a class is suspended due to weather, the session will be moved to the next Monday or Wednesday until all required Adventure sessions are completed.</p>
-                <p>🌟 <strong>Discovery Club: Everyday Curious</strong> — If a class is suspended due to weather, the session will be moved to the next available weekday afternoon until all required Adventure sessions are completed.</p>
-                <p>🚀 <strong>Discovery Club: Creative Explorer</strong> — Classes will continue according to the regular schedule, and any weather-related suspended session will automatically be made up on a Saturday. The Saturday make-up arrangement will continue until the required number of Adventure sessions is completed.</p>
                 <p>💡 <strong>Trailblazer: Brave Explorer</strong> — A suspended face-to-face session will shift online.</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Online session: 45 minutes</li>
-                  <li>Practice worksheets will be provided</li>
-                  <li>The online shift is considered a consumed session</li>
-                </ul>
-                <p>💛 <strong>Complimentary Free Session for All Explorers</strong> — For an excused missed session (sickness or other valid reasons), each child receives 1 complimentary session per Adventure. This is only one free session regardless of the number of missed sessions, and the schedule will be determined by Merry Explorers.</p>
+                <p>💛 <strong>Complimentary Free Session for All Explorers</strong> — For an excused missed session (sickness or other valid reasons), each child receives 1 complimentary session per Adventure.</p>
               </div>
-
               <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">5. PHOTO & VIDEO HIGHLIGHTS</p>
-                <p>📸 <strong>Photo Highlights — Uploading Schedule:</strong></p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>🎨 Discovery Club: Curious Explorer — Monday</li>
-                  <li>🌟 Discovery Club: Everyday Curious — Tuesday</li>
-                  <li>🚀 Discovery Club: Creative Explorer — Tuesday & Thursday</li>
-                  <li>💡 Trailblazer: Brave Explorer — Thursday & Friday</li>
-                </ul>
-                <p>A designated Google Drive folder will be updated after each session. Parents/Guardians may download the photos they wish to keep.</p>
-                <p>🎥 <strong>Video Highlights — Uploading Schedule:</strong></p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>🎨 Discovery Club: Curious Explorer — Friday</li>
-                  <li>🌟 Discovery Club: Everyday Curious — Friday</li>
-                  <li>🚀 Discovery Club: Creative Explorer — Wednesday</li>
-                  <li>💡 Trailblazer: Brave Explorer — Monday</li>
-                </ul>
-                <p>Video Highlights will be posted on the official Merry Explorers page.</p>
-                <p>🗑️ <strong>Photo Deletion:</strong> All photos in the Google Drive will be deleted every Saturday at 11:59 PM, regardless of whether they have been downloaded. Parents/Guardians are responsible for downloading photos they wish to keep before the deadline.</p>
+                <p className="font-extrabold text-[#0b2a82]">4. UNIFORMS</p>
+                <p>The Merry Explorers uniform is the <strong>SAME uniform</strong> across adventures.</p>
+                <p><strong>Uniform Days:</strong> Wednesday & Friday.</p>
               </div>
-
-              <div className="space-y-2">
-                <p className="font-extrabold text-[#002f76]">6. MERRY EXPLORERS UNIFORM</p>
-                <p>The Merry Explorers uniform is the <strong>SAME uniform</strong>. If your child already has a Merry Explorers uniform from the previous chapter, you are <strong>NOT required</strong> to purchase a new set for Adventure 1.</p>
-                <p><strong>Uniform Days:</strong> Wednesday & Friday. On all other class days, children may wear anything comfortable, safe, and appropriate for active play and learning.</p>
-                <p><strong>Welcome Kit — ₱{UNIFORM_KIT.welcomeKitPrice}</strong> includes: 1 Merry Explorers polo shirt with logo, 1 pair of jogging pants, 1 name tag with Merry Explorers lanyard. Required for all new families.</p>
-                <p><strong>Lanyard &amp; Name Tag — ₱{UNIFORM_KIT.lanyardPrice}</strong> — May also be purchased separately.</p>
-                <p>Uniform Set only (polo shirt and jogging pants, <em>no lanyard</em>) — ₱{UNIFORM_KIT.price}/set. For returning families who already have a lanyard.</p>
+              <div className="rounded-2xl bg-[#f2faff] border-2 border-[#b6dcf5] p-4 space-y-2">
+                <p className="font-extrabold text-[#0b2a82] text-[14px]">PARENT/GUARDIAN ACKNOWLEDGMENT</p>
+                <p className="font-medium text-[13px]">I, the undersigned Parent/Guardian, confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement.</p>
               </div>
-
-              <div className="rounded-2xl bg-[#f8fafc] border border-slate-200 p-5 space-y-2">
-                <p className="font-extrabold text-[#002f76] text-[14px]">PARENT/GUARDIAN ACKNOWLEDGMENT</p>
-                <p>I, the undersigned Parent/Guardian, confirm that I have read, understood, and voluntarily agree to all terms and policies stated in this Agreement, including those covering program requirements, payments, attendance and make-ups, photos and videos, and uniforms.</p>
-                <p>I confirm that the information I provided about my child is true and complete, and I agree to comply with Merry Explorers&apos; policies and arrangements.</p>
-                <p>By signing, I voluntarily acknowledge, accept, and agree to be bound by these terms and policies as part of my child&apos;s registration with Merry Explorers Playgroup Learning Center.</p>
-              </div>
-
-              {/* Spacer so user definitely sees the bottom */}
-              <div className="h-4" />
             </div>
-
-            {/* Modal Footer */}
-            <div className="px-8 py-5 border-t border-slate-100 shrink-0 flex items-center gap-3">
-              <button
-                onClick={() => setWaiverModalOpen(false)}
-                className="flex-1 rounded-2xl border border-slate-200 py-3 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors"
-              >
-                Close
-              </button>
+            <div className="px-6 py-4 border-t-2 border-[#b6dcf5] shrink-0 flex items-center gap-3 bg-[#f2faff]">
+              <button onClick={() => setWaiverModalOpen(false)} className="flex-1 rounded-2xl border-2 border-[#0b2a82] bg-white py-3 text-[14px] font-extrabold text-[#0b2a82] hover:bg-slate-50 transition-colors">Close</button>
               <button
                 disabled={!waiverScrolled}
                 onClick={() => { setWaiverRead(true); setWaiverModalOpen(false); }}
-                className={`flex-1 rounded-2xl py-3 text-[14px] font-bold text-white transition-all ${waiverScrolled
-                  ? "bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20"
-                  : "bg-slate-300 cursor-not-allowed"
-                  }`}
+                className={`flex-1 rounded-2xl border-2 border-[#0b2a82] py-3 text-[14px] font-extrabold transition-all ${waiverScrolled ? "bg-gradient-to-r from-[#ffe066] to-[#ffd23f] text-[#0b2a82] shadow-[0_4px_0_#0b2a82]" : "bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed"}`}
               >
                 {waiverScrolled ? "✓ I Accept the Waiver" : "↓ Scroll to Accept"}
               </button>
@@ -567,713 +442,773 @@ export default function RegisterPage() {
         </div>
       )}
 
-
-      {/* ── Dreamy Background Orbs ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]"></div>
-        <div aria-hidden className="absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1]"></div>
-        <div aria-hidden className="absolute -bottom-40 left-1/3 w-[700px] h-[700px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05]"></div>
-      </div>
-
-      {/* Header */}
-      <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">
-        <div className="mx-auto flex h-[80px] w-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
+      {/* ── Top Header ────────────────────────────────────────────────────── */}
+      <header className="relative z-20 bg-white/80 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1000px] items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="40px" className="object-contain" />
+            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border-2 border-[#0b2a82] bg-white p-1 shadow-[0_3px_0_#0b2a82]">
+              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" />
             </div>
             <span className="flex flex-col leading-none">
-              <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">Merry</span>
-              <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">Explorers</span>
+              <span className="text-[18px] font-black tracking-tight text-[#0b2a82]">Merry Explorers</span>
+              <span className="text-[11px] font-extrabold tracking-widest text-[#ff8a1f]">PARENT PORTAL</span>
             </span>
           </Link>
-          <nav className="hidden md:flex items-center gap-2">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="rounded-full px-6 py-2.5 text-[15px] font-bold transition-all text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="w-10 shrink-0" aria-hidden="true" />
+          <div className="flex items-center gap-2">
+            <span className="vp-tag text-[12px] font-black uppercase">
+              🌟 2026 ADVENTURE 2
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* ── Main Content ── */}
-      <main className="relative z-10 flex-grow flex flex-col items-center justify-start px-5 py-12 sm:py-16">
+      {/* ── Main Content Area ────────────────────────────────────────────── */}
+      <main className="vp-main">
 
-        {/* Header Text */}
-        <div className="text-center mb-8">
-          <m.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <span className="inline-block mb-3">
-              <span className="text-4xl">🎒</span>
-            </span>
-            <div className="mb-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#0033A0] to-[#0050d5] text-white px-4 py-1 text-[12px] font-extrabold uppercase tracking-wider shadow-sm">
-                <span>🌟</span> 2026 ADVENTURE 2 REGISTRATION
-              </span>
-            </div>
-            <h1 className="font-headline text-[38px] sm:text-[46px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-3">
-              Register Your Explorer
-            </h1>
-            <p className="text-[16px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
-              Secure your child&apos;s slot for <strong>Adventure 2</strong> in just a few steps
-            </p>
-          </m.div>
+        {/* Hero Title */}
+        <div className="text-center flex flex-col items-center gap-2 -mb-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+            <span>🎒</span> 2026 ADVENTURE 2 REGISTRATION
+          </div>
+          <h1 className="vp-title text-[32px] sm:text-[42px]">
+            Register Your Explorer
+          </h1>
+          <p className="vp-sub text-[15px] max-w-md">
+            Secure your child&apos;s slot for <strong>Adventure 2</strong> in just a few friendly steps!
+          </p>
         </div>
 
-        <div className="w-full max-w-[800px]">
+        {/* Step Tabs Indicator */}
+        <nav className="vp-tabs">
+          {STEPS.map((label, i) => {
+            const isDone = i < step;
+            const isActive = i === step;
+            return (
+              <button
+                key={label}
+                type="button"
+                disabled={i > step}
+                onClick={() => i < step && setStep(i)}
+                className={`vp-tab ${isActive ? "on" : ""} ${i > step ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span>{isDone ? "✓" : i + 1}</span>
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-          {/* Step progress */}
-          {step < 5 && (
-            <div className="mb-8 w-full max-w-lg mx-auto">
-              {/* Draft restored banner */}
-              {draft && step > 0 && (
-                <m.div
-                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  className="mb-5 flex items-center gap-3 rounded-2xl bg-[#0033A0]/5 border border-[#0033A0]/20 px-4 py-3"
-                >
-                  <span className="text-lg">💾</span>
-                  <p className="text-[12px] font-semibold text-[#0033A0] flex-1">Your progress was saved — welcome back!</p>
-                  <button
-                    onClick={() => { clearDraft(); window.location.reload(); }}
-                    className="shrink-0 text-[11px] font-bold text-[#64748b] hover:text-red-500 transition-colors underline"
-                  >
-                    Start fresh
-                  </button>
-                </m.div>
-              )}
-              <div className="flex items-center justify-between px-2">
-                {STEPS.map((label, i) => (
-                  <div key={label} className={`flex items-center ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
-                    <StepDot label={label} index={i} current={step} />
-                    {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-500 ${i < step ? "bg-green-400" : "bg-slate-200"}`} />}
-                  </div>
-                ))}
-              </div>
+        {/* Draft Notice if Restored */}
+        {draft && step > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#fff6cf] border-2 border-[#0b2a82] px-4 py-2.5 text-[12px] font-extrabold text-[#0b2a82] shadow-[0_3px_0_rgba(11,42,130,0.18)]">
+            <div className="flex items-center gap-2">
+              <span>💾</span>
+              <span>Your progress was restored from draft.</span>
             </div>
-          )}
+            <button
+              onClick={() => { clearDraft(); window.location.reload(); }}
+              className="text-red-500 hover:text-red-700 underline font-black"
+            >
+              Start Fresh
+            </button>
+          </div>
+        )}
 
+        {/* Main Card with Playful Tape */}
+        <div className="vp-card">
+          <div className="vp-tape" />
 
-          {/* Floating Form Card */}
-          <m.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
-          >
-            <AnimatePresence mode="wait">
+          {/* Note & Disclaimer Banner */}
+          <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
+            <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
+              <span>⚠️</span>
+              <span>NOTE &amp; DISCLAIMER</span>
+            </div>
+            <p className="font-bold text-[#0b2a82] leading-snug">
+              Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
+            </p>
+            <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
+              &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+            </p>
+          </div>
 
-              {/* ── STEP 0: Details (creates the lead on Continue) ── */}
-              {step === 0 && (
-                <m.div key="step0" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Explorer Information</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Tell us about your child and your contact details.</p>
+          <AnimatePresence mode="wait">
 
-                  {prefillLoading && (
-                    <div className="mb-6 flex items-center gap-3 rounded-2xl bg-[#0033A0]/5 border border-[#0033A0]/20 p-4 text-[13px] text-[#0033A0] animate-pulse">
-                      <div className="h-4 w-4 rounded-full border-2 border-[#0033A0] border-t-transparent animate-spin shrink-0" />
-                      <span className="font-semibold">Loading your saved information from Adventure 1...</span>
+            {/* ── STEP 0: Details ────────────────────────────────────────── */}
+            {step === 0 && (
+              <m.div key="step0" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <h2 className="vp-h2 text-[24px] mb-1">Explorer Information</h2>
+                <p className="vp-sub mb-6">Tell us about your child and your primary contact details.</p>
+
+                {prefillLoading && (
+                  <div className="mb-5 flex items-center gap-3 rounded-2xl bg-[#f2faff] border-2 border-[#b6dcf5] p-4 text-[13px] text-[#0b2a82] animate-pulse">
+                    <div className="h-4 w-4 rounded-full border-2 border-[#0b2a82] border-t-transparent animate-spin shrink-0" />
+                    <span className="font-bold">Loading your saved information from Adventure 1…</span>
+                  </div>
+                )}
+
+                {prefilledFamilyName && !prefillLoading && (
+                  <div className="mb-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-4 flex items-center gap-3 shadow-[0_4px_0_rgba(11,42,130,0.18)]">
+                    <span className="text-2xl">✨</span>
+                    <div>
+                      <p className="font-black text-[14px] text-[#0b2a82]">Welcome back, {prefilledFamilyName}! 🌈</p>
+                      <p className="text-[12px] font-medium text-[#3d5a99]">We&apos;ve filled in your Adventure 1 details automatically. Feel free to review or modify anything below.</p>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {prefilledFamilyName && !prefillLoading && (
-                    <m.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mb-6 flex items-start gap-3.5 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/50 to-transparent border border-emerald-200/80 p-5 shadow-sm"
-                    >
-                      <div className="h-10 w-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md shadow-emerald-600/20">
-                        ✨
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-headline text-[15px] font-extrabold text-[#002f76]">
-                            Welcome back, {prefilledFamilyName}! 🌈
-                          </h4>
-                          <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wide">
-                            Adventure 1 Returning Family
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[13px] text-[#475569] leading-relaxed">
-                          We&apos;ve automatically filled in your information from Adventure 1 so you don&apos;t have to re-type it. Please review or update anything below if needed!
-                        </p>
-                      </div>
-                    </m.div>
-                  )}
-
-                  {/* Child Info */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                    <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">🧒 Child Information</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <FieldRow label="First Name *">
-                        <input className={inputCls} value={childInfo.firstName} onChange={e => setChildInfo((p: any) => ({ ...p, firstName: e.target.value }))} placeholder="e.g. Sofia" />
-                      </FieldRow>
-                      <FieldRow label="Last Name *">
-                        <input className={inputCls} value={childInfo.lastName} onChange={e => setChildInfo((p: any) => ({ ...p, lastName: e.target.value }))} placeholder="e.g. Reyes" />
-                      </FieldRow>
-                      <FieldRow label="Nickname">
-                        <input className={inputCls} value={childInfo.nickname} onChange={e => setChildInfo((p: any) => ({ ...p, nickname: e.target.value }))} placeholder="What do you call them?" />
-                      </FieldRow>
-                      <FieldRow label="Date of Birth *">
-                        <input type="date" className={inputCls} value={childInfo.dateOfBirth} onChange={e => setChildInfo((p: any) => ({ ...p, dateOfBirth: e.target.value }))} />
-                      </FieldRow>
-                      <FieldRow label="Gender *">
-                        <select className={inputCls} value={childInfo.gender} onChange={e => setChildInfo((p: any) => ({ ...p, gender: e.target.value }))}>
-                          <option value="">Select gender</option>
-                          <option value="Female">Female</option>
-                          <option value="Male">Male</option>
-                        </select>
-                      </FieldRow>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-3 mt-4">
-                      <FieldRow label="Favorite Song">
-                        <input className={inputCls} value={childInfo.favoriteSong} onChange={e => setChildInfo((p: any) => ({ ...p, favoriteSong: e.target.value }))} placeholder="e.g. Baby Shark" />
-                      </FieldRow>
-                      <FieldRow label="Favorite Color">
-                        <input className={inputCls} value={childInfo.favoriteColor} onChange={e => setChildInfo((p: any) => ({ ...p, favoriteColor: e.target.value }))} placeholder="e.g. Blue" />
-                      </FieldRow>
-                      <FieldRow label="Favorite Character">
-                        <input className={inputCls} value={childInfo.favoriteCharacter} onChange={e => setChildInfo((p: any) => ({ ...p, favoriteCharacter: e.target.value }))} placeholder="e.g. Elsa" />
-                      </FieldRow>
-                    </div>
-                    <FieldRow label="Health and Medical Profile">
-                      <textarea className={inputCls} rows={3} value={childInfo.healthProfile} onChange={e => setChildInfo((p: any) => ({ ...p, healthProfile: e.target.value }))} placeholder="Please list any allergies, medical conditions, or special needs we should be aware of." />
+                {/* Child Info Card */}
+                <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-4">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82]">🧒 Child Information</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FieldRow label="First Name *">
+                      <input className={inputCls} value={childInfo.firstName} onChange={e => setChildInfo((p: any) => ({ ...p, firstName: e.target.value }))} placeholder="e.g. Sofia" />
+                    </FieldRow>
+                    <FieldRow label="Last Name *">
+                      <input className={inputCls} value={childInfo.lastName} onChange={e => setChildInfo((p: any) => ({ ...p, lastName: e.target.value }))} placeholder="e.g. Reyes" />
+                    </FieldRow>
+                    <FieldRow label="Nickname">
+                      <input className={inputCls} value={childInfo.nickname} onChange={e => setChildInfo((p: any) => ({ ...p, nickname: e.target.value }))} placeholder="What do you call them?" />
+                    </FieldRow>
+                    <FieldRow label="Date of Birth *">
+                      <input type="date" className={inputCls} value={childInfo.dateOfBirth} onChange={e => setChildInfo((p: any) => ({ ...p, dateOfBirth: e.target.value }))} />
+                    </FieldRow>
+                    <FieldRow label="Gender *">
+                      <select className={inputCls} value={childInfo.gender} onChange={e => setChildInfo((p: any) => ({ ...p, gender: e.target.value }))}>
+                        <option value="">Select gender</option>
+                        <option value="Female">Female</option>
+                        <option value="Male">Male</option>
+                      </select>
                     </FieldRow>
                   </div>
-
-                  {/* Parent Info */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                    <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">👨‍👩‍👧 Parent / Guardian</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <FieldRow label="Full Name *">
-                        <input className={inputCls} value={parentInfo.name} onChange={e => setParentInfo((p: any) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
-                      </FieldRow>
-                      <FieldRow label="Relationship *">
-                        <select className={inputCls} value={parentInfo.relationship} onChange={e => setParentInfo((p: any) => ({ ...p, relationship: e.target.value }))}>
-                          <option value="">Select</option>
-                          <option>Mother</option><option>Father</option><option>Guardian</option><option>Grandparent</option><option>Other</option>
-                        </select>
-                      </FieldRow>
-                      <FieldRow label="Email Address *">
-                        <input type="email" className={inputCls} value={parentInfo.email} onChange={e => setParentInfo((p: any) => ({ ...p, email: e.target.value }))} placeholder="your@email.com" />
-                      </FieldRow>
-                      <FieldRow label="Phone Number *">
-                        <input type="tel" className={inputCls} value={parentInfo.phone} onChange={e => setParentInfo((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
-                      </FieldRow>
-                    </div>
+                  <div className="grid gap-4 sm:grid-cols-3 mt-3">
+                    <FieldRow label="Favorite Song">
+                      <input className={inputCls} value={childInfo.favoriteSong} onChange={e => setChildInfo((p: any) => ({ ...p, favoriteSong: e.target.value }))} placeholder="e.g. Baby Shark" />
+                    </FieldRow>
+                    <FieldRow label="Favorite Color">
+                      <input className={inputCls} value={childInfo.favoriteColor} onChange={e => setChildInfo((p: any) => ({ ...p, favoriteColor: e.target.value }))} placeholder="e.g. Yellow" />
+                    </FieldRow>
+                    <FieldRow label="Favorite Character">
+                      <input className={inputCls} value={childInfo.favoriteCharacter} onChange={e => setChildInfo((p: any) => ({ ...p, favoriteCharacter: e.target.value }))} placeholder="e.g. Bluey" />
+                    </FieldRow>
                   </div>
+                  <FieldRow label="Health and Medical Profile">
+                    <textarea className={inputCls} rows={2} value={childInfo.healthProfile} onChange={e => setChildInfo((p: any) => ({ ...p, healthProfile: e.target.value }))} placeholder="List any allergies, special medical needs, or dietary guidelines." />
+                  </FieldRow>
+                </div>
 
-                  {/* Emergency Contact */}
-                  <div className="rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                    <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">🚨 Emergency Contact</h3>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <FieldRow label="Full Name *">
-                        <input className={inputCls} value={emergencyContact.name} onChange={e => setEmergencyContact((p: any) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
-                      </FieldRow>
-                      <FieldRow label="Phone *">
-                        <input type="tel" className={inputCls} value={emergencyContact.phone} onChange={e => setEmergencyContact((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
-                      </FieldRow>
-                      <FieldRow label="Relationship *">
-                        <select className={inputCls} value={emergencyContact.relationship} onChange={e => setEmergencyContact((p: any) => ({ ...p, relationship: e.target.value }))}>
-                          <option value="">Select</option>
-                          <option>Mother</option><option>Father</option><option>Grandparent</option><option>Aunt/Uncle</option><option>Other</option>
-                        </select>
-                      </FieldRow>
-                    </div>
+                {/* Parent Info Card */}
+                <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-4">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82]">👨‍👩‍👧 Parent / Guardian</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FieldRow label="Full Name *">
+                      <input className={inputCls} value={parentInfo.name} onChange={e => setParentInfo((p: any) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
+                    </FieldRow>
+                    <FieldRow label="Relationship *">
+                      <select className={inputCls} value={parentInfo.relationship} onChange={e => setParentInfo((p: any) => ({ ...p, relationship: e.target.value }))}>
+                        <option value="">Select relationship</option>
+                        <option>Mother</option><option>Father</option><option>Guardian</option><option>Grandparent</option><option>Other</option>
+                      </select>
+                    </FieldRow>
+                    <FieldRow label="Email Address *">
+                      <input type="email" className={inputCls} value={parentInfo.email} onChange={e => setParentInfo((p: any) => ({ ...p, email: e.target.value }))} placeholder="your@email.com" />
+                    </FieldRow>
+                    <FieldRow label="Phone Number *">
+                      <input type="tel" className={inputCls} value={parentInfo.phone} onChange={e => setParentInfo((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
+                    </FieldRow>
                   </div>
+                </div>
 
-                  <div className="mt-8">
-                    {!canProceedStep1 && (
-                      <div className="mb-4 rounded-2xl border border-orange-100 bg-orange-50 px-5 py-4">
-                        <p className="mb-2 text-[12px] font-extrabold uppercase tracking-widest text-orange-500">⚠ Please complete the following</p>
-                        <ul className="space-y-1">
-                          {missingStep1.map((field) => (
-                            <li key={field} className="flex items-center gap-2 text-[13px] font-semibold text-orange-700">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-400" />
-                              {field}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <div className="flex justify-end">
-                      <button
-                        disabled={!canProceedStep1 || savingLead}
-                        onClick={handleDetailsContinue}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {savingLead ? "Saving..." : <>Continue <span>→</span></>}
-                      </button>
-                    </div>
+                {/* Emergency Contact Card */}
+                <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-4">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82]">🚨 Emergency Contact</h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <FieldRow label="Full Name *">
+                      <input className={inputCls} value={emergencyContact.name} onChange={e => setEmergencyContact((p: any) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
+                    </FieldRow>
+                    <FieldRow label="Phone *">
+                      <input type="tel" className={inputCls} value={emergencyContact.phone} onChange={e => setEmergencyContact((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
+                    </FieldRow>
+                    <FieldRow label="Relationship *">
+                      <select className={inputCls} value={emergencyContact.relationship} onChange={e => setEmergencyContact((p: any) => ({ ...p, relationship: e.target.value }))}>
+                        <option value="">Select relationship</option>
+                        <option>Mother</option><option>Father</option><option>Grandparent</option><option>Aunt/Uncle</option><option>Other</option>
+                      </select>
+                    </FieldRow>
                   </div>
-                </m.div>
-              )}
+                </div>
 
-              {/* ── STEP 1: Choose Program ── */}
-              {step === 1 && (
-                <m.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose a Program</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time that works best for your child.</p>
-
-                  <div className="mb-8 flex flex-wrap justify-center gap-3">
-                    {[
-                      { id: "discovery", label: "Discovery Club" },
-                      { id: "trailblazer", label: "Trailblazer" },
-                      { id: "weekend", label: "Weekend Adventures" },
-                    ].map((tab) => {
-                      const isActive = activeTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
-                          className={`relative overflow-hidden rounded-full px-5 py-2.5 text-[13px] font-bold transition-all duration-300 ${isActive
-                            ? "text-white shadow-md shadow-[#0033A0]/20"
-                            : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0]"
-                            }`}
-                        >
-                          {isActive && (
-                            <m.div
-                              layoutId="registerActiveTabIndicator"
-                              className="absolute inset-0 bg-[#0033A0]"
-                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                            />
-                          )}
-                          <span className="relative z-10">{tab.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <m.div layout className="space-y-5">
-                    <AnimatePresence mode="popLayout">
-                      {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
-                        .filter(p => {
-                          if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
-                          if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
-                          if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
-                          return true;
-                        })
-                        .map((p) => {
-                          const programSlots = slots[p.id] || {};
-                          const totalAvailable = Object.values(programSlots).reduce((a, c) => a + c.available, 0);
-                          const isSelected = selectedProgram === p.id;
-
-                          return (
-                            <m.div
-                              layout
-                              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                              transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
-                              key={p.id}
-                              className={`rounded-3xl border-2 overflow-hidden transition-all duration-200 cursor-pointer ${isSelected ? "border-[#0033A0] shadow-lg shadow-[#0033A0]/10" : "border-slate-100 hover:border-slate-200 bg-white"}`}
-                              onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
-                            >
-                              {/* Card header */}
-                              <div className="flex items-center justify-between px-6 py-5 bg-white">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: p.accentSoft }}>
-                                    {p.icon}
-                                  </div>
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <h3 className="font-headline text-[16px] font-extrabold text-[#002f76]">{p.name}</h3>
-                                      {totalAvailable === 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Full</span>}
-                                    </div>
-                                    <p className="text-[12px] text-[#64748b]">{p.ageRange} • {p.schedule} • {p.sessions} Sessions</p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-[18px] font-extrabold text-[#002f76]">₱{p.rate.toLocaleString()}</p>
-                                  <p className="text-[11px] text-[#94a3b8]">60% down: ₱{p.downpayment.toLocaleString()}</p>
-                                </div>
-                              </div>
-
-                              {/* Class options */}
-                              {isSelected && (
-                                <div className="border-t border-slate-100 bg-[#f8fafc] px-6 py-4 space-y-3">
-                                  {p.prerequisite && (
-                                    <div className="flex gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-[12px] text-amber-800 font-medium">
-                                      <span className="shrink-0">⚠️</span> <span><strong>Pre-requisite:</strong> {p.prerequisite}</span>
-                                    </div>
-                                  )}
-                                  <p className="text-[12px] font-bold text-[#64748b] uppercase tracking-widest">Select Class Time</p>
-                                  <div className="grid gap-2 sm:grid-cols-2">
-                                    {p.classes.map((cls) => {
-                                      const slotInfo = programSlots[cls.name];
-                                      const isFull = slotInfo ? slotInfo.available === 0 : false;
-                                      const isClassSelected = selectedClass === cls.name;
-                                      return (
-                                        <button
-                                          key={cls.name}
-                                          disabled={isFull}
-                                          onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
-                                          className={[
-                                            "flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition-all duration-150",
-                                            isFull ? "opacity-40 cursor-not-allowed border-slate-200 bg-white" :
-                                              isClassSelected ? "border-[#0033A0] bg-[#0033A0]/5 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300",
-                                          ].join(" ")}
-                                        >
-                                          <div>
-                                            <p className="text-[13px] font-bold text-[#002f76]">{cls.name}</p>
-                                            <p className="text-[11px] text-[#64748b]">{cls.time}</p>
-                                          </div>
-                                          {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </m.div>
-                          );
-                        })}
-                    </AnimatePresence>
-                  </m.div>
-
-                  {/* ── TASK 1: Class Size Disclaimer ── */}
-                  <div className="mt-8 rounded-3xl bg-amber-50/70 border border-amber-200/80 p-6 sm:p-7 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="text-2xl select-none">🌈</div>
-                      <div className="space-y-3 text-[#334155]">
-                        <h3 className="font-headline text-[16px] sm:text-[17px] font-extrabold text-[#002f76]">
-                          A Little Note About Our Class Schedules 🌈
-                        </h3>
-                        <p className="text-[13px] leading-relaxed">
-                          At Merry Explorers, we believe that little learners thrive best when they learn, play, and grow together! To ensure a meaningful and engaging group experience, each session requires a minimum of three (3) registered students to proceed.
-                        </p>
-                        <p className="text-[13px] leading-relaxed">
-                          Should your chosen session not meet the minimum class size, our team will personally reach out to you to explore alternative schedules that best suit your family.
-                        </p>
-                        <p className="text-[13px] font-medium leading-relaxed">
-                          Thank you for your understanding and flexibility as we create wonderful learning adventures for our little explorers. 💛
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── TASK 4: Promo Code Reservation Section ── */}
-                  <div className="mt-6 rounded-3xl bg-white border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🎟️</span>
-                        <h3 className="font-headline text-[15px] sm:text-[16px] font-extrabold text-[#002f76]">
-                          Have a Reservation Promo Code?
-                        </h3>
-                      </div>
-                      <p className="mt-1 text-[12.5px] text-[#64748b] leading-relaxed">
-                        <strong>Important:</strong> This promo code is <span className="underline decoration-amber-500 font-semibold text-[#0f172a]">not a discount voucher</span>. It only allows families to reserve a slot without immediate payment until <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released. A slot is confirmed only upon receipt of the 60% non-refundable downpayment.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2.5">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          value={promoCode}
-                          onChange={(e) => {
-                            setPromoCode(e.target.value.toUpperCase());
-                            setPromoError("");
-                          }}
-                          placeholder="Enter your promo code"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[14px] font-mono uppercase tracking-wider text-[#002f76] placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-[#0033A0] focus:outline-none focus:ring-2 focus:ring-[#0033A0]/10 transition-all"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        disabled={validatingPromo}
-                        onClick={applyPromoCode}
-                        className="rounded-2xl bg-[#002f76] hover:bg-[#0033A0] text-white px-6 py-3 text-[13px] font-bold shadow-sm transition-colors shrink-0 disabled:opacity-50"
-                      >
-                        {validatingPromo ? "Checking..." : "Apply Code"}
-                      </button>
-                    </div>
-
-                    {promoAccepted && (
-                      <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-start gap-2.5 text-emerald-800 text-[13px]">
-                        <span className="text-emerald-600 font-bold shrink-0">✓</span>
-                        <div>
-                          <p className="font-bold tracking-wide">
-                            THIS CODE HAS BEEN ACCEPTED…
-                          </p>
-                          <p className="text-[12px] text-emerald-700 mt-0.5">
-                            Your reservation code has been applied. You can proceed to reserve your slot without upfront payment today.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {promoError && (
-                      <p className="text-[12px] text-rose-600 font-medium flex items-center gap-1.5">
-                        <span>⚠️</span> {promoError}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* ── TASK 2: Uniform Day Acknowledgment ── */}
-                  <div className="mt-6 rounded-3xl bg-slate-50 border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-3">
-                    <p className="text-[13.5px] font-extrabold text-[#002f76] flex items-center gap-2">
-                      <span>👕</span> Every Wednesday &amp; Friday is Merry Explorers&apos; official uniform day.
-                    </p>
-                    <label className="flex items-start gap-3 cursor-pointer pt-1 group">
-                      <input
-                        type="checkbox"
-                        checked={uniformDayAcknowledged}
-                        onChange={(e) => setUniformDayAcknowledged(e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded-lg border-2 border-slate-300 text-[#0033A0] focus:ring-[#0033A0] focus:ring-offset-0 transition cursor-pointer"
-                      />
-                      <span className="text-[13px] text-[#334155] leading-snug group-hover:text-[#002f76] transition-colors">
-                        <strong className="text-red-500">*</strong> I understand that every Wednesday &amp; Friday is Merry Explorers&apos; official uniform day.
-                      </span>
-                    </label>
-                    {!uniformDayAcknowledged && (
-                      <p className="text-[11.5px] text-amber-700 font-medium pl-8">
-                        * Required to continue registration.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(0)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
-                      ← Back
-                    </button>
-                    <button
-                      disabled={!canProceedStep0}
-                      onClick={() => setStep(2)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Continue <span>→</span>
-                    </button>
-                  </div>
-                </m.div>
-              )}
-
-              {/* ── STEP 2: Consents & Waivers ── */}
-              {step === 2 && (
-                <m.div key="step2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Consents & Waivers</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Please read and agree to the following before proceeding.</p>
-
-                  {/* Photo/Video Consent */}
-                  <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                    <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">📷 Photo & Video Consent</h3>
-                    <p className="text-[13px] text-[#334155] leading-relaxed">
-                      We&apos;d love to feature your little one in session highlights on our official Facebook page! In compliance with <strong>R.A. 10173 (Data Privacy Act of 2012)</strong>, we ask your consent first. No full names, addresses, or birthdays will be disclosed.
-                    </p>
-                    <div className="space-y-3 mt-2">
-                      {[
-                        { value: "yes", label: "Yes, I happily consent — please feature my child in Facebook highlights." },
-                        { value: "no", label: "Not at this time — please exclude my child from any posted content." },
-                      ].map((opt) => (
-                        <label key={opt.value} className={`flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition-all ${photoConsent === opt.value ? "border-[#0033A0] bg-[#0033A0]/5" : "border-slate-200 hover:border-slate-300"}`}>
-                          <input
-                            type="radio"
-                            name="photoConsent"
-                            value={opt.value}
-                            checked={photoConsent === opt.value}
-                            onChange={() => setPhotoConsent(opt.value)}
-                            className="mt-0.5 accent-[#0033A0] shrink-0"
-                          />
-                          <span className="text-[13px] font-medium text-[#334155]">{opt.label}</span>
-                        </label>
+                {!canProceedStep1 && (
+                  <div className="mb-5 rounded-2xl bg-amber-50 border-2 border-amber-300 p-4 text-[12px] font-bold text-amber-900">
+                    <p className="font-black text-[13px] mb-1">⚠️ Please complete the required fields:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {missingStep1.map((field) => (
+                        <span key={field} className="px-2.5 py-1 rounded-lg bg-amber-200/70 text-amber-950 font-bold">
+                          {field}
+                        </span>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Program Waiver — modal trigger */}
-                  {selectedProgram !== "brave-explorer" && (
-                    <div className="mb-6 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
-                      <div className="flex items-start gap-4">
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl transition-all ${waiverRead ? "bg-green-100" : "bg-[#0033A0]/10"}`}>
-                          {waiverRead ? "✅" : "📋"}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-headline text-[16px] font-extrabold text-[#0033A0]">Parent/Guardian Acknowledgment & Agreement</h3>
-                          <p className="text-[13px] text-[#64748b] mt-1">
-                            {waiverRead
-                              ? "You have read and accepted the program waiver."
-                              : "You must read and accept the full waiver before signing."}
-                          </p>
-                        </div>
-                      </div>
+                <div className="flex justify-end">
+                  <button
+                    disabled={!canProceedStep1 || savingLead}
+                    onClick={handleDetailsContinue}
+                    className="vp-btn"
+                  >
+                    {savingLead ? "Saving..." : "Continue to Choose Program →"}
+                  </button>
+                </div>
+              </m.div>
+            )}
 
-                      {waiverRead ? (
-                        <div className="flex items-center gap-2 rounded-2xl bg-green-50 border border-green-200 px-4 py-3">
-                          <span className="text-green-600 font-bold text-[13px]">✓ Waiver accepted</span>
-                          <button onClick={() => setWaiverModalOpen(true)} className="ml-auto text-[12px] text-[#0033A0] hover:underline font-semibold">Re-read</button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setWaiverModalOpen(true)}
-                          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0033A0] py-4 text-[14px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002f76] transition-colors"
+            {/* ── STEP 1: Choose Program ────────────────────────────────── */}
+            {step === 1 && (
+              <m.div key="step1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <div className="mb-3">
+                  <span className="vp-tag text-[12px] font-black uppercase">
+                    🌟 2026 Adventure 2
+                  </span>
+                </div>
+                <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure 2 Program</h2>
+                <p className="vp-sub mb-6">Select the program and class time that works best for your explorer.</p>
+
+                {/* Filter Tabs */}
+                <div className="mb-6 flex flex-wrap justify-center gap-2.5">
+                  {[
+                    { id: "discovery", label: "Discovery Club" },
+                    { id: "trailblazer", label: "Trailblazer" },
+                    { id: "weekend", label: "Weekend Adventures" },
+                  ].map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`vp-tab ${isActive ? "on" : ""}`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Program Cards */}
+                <div className="space-y-4">
+                  {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
+                    .filter(p => {
+                      if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
+                      if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
+                      if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
+                      return true;
+                    })
+                    .map((p) => {
+                      const programSlots = slots[p.id] || {};
+                      const isSelected = selectedProgram === p.id;
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
+                          className={`cursor-pointer rounded-[22px] border-3 p-5 transition-all ${isSelected
+                            ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_6px_0_#0b2a82]"
+                            : "bg-white border-[#b6dcf5] hover:border-[#0b2a82] shadow-sm"
+                            }`}
                         >
-                          📄 Read & Accept Waiver
-                        </button>
-                      )}
-
-                      {/* Signature — only shown after waiver is accepted */}
-                      {waiverRead && (
-                        <div className="pt-2 border-t border-slate-100">
-                          <p className="text-[12px] font-bold uppercase tracking-widest text-[#0033A0]/60 mb-2">Signature over Printed Name of Parent/Guardian</p>
-                          <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-[#f8fafc] overflow-hidden">
-                            <SignatureCanvas
-                              ref={sigCanvas}
-                              penColor="#0033A0"
-                              canvasProps={{ className: "w-full", height: 160 }}
-                              onEnd={() => {
-                                if (sigCanvas.current) {
-                                  setSignatureBase64(sigCanvas.current.toDataURL("image/png"));
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="mt-3 flex items-center justify-between">
-                            <div className="text-[12px] text-[#64748b]">
-                              <span className="font-semibold text-[#334155]">{parentInfo.name || "Parent/Guardian Name"}</span>
-                              <span className="ml-3 text-[#94a3b8]">{new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</span>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-2xl">{p.icon}</span>
+                                <h3 className="text-[17px] font-black text-[#0b2a82]">{p.name}</h3>
+                              </div>
+                              <p className="text-[12.5px] font-medium text-[#3d5a99] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
+                              <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
                             </div>
-                            <button
-                              onClick={() => { sigCanvas.current?.clear(); setSignatureBase64(""); }}
-                              className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors"
-                            >
-                              Clear
-                            </button>
+                            <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${isSelected ? "border-[#0b2a82] bg-[#ffd23f]" : "border-[#b6dcf5] bg-white"}`}>
+                              {isSelected && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
+                            </div>
                           </div>
-                          {!signatureBase64 && (
-                            <p className="mt-2 text-[11px] text-amber-600 font-medium">✏️ Please sign in the box above to proceed.</p>
+
+                          {isSelected && (
+                            <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
+                              {p.prerequisite && (
+                                <div className="mb-3 rounded-xl bg-amber-100 border border-amber-300 p-2.5 text-[12px] font-bold text-amber-900">
+                                  ⚠️ Pre-requisite: {p.prerequisite}
+                                </div>
+                              )}
+                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
+                              <div className="grid gap-2.5 sm:grid-cols-2">
+                                {p.classes.map((cls) => {
+                                  const slotInfo = programSlots[cls.name];
+                                  const isFull = slotInfo ? slotInfo.available === 0 : false;
+                                  const isClassSelected = selectedClass === cls.name;
+                                  return (
+                                    <button
+                                      key={cls.name}
+                                      type="button"
+                                      disabled={isFull}
+                                      onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
+                                      className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${isFull
+                                        ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50"
+                                        : isClassSelected
+                                          ? "border-[#0b2a82] bg-white shadow-[0_3px_0_#0b2a82]"
+                                          : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"
+                                        }`}
+                                    >
+                                      <div>
+                                        <p className="text-[13px] font-black text-[#0b2a82]">{cls.name}</p>
+                                        <p className="text-[11px] font-semibold text-[#3d5a99]">{cls.time}</p>
+                                      </div>
+                                      {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(1)} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors">
-                      ← Back
-                    </button>
+                      );
+                    })}
+                </div>
+
+                {/* Promo Code Reservation Section */}
+                <div className="mt-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🎟️</span>
+                    <h3 className="vp-h3 text-[15px] text-[#0b2a82] mb-0">Have a Reservation Promo Code?</h3>
+                  </div>
+                  <p className="text-[12px] font-medium text-[#3d5a99] leading-relaxed">
+                    This code reserves your slot today without immediate payment until <strong>October 15</strong>. All unpaid slots will be released on <strong>October 16, 1:00 PM</strong>.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); }}
+                      placeholder="ENTER PROMO CODE"
+                      className="flex-1 rounded-xl border-2 border-[#b6dcf5] bg-white px-4 py-2.5 text-[14px] font-mono font-black text-[#0b2a82] uppercase tracking-wider focus:border-[#0b2a82] focus:outline-none"
+                    />
                     <button
-                      disabled={!photoConsent || (selectedProgram !== "brave-explorer" && (!waiverRead || !signatureBase64))}
-                      onClick={() => setStep(3)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0033A0] px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-[#0033A0]/20 transition-all hover:bg-[#002f76] disabled:opacity-40 disabled:cursor-not-allowed"
+                      type="button"
+                      disabled={validatingPromo}
+                      onClick={applyPromoCode}
+                      className="vp-btn small"
                     >
-                      Review →
+                      {validatingPromo ? "Checking..." : "Apply Code"}
                     </button>
                   </div>
-                </m.div>
-              )}
-
-              {/* ── STEP 3: Review & Confirm ── */}
-              {step === 3 && prog && (
-                <m.div key="step3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                  <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Review & Confirm</h2>
-                  <p className="mb-6 text-[14px] text-[#64748b]">Please double-check all details before reserving your slot. You will complete payment on the next page.</p>
-
-                  {[
-                    {
-                      title: "Program", emoji: "📚", rows: [
-                        ["Program", prog.name],
-                        ["Class Time", selectedClass],
-                        ["Schedule", prog.schedule],
-                        ["Sessions", `${prog.sessions} sessions`],
-                        ["Total Rate", `₱${prog.rate.toLocaleString()}`],
-                        ["Downpayment (60%)", `₱${prog.downpayment.toLocaleString()}`],
-                        ["Balance (40% on session 6)", `₱${prog.balance.toLocaleString()}`],
-                      ],
-                    },
-                    {
-                      title: "Explorer", emoji: "🧒", rows: [
-                        ["Name", `${childInfo.firstName} ${childInfo.lastName}${childInfo.nickname ? ` (${childInfo.nickname})` : ""}`],
-                        ["Date of Birth", childInfo.dateOfBirth],
-                        ["Gender", childInfo.gender],
-                        ["Favorites", `${childInfo.favoriteSong} / ${childInfo.favoriteColor} / ${childInfo.favoriteCharacter}`],
-                        ["Health Profile", childInfo.healthProfile || "None"],
-                      ],
-                    },
-                    {
-                      title: "Parent / Guardian", emoji: "👨‍👩‍👧", rows: [
-                        ["Name", parentInfo.name],
-                        ["Relationship", parentInfo.relationship],
-                        ["Email", parentInfo.email],
-                        ["Phone", parentInfo.phone],
-                      ],
-                    },
-                    {
-                      title: "Emergency Contact", emoji: "🚨", rows: [
-                        ["Name", emergencyContact.name],
-                        ["Phone", emergencyContact.phone],
-                        ["Relationship", emergencyContact.relationship],
-                      ],
-                    },
-                    {
-                      title: "Consents", emoji: "📝", rows: [
-                        ["Photo/Video Consent", photoConsent === "yes" ? "Yes" : "No"],
-                        ["Program Waiver", "Digitally Signed"],
-                      ],
-                    },
-                  ].map((section) => (
-                    <div key={section.title} className="mb-4 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
-                      <h3 className="mb-4 font-headline text-[15px] font-extrabold text-[#0033A0]">{section.emoji} {section.title}</h3>
-                      <table className="w-full text-[13px]">
-                        <tbody>
-                          {section.rows.map(([label, value]) => (
-                            <tr key={label} className="border-b border-slate-50 last:border-0">
-                              <td className="py-2 pr-4 text-[#94a3b8] font-semibold w-[45%]">{label}</td>
-                              <td className="py-2 text-[#334155] font-bold">{value}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))}
-
-                  {promoAccepted ? (
-                    <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 text-[13px] text-amber-900 space-y-1">
-                      <p>🎟️ <strong>Promo Reservation Applied:</strong></p>
-                      <p className="text-[12.5px] text-amber-800 leading-relaxed">
-                        Your slot is reserved without upfront payment today. To confirm your slot, a 60% non-refundable downpayment is required by <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released. You will receive an automated payment reminder with your payment link.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-[13px] text-blue-800">
-                      <p>⏱️ <strong>1-Hour Payment Window:</strong> Once you reserve your slot, you will have <strong>1 hour</strong> to complete your payment on the next page. Unpaid reservations are automatically released.</p>
+                  {promoAccepted && (
+                    <div className="rounded-xl bg-emerald-100 border-2 border-emerald-400 p-2.5 text-[12px] font-extrabold text-emerald-900">
+                      ✓ Promo code accepted! Upfront payment waived for today.
                     </div>
                   )}
-
-                  {error && (
-                    <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-[13px] font-medium text-red-700">
-                      ❌ {error}
+                  {promoError && (
+                    <div className="rounded-xl bg-red-100 border-2 border-red-300 p-2.5 text-[12px] font-extrabold text-red-900">
+                      ⚠️ {promoError}
                     </div>
                   )}
+                </div>
 
-                  <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 text-[12px] text-amber-800">
-                    <p><strong>Payment Terms:</strong> The 60% downpayment is non-refundable. The 40% balance is due on the 6th session. A 4% weekly interest applies to overdue balances (charged every Monday).</p>
+                {/* Uniform Day Acknowledgment */}
+                <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
+                  <p className="text-[13.5px] font-black text-[#0b2a82] flex items-center gap-2">
+                    <span>👕</span> Every Wednesday & Friday is Merry Explorers&apos; official uniform day.
+                  </p>
+                  <label className="flex items-start gap-3 cursor-pointer pt-1 group">
+                    <input
+                      type="checkbox"
+                      checked={uniformDayAcknowledged}
+                      onChange={(e) => setUniformDayAcknowledged(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded-md border-2 border-[#0b2a82] accent-[#0b2a82] cursor-pointer"
+                    />
+                    <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
+                      <strong className="text-red-500">*</strong> I understand that every Wednesday & Friday is Merry Explorers&apos; official uniform day.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="mt-8 flex justify-between items-center">
+                  <button onClick={() => setStep(0)} className="vp-btn ghost small">← Back</button>
+                  <button
+                    disabled={!canProceedStep0}
+                    onClick={() => setStep(2)}
+                    className="vp-btn"
+                  >
+                    Continue to Consents →
+                  </button>
+                </div>
+              </m.div>
+            )}
+
+            {/* ── STEP 2: Consents & Waivers ────────────────────────────── */}
+            {step === 2 && (
+              <m.div key="step2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <h2 className="vp-h2 text-[24px] mb-1">Consents & Waivers</h2>
+                <p className="vp-sub mb-6">Please read and agree to the following before proceeding.</p>
+
+                {/* Photo consent */}
+                <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-3">
+                  <h3 className="vp-h3 text-[16px] text-[#0b2a82]">📷 Photo & Video Consent</h3>
+                  <p className="text-[13px] text-[#3d5a99] font-medium leading-relaxed">
+                    We&apos;d love to feature your little one in session highlights on our official Facebook page! In compliance with <strong>R.A. 10173 (Data Privacy Act of 2012)</strong>, we ask your consent first. No full names, addresses, or birthdays will be disclosed.
+                  </p>
+                  <div className="space-y-2.5 pt-1">
+                    {[
+                      { value: "yes", label: "Yes, I happily consent — please feature my child in Facebook highlights." },
+                      { value: "no", label: "Not at this time — please exclude my child from any posted content." },
+                    ].map((opt) => (
+                      <label key={opt.value} className={`flex items-start gap-3 cursor-pointer rounded-xl border-2 p-3.5 transition-all ${photoConsent === opt.value ? "border-[#0b2a82] bg-[#fff6cf] shadow-[0_3px_0_#0b2a82]" : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"}`}>
+                        <input type="radio" name="photoConsent" value={opt.value} checked={photoConsent === opt.value} onChange={() => setPhotoConsent(opt.value)} className="mt-0.5 accent-[#0b2a82] shrink-0" />
+                        <span className="text-[13px] font-bold text-[#0b2a82]">{opt.label}</span>
+                      </label>
+                    ))}
                   </div>
+                </div>
 
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(2)} disabled={submitting} className="rounded-2xl border border-slate-200 px-6 py-3.5 text-[14px] font-bold text-[#64748b] hover:bg-slate-50 transition-colors disabled:opacity-50">
-                      ← Back
-                    </button>
-                    <button
-                      disabled={submitting}
-                      onClick={handleSubmit}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-green-500 px-8 py-4 text-[15px] font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:bg-green-600 disabled:opacity-60"
-                    >
-                      {submitting ? "Reserving..." : (promoAccepted ? "Complete Slot Reservation 🎉" : "Reserve Slot & Pay 🎉")}
-                    </button>
+                {/* Program Waiver */}
+                {selectedProgram !== "brave-explorer" && (
+                  <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl border-2 border-[#0b2a82] ${waiverRead ? "bg-[#ffd23f]" : "bg-white"}`}>
+                        {waiverRead ? "✅" : "📋"}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="vp-h3 text-[16px] text-[#0b2a82] mb-0.5">Parent/Guardian Acknowledgment & Agreement</h3>
+                        <p className="text-[12.5px] font-medium text-[#3d5a99]">
+                          {waiverRead ? "You have read and accepted the program waiver." : "You must read and accept the full waiver before signing."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {waiverRead ? (
+                      <div className="flex items-center gap-2 rounded-xl bg-[#fff6cf] border-2 border-[#0b2a82] px-4 py-3 shadow-[0_3px_0_rgba(11,42,130,0.18)]">
+                        <span className="text-[#0b2a82] font-black text-[13px]">✓ Official Waiver accepted</span>
+                        <button onClick={() => setWaiverModalOpen(true)} className="ml-auto text-[12px] text-[#1f7ae0] hover:underline font-extrabold">Re-read</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setWaiverModalOpen(true)} className="w-full vp-btn small">
+                        📄 Read & Accept Official Waiver
+                      </button>
+                    )}
+
+                    {waiverRead && (
+                      <div className="pt-2 border-t-2 border-[#b6dcf5]">
+                        <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-2">Signature of Parent / Guardian</p>
+                        <div className="rounded-2xl border-3 border-dashed border-[#0b2a82] bg-white overflow-hidden shadow-inner">
+                          <SignatureCanvas
+                            ref={sigCanvas}
+                            penColor="#0b2a82"
+                            canvasProps={{ className: "w-full", height: 160 }}
+                            onEnd={() => { if (sigCanvas.current) setSignatureBase64(sigCanvas.current.toDataURL("image/png")); }}
+                          />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="text-[12px] text-[#3d5a99] font-medium">
+                            <span className="font-extrabold text-[#0b2a82]">{parentInfo.name || "Parent/Guardian Name"}</span>
+                            <span className="ml-3 text-[#3d5a99]">{new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</span>
+                          </div>
+                          <button onClick={() => { sigCanvas.current?.clear(); setSignatureBase64(""); }} className="text-[12px] font-black text-red-500 hover:text-red-700 transition-colors">Clear</button>
+                        </div>
+                        {!signatureBase64 && <p className="mt-2 text-[12px] text-amber-700 font-bold">✏️ Please draw your signature in the box above to continue.</p>}
+                      </div>
+                    )}
                   </div>
-                </m.div>
-              )}
+                )}
 
-            </AnimatePresence>
-          </m.div>
+                <div className="mt-8 flex justify-between items-center">
+                  <button onClick={() => setStep(1)} className="vp-btn ghost small">← Back</button>
+                  <button
+                    disabled={!photoConsent || (selectedProgram !== "brave-explorer" && (!waiverRead || !signatureBase64))}
+                    onClick={() => setStep(3)}
+                    className="vp-btn"
+                  >
+                    Review Details →
+                  </button>
+                </div>
+              </m.div>
+            )}
 
+            {/* ── STEP 3: Review & Confirm ──────────────────────────────── */}
+            {step === 3 && prog && (
+              <m.div key="step3" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
+                <div className="mb-3">
+                  <span className="vp-tag text-[12px] font-black uppercase">
+                    🌟 2026 ADVENTURE 2
+                  </span>
+                </div>
+                <h2 className="vp-h2 text-[24px] mb-1">Review & Confirm</h2>
+                <p className="vp-sub mb-6">Please double-check all details before reserving your slot.</p>
+
+                {[
+                  {
+                    title: "Program Selection", emoji: "📚", rows: [
+                      ["Program", prog.name],
+                      ["Class Time", selectedClass],
+                      ["Schedule", prog.schedule],
+                      ["Sessions", `${prog.sessions} sessions`],
+                      ["Total Rate", `₱${prog.rate.toLocaleString()}`],
+                      ["Downpayment (60%)", `₱${prog.downpayment.toLocaleString()}`],
+                      ["Balance (40% on session 6)", `₱${prog.balance.toLocaleString()}`],
+                    ],
+                  },
+                  {
+                    title: "Explorer Information", emoji: "🧒", rows: [
+                      ["Name", `${childInfo.firstName} ${childInfo.lastName}${childInfo.nickname ? ` (${childInfo.nickname})` : ""}`],
+                      ["Date of Birth", childInfo.dateOfBirth],
+                      ["Gender", childInfo.gender],
+                      ["Favorites", `${childInfo.favoriteSong || "—"} / ${childInfo.favoriteColor || "—"} / ${childInfo.favoriteCharacter || "—"}`],
+                      ["Health Profile", childInfo.healthProfile || "None"],
+                    ],
+                  },
+                  {
+                    title: "Parent / Guardian", emoji: "👨‍👩‍👧", rows: [
+                      ["Name", parentInfo.name],
+                      ["Relationship", parentInfo.relationship],
+                      ["Email", parentInfo.email],
+                      ["Phone", parentInfo.phone],
+                    ],
+                  },
+                  {
+                    title: "Emergency Contact", emoji: "🚨", rows: [
+                      ["Name", emergencyContact.name],
+                      ["Phone", emergencyContact.phone],
+                      ["Relationship", emergencyContact.relationship],
+                    ],
+                  },
+                  {
+                    title: "Consents & Waivers", emoji: "📝", rows: [
+                      ["Photo/Video Consent", photoConsent === "yes" ? "Yes" : "No"],
+                      ...(selectedProgram !== "brave-explorer" ? [["Official Program Waiver", "Digitally Signed ✓"]] : []),
+                    ],
+                  },
+                ].map((section) => (
+                  <div key={section.title} className="mb-4 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                    <h3 className="mb-3 vp-h3 text-[15px] text-[#0b2a82]">{section.emoji} {section.title}</h3>
+                    <table className="w-full text-[13px]">
+                      <tbody>
+                        {section.rows.map(([label, value]) => (
+                          <tr key={label} className="border-b border-[#b6dcf5]/40 last:border-0">
+                            <td className="py-1.5 pr-4 text-[#3d5a99] font-bold w-[45%]">{label}</td>
+                            <td className="py-1.5 text-[#0b2a82] font-black">{value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+
+                {promoAccepted ? (
+                  <div className="mb-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] px-5 py-4 text-[13px] text-[#0b2a82] shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-1">
+                    <p className="font-black text-[14px]">🎟️ Promo Reservation Applied:</p>
+                    <p className="text-[12.5px] font-medium text-[#3d5a99] leading-relaxed">
+                      Your slot is held today without upfront payment. To confirm your slot, a 60% non-refundable downpayment is required by <strong>October 15</strong>. All unpaid slots will be released on <strong>October 16, 1:00 PM</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] px-5 py-4 text-[13px] text-[#0b2a82] space-y-1">
+                    <p className="font-black text-[14px]">⏱️ 1-Hour Payment Window:</p>
+                    <p className="text-[12.5px] font-medium text-[#3d5a99] leading-relaxed">
+                      Once you reserve your slot, you will have <strong>1 hour</strong> to submit your payment on the next page.
+                    </p>
+                  </div>
+                )}
+
+                {error && <div className="vp-error mb-4">❌ {error}</div>}
+
+                <div className="mt-8 flex justify-between items-center">
+                  <button onClick={() => setStep(2)} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
+                  <button
+                    disabled={submitting}
+                    onClick={handleSubmit}
+                    className="vp-btn"
+                  >
+                    {submitting ? "Reserving..." : (promoAccepted ? "Complete Slot Reservation 🎉" : "Reserve Slot & Proceed to Pay 💳")}
+                  </button>
+                </div>
+              </m.div>
+            )}
+
+          </AnimatePresence>
         </div>
+
+        <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
+          Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
+        </p>
       </main>
 
       <SiteFooter />
-    </m.div>
+
+      <style jsx global>{`
+        .vp-root {
+          color: ${NAVY};
+          font-family: inherit;
+          background: radial-gradient(ellipse at 50% 0%, #b9e5fb 0%, #8fd3f7 55%, #74c3f1 100%);
+          background-attachment: fixed;
+        }
+        .vp-root * { box-sizing: border-box; }
+        .vp-main {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 28px 20px 100px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; }
+        .vp-h2 { margin: 0; font-size: 22px; font-weight: 800; color: ${NAVY}; }
+        .vp-h3 { margin: 0 0 10px; font-size: 16px; font-weight: 800; color: ${NAVY}; display: flex; align-items: center; gap: 8px; }
+        .vp-title {
+          margin: 0;
+          font-size: 38px;
+          font-weight: 800;
+          line-height: 1.15;
+          color: ${BLUE};
+          -webkit-text-stroke: 6px ${NAVY};
+          paint-order: stroke fill;
+          text-shadow: 0 4px 0 ${NAVY};
+          filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff);
+        }
+        .vp-sticker {
+          filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff);
+        }
+        .vp-scene {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        .vp-sun {
+          position: absolute;
+          top: 12px;
+          right: 24px;
+          width: 130px;
+          animation: vp-bob 5s ease-in-out infinite;
+        }
+        .vp-rays { transform-origin: 70px 70px; animation: vp-rot 40s linear infinite; }
+        .vp-cloud {
+          position: absolute;
+          left: 0;
+          width: 130px;
+          overflow: visible;
+          animation: vp-drift linear infinite;
+        }
+        .vp-cloud.c1 { top: 16%; animation-duration: 70s; }
+        .vp-cloud.c2 { top: 46%; width: 104px; animation-duration: 90s; animation-delay: -40s; }
+        .vp-cloud.c3 { top: 72%; width: 140px; animation-duration: 60s; animation-delay: -20s; }
+        .vp-star { position: absolute; width: 26px; animation: vp-twinkle 2.6s ease-in-out infinite; }
+        @keyframes vp-bob { 50% { transform: translateY(10px); } }
+        @keyframes vp-rot { to { transform: rotate(360deg); } }
+        @keyframes vp-drift { from { transform: translateX(-200px); } to { transform: translateX(110vw); } }
+        @keyframes vp-twinkle { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.5; } }
+        .vp-card {
+          position: relative;
+          background: #fff;
+          border: 4px solid ${NAVY};
+          border-radius: 28px;
+          padding: 28px;
+          box-shadow: 0 0 0 6px #fff, 0 12px 0 6px rgba(11,42,130,0.18);
+        }
+        @media(max-width: 640px) {
+          .vp-card { padding: 20px 16px; border-radius: 24px; }
+        }
+        .vp-tape {
+          position: absolute;
+          top: -16px;
+          left: 50%;
+          width: 92px;
+          height: 26px;
+          margin-left: -46px;
+          transform: rotate(4deg);
+          background: repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px);
+          border: 2px solid rgba(11,42,130,0.25);
+          border-radius: 4px;
+        }
+        .vp-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 10px;
+          padding: 4px;
+        }
+        .vp-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+          min-height: 44px;
+          padding: 0 18px;
+          font: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          color: ${NAVY};
+          background: #fff;
+          border: 3px solid ${NAVY};
+          border-radius: 18px;
+          box-shadow: 0 4px 0 rgba(11,42,130,0.25);
+          cursor: pointer;
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .vp-tab:hover:not(:disabled) { transform: translateY(-2px); }
+        .vp-tab.on {
+          background: linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP});
+          box-shadow: 0 4px 0 ${NAVY};
+        }
+        .vp-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          min-height: 48px;
+          padding: 0 24px;
+          font: inherit;
+          font-size: 16px;
+          font-weight: 800;
+          color: ${NAVY};
+          text-decoration: none;
+          cursor: pointer;
+          background: linear-gradient(${SUN_LIGHT}, ${SUN} 50%, ${SUN_DEEP});
+          border: 3px solid ${NAVY};
+          border-radius: 18px;
+          box-shadow: 0 6px 0 ${NAVY};
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .vp-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 ${NAVY}; }
+        .vp-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 ${NAVY}; }
+        .vp-btn:disabled {
+          background: #fff3c4;
+          color: #8c9bc9;
+          border-color: #8c9bc9;
+          box-shadow: 0 5px 0 #c3cce6;
+          cursor: not-allowed;
+        }
+        .vp-btn.ghost { background: #fff; }
+        .vp-btn.small { min-height: 42px; font-size: 14px; padding: 0 16px; box-shadow: 0 4px 0 ${NAVY}; }
+        .vp-tag {
+          display: inline-block;
+          font-size: 12px;
+          font-weight: 800;
+          color: ${NAVY};
+          border: 2.5px solid ${NAVY};
+          border-radius: 20px;
+          padding: 3px 12px;
+          background: #fff6cf;
+        }
+        .vp-error {
+          margin: 12px 0;
+          padding: 10px 14px;
+          border: 3px solid #ff6b57;
+          background: #fff1ee;
+          color: #b3261e;
+          border-radius: 16px;
+          font-weight: 700;
+          font-size: 14px;
+        }
+      `}</style>
+    </div>
   );
 }
