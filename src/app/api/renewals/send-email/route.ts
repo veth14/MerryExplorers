@@ -45,8 +45,9 @@ export async function POST(request: Request) {
     const currentAdventureNum = matchedProgramEntry?.currentAdventure ?? 2;
     const adventureLabel = `Adventure ${currentAdventureNum}`;
     const formattedStartDate = matchedProgramEntry?.nextAdventureStart
-      ? new Date(matchedProgramEntry.nextAdventureStart).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      ? new Date(matchedProgramEntry.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
       : null;
+    const programDisplayName = matchedProgramEntry?.programKey || targetProgramName;
 
     // Default configuration
     const promoCode = "A1RENEWAL2026";
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
     let htmlContent = "";
 
     if (emailType === "promo_code") {
-      subject = subject || `Priority Renewal & Slot Reservation Code for ${childName} (${adventureLabel}) 🌈`;
+      subject = subject || `Priority Renewal: ${programDisplayName} (${adventureLabel}) for ${childName} 🌈`;
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
           <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
@@ -68,8 +69,34 @@ export async function POST(request: Request) {
           </div>
           <div style="padding: 28px;">
             <p>Dear <strong>${parentName}</strong>,</p>
-            <p>We are excited to welcome back <strong>${childName}</strong> for <strong>${adventureLabel}</strong>${formattedStartDate ? ` (scheduled to start on <strong>${formattedStartDate}</strong>)` : ""}!</p>
-            <p>As a valued returning family, you have priority access to reserve your slot before general registration:</p>
+            <p>We are thrilled to welcome back <strong>${childName}</strong> for <strong>${adventureLabel}</strong>!</p>
+            
+            <!-- Specific Renewal Program & Schedule Details Box -->
+            <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
+              <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Program & Schedule Information</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${childName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${programDisplayName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #059669;">${adventureLabel}</td>
+                </tr>
+                ${formattedStartDate ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${formattedStartDate}</td>
+                </tr>
+                ` : ""}
+              </table>
+            </div>
+
+            <p>As a valued returning family, you have priority access to reserve your slot before general registration opens:</p>
             
             <div style="background-color: #f8fafc; border: 2px dashed #0033a0; border-radius: 12px; padding: 18px; text-align: center; margin: 24px 0;">
               <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: bold;">Your Priority Reservation Code</p>
@@ -78,14 +105,14 @@ export async function POST(request: Request) {
 
             <p style="text-align: center; margin: 24px 0;">
               <a href="${registerUrl}" style="background-color: #0033a0; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">
-                Complete Registration Form →
+                Complete Renewal Registration Form →
               </a>
             </p>
 
             <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-top: 24px; font-size: 13px; color: #92400e;">
               <p style="margin: 0 0 8px; font-weight: bold;">⚠️ Key Reminders Regarding Your Reservation:</p>
               <ul style="margin: 0 0 12px; padding-left: 20px;">
-                <li>This code is <strong>not a discount voucher</strong>. It reserves your child's slot without upfront payment today.</li>
+                <li>This code is <strong>not a discount voucher</strong>. It holds your child's slot without upfront payment today.</li>
                 <li><strong>Code validity:</strong> Valid only until <strong>October 15, 2026</strong>.</li>
                 <li><strong>Slot release policy:</strong> All unpaid slots as of <strong>October 16, 2026 at 1:00 PM</strong> will be released.</li>
                 <li><strong>Confirmation:</strong> Your slot is officially confirmed upon receipt of the 60% non-refundable downpayment.</li>
@@ -113,7 +140,7 @@ export async function POST(request: Request) {
     } else if (emailType === "payment_reminder") {
       const regId = family.registrationId || "";
       const paymentUrl = regId ? `${baseUrl}/register/payment/${regId}` : `${baseUrl}/renew?ref=${family._id.toString()}`;
-      subject = subject || `Payment Reminder & Slot Confirmation for ${childName} (${adventureLabel}) 🌈`;
+      subject = subject || `Payment Reminder & Slot Confirmation: ${programDisplayName} (${adventureLabel}) for ${childName} 🌈`;
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
           <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
@@ -122,7 +149,32 @@ export async function POST(request: Request) {
           </div>
           <div style="padding: 28px;">
             <p>Dear <strong>${parentName}</strong>,</p>
-            <p>Thank you for submitting your priority renewal registration for <strong>${childName}</strong> for <strong>${adventureLabel}</strong>${formattedStartDate ? ` (starting <strong>${formattedStartDate}</strong>)` : ""}! Your slot is currently on hold under reservation.</p>
+            <p>Thank you for submitting your priority renewal registration for <strong>${childName}</strong>! Your slot is currently on hold under reservation.</p>
+
+            <!-- Specific Program Details -->
+            <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
+              <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Confirmed Reservation Details</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${childName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${programDisplayName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #059669;">${adventureLabel}</td>
+                </tr>
+                ${formattedStartDate ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${formattedStartDate}</td>
+                </tr>
+                ` : ""}
+              </table>
+            </div>
 
             <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
               <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold;">Ready to complete your payment?</p>

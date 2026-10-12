@@ -1347,9 +1347,13 @@ export default function RenewalsPage() {
                                   <strong>{adv.adventure}:</strong> {adv.program}
                                 </span>
                               ))
+                            ) : f.previousProgram ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[11px] font-medium text-[#002f76]">
+                                <strong>Adventure 1:</strong> {f.previousProgram}
+                              </span>
                             ) : (
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 font-medium">
-                                {f.previousProgram || "Adventure 1"}
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 font-medium">
+                                Adventure 1
                               </span>
                             )}
                           </div>

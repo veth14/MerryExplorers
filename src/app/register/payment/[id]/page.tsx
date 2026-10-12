@@ -321,7 +321,7 @@ export default function PaymentPage() {
             Finalize Your Slot
           </h1>
           <p className="vp-sub text-[15px] max-w-md">
-            Submit your receipt below to confirm enrollment for <strong>2026 Adventure 2</strong>.
+            Submit your receipt below to confirm registration for <strong>2026 Adventure 2</strong>.
           </p>
         </div>
 
@@ -380,7 +380,7 @@ export default function PaymentPage() {
               As of <strong>October 16, 2026 at 1:00 PM</strong>, the priority reservation deadline has passed and your reserved slot has been released to waitlisted families.
             </p>
             <p className="vp-sub max-w-md mx-auto text-[13px] mb-8 leading-relaxed text-[#3d5a99]">
-              If you would still like to enroll, please submit a <strong>new registration form</strong> through our standard registration portal, subject to slot availability.
+              If you would still like to register, please submit a <strong>new registration form</strong> through our standard registration portal, subject to slot availability.
             </p>
             <div className="flex justify-center gap-3 flex-wrap">
               <Link href="/register" className="vp-btn">Submit New Registration →</Link>

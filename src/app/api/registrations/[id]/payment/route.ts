@@ -156,12 +156,30 @@ export async function POST(
         "everyday-curious": "Discovery Club: Everyday Curious",
         "creative-explorer": "Discovery Club: Creative Explorer",
         "brave-explorer": "Trailblazer: Brave Explorer",
+        "ballet": "Ballet",
+        "saturday-playdate": "Saturday Playdate",
       };
+
+      const resolvedProgramTitle = programNames[registration.program] || registration.program;
+
+      // Fetch dynamic adventure number & start date
+      const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+      const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+      const matchedProg = storedPrograms.find((p) =>
+        p.programKey.toLowerCase().includes(resolvedProgramTitle.toLowerCase()) ||
+        resolvedProgramTitle.toLowerCase().includes(p.programKey.toLowerCase())
+      ) || storedPrograms[0];
+
+      const advNumber = matchedProg?.currentAdventure ?? 2;
+      const advLabel = `Adventure ${advNumber}`;
+      const advStartDateStr = matchedProg?.nextAdventureStart
+        ? new Date(matchedProg.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+        : null;
 
       await transporter.sendMail({
         from: `"Merry Explorers" <merryexplorerscenter@gmail.com>`,
         to: registration.parentInfo.email,
-        subject: "We've Received Your Registration! ✨",
+        subject: `Payment Receipt Received: ${resolvedProgramTitle} (${advLabel}) for ${registration.childInfo.firstName}! ✨`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -194,9 +212,40 @@ export async function POST(
                     <tr>
                       <td style="padding: 36px 40px 30px 40px;">
                         <h2 style="color: #1e293b; font-size: 23px; margin: 0 0 18px 0;">Hi ${registration.parentInfo.name}! 👋</h2>
-                        <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-                          Thank you for registering <strong>${registration.childInfo.firstName}</strong> for our <strong>${programNames[registration.program] || registration.program}</strong> program! We've safely received your application and payment receipt, and we can't wait for this next Merry Adventure together.
+                        <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                          Thank you for renewing <strong>${registration.childInfo.firstName}</strong> for our <strong>${resolvedProgramTitle}</strong> program! We've safely received your application and payment receipt, and we can't wait for this next Merry Adventure together.
                         </p>
+
+                        <!-- Program & Adventure Start Summary Box -->
+                        <div style="background-color: #f0f7ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 0 0 24px 0;">
+                          <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Program & Schedule Information</p>
+                          <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
+                            <tr>
+                              <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
+                              <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${registration.childInfo.firstName} ${registration.childInfo.lastName || ""}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
+                              <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${resolvedProgramTitle}</td>
+                            </tr>
+                            ${registration.classTime ? `
+                            <tr>
+                              <td style="padding: 4px 0; color: #64748b;"><strong>Class / Session:</strong></td>
+                              <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${registration.classTime}</td>
+                            </tr>
+                            ` : ""}
+                            <tr>
+                              <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
+                              <td style="padding: 4px 0; font-weight: bold; color: #059669;">${advLabel}</td>
+                            </tr>
+                            ${advStartDateStr ? `
+                            <tr>
+                              <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                              <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${advStartDateStr}</td>
+                            </tr>
+                            ` : ""}
+                          </table>
+                        </div>
 
                         <div style="background-color: #fffbea; border: 2px dashed #ffd84d; border-radius: 14px; padding: 22px 24px; margin: 0 0 26px 0;">
                           <h3 style="color: #0033A0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 14px 0;">☀️ What Happens Next?</h3>

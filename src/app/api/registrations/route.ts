@@ -221,6 +221,31 @@ export async function POST(request: Request) {
     // Send instant confirmation and payment reminder email to returning / reserving families
     if (parentInfo?.email) {
       try {
+        // Fetch program configuration & adventure start date
+        const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+        const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+        
+        const programKeyMap: Record<string, string> = {
+          "curious-explorer": "Discovery Club: Curious Explorer",
+          "creative-explorer": "Discovery Club: Creative Explorer",
+          "everyday-curious": "Discovery Club: Everyday Curious",
+          "brave-explorer": "Trailblazer: Brave Explorer",
+          "ballet": "Ballet",
+          "saturday-playdate": "Saturday Playdate",
+        };
+
+        const readableProgramName = programKeyMap[program] || program;
+        const matchedProg = storedPrograms.find((p) =>
+          p.programKey.toLowerCase().includes(readableProgramName.toLowerCase()) ||
+          readableProgramName.toLowerCase().includes(p.programKey.toLowerCase())
+        ) || storedPrograms[0];
+
+        const advNum = matchedProg?.currentAdventure ?? 2;
+        const advLabel = `Adventure ${advNum}`;
+        const advStartDateStr = matchedProg?.nextAdventureStart
+          ? new Date(matchedProg.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+          : null;
+
         const auth = process.env.GMAIL_CLIENT_ID
           ? {
             type: "OAuth2",
@@ -247,16 +272,47 @@ export async function POST(request: Request) {
         await transporter.sendMail({
           from: `"Merry Explorers" <merryexplorerscenter@gmail.com>`,
           to: parentInfo.email,
-          subject: `Payment Reminder & Slot Confirmation for ${childName} 🌈`,
+          subject: `Payment Reminder & Slot Confirmation: ${readableProgramName} (${advLabel}) for ${childName} 🌈`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
               <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
                 <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation · ${advLabel}</p>
               </div>
               <div style="padding: 28px;">
                 <p>Dear <strong>${parentName}</strong>,</p>
                 <p>Thank you for submitting your renewal registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.</p>
+
+                <!-- Specific Program & Schedule Details Box -->
+                <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
+                  <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Confirmed Renewal Details</p>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
+                    <tr>
+                      <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
+                      <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${childName} ${childInfo?.lastName || ""}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
+                      <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${readableProgramName}</td>
+                    </tr>
+                    ${classTime ? `
+                    <tr>
+                      <td style="padding: 4px 0; color: #64748b;"><strong>Class / Session:</strong></td>
+                      <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${classTime}</td>
+                    </tr>
+                    ` : ""}
+                    <tr>
+                      <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
+                      <td style="padding: 4px 0; font-weight: bold; color: #059669;">${advLabel}</td>
+                    </tr>
+                    ${advStartDateStr ? `
+                    <tr>
+                      <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                      <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${advStartDateStr}</td>
+                    </tr>
+                    ` : ""}
+                  </table>
+                </div>
 
                 <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
                   <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold;">Ready to complete your payment?</p>
@@ -268,9 +324,9 @@ export async function POST(request: Request) {
 
                 <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
                   <p style="margin: 0 0 6px; font-weight: bold;">⚠️ IMPORTANT NOTE &amp; DISCLAIMER:</p>
-                  <p style="margin: 0 0 8px;">Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+                  <p style="margin: 0 0 8px;">Please ensure to settle your <strong>Adventure 1 Balance</strong> before you can proceed to the registration.</p>
                   <p style="margin: 0; font-style: italic;">
-                    "In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1."
+                    "In the event that a family has unsettled balance, your downpayment for ${advLabel} will be credited as your balance payment for the previous cycle."
                   </p>
                 </div>
 
