@@ -848,24 +848,20 @@ export default function RegisterPage() {
                               <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
                               <div className="grid gap-2.5 sm:grid-cols-2">
                                 {p.classes.map((cls) => {
-                                  const isCreativeMorningDisabled = p.id === "creative-explorer" && cls.time.includes("9:45 AM");
-                                  const displayName = isCreativeMorningDisabled
-                                    ? "Morning Class / Everyday Curious"
-                                    : cls.name;
+                                  const isCreativeMorning = p.id === "creative-explorer" && cls.time.includes("9:45 AM");
+                                  const displayName = isCreativeMorning ? "Morning Class / Everyday Curious" : cls.name;
 
                                   const slotInfo = programSlots[cls.name];
                                   const isFull = slotInfo ? slotInfo.available === 0 : false;
-                                  const isDisabled = isFull || isCreativeMorningDisabled;
                                   const isClassSelected = selectedClass === cls.name;
                                   return (
                                     <button
                                       key={cls.name}
                                       type="button"
-                                      disabled={isDisabled}
-                                      onClick={(e) => { e.stopPropagation(); if (!isDisabled) setSelectedClass(cls.name); }}
-                                      className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${isCreativeMorningDisabled
-                                        ? "opacity-50 cursor-not-allowed border-slate-300 bg-slate-100"
-                                        : isFull
+                                      disabled={isFull}
+                                      onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
+                                      className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${
+                                        isFull
                                         ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50"
                                         : isClassSelected
                                           ? "border-[#0b2a82] bg-white shadow-[0_3px_0_#0b2a82]"
@@ -876,13 +872,7 @@ export default function RegisterPage() {
                                         <p className="text-[13px] font-black text-[#0b2a82]">{displayName}</p>
                                         <p className="text-[11px] font-semibold text-[#3d5a99]">{cls.time}</p>
                                       </div>
-                                      {isCreativeMorningDisabled ? (
-                                        <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
-                                          Unavailable
-                                        </span>
-                                      ) : (
-                                        slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />
-                                      )}
+                                      {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
                                     </button>
                                   );
                                 })}
