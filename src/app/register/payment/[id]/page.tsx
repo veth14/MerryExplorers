@@ -16,6 +16,7 @@ type RegData = {
   program: ProgramId;
   reservedUntil: string;
   paymentDeadline?: string;
+  isPromoRegistration?: boolean;
 };
 
 // ─── Design Tokens (aligned with Parent Portal / TrailblazerDashboard) ───────
@@ -93,6 +94,18 @@ export default function PaymentPage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrDone, setOcrDone] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
+
+  // Oct 16, 1:00 PM deadline gate — only applies to promo code (renewal) reservations
+  // Regular 1-hour registrations are already handled by the countdown timer expiry
+  const SLOT_RELEASE_DEADLINE = new Date("2026-10-16T13:00:00+08:00");
+  const isSlotReleased =
+    mounted &&
+    !loading &&
+    !!regData &&
+    regData.status === "reserved" &&
+    regData.isPromoRegistration === true &&
+    Date.now() >= SLOT_RELEASE_DEADLINE.getTime() &&
+    !success;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -355,6 +368,25 @@ export default function PaymentPage() {
                 Return to Home
               </Link>
             </div>
+          </div>
+        ) : isSlotReleased ? (
+          <div className="vp-card text-center py-12">
+            <div className="vp-tape" />
+            <div className="w-20 h-20 rounded-full bg-red-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+              🔓
+            </div>
+            <h2 className="vp-h2 text-[24px] text-red-600 mb-2">Your Slot Has Been Released</h2>
+            <p className="vp-sub max-w-md mx-auto text-[14px] mb-4 leading-relaxed">
+              As of <strong>October 16, 2026 at 1:00 PM</strong>, the priority reservation deadline has passed and your reserved slot has been released to waitlisted families.
+            </p>
+            <p className="vp-sub max-w-md mx-auto text-[13px] mb-8 leading-relaxed text-[#3d5a99]">
+              If you would still like to enroll, please submit a <strong>new registration form</strong> through our standard registration portal, subject to slot availability.
+            </p>
+            <div className="flex justify-center gap-3 flex-wrap">
+              <Link href="/register" className="vp-btn">Submit New Registration →</Link>
+              <Link href="/" className="vp-btn ghost small">Back to Home</Link>
+            </div>
+            <p className="mt-6 text-[12px] text-[#64748b]">Questions? Contact Teacher Angel onsite or reply to the email you received.</p>
           </div>
         ) : showErrorScreen || !prog ? (
           <div className="vp-card text-center py-12">
