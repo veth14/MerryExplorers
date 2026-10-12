@@ -47,7 +47,7 @@ function StatusBadge({ status }: { status: ResultStatus }) {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${s.bg} ${s.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {status}
+      {status === "Enrolled" ? "Registered" : status}
     </span>
   );
 }
@@ -228,7 +228,7 @@ export default function DiscoveryDayAdminPage() {
                   style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" viewBox="0 0 24 24" stroke="%23334155" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundSize: "12px", paddingRight: "30px" }}
                 >
                   <option value="All">All Statuses</option>
-                  {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {ALL_STATUSES.map((s) => <option key={s} value={s}>{s === "Enrolled" ? "Registered" : s}</option>)}
                 </select>
               </div>
             </div>
@@ -378,7 +378,7 @@ export default function DiscoveryDayAdminPage() {
                           : "bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#0033A0]/40 hover:text-[#0033A0]"
                       } disabled:opacity-50`}
                     >
-                      {s}
+                      {s === "Enrolled" ? "Registered" : s}
                     </button>
                   ))}
                 </div>

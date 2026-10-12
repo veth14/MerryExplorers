@@ -108,7 +108,7 @@ export async function POST(
                           <h2 style="color: #1e293b; font-size: 22px; margin: 0 0 18px 0;">Hi ${parentInfo.name},</h2>
 
                           <p style="color: #475569; font-size: 16px; line-height: 1.7; margin: 0 0 20px 0;">
-                            Thank you for your interest in enrolling <strong>${childInfo?.firstName || "your child"}</strong> at Merry Explorers. After reviewing your registration, we're unable to confirm this slot at this time.
+                            Thank you for your interest in registering <strong>${childInfo?.firstName || "your child"}</strong> at Merry Explorers. After reviewing your registration, we're unable to confirm this slot at this time.
                           </p>
 
                           ${reason

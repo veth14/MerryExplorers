@@ -149,7 +149,7 @@ export async function POST(
       await transporter.sendMail({
         from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
         to: parentInfo.email,
-        subject: `🎉 ${childInfo.firstName} is Officially Enrolled at Merry Explorers!`,
+        subject: `🎉 ${childInfo.firstName} is Officially Registered at Merry Explorers!`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -189,12 +189,12 @@ export async function POST(
                         <p style="color: #0033A0; font-size: 16px; font-weight: 700; margin: 0 0 26px 0; text-align: center;">${childInfo.firstName} is officially an Explorer!</p>
 
                         <p style="color: #475569; font-size: 16px; line-height: 1.7; margin: 0 0 26px 0;">
-                          Hi <strong>${parentInfo.name}</strong>! We're thrilled to confirm that your payment has been verified and <strong>${childInfo.firstName}</strong> is now officially enrolled at Merry Explorers. 🎉
+                          Hi <strong>${parentInfo.name}</strong>! We're thrilled to confirm that your payment has been verified and <strong>${childInfo.firstName}</strong> is now officially registered at Merry Explorers. 🎉
                         </p>
 
-                        <!-- Enrollment details card -->
+                        <!-- Registration details card -->
                         <div style="background-color: #f8fbff; border: 1.5px solid #dbeafe; border-radius: 16px; padding: 22px 24px; margin: 0 0 20px 0;">
-                          <p style="margin: 0 0 14px 0; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">📋 Enrollment Details</p>
+                          <p style="margin: 0 0 14px 0; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">📋 Registration Details</p>
                           <table width="100%" cellpadding="0" cellspacing="0">
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600; width: 40%;">Explorer</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${childInfo.firstName} ${childInfo.lastName}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Program</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${programName}</td></tr>

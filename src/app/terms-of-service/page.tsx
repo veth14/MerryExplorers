@@ -100,7 +100,7 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section title="4. Trailblazer: Brave Explorer Prerequisite">
-              <p>Students enrolling in the Trailblazer: Brave Explorer program must meet the following prerequisites before the start of the Adventure:</p>
+              <p>Students registering in the Trailblazer: Brave Explorer program must meet the following prerequisites before the start of the Adventure:</p>
               <ul className="list-disc pl-5 space-y-1 mt-2">
                 <li>Must be able to grip independently (e.g., crayons, pencils).</li>
                 <li>Must be able to stay independently with teachers without a guardian present.</li>

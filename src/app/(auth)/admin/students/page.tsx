@@ -111,7 +111,7 @@ export default function AdminStudentsPage() {
           { label: "Total Explorers", value: stats.total,    icon: "🧒", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
           { label: "Active",          value: stats.active,   icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
           { label: "Programs",        value: stats.programs, icon: "📚", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
-          { label: "Enrolled Today",  value: stats.today,    icon: "🆕", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
+          { label: "Registered Today",  value: stats.today,    icon: "🆕", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
         ].map(s => (
           <div key={s.label} style={{ background: "white", borderRadius: "20px", padding: "20px 24px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", display: "flex", alignItems: "center", gap: "16px" }}>
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>{s.icon}</div>
@@ -166,7 +166,7 @@ export default function AdminStudentsPage() {
         <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,47,118,0.06)", overflow: "hidden" }}>
           {/* Header */}
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 1fr 56px", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
-            {["Explorer", "Program", "Parent / Guardian", "Enrolled", ""].map((h, i) => (
+            {["Explorer", "Program", "Parent / Guardian", "Registered", ""].map((h, i) => (
               <div key={i} style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px" }}>{h}</div>
             ))}
           </div>

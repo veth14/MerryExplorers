@@ -977,12 +977,12 @@ export default function AdminPaymentsPage() {
     setManualSaving(true);
     try {
       let balanceResult: any | null = null; // what the server stored for a balance payment
-      let approveEmailed = false; // the approve route already emailed the parent ("Officially Enrolled")
+      let approveEmailed = false; // the approve route already emailed the parent ("Officially Registered")
 
       if (form.type === "registration") {
         if (isFollowUp) {
           // Balance payment: its own admin endpoint. It never touches /payment (first payment only)
-          // or /approve (would create a duplicate student and send the enrollment email again).
+          // or /approve (would create a duplicate student and send the registration email again).
           const r = await postJson(`/api/registrations/${form.registrationId}/balance-payment`, "POST", {
             paymentMethod: form.paymentMethod,
             receiptBase64: receipt,
@@ -1316,7 +1316,7 @@ export default function AdminPaymentsPage() {
 
         const pendingHelp =
           type === "registration"
-            ? "Verifying APPROVES the registration, enrolls the student and emails the parent. Check the receipt amount and reference no. against GCash/BPI first."
+            ? "Verifying APPROVES the registration, registers the student and emails the parent. Check the receipt amount and reference no. against GCash/BPI first."
             : type === "session"
               ? "Verifying counts this payment toward the family's balance. Check the receipt amount and reference no. first."
               : "Verifying confirms the renewal downpayment for the Next Adventure. Check the receipt amount and reference no. first.";
@@ -1945,7 +1945,7 @@ export default function AdminPaymentsPage() {
                       <span style={{ display: "block", fontWeight: 500, color: "#94a3b8", marginTop: "2px" }}>
                         {isFollowUp
                           ? "Sent after the payment is saved, with the balance statement."
-                          : "Sent when the payment is marked verified. Skipped if the enrollment email was already sent."}
+                          : "Sent when the payment is marked verified. Skipped if the registration email was already sent."}
                       </span>
                     </span>
                   </label>
@@ -2246,7 +2246,7 @@ export default function AdminPaymentsPage() {
                           <button
                             title={
                               (pendingItems.length > 1 ? `Verifies the oldest of ${pendingItems.length} pending payments. Open Details to review each one. ` : "") +
-                              (g.pendingItem.type === "registration" ? "Approves the registration, enrolls the student and emails the parent." : "Mark this payment as verified.")
+                              (g.pendingItem.type === "registration" ? "Approves the registration, registers the student and emails the parent." : "Mark this payment as verified.")
                             }
                             onClick={(e) => { e.stopPropagation(); const pi = g.pendingItem!; handleAction(pi.uid, pi.type === "session" ? pi.payment.id : null, "verify", pi.type); }}
                             disabled={!!actioning}

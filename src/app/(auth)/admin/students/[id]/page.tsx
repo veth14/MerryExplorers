@@ -150,7 +150,7 @@ export default function AdminStudentProfilePage() {
                 </span>
               )}
               <span style={{ padding: "4px 12px", background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.2)" }}>
-                Enrolled {enrolledDate}
+                Registered {enrolledDate}
               </span>
             </div>
           </div>
@@ -204,13 +204,13 @@ export default function AdminStudentProfilePage() {
           <InfoRow label="Phone" value={student.emergencyContact?.phone} />
         </Section>
 
-        <Section title="Enrollment Details" icon="📋" accentColor="#047857" iconBg="linear-gradient(135deg,#d1fae5,#a7f3d0)">
+        <Section title="Registration Details" icon="📋" accentColor="#047857" iconBg="linear-gradient(135deg,#d1fae5,#a7f3d0)">
           <InfoRow label="Program" value={student.programName} />
           <InfoRow label="Class Time" value={student.classTime} />
           <InfoRow label="Schedule" value={student.schedule} />
           <InfoRow label="Uniform Kit" value={student.uniformOrdered ? "✅ Ordered" : "No"} />
           <InfoRow label="Lanyard" value={student.lanyardOrdered ? "✅ Ordered" : "No"} />
-          <InfoRow label="Enrolled On" value={enrolledDate} />
+          <InfoRow label="Registered On" value={enrolledDate} />
         </Section>
 
         <Section title="Consents & Waivers" icon="📝" accentColor="#0e7490" iconBg="linear-gradient(135deg,#cffafe,#a5f3fc)">

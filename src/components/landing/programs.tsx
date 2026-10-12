@@ -547,7 +547,7 @@ export function ProgramsSection() {
           className="mt-4 text-center"
         >
           <p className="mb-4 text-[14px] font-medium text-[#64748b]">
-            Secure your slot and enroll online today! 🎒
+            Secure your slot and register online today! 🎒
           </p>
           <Link
             href="/register"

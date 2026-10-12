@@ -116,7 +116,7 @@ export default function ContactPage() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="mt-12 text-center"
           >
-            <p className="text-[16px] font-semibold text-[#64748b] mb-4">Want to ask about enrollment or programs?</p>
+            <p className="text-[16px] font-semibold text-[#64748b] mb-4">Want to ask about registration or programs?</p>
             <Link
               href="/inquire"
               className="inline-flex items-center gap-3 rounded-[1rem] bg-gradient-to-r from-[#0033A0] to-[#0047df] px-8 py-4 text-[16px] font-extrabold text-white shadow-[0_12px_32px_rgba(0,51,160,0.3)] hover:shadow-[0_16px_40px_rgba(0,51,160,0.4)] transition-all hover:-translate-y-1"

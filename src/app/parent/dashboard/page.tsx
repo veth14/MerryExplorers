@@ -1663,7 +1663,7 @@ export default function ParentDashboardPage() {
                           { label: "Date of Birth", value: profile.studentInfo.childInfo.dateOfBirth || "—", icon: "🎂" },
                           { label: "Gender", value: profile.studentInfo.childInfo.gender || "—", icon: "👤" },
                           { label: "Health Notes", value: profile.studentInfo.childInfo.healthProfile || "None", icon: "🩺" },
-                          { label: "Enrolled", value: profile.studentInfo.enrolledAt ? new Date(profile.studentInfo.enrolledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—", icon: "📋" },
+                          { label: "Registered", value: profile.studentInfo.enrolledAt ? new Date(profile.studentInfo.enrolledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—", icon: "📋" },
                           { label: "Reg. ID", value: profile.studentInfo.registrationId || "—", icon: "🔖" },
                         ] as const).map(({ label, value, icon }) => (
                           <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 13px", background: "#f8faff", borderRadius: "10px", gap: "8px" }}>

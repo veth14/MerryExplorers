@@ -76,7 +76,7 @@ export default function Adventure2RegistrationPage() {
                 </div>
                 <div>
                   <h2 className="font-headline text-2xl font-extrabold text-[#0F006E]">Renewing Explorers</h2>
-                  <p className="text-[14px] font-bold text-[#0066CC] uppercase tracking-wider">Currently Enrolled</p>
+                  <p className="text-[14px] font-bold text-[#0066CC] uppercase tracking-wider">Currently Registered</p>
                 </div>
               </div>
 
@@ -185,9 +185,9 @@ export default function Adventure2RegistrationPage() {
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FEF3C7] text-[#B45309] font-black text-sm ring-4 ring-white">3</div>
                   </div>
                   <div className="pt-1">
-                    <h3 className="font-bold text-[#1E293B] text-lg mb-1">Complete Enrollment</h3>
+                    <h3 className="font-bold text-[#1E293B] text-lg mb-1">Complete Registration</h3>
                     <p className="text-[#64748B] text-[15px] leading-relaxed">
-                      Once approved, proceed with the enrollment fee payment and claim your child's official MerryExplorers uniform!
+                      Once approved, proceed with the registration fee payment and claim your child's official MerryExplorers uniform!
                     </p>
                   </div>
                 </div>

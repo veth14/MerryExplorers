@@ -894,7 +894,7 @@ export default function TrailblazerDashboard(p: Props) {
     function RenewalPanel() {
         return (
             <Card tape>
-                <Heading icon="refresh" title="Renewal" sub="Renew your child's enrollment." />
+                <Heading icon="refresh" title="Renewal" sub="Renew your child's registration." />
                 <Empty icon="refresh" title="Coming soon" text="Renewal options for Trailblazer will be available shortly." />
             </Card>
         );

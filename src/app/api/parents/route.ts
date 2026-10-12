@@ -72,7 +72,7 @@ async function sendWelcomeEmail(
                 We're thrilled to have you and <strong style="color:#002f76;">${childName}</strong> as part of the Merry Explorers family! Your Parent Portal account has been set up so you can follow your child's adventures, view session photos, and access important documents.
               </p>
               <div style="background:#f0f5ff;border-left:4px solid #0050d5;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
-                <p style="color:#002f76;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">Program Enrolled</p>
+                <p style="color:#002f76;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">Program Registered</p>
                 <p style="color:#1e3a6e;font-size:15px;font-weight:600;margin:0 0 4px;">📚 ${program}</p>
                 ${classTime ? `<p style="color:#5a6e8c;font-size:14px;margin:0;">🕐 ${classTime}</p>` : ""}
               </div>
