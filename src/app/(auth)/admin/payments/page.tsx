@@ -16,6 +16,7 @@ import {
 } from "@/lib/payment-terms";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
+import { readReceipt, type ReceiptData } from "@/lib/receipt-ocr";
 
 type Payment = {
   id: string;
@@ -114,47 +115,6 @@ const ADMIN_ACTOR: { actorUid?: string; actorName?: string } = {};
 
 // Registration statuses that can take a follow-up (balance) payment
 const SETTLEABLE_STATUSES = ["approved", "active"];
-
-// Reads the reference number AND the amount off a receipt image
-async function extractReceiptData(imageDataUrl: string): Promise<{ reference: string; amount: number | null }> {
-  let reference = "";
-  let amount: number | null = null;
-  try {
-    const Tesseract = (await import("tesseract.js")).default;
-    const { data } = await Tesseract.recognize(imageDataUrl, "eng");
-    const text: string = data.text;
-
-    // reference number (same patterns as the parent payment page)
-    const refPatterns = [
-      /\b(ITO\d{12,20})\b/i,
-      /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i,
-      /\b(\d{13})\b/,
-      /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i,
-      /\b(\d{10,20})\b/,
-    ];
-    for (const pattern of refPatterns) {
-      const hit = text.match(pattern);
-      if (hit && hit[1]) { reference = hit[1].replace(/\s+/g, ""); break; }
-    }
-
-    // amount: look next to "Total Amount / Amount Sent / Transfer Amount / Amount", else any "PHP 1,234.00"
-    const toNum = (v: string) => parseFloat(v.replace(/,/g, ""));
-    const found: number[] = [];
-    const labeled = /(?:total\s*amount(?:\s*sent)?|amount\s*sent|transfer\s*amount|amount)\s*[:\-]?\s*(?:php|₱|p)?\s*([\d,]+\.\d{2})\b/gi;
-    for (const hit of text.matchAll(labeled)) found.push(toNum(hit[1]));
-    if (found.length === 0) {
-      for (const hit of text.matchAll(/(?:php|₱)\s*([\d,]+\.\d{2})\b/gi)) found.push(toNum(hit[1]));
-    }
-    // receipts repeat the amount, so take the value that shows up most often
-    const counts = new Map<number, number>();
-    found.filter((n) => n > 0).forEach((n) => counts.set(n, (counts.get(n) || 0) + 1));
-    let best = 0;
-    counts.forEach((c, n) => { if (c > best) { best = c; amount = n; } });
-  } catch {
-    // OCR failed silently – admin types the details in
-  }
-  return { reference, amount };
-}
 
 const MAX_RECEIPT_BYTES = 1_200_000; // ~1.2MB after compression
 
@@ -431,6 +391,13 @@ export default function AdminPaymentsPage() {
   const [manualError, setManualError] = useState("");
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrAmount, setOcrAmount] = useState<number | null>(null);
+  const [ocrInfo, setOcrInfo] = useState<ReceiptData | null>(null); // what the last receipt scan found
+  const ocrRunRef = useRef(0); // lets a newer upload cancel the result of an older scan
+  const lastOcrRef = useRef<ReceiptData | null>(null); // what the previous scan filled in (so a new receipt can replace it)
+  const paidOnTouched = useRef(false); // the admin picked the date by hand: don't overwrite it
+  const methodTouched = useRef(false); // same for the payment method
+  // keeps the receipt's amount when another registration / parent is chosen after the receipt was uploaded
+  const ocrAmountText = ocrAmount != null ? String(ocrAmount) : "";
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast({ msg, type });
@@ -712,6 +679,11 @@ export default function AdminPaymentsPage() {
     setManualError("");
     setOcrLoading(false);
     setOcrAmount(null);
+    setOcrInfo(null);
+    ocrRunRef.current++;
+    lastOcrRef.current = null;
+    paidOnTouched.current = false;
+    methodTouched.current = false;
     setManualOpen(true);
   }
 
@@ -732,13 +704,16 @@ export default function AdminPaymentsPage() {
       .sort((a, b) => (a.childInfo?.firstName || "").localeCompare(b.childInfo?.firstName || ""));
   }, [allRegistrations, parentFilter]);
 
-  // Same rules as the details modal (calcRegistrationTerms) so the numbers always match
-  function regInfo(reg: any) {
+  // Same rules as the details modal (calcRegistrationTerms) so the numbers always match.
+  // `asOf` = the date interest is calculated up to. Omit it for "today" (list rows, details modal);
+  // the Encode Payment form passes the "Date paid" so a payment made last Sunday isn't charged
+  // for a Monday that only arrived afterwards.
+  function regInfo(reg: any, asOf?: Date) {
     const email = (reg?.parentInfo?.email || "").toLowerCase();
     const parentAcc = allAccounts.find((a) => (a.email || "").toLowerCase() === email);
     const student = getStudentSessionInfo(reg, parentAcc);
     const paidVerified = isRegistrationVerified(reg.status) ? reg.amountPaid || reg.amountDue || 0 : 0;
-    const terms = calcRegistrationTerms(reg, student, paidVerified, reg.amountDue);
+    const terms = calcRegistrationTerms(reg, student, paidVerified, reg.amountDue, asOf);
     // first payment = the one parents make on the "Secure Your Slot" page
     const isInitial = reg.status === "reserved" || reg.status === "early-bird";
     const prog = (PROGRAM_SLOTS as any)[reg.program] ?? null;
@@ -759,6 +734,10 @@ export default function AdminPaymentsPage() {
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registrations, allAccounts]);
+
+  // Interest in the Encode Payment form is calculated as of the DATE THE PARENT PAID, not today.
+  // Noon is used so the date can't slip a day because of timezones.
+  const paidAsOf = form.paidOn ? new Date(form.paidOn + "T12:00:00") : undefined;
 
   const selectedReg = useMemo(
     () => (form.type === "registration" ? allRegistrations.find((r) => r.id === form.registrationId) ?? null : null),
@@ -785,7 +764,7 @@ export default function AdminPaymentsPage() {
   // Amount due for the FIRST registration payment (program rate/downpayment + kits), same as the parent page
   const regCalc = useMemo(() => {
     if (!selectedReg) return null;
-    const info = regInfo(selectedReg);
+    const info = regInfo(selectedReg, paidAsOf);
     const isBallet = selectedReg.program === "ballet";
     const addons: { label: string; amount: number }[] = [];
     if (isBallet) {
@@ -800,7 +779,7 @@ export default function AdminPaymentsPage() {
     const amountDue = info.isInitial && info.prog ? base + addonCost : null;
     return { ...info, isBallet, addons, addonCost, base, amountDue };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedReg, form.paymentOption, form.isNewFamily, form.uniformOrdered, form.recitalKitOrdered, allAccounts]);
+  }, [selectedReg, form.paymentOption, form.isNewFamily, form.uniformOrdered, form.recitalKitOrdered, allAccounts, form.paidOn]);
 
   const paidNum = Number(form.amountPaid) || 0;
   const expectedNow = regCalc?.amountDue ?? null;
@@ -810,6 +789,17 @@ export default function AdminPaymentsPage() {
   // ── Follow-up payment: paying off what's left on a registration that already has a payment ──
   const isFollowUp = form.type === "registration" && !!selectedReg && !!regCalc && !regCalc.isInitial;
   const followTerms = isFollowUp ? regCalc!.terms : null;
+
+  // ── Interest rule: no interest is owed for a payment made before the first interest Monday ──
+  // `followTerms` is calculated as of the DATE PAID. `serverTerms` is the same registration as of TODAY, which is what
+  // the balance-payment route calculates. If interest only built up AFTER the payment date, that part is not charged.
+  // TEMPORARY: once the balance-payment route counts interest up to `paidOn`, delete autoWaiveInterest / serverTerms
+  // and send `expectedTotalPayable: followTerms?.totalPayable` and `waiveInterest: waivable && form.waiveInterest` again.
+  const serverTerms = isFollowUp && selectedReg ? regInfo(selectedReg).terms : null;
+  const lateInterest = followTerms && serverTerms ? Math.max(0, (serverTerms.interest || 0) - (followTerms.interest || 0)) : 0;
+  const owedOnPaidDate = followTerms ? followTerms.totalPayable ?? followTerms.balance ?? 0 : 0;
+  // only when the parent paid everything that was owed on the day they paid
+  const autoWaiveInterest = lateInterest > 0 && paidNum > 0 && paidNum >= owedOnPaidDate;
   const settleDue = followTerms ? followTerms.totalPayable ?? followTerms.balance ?? null : null;
   // same function the server uses, so this preview always matches what gets saved
   const settleAlloc = followTerms && paidNum > 0 ? allocateBalancePayment(followTerms, paidNum, form.waiveInterest) : null;
@@ -834,21 +824,42 @@ export default function AdminPaymentsPage() {
       const data = await fileToReceipt(file);
       setReceipt(data);
       setReceiptName(file.name);
-      // read the reference number off the receipt (same OCR the parent page uses)
+      // Read the reference no., amount, date and bank off the receipt and fill the form with them
       if (data.startsWith("data:image")) {
+        const run = ++ocrRunRef.current;
         setOcrLoading(true);
+        setOcrInfo(null);
         setOcrAmount(null);
-        extractReceiptData(data)
-          .then(({ reference, amount }) => {
-            setOcrAmount(amount);
-            // only fill empty fields – never overwrite what the admin already typed
-            setForm((f) => ({
-              ...f,
-              referenceNumber: f.referenceNumber || reference,
-              amountPaid: f.amountPaid || (amount != null ? String(amount) : ""),
-            }));
+        readReceipt(file, data)
+          .then((res) => {
+            if (run !== ocrRunRef.current) return; // a newer receipt was uploaded (or this one removed) meanwhile
+            const prev = lastOcrRef.current;
+            lastOcrRef.current = res;
+            setOcrInfo(res);
+            setOcrAmount(res.amount);
+            setForm((f) => {
+              const next = { ...f };
+              // a field is only replaced when it is empty or still holds what the previous scan put there,
+              // so anything the admin typed or changed by hand is never overwritten
+              if (res.reference && (!f.referenceNumber || f.referenceNumber === prev?.reference)) next.referenceNumber = res.reference;
+              if (res.amount != null && (!f.amountPaid || Number(f.amountPaid) === prev?.amount)) next.amountPaid = String(res.amount);
+              if (res.date && !paidOnTouched.current) next.paidOn = res.date;
+              if (res.method && !methodTouched.current) next.paymentMethod = res.method;
+              return next;
+            });
           })
-          .finally(() => setOcrLoading(false));
+          .catch(() => {
+            if (run === ocrRunRef.current) setOcrInfo({ reference: "", amount: null, date: null, method: null });
+          })
+          .finally(() => {
+            if (run === ocrRunRef.current) setOcrLoading(false);
+          });
+      } else {
+        // a PDF can't be scanned here: the admin types the details in
+        ocrRunRef.current++;
+        setOcrLoading(false);
+        setOcrInfo(null);
+        setOcrAmount(null);
       }
     } catch (e: any) {
       setReceipt(null);
@@ -978,9 +989,14 @@ export default function AdminPaymentsPage() {
             referenceNumber: form.referenceNumber.trim(),
             amountPaid: amount,
             paidOn: adminFields.submittedAt,
-            adminNote: adminFields.adminNote,
-            waiveInterest: waivable && form.waiveInterest,
-            expectedTotalPayable: followTerms?.totalPayable ?? null,
+            adminNote: [
+              adminFields.adminNote,
+              autoWaiveInterest
+                ? `Interest not charged: paid on ${fmtDate(form.paidOn)}${followTerms?.interestStart ? `, before interest started on ${fmtDate(followTerms.interestStart)}` : ""}.`
+                : "",
+            ].filter(Boolean).join(" · "),
+            waiveInterest: autoWaiveInterest || (waivable && form.waiveInterest),
+            expectedTotalPayable: serverTerms?.totalPayable ?? followTerms?.totalPayable ?? null, // the server's own (today) total
             ...ADMIN_ACTOR,
           });
           if (!r.ok) return setManualError(r.error || "Could not save the payment. Please try again.");
@@ -1518,9 +1534,10 @@ export default function AdminPaymentsPage() {
         const pctRes = Math.round(RESERVATION_RATE * 100);
         const pctInt = Math.round(WEEKLY_INTEREST_RATE * 100);
 
-        // Remaining-balance box (same numbers as the Payment Details modal)
+        // Remaining-balance box (same numbers as the Payment Details modal,
+        // but interest is counted up to the "Date paid" chosen in this form)
         const balanceBox = (reg: any) => {
-          const t = regInfo(reg).terms;
+          const t = regInfo(reg, paidAsOf).terms;
           if (!t) return null;
           const childName = `${reg.childInfo?.firstName ?? ""} ${reg.childInfo?.lastName ?? ""}`.trim();
           const hasSplit = t.reservation != null;
@@ -1603,7 +1620,7 @@ export default function AdminPaymentsPage() {
                     <span style={label}>Payment type</span>
                     <select
                       value={form.type}
-                      onChange={(e) => { setF({ type: e.target.value as PaymentKind, accountId: "", registrationId: "", amountPaid: "", waiveInterest: false }); setParentFilter(""); }}
+                      onChange={(e) => { setF({ type: e.target.value as PaymentKind, accountId: "", registrationId: "", amountPaid: ocrAmountText, waiveInterest: false }); setParentFilter(""); }}
                       style={input}
                     >
                       <option value="registration">Registration Payment (1st payment or balance)</option>
@@ -1616,7 +1633,7 @@ export default function AdminPaymentsPage() {
                     <span style={label}>{form.type === "registration" ? "Registration (child / parent)" : "Parent account"}</span>
                     <input value={parentFilter} onChange={(e) => setParentFilter(e.target.value)} placeholder="Type to filter by name or email…" style={{ ...input, marginBottom: "6px" }} />
                     {form.type === "registration" ? (
-                      <select value={form.registrationId} onChange={(e) => setF({ registrationId: e.target.value, amountPaid: "", waiveInterest: false })} style={input}>
+                      <select value={form.registrationId} onChange={(e) => setF({ registrationId: e.target.value, amountPaid: ocrAmountText, waiveInterest: false })} style={input}>
                         <option value="">Select registration…</option>
                         {registrationOptions.map((r) => (
                           <option key={r.id} value={r.id}>
@@ -1625,7 +1642,7 @@ export default function AdminPaymentsPage() {
                         ))}
                       </select>
                     ) : (
-                      <select value={form.accountId} onChange={(e) => setF({ accountId: e.target.value, amountPaid: "" })} style={input}>
+                      <select value={form.accountId} onChange={(e) => setF({ accountId: e.target.value, amountPaid: ocrAmountText })} style={input}>
                         <option value="">Select parent…</option>
                         {parentOptions.map((a) => (
                           <option key={a.id} value={a.id}>
@@ -1774,12 +1791,9 @@ export default function AdminPaymentsPage() {
                     </div>
                     <div>
                       <span style={label}>Date paid</span>
-                      <input type="date" max={todayIso()} value={form.paidOn} onChange={(e) => setF({ paidOn: e.target.value })} style={input} />
+                      <input type="date" max={todayIso()} value={form.paidOn} onChange={(e) => { paidOnTouched.current = true; setF({ paidOn: e.target.value }); }} style={input} />
                     </div>
                   </div>
-                  {ocrLoading && !form.amountPaid && (
-                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "6px" }}>Reading the amount from the receipt…</div>
-                  )}
                   {ocrAmount != null && (
                     <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "6px", color: Number(form.amountPaid) === ocrAmount ? "#15803d" : "#b45309" }}>
                       {Number(form.amountPaid) === ocrAmount
@@ -1816,6 +1830,12 @@ export default function AdminPaymentsPage() {
                       </span>
                     </label>
                   )}
+                  {autoWaiveInterest && followTerms && (
+                    <div style={{ fontSize: "12px", fontWeight: 700, marginBottom: "8px", padding: "8px 10px", borderRadius: "10px", background: "#f0fdf4", color: "#15803d" }}>
+                      ✓ Paid on {fmtDate(form.paidOn)}{followTerms.interestStart ? `, before interest started on ${fmtDate(followTerms.interestStart)}` : ""}.
+                      The {fmtCurrency(lateInterest)} interest that built up since then is not charged (waived automatically and noted in the audit log).
+                    </div>
+                  )}
                   {amountShort > 0 && (
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "#b91c1c", marginBottom: "6px" }}>Short by {fmtCurrency(amountShort)}</div>
                   )}
@@ -1830,7 +1850,7 @@ export default function AdminPaymentsPage() {
 
                   <div style={field}>
                     <span style={label}>Payment method</span>
-                    <select value={form.paymentMethod} onChange={(e) => setF({ paymentMethod: e.target.value })} style={input}>
+                    <select value={form.paymentMethod} onChange={(e) => { methodTouched.current = true; setF({ paymentMethod: e.target.value }); }} style={input}>
                       {PAYMENT_METHODS.map((mm) => <option key={mm.id} value={mm.id}>{mm.label}</option>)}
                     </select>
                   </div>
@@ -1838,7 +1858,6 @@ export default function AdminPaymentsPage() {
                   <div style={field}>
                     <span style={label}>Reference no. (required)</span>
                     <input value={form.referenceNumber} onChange={(e) => setF({ referenceNumber: e.target.value })} placeholder="Copy from the receipt" style={{ ...input, fontFamily: "monospace" }} />
-                    {ocrLoading && <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>Reading the receipt…</div>}
                     {dupRefMatch && (
                       <div style={{ fontSize: "12px", fontWeight: 700, color: "#b91c1c", marginTop: "6px", padding: "8px 10px", borderRadius: "10px", background: "#fef2f2" }}>
                         ⚠ This reference no. is already recorded for {dupRefMatch.acc.childName || dupRefMatch.acc.fullName || dupRefMatch.acc.email} ({fmtCurrency(dupRefMatch.payment.amountPaid)} on {new Date(dupRefMatch.payment.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}). Make sure this is not a duplicate before saving.
@@ -1865,9 +1884,38 @@ export default function AdminPaymentsPage() {
                   {receipt && (
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "11px", color: "#64748b" }}>
                       <span>{receiptName}</span>
-                      <button onClick={() => { setReceipt(null); setReceiptName(""); setOcrAmount(null); }} style={{ border: "none", background: "none", color: "#b91c1c", fontWeight: 700, cursor: "pointer", fontSize: "11px" }}>Remove</button>
+                      <button onClick={() => { ocrRunRef.current++; setOcrLoading(false); setOcrInfo(null); setReceipt(null); setReceiptName(""); setOcrAmount(null); }} style={{ border: "none", background: "none", color: "#b91c1c", fontWeight: 700, cursor: "pointer", fontSize: "11px" }}>Remove</button>
                     </div>
                   )}
+
+                  {ocrLoading && (
+                    <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>🔎 Reading the receipt (reference no., amount and date)…</div>
+                  )}
+                  {!ocrLoading && ocrInfo && (() => {
+                    const found = !!ocrInfo.reference || ocrInfo.amount != null || !!ocrInfo.date;
+                    const methodLabel = PAYMENT_METHODS.find((mm) => mm.id === ocrInfo.method)?.label || null;
+                    const line = (k: string, v: string | null, mono?: boolean) => (
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "2px 0" }}>
+                        <span style={{ color: "#64748b" }}>{k}</span>
+                        <span style={{ fontWeight: 800, color: v ? "#334155" : "#b45309", fontFamily: mono ? "monospace" : "inherit", wordBreak: "break-all", textAlign: "right" }}>{v || "not found"}</span>
+                      </div>
+                    );
+                    return (
+                      <div style={{ marginTop: "8px", padding: "10px 12px", borderRadius: "12px", fontSize: "12px", fontWeight: 600, background: found ? "#f0fdf4" : "#fffbeb", border: `1px solid ${found ? "#bbf7d0" : "#fde68a"}`, color: found ? "#15803d" : "#92400e" }}>
+                        {found ? (
+                          <>
+                            <div style={{ fontWeight: 800, marginBottom: "4px" }}>✓ Read from the receipt. Please double-check it against the image.</div>
+                            {line("Reference no.", ocrInfo.reference || null, true)}
+                            {line("Amount", ocrInfo.amount != null ? fmtCurrency(ocrInfo.amount) : null)}
+                            {line("Date", ocrInfo.date ? fmtDate(ocrInfo.date) : null)}
+                            {line("Sent to", methodLabel)}
+                          </>
+                        ) : (
+                          "Couldn't read this receipt automatically. Please type the reference no. and the amount yourself."
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div style={{ ...field, marginTop: "14px" }}>
                     <span style={label}>Admin note (optional)</span>

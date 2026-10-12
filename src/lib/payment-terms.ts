@@ -31,7 +31,8 @@ export function fmtIsoDate(iso: string) {
     return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// How many Mondays have passed since the due date (the due day itself doesn't count)
+// How many Mondays have passed since the due date (the due day itself doesn't count).
+// `now` is the "as of" moment: today by default, or the date the parent actually paid.
 export function countMondaysAfter(dueIso: string, now = new Date()) {
     const d = new Date(dueIso + "T00:00:00");
     d.setDate(d.getDate() + 1);
@@ -101,11 +102,14 @@ export function getBalanceDueDate(student: { enrolledAt?: string; schedule: stri
 }
 
 // The full breakdown for one registration.
+// `asOf` = the moment interest is calculated up to. Leave it out for "today";
+// pass the payment date when recording a payment that was made earlier.
 export function calcRegistrationTerms(
     reg: any,
     student: { enrolledAt?: string; schedule: string },
     paidVerified: number,
-    fallbackDue?: number
+    fallbackDue?: number,
+    asOf: Date = new Date()
 ) {
     const rawDue = getRegistrationTotal(reg, fallbackDue);
     const due = rawDue && rawDue > 0 ? rawDue : null;
@@ -121,7 +125,7 @@ export function calcRegistrationTerms(
         balanceShare = due - reservation;
         dueDate = getBalanceDueDate(student);
         if (dueDate && balance && balance > 0) {
-            mondays = countMondaysAfter(dueDate);
+            mondays = countMondaysAfter(dueDate, asOf);
             interest = Math.round(balance * WEEKLY_INTEREST_RATE * mondays);
         }
     }
