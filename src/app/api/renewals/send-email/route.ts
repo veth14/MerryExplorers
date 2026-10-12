@@ -83,7 +83,7 @@ export async function POST(request: Request) {
             </div>
 
             <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
-              If you have any questions about schedules or need help accessing the form, feel free to approach Teacher Kyle or Teacher Angel onsite, or reply directly to this email.
+              If you have any questions about schedules or need help accessing the form, feel free to approach Teacher Angel onsite, or reply directly to this email.
             </p>
             
             <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">
@@ -129,7 +129,57 @@ export async function POST(request: Request) {
             </div>
 
             <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
-              Need help? Feel free to approach Teacher Kyle or Teacher Angel onsite, or reply directly to this email.
+              Need help? Feel free to approach Teacher Angel onsite, or reply directly to this email.
+            </p>
+            
+            <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">
+              Warm regards,<br />
+              The Merry Explorers Team 💛
+            </p>
+          </div>
+        </div>
+      `;
+    } else if (emailType === "slot_released") {
+      const newRegUrl = `${baseUrl}/register`;
+      subject = subject || `Notice of Released Slot: Priority Reservation Expired for ${childName} ⏳`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+          <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #f59e0b; font-weight: bold;">Adventure 2 Reservation Update</p>
+          </div>
+          <div style="padding: 28px;">
+            <p>Dear <strong>${parentName}</strong>,</p>
+            <p>We are reaching out to inform you regarding your temporary reservation for <strong>${childName}</strong> for the upcoming <strong>2026 Adventure 2</strong> program.</p>
+
+            <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
+              <p style="margin: 0; font-size: 16px; color: #991b1b; font-weight: 800;">Notice of Released Slot</p>
+              <p style="margin: 8px 0 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
+                As of <strong>October 16, 2026 at 1:00 PM</strong>, our priority reservation payment deadline has officially closed. Because payment was not received or confirmed before the cutoff, your reserved slot has now been <strong>released</strong> to waitlisted families.
+              </p>
+            </div>
+
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 20px 0; font-size: 13px;">
+              <p style="margin: 0 0 8px; font-weight: bold; color: #002f76;">Would you still like ${childName} to join us for Adventure 2?</p>
+              <p style="margin: 0 0 16px; color: #475569;">
+                Families who miss the payment deadline and still wish to secure a slot must submit a <strong>new registration form</strong> through our standard registration portal, subject to remaining program availability.
+              </p>
+              <p style="text-align: center; margin: 0;">
+                <a href="${newRegUrl}" style="background-color: #0033a0; color: white; padding: 13px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">
+                  Submit New Registration Form →
+                </a>
+              </p>
+            </div>
+
+            <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 20px 0; font-size: 12.5px; color: #92400e;">
+              <p style="margin: 0 0 4px; font-weight: bold;">⚠️ Reminder for Adventure 1 Balances:</p>
+              <p style="margin: 0;">
+                If you have an unsettled Adventure 1 account balance, please remember that any new downpayments will be credited toward outstanding balances first.
+              </p>
+            </div>
+
+            <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
+              If you have any questions or have already made a payment that needs verification, please reach out to Teacher Angel immediately, or reply directly to this email.
             </p>
             
             <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">
@@ -196,6 +246,8 @@ export async function POST(request: Request) {
             ? "Promo Code Email Sent"
             : emailType === "payment_reminder"
             ? "Payment Reminder Sent"
+            : emailType === "slot_released"
+            ? "Slot Released Notice Sent"
             : "Message Sent",
           lastEmailDate: new Date(),
           updatedAt: new Date(),

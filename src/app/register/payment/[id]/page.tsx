@@ -132,13 +132,22 @@ export default function PaymentPage() {
     const tick = () => {
       const remaining = new Date(regData.reservedUntil).getTime() - Date.now();
       if (remaining <= 0) {
-        setTimeLeft("00:00");
+        setTimeLeft("0d 0h 0m 0s");
         setError("Your slot reservation has expired.");
         return true;
       }
-      const mins = Math.floor(remaining / 1000 / 60);
+      const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((remaining / (1000 * 60)) % 60);
       const secs = Math.floor((remaining / 1000) % 60);
-      setTimeLeft(`${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`);
+
+      const parts: string[] = [];
+      if (days > 0) parts.push(`${days}d`);
+      parts.push(`${hours}h`);
+      parts.push(`${mins}m`);
+      parts.push(`${secs}s`);
+
+      setTimeLeft(parts.join(" "));
       return false;
     };
     if (tick()) return;
@@ -244,7 +253,7 @@ export default function PaymentPage() {
 
   if (!mounted) return null;
 
-  const isExpired = timeLeft === "00:00";
+  const isExpired = timeLeft === "0d 0h 0m 0s" || timeLeft === "00:00";
   const showErrorScreen = !!error && (!regData || regData.status !== "reserved" || isExpired);
 
   return (
@@ -356,7 +365,7 @@ export default function PaymentPage() {
             <h2 className="vp-h2 text-[24px] text-red-600 mb-2">
               {error || "We couldn't find this registration."}
             </h2>
-            <p className="vp-sub mb-6">If you believe this is an error, please contact Teacher Kyle or Teacher Angel.</p>
+            <p className="vp-sub mb-6">If you believe this is an error, please contact Teacher Angel.</p>
             <Link href="/" className="vp-btn ghost small">Back to Home</Link>
           </div>
         ) : (
@@ -619,7 +628,7 @@ export default function PaymentPage() {
         )}
 
         <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
-          Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
+          Need help? Ask <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
         <DreamBanner />
       </main>

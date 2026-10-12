@@ -144,7 +144,7 @@ export default function RenewalsPage() {
 
   // Email Sending Modal state
   const [emailModalFamily, setEmailModalFamily] = useState<Family | null>(null);
-  const [emailType, setEmailType] = useState<"promo_code" | "payment_reminder" | "custom">("promo_code");
+  const [emailType, setEmailType] = useState<"promo_code" | "payment_reminder" | "slot_released" | "custom">("promo_code");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailCustomMessage, setEmailCustomMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -626,11 +626,15 @@ export default function RenewalsPage() {
     }
   };
 
-  // Remind All Unpaid Families
+  // Remind All Unpaid Families (October 16, 1:00 PM Deadline Reminder)
   const [remindingAll, setRemindingAll] = useState(false);
   const handleRemindAllUnpaid = async () => {
+    // Only send to those who haven't paid the exact expected downpayment
     const unpaidList = renewalRecords.filter(
-      (r) => (r.renewalStatus === "reserved" || r.renewalStatus === "for_release") && r.amountPaid === 0 && r.parentEmail
+      (r) =>
+        (r.renewalStatus === "reserved" || r.renewalStatus === "for_release") &&
+        (r.expectedDownpayment ? r.amountPaid < r.expectedDownpayment : r.amountPaid === 0) &&
+        r.parentEmail
     );
     if (unpaidList.length === 0) {
       showModalNotice("All Set", "There are currently no unpaid reservations to remind.", "info");
@@ -640,9 +644,9 @@ export default function RenewalsPage() {
     setFeedbackDialog({
       open: true,
       type: "confirm",
-      title: "Remind All Unpaid Families?",
-      message: `Send an automated Payment Reminder email with direct payment links & Adventure 1 balance disclaimer to ${unpaidList.length} family/families currently holding unpaid reserved slots?`,
-      confirmLabel: `Send Reminders (${unpaidList.length})`,
+      title: "Send Oct 16 1:00 PM Payment Reminder?",
+      message: `Send an automated Oct 16 1:00 PM Payment Deadline Reminder email with direct payment links & Adventure 1 balance disclaimer to ${unpaidList.length} family/families who have not yet paid the exact downpayment?`,
+      confirmLabel: `Send Oct 16 Reminders (${unpaidList.length})`,
       cancelLabel: "Cancel",
       onConfirm: async () => {
         setFeedbackDialog((prev) => ({ ...prev, open: false }));
@@ -650,7 +654,6 @@ export default function RenewalsPage() {
         let sentCount = 0;
         try {
           for (const item of unpaidList) {
-            // Find family record or send via familyId
             if (item.familyId) {
               await fetch("/api/renewals/send-email", {
                 method: "POST",
@@ -664,11 +667,62 @@ export default function RenewalsPage() {
             }
           }
           fetchData();
-          showModalNotice("Reminders Dispatched", `Successfully delivered payment reminders to ${sentCount} reserved family/families!`, "success");
+          showModalNotice("Reminders Dispatched", `Successfully delivered Oct 16 deadline reminders to ${sentCount} family/families!`, "success");
         } catch {
           showModalNotice("Error", "An issue occurred while sending some email reminders.", "error");
         } finally {
           setRemindingAll(false);
+        }
+      },
+    });
+  };
+
+  // Notify Released Slots (Unpaid families whose slots have been released after Oct 16 1:00 PM)
+  const [releasingAll, setReleasingAll] = useState(false);
+  const handleNotifyReleasedSlots = async () => {
+    // Only send to families who haven't paid the exact required amount
+    const unpaidList = renewalRecords.filter(
+      (r) =>
+        (r.renewalStatus === "reserved" || r.renewalStatus === "for_release" || r.renewalStatus === "released") &&
+        (r.expectedDownpayment ? r.amountPaid < r.expectedDownpayment : r.amountPaid === 0) &&
+        r.parentEmail
+    );
+    if (unpaidList.length === 0) {
+      showModalNotice("All Set", "There are no unpaid families eligible for slot release notifications.", "info");
+      return;
+    }
+
+    setFeedbackDialog({
+      open: true,
+      type: "confirm",
+      title: "Send 'Slot Released' Notice to Unpaid Families?",
+      message: `Send the official 'Your slot has been released' email to ${unpaidList.length} family/families who have not paid the exact amount? They will be informed that the reservation has expired and they must submit a new registration form to re-reserve.`,
+      confirmLabel: `Send Release Notices (${unpaidList.length})`,
+      cancelLabel: "Cancel",
+      onConfirm: async () => {
+        setFeedbackDialog((prev) => ({ ...prev, open: false }));
+        setReleasingAll(true);
+        let sentCount = 0;
+        try {
+          for (const item of unpaidList) {
+            if (item.familyId) {
+              await fetch("/api/renewals/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  familyId: item.familyId,
+                  emailType: "slot_released",
+                }),
+              });
+              sentCount++;
+            }
+          }
+          fetchData();
+          showModalNotice("Notices Dispatched", `Successfully notified ${sentCount} family/families that their slot has been released.`, "success");
+        } catch {
+          showModalNotice("Error", "An issue occurred while sending slot release notices.", "error");
+        } finally {
+          setReleasingAll(false);
         }
       },
     });
@@ -997,16 +1051,26 @@ export default function RenewalsPage() {
                 <button
                   disabled={remindingAll}
                   onClick={handleRemindAllUnpaid}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-[12.5px] font-bold transition-colors shadow-sm disabled:opacity-50"
-                  title="Send payment reminder email with payment link to all unpaid reserved families"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-[12px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                  title="Send payment reminder email for Oct 16 1:00 PM deadline to unpaid families"
+                >
+                  <span>⏰</span>
+                  <span>{remindingAll ? "Sending Reminders..." : "Remind: Oct 16 1PM"}</span>
+                </button>
+
+                <button
+                  disabled={releasingAll}
+                  onClick={handleNotifyReleasedSlots}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 text-[12px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                  title="Send official slot released email to families who haven't paid the exact amount by Oct 16 1:00 PM"
                 >
                   <span>📢</span>
-                  <span>{remindingAll ? "Sending Reminders..." : "Remind All Unpaid"}</span>
+                  <span>{releasingAll ? "Notifying..." : "Notify Slot Released (Oct 16)"}</span>
                 </button>
 
                 <button
                   onClick={handleExportRenewals}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[12.5px] font-bold text-[#002f76] hover:bg-slate-50 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[12px] font-bold text-[#002f76] hover:bg-slate-50 transition-colors shadow-sm"
                 >
                   <span>📥</span> Export to Excel
                 </button>
@@ -1784,6 +1848,20 @@ export default function RenewalsPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    setEmailType("slot_released");
+                    setEmailSubject(`Notice of Released Slot: Priority Reservation Expired for ${emailModalFamily.childName} ⏳`);
+                  }}
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
+                    emailType === "slot_released"
+                      ? "bg-white text-[#0033A0] shadow-sm"
+                      : "text-slate-600 hover:text-[#002f76]"
+                  }`}
+                >
+                  🚪 Slot Released
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     setEmailType("custom");
                     setEmailSubject(`Merry Explorers: Message regarding ${emailModalFamily.childName}`);
                   }}
@@ -1820,7 +1898,7 @@ export default function RenewalsPage() {
                       <li><strong>Valid until:</strong> October 15, 2026.</li>
                       <li><strong>Release deadline:</strong> Unpaid slots released October 16, 1:00 PM.</li>
                       <li><strong>Confirmation:</strong> Confirmed upon receipt of 60% downpayment.</li>
-                      <li>Need help? Ask Teacher Kyle or Teacher Angel onsite.</li>
+                      <li>Need help? Ask Teacher Angel onsite.</li>
                     </ul>
                   </div>
                 </div>
@@ -1851,6 +1929,30 @@ export default function RenewalsPage() {
                       <p className="italic mt-1">
                         &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
                       </p>
+                    </div>
+                  </div>
+                </div>
+              ) : emailType === "slot_released" ? (
+                <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
+                  <div className="border-b border-slate-200 pb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
+                    <p className="font-bold text-rose-700 mt-0.5">
+                      Notice of Released Slot: Priority Reservation Expired for {emailModalFamily.childName} ⏳
+                    </p>
+                  </div>
+                  <div className="space-y-2.5 text-slate-600 text-[12px] leading-relaxed">
+                    <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
+                    <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-red-900 text-[11.5px]">
+                      <p className="font-bold">⚠️ SLOT RELEASED (OCTOBER 16, 1:00 PM CUTOFF):</p>
+                      <p className="mt-0.5">
+                        Priority reservation has expired due to unconfirmed payment. The reserved slot has been released.
+                      </p>
+                    </div>
+                    <p>
+                      If you still wish to renew, you must submit a <strong>new registration form</strong> via the registration portal:
+                    </p>
+                    <div className="rounded-xl bg-slate-100 border border-slate-200 p-2 text-center text-slate-700 font-mono text-[11px]">
+                      /register (Standard Form)
                     </div>
                   </div>
                 </div>

@@ -104,7 +104,7 @@ export default function RenewPage() {
   // Program selection
   const [selectedProgram, setSelectedProgram] = useState<ProgramId | "">("");
   const [selectedClass, setSelectedClass] = useState("");
-  const [activeTab, setActiveTab] = useState("discovery");
+  const [activeTab, setActiveTab] = useState("all");
   const [slots, setSlots] = useState<SlotData>({});
   const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState(false);
   const [uniformOrdered, setUniformOrdered] = useState(false);
@@ -156,7 +156,7 @@ export default function RenewPage() {
           setEmergencyContact(d.emergencyContact);
           setPreviousProgram(d.previousProgram || "Trailblazer: Brave Explorer");
         } else {
-          setLoadError("We couldn't find your registration record. Please contact Teacher Kyle or Teacher Angel.");
+          setLoadError("We couldn't find your registration record. Please contact Teacher Angel.");
         }
       })
       .catch(() => setLoadError("Network error. Please check your connection and try again."))
@@ -271,7 +271,7 @@ export default function RenewPage() {
           <div className="text-5xl">🧭</div>
           <h2 className="font-extrabold text-[22px] text-[#0b2a82]">Renewal Link Not Found</h2>
           <p className="text-[14px] text-[#3d5a99] font-medium leading-relaxed">{loadError}</p>
-          <p className="text-[13px] text-[#3d5a99]">Need help? Ask <strong>Teacher Kyle</strong> or <strong>Teacher Angel</strong> onsite.</p>
+          <p className="text-[13px] text-[#3d5a99]">Need help? Ask <strong>Teacher Angel</strong> onsite.</p>
         </div>
       </div>
     );
@@ -480,7 +480,7 @@ export default function RenewPage() {
                 </div>
 
                 <p className="mb-6 text-[13px] text-[#3d5a99] font-medium leading-relaxed">
-                  If any details need updates, please let <strong>Teacher Kyle</strong> or <strong>Teacher Angel</strong> know onsite.
+                  If any details need updates, please let <strong>Teacher Angel</strong> know onsite.
                 </p>
 
                 <div className="flex justify-end">
@@ -508,6 +508,7 @@ export default function RenewPage() {
                 {/* Tab filter styled like portal tabs */}
                 <div className="mb-6 flex flex-wrap justify-center gap-2.5">
                   {[
+                    { id: "all", label: "All Programs" },
                     { id: "discovery", label: "Discovery Club" },
                     { id: "trailblazer", label: "Trailblazer" },
                     { id: "weekend", label: "Weekend Adventures" },
@@ -530,6 +531,7 @@ export default function RenewPage() {
                 <div className="space-y-4">
                   {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
                     .filter(p => {
+                      if (activeTab === "all") return true;
                       if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
                       if (activeTab === "trailblazer") return p.id === "brave-explorer";
                       return ["saturday-playdate", "ballet"].includes(p.id);
@@ -913,7 +915,7 @@ export default function RenewPage() {
         </div>
 
         <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
-          Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
+          Need help? Ask <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
         <DreamBanner />
       </main>

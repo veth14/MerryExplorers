@@ -280,7 +280,7 @@ export async function POST(request: Request) {
                 </div>
 
                 <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
-                  Need help? Feel free to approach Teacher Kyle or Teacher Angel onsite, or reply directly to this email.
+                  Need help? Feel free to approach Teacher Angel onsite, or reply directly to this email.
                 </p>
                 
                 <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">

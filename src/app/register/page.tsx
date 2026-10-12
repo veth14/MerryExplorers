@@ -114,7 +114,7 @@ export default function RegisterPage() {
   const draft = loadDraft();
 
   const [step, setStep] = useState<number>(draft?.step ?? 0);
-  const [activeTab, setActiveTab] = useState<string>("discovery");
+  const [activeTab, setActiveTab] = useState<string>("all");
   const [slots, setSlots] = useState<SlotData>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -693,6 +693,7 @@ export default function RegisterPage() {
                 {/* Filter Tabs */}
                 <div className="mb-6 flex flex-wrap justify-center gap-2.5">
                   {[
+                    { id: "all", label: "All Programs" },
                     { id: "discovery", label: "Discovery Club" },
                     { id: "trailblazer", label: "Trailblazer" },
                     { id: "weekend", label: "Weekend Adventures" },
@@ -715,6 +716,7 @@ export default function RegisterPage() {
                 <div className="space-y-4">
                   {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
                     .filter(p => {
+                      if (activeTab === "all") return true;
                       if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
                       if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
                       if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
@@ -1083,7 +1085,7 @@ export default function RegisterPage() {
         </div>
 
         <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
-          Need help? Ask <strong className="text-[#0b2a82]">Teacher Kyle</strong> or <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
+          Need help? Ask <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
         <DreamBanner />
       </main>
