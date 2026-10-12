@@ -608,14 +608,19 @@ export default function RegisterPage() {
         {/* Header Text */}
         <div className="text-center mb-8">
           <m.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <span className="inline-block mb-4">
+            <span className="inline-block mb-3">
               <span className="text-4xl">🎒</span>
             </span>
-            <h1 className="font-headline text-[40px] sm:text-[48px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-4">
+            <div className="mb-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#0033A0] to-[#0050d5] text-white px-4 py-1 text-[12px] font-extrabold uppercase tracking-wider shadow-sm">
+                <span>🌟</span> 2026 ADVENTURE 2 REGISTRATION
+              </span>
+            </div>
+            <h1 className="font-headline text-[38px] sm:text-[46px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-3">
               Register Your Explorer
             </h1>
-            <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
-              Secure your child&apos;s slot in just a few steps
+            <p className="text-[16px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
+              Secure your child&apos;s slot for <strong>Adventure 2</strong> in just a few steps
             </p>
           </m.div>
         </div>

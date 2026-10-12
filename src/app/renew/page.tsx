@@ -347,16 +347,21 @@ export default function RenewPage() {
                   <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                   <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#FFB800]/10 rounded-full translate-y-1/2 -translate-x-1/2" />
                   <div className="relative z-10">
-                    <p className="text-[12px] font-bold uppercase tracking-widest text-[#FFB800] mb-2">Welcome Back 🌈</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="rounded-full bg-[#FFB800] text-[#002f76] px-3 py-0.5 text-[11px] font-black uppercase tracking-wider">
+                        🌟 2026 ADVENTURE 2
+                      </span>
+                      <p className="text-[12px] font-bold uppercase tracking-widest text-[#FFB800]">Priority Renewal Access</p>
+                    </div>
                     <h1 className="font-headline text-[28px] sm:text-[32px] font-extrabold leading-tight mb-2">
                       Hello, {childNick}!
                     </h1>
-                    <p className="text-[14px] text-white/80 leading-relaxed">
-                      We&apos;re so excited to have you back for another adventure! Your information from <strong>Adventure 1</strong> is already saved — just pick your new program and you&apos;re all set.
+                    <p className="text-[14px] text-white/90 leading-relaxed">
+                      We&apos;re so excited to welcome you to <strong>Adventure 2</strong>! Your details from <strong>Adventure 1</strong> are already verified below — simply review and choose your <strong>Adventure 2</strong> schedule.
                     </p>
                     <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[12px] font-bold">
                       <span className="h-2 w-2 rounded-full bg-[#FFB800] shrink-0" />
-                      Priority Reservation Code: Already Applied ✓
+                      Adventure 2 Priority Reservation Code: Already Applied ✓
                     </div>
                   </div>
                 </div>
@@ -435,8 +440,13 @@ export default function RenewPage() {
             {/* ── STEP 1: Choose Program ────────────────────────────────────── */}
             {step === 1 && (
               <m.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-                <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose a Program</h2>
-                <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time for {childNick}&apos;s next adventure.</p>
+                <div className="mb-2">
+                  <span className="inline-block rounded-full bg-blue-100 text-[#0033A0] px-3 py-0.5 text-[11px] font-black uppercase tracking-wider">
+                    2026 Adventure 2
+                  </span>
+                </div>
+                <h2 className="mb-2 font-headline text-[24px] font-extrabold text-[#002f76]">Choose an Adventure 2 Program</h2>
+                <p className="mb-6 text-[14px] text-[#64748b]">Select the program and class time for {childNick}&apos;s Adventure 2 journey.</p>
 
                 {/* Tab filter */}
                 <div className="mb-8 flex flex-wrap justify-center gap-3">
