@@ -105,12 +105,16 @@ export async function POST(request: Request) {
       "brave-explorer": { classes: { "Afternoon Class": 6 } },
     } as Record<string, { classes: Record<string, number> }>;
 
+    // Adventure 2 start — only count registrations from this cycle onward
+    const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
+
     const maxSlots = programConfig[program]?.classes[classTime];
     if (maxSlots !== undefined) {
       const takenSlots = await db.collection("student_registrations").countDocuments({
         program,
         classTime,
         status: { $in: ["pending", "approved", "reserved"] },
+        submittedAt: { $gte: ADVENTURE_2_START },
         "parentInfo.name": { $not: /ian angelo valmores/i },
       });
       if (takenSlots >= maxSlots) {
@@ -147,6 +151,7 @@ export async function POST(request: Request) {
       isNewFamily: typeof data.isNewFamily === "boolean" ? data.isNewFamily : true,
       notes: isPromo ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)" : "",
       submittedAt: new Date(),
+      period: "adventure-2",
       approvedAt: null,
       approvedBy: null,
       confirmationEmailSent: false,

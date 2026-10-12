@@ -9,6 +9,9 @@ export async function GET() {
   try {
     const { db } = await connectToDatabase();
 
+    // Only count registrations from Adventure 2 onward
+    const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
+
     const result: Record<string, Record<string, { maxSlots: number; taken: number; available: number }>> = {};
 
     for (const [programId, config] of Object.entries(PROGRAM_SLOTS)) {
@@ -17,7 +20,8 @@ export async function GET() {
         const taken = await db.collection("student_registrations").countDocuments({
           program: programId,
           classTime: cls.name,
-          status: { $in: ["pending", "approved"] },
+          status: { $in: ["pending", "approved", "reserved"] },
+          submittedAt: { $gte: ADVENTURE_2_START },
           "parentInfo.name": { $not: /ian angelo valmores/i },
         });
         result[programId][cls.name] = {
