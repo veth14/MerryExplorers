@@ -428,18 +428,62 @@ export default function PaymentPage() {
             )}
 
             {/* Note / Disclaimer Banner */}
-            <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
-              <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
-                <span>⚠️</span>
-                <span>NOTE &amp; DISCLAIMER</span>
+            {isBallet ? (
+              <div className="mb-6 rounded-[22px] bg-[#fdf2f8] border-3 border-[#be185d] p-5 text-[13px] text-[#831843] shadow-[0_5px_0_rgba(190,24,93,0.2)]">
+                <div className="flex items-center gap-2 font-black text-[#be185d] mb-1 text-[15px]">
+                  <span>🩰</span>
+                  <span>2026 Ballet Recital on November 28</span>
+                </div>
+                <p className="font-extrabold text-[#831843] leading-snug">
+                  Recital kit is optional, but required if joining the recital.
+                </p>
+                <div className="mt-3 bg-white/90 p-4 rounded-xl border-2 border-[#fbcfe8] space-y-2 text-[12.5px]">
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="text-[#be185d] font-black text-[14px]">Recital Kit</span>
+                    <span className="text-[#be185d] font-black text-[15px]">₱1,500</span>
+                  </div>
+                  <p className="text-slate-600">
+                    Recital kit preorder starts on October 3. Inclusive of 2 guest passes, 1 mini bouquet, and 1 set of costume.
+                  </p>
+                  <div className="flex gap-4 font-bold text-[#831843] text-[12px] flex-wrap pt-1">
+                    <span>🎫 2 Guest Passes</span>
+                    <span>💐 1 Mini Bouquet</span>
+                    <span>👗 1 Set of Costume</span>
+                  </div>
+                  <div className="pt-2 border-t border-[#fbcfe8] text-[12px] text-slate-700 space-y-1">
+                    <p>• <strong>12 completed sessions</strong> are required to join the recital.</p>
+                    <p>• The next recital will be in <strong>Q1 of 2027</strong>.</p>
+                  </div>
+                </div>
+
+                {/* Preorder Recital Kit Checkbox */}
+                <label className="mt-4 flex items-center justify-between p-3 rounded-xl bg-white border-2 border-[#be185d] cursor-pointer hover:bg-pink-50/50 transition-colors">
+                  <div>
+                    <span className="text-[13px] font-black text-[#be185d]">Preorder 2026 Recital Kit (+₱1,500)</span>
+                    <p className="text-[11.5px] text-slate-600 font-medium">Add to payment today to reserve costume and guest passes</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={recitalKitOrdered}
+                    onChange={(e) => setRecitalKitOrdered(e.target.checked)}
+                    className="h-5 w-5 rounded border-2 border-[#be185d] text-[#be185d] focus:ring-[#be185d]"
+                  />
+                </label>
               </div>
-              <p className="font-bold text-[#0b2a82] leading-snug">
-                Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
-              </p>
-              <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
-                &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
-              </p>
-            </div>
+            ) : (
+              <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
+                <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
+                  <span>⚠️</span>
+                  <span>NOTE &amp; DISCLAIMER</span>
+                </div>
+                <p className="font-bold text-[#0b2a82] leading-snug">
+                  Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
+                </p>
+                <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
+                  &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                </p>
+              </div>
+            )}
 
             {/* Payment Option Selector */}
             <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">

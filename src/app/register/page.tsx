@@ -229,19 +229,43 @@ export default function RegisterPage() {
     }
   }, []);
 
-  // Program renewal settings for dynamic Adventure cycle # & dates
-  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null }>>({});
+  // Program renewal settings for dynamic Adventure cycle #, dates & registration open/close status
+  type ProgramSetting = {
+    currentAdventure: number;
+    adventureStartDate: string | null;
+    nextAdventureStart: string | null;
+    registrationOpen: boolean;
+    registrationAutoCloseDays: number | null;
+    customClosedMessage?: string;
+  };
+
+  const [renewalSettings, setRenewalSettings] = useState<Record<string, ProgramSetting>>({});
+
+  function checkIsRegistrationClosed(setting?: ProgramSetting): boolean {
+    if (!setting) return false;
+    if (setting.registrationOpen === false) return true;
+    if (setting.adventureStartDate && setting.registrationAutoCloseDays) {
+      const started = new Date(setting.adventureStartDate).getTime();
+      const threshold = started + setting.registrationAutoCloseDays * 86400000;
+      if (Date.now() >= threshold) return true;
+    }
+    return false;
+  }
 
   useEffect(() => {
     fetch("/api/renewal-settings")
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.programs)) {
-          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null }> = {};
+          const map: Record<string, ProgramSetting> = {};
           d.programs.forEach((p: any) => {
             map[p.programKey] = {
               currentAdventure: p.currentAdventure ?? 2,
+              adventureStartDate: p.adventureStartDate ?? null,
               nextAdventureStart: p.nextAdventureStart ?? null,
+              registrationOpen: p.registrationOpen !== false,
+              registrationAutoCloseDays: p.registrationAutoCloseDays ?? 7,
+              customClosedMessage: p.customClosedMessage || "",
             };
           });
           setRenewalSettings(map);
@@ -281,7 +305,12 @@ export default function RegisterPage() {
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
 
-  const canProceedStep0 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged;
+  const selectedProgSetting = selectedProgram
+    ? (renewalSettings[PROGRAM_SLOTS[selectedProgram]?.name] || renewalSettings[selectedProgram])
+    : undefined;
+  const isSelectedProgClosed = checkIsRegistrationClosed(selectedProgSetting);
+
+  const canProceedStep0 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged && !isSelectedProgClosed;
 
   async function applyPromoCode() {
     const trimmed = promoCode.trim();
@@ -718,6 +747,7 @@ export default function RegisterPage() {
                     { id: "discovery", label: "Discovery Club" },
                     { id: "trailblazer", label: "Trailblazer" },
                     { id: "weekend", label: "Weekend Adventures" },
+                    { id: "virtual", label: "Virtual Tutorial" },
                   ].map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -741,58 +771,79 @@ export default function RegisterPage() {
                       if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
                       if (activeTab === "trailblazer") return ["brave-explorer"].includes(p.id);
                       if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
+                      if (activeTab === "virtual") return (p.id as string) === "virtual-session";
                       return true;
                     })
                     .map((p) => {
-                      const isUnavailable = p.id === "ballet" || (p.id as string) === "virtual-session" || p.id === "saturday-playdate";
+                      const progSettings = renewalSettings[p.name] || renewalSettings[p.id];
                       const programSlots = slots[p.id] || {};
                       const isSelected = selectedProgram === p.id;
 
-                      if (isUnavailable) {
+                      const isAdvProgram = !["ballet", "virtual-session"].includes(p.id) && !["Ballet", "Virtual Tutorial"].includes(p.name);
+                      const advNumber = progSettings?.currentAdventure ?? 2;
+                      const nextAdvNumber = advNumber + 1;
+                      const startDateStr = progSettings?.nextAdventureStart
+                        ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : null;
+
+                      const isClosed = checkIsRegistrationClosed(progSettings);
+
+                      if (isClosed) {
                         return (
                           <div
                             key={p.id}
-                            className="relative rounded-[22px] border-3 border-dashed border-[#b6dcf5] bg-slate-50/80 p-5 opacity-75 shadow-sm overflow-hidden"
+                            className="relative rounded-[22px] border-3 border-amber-300 bg-amber-50/70 p-5 shadow-sm overflow-hidden"
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-2xl grayscale">{p.icon}</span>
-                                  <h3 className="text-[17px] font-black text-slate-700">{p.name}</h3>
-                                  <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10.5px] font-black uppercase text-amber-900 tracking-wider">
-                                    Not Yet Ready
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <span className="text-2xl">{p.icon}</span>
+                                  <h3 className="text-[17px] font-black text-slate-800">{p.name}</h3>
+                                  <span className="rounded-full bg-amber-200 border border-amber-400 px-2.5 py-0.5 text-[10.5px] font-black uppercase text-amber-950 tracking-wider">
+                                    Registration Closed
                                   </span>
+                                  {isAdvProgram ? (
+                                    <span className="rounded-full bg-slate-200/80 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                      Adventure {advNumber} in Session
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-slate-200/80 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                      Current Batch Full / Closed
+                                    </span>
+                                  )}
                                 </div>
-                                <p className="text-[12.5px] font-medium text-slate-500 mb-1">
+                                <p className="text-[12.5px] font-medium text-slate-600 mb-1">
                                   {p.ageRange} · {p.schedule} · {p.sessions} sessions
                                 </p>
-                                <p className="text-[15px] font-black text-slate-400">₱{p.rate.toLocaleString()}</p>
+                                <p className="text-[15px] font-black text-slate-500">₱{p.rate.toLocaleString()}</p>
                               </div>
-                              <div className="h-6 w-6 rounded-full border-2 border-slate-300 bg-slate-100 shrink-0 mt-1 flex items-center justify-center">
-                                <span className="text-[11px] font-black text-slate-400">✕</span>
+                              <div className="h-6 w-6 rounded-full border-2 border-amber-400 bg-amber-100 shrink-0 mt-1 flex items-center justify-center">
+                                <span className="text-[11px] font-black text-amber-800">🔒</span>
                               </div>
                             </div>
 
-                            {/* Informational banner */}
-                            <div className="mt-4 pt-3.5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/70 -mx-5 -mb-5 p-4 rounded-b-[19px]">
-                              <p className="text-[12px] font-semibold text-slate-600 leading-snug">
-                                ⏳ Online registration for <strong>{p.name}</strong> is not yet ready. For questions or early slot reservations, please contact us:
-                              </p>
+                            {/* Informational closure notice */}
+                            <div className="mt-4 pt-3.5 border-t border-amber-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/80 -mx-5 -mb-5 p-4 rounded-b-[19px]">
+                              <div className="space-y-0.5 max-w-lg">
+                                <p className="text-[13px] font-extrabold text-amber-950">
+                                  {isAdvProgram
+                                    ? `🎒 Current Adventure ${advNumber} is starting / in session!`
+                                    : `🎒 Registration for ${p.name} is currently closed.`}
+                                </p>
+                                <p className="text-[12px] font-medium text-slate-600 leading-snug">
+                                  {isAdvProgram ? (
+                                    <>Online registration for Adventure {advNumber} has closed. Please wait for the next <strong>Adventure {nextAdvNumber}</strong>{startDateStr ? ` starting on ${startDateStr}` : ""}!</>
+                                  ) : (
+                                    <>Online registration for the current batch has closed.{startDateStr ? ` Please wait for the next schedule starting on ${startDateStr}!` : " Please check back soon or inquire for upcoming dates!"}</>
+                                  )}
+                                </p>
+                              </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <a
-                                  href="https://www.facebook.com/profile.php?id=61588889372224"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1877F2] text-white text-[11.5px] font-black hover:bg-[#0c63d4] transition-all shadow-sm"
-                                >
-                                  <span>Facebook Page</span>
-                                  <span>↗</span>
-                                </a>
                                 <Link
-                                  href="/inquire"
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0b2a82] text-white text-[11.5px] font-black hover:bg-[#1f7ae0] transition-all shadow-sm"
+                                  href={`/inquire?program=${encodeURIComponent(p.name)}`}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0033a0] text-white text-[12px] font-black hover:bg-[#002f76] transition-all shadow-sm"
                                 >
-                                  <span>Inquiry Form</span>
+                                  <span>{isAdvProgram ? `Inquire for Adv ${nextAdvNumber}` : "Inquire for Next Batch"}</span>
                                   <span>→</span>
                                 </Link>
                               </div>
@@ -801,11 +852,7 @@ export default function RegisterPage() {
                         );
                       }
 
-                      const progSettings = renewalSettings[p.name] || Object.values(renewalSettings)[0];
-                      const advNumber = progSettings?.currentAdventure ?? 2;
-                      const startDateStr = progSettings?.nextAdventureStart
-                        ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                        : null;
+
 
                       return (
                         <div
@@ -821,9 +868,11 @@ export default function RegisterPage() {
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-2xl">{p.icon}</span>
                                 <h3 className="text-[17px] font-black text-[#0b2a82]">{p.name}</h3>
-                                <span className="rounded-full bg-[#0b2a82]/10 border border-[#0b2a82]/20 px-2 py-0.5 text-[10.5px] font-black uppercase text-[#0b2a82]">
-                                  Adventure {advNumber}
-                                </span>
+                                {isAdvProgram && (
+                                  <span className="rounded-full bg-[#0b2a82]/10 border border-[#0b2a82]/20 px-2 py-0.5 text-[10.5px] font-black uppercase text-[#0b2a82]">
+                                    Adventure {advNumber}
+                                  </span>
+                                )}
                                 {startDateStr && (
                                   <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
                                     Starts {startDateStr}
@@ -856,7 +905,7 @@ export default function RegisterPage() {
                                   const isClassSelected = selectedClass === cls.name;
                                   return (
                                     <button
-                                      key={cls.name}
+                                      key={`${cls.name}-${cls.time}`}
                                       type="button"
                                       disabled={isFull}
                                       onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
@@ -877,6 +926,19 @@ export default function RegisterPage() {
                                   );
                                 })}
                               </div>
+
+                              {"notes" in p && Array.isArray((p as any).notes) && (
+                                <div className="mt-4 rounded-2xl bg-pink-50 border-2 border-pink-200 p-4 text-[12.5px] text-pink-950 space-y-1.5 shadow-sm">
+                                  <p className="font-black text-pink-900 flex items-center gap-1.5 text-[13px]">
+                                    <span>🩰</span> Important Program &amp; Recital Information:
+                                  </p>
+                                  <ul className="list-disc pl-4 space-y-1 text-[12px] font-semibold text-pink-900/90 leading-relaxed">
+                                    {((p as any).notes as string[]).map((note, idx) => (
+                                      <li key={idx}>{note}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

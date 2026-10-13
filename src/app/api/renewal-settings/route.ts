@@ -10,15 +10,31 @@ const RENEWAL_PROGRAMS = [
   "Discovery Club: Everyday Curious",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
+  "Ballet",
+  "Virtual Tutorial",
 ] as const;
 
 type ProgramKey = typeof RENEWAL_PROGRAMS[number];
 
+const ADVENTURE_PROGRAMS: readonly ProgramKey[] = [
+  "Discovery Club: Curious Explorer",
+  "Discovery Club: Creative Explorer",
+  "Discovery Club: Everyday Curious",
+  "Trailblazer: Brave Explorer",
+  "Saturday Playdate",
+];
+
+const CURIOUS_EXPLORER_KEY: ProgramKey = "Discovery Club: Curious Explorer";
+
 export type ProgramRenewalEntry = {
   programKey: ProgramKey;
-  currentAdventure: number;            // which adventure number the program is currently in
-  nextAdventureStart: string | null;  // ISO date string
-  renewalOpen: boolean;
+  currentAdventure: number;            // which adventure number the program is currently in (e.g. 2)
+  adventureStartDate?: string | null;  // when current adventure started/starts (ISO date or YYYY-MM-DD)
+  nextAdventureStart: string | null;  // ISO date string for next adventure (e.g. Adventure 3)
+  registrationOpen: boolean;          // whether public registration is open (true = open, false = closed)
+  registrationAutoCloseDays?: number | null; // e.g. 7 (days after adventureStartDate to auto-close)
+  customClosedMessage?: string;       // optional override for closed notice
+  renewalOpen: boolean;               // whether priority renewal is open for returning families
   renewalOpenDate: string | null;     // auto-computed: 2 weeks before start
   virtualLink?: string;
   virtualLinkOpen?: boolean;
@@ -31,12 +47,89 @@ function computeDeadline(startIso: string | null): string | null {
   return d.toISOString();
 }
 
+function getManilaDateStr(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Evaluates and applies the auto-increment rollover rule:
+ * 1. Curious Explorer is the master source for the adventure cycle increment.
+ * 2. When today >= Curious Explorer's nextAdventureStart date:
+ *    - currentAdventure increments (e.g. Adv 1 -> Adv 2)
+ *    - All adventure programs adopt the incremented adventure number
+ *    - The nextAdventureStart date moves to the left side (adventureStartDate)
+ *    - The right side (nextAdventureStart) is cleared to null and ready to be set again
+ * 3. For non-adventure programs (Ballet, Virtual Tutorial):
+ *    - They do not track adventure numbers (start date only)
+ *    - When their next date arrives, it moves to adventureStartDate and nextAdventureStart is cleared
+ */
+function applyAutoRollover(programs: ProgramRenewalEntry[]): {
+  changed: boolean;
+  programs: ProgramRenewalEntry[];
+} {
+  const todayStr = getManilaDateStr();
+  let changed = false;
+
+  const curiousProg = programs.find((p) => p.programKey === CURIOUS_EXPLORER_KEY);
+  const curiousNext = curiousProg?.nextAdventureStart;
+  const isCuriousAdvReached = Boolean(
+    curiousNext && todayStr >= curiousNext.slice(0, 10)
+  );
+
+  const updated = programs.map((p) => {
+    const isAdv = ADVENTURE_PROGRAMS.includes(p.programKey);
+
+    // 1) Adventure programs roll over together when Curious Explorer reaches next start date
+    if (isAdv && isCuriousAdvReached && curiousProg) {
+      changed = true;
+      const nextAdvNum = (curiousProg.currentAdventure ?? 1) + 1;
+      const shiftedStart = p.nextAdventureStart || curiousNext;
+      return {
+        ...p,
+        currentAdventure: nextAdvNum,
+        adventureStartDate: shiftedStart, // moved to left side
+        nextAdventureStart: null,          // right side is empty and ready to be set again
+        registrationOpen: true,            // new adventure starts open for registration
+        renewalOpenDate: null,
+      };
+    }
+
+    // 2) Non-adventure programs (Ballet, Virtual Tutorial): start date only
+    if (!isAdv && p.nextAdventureStart) {
+      const nextDateStr = p.nextAdventureStart.slice(0, 10);
+      if (todayStr >= nextDateStr) {
+        changed = true;
+        return {
+          ...p,
+          adventureStartDate: p.nextAdventureStart, // moved to left side
+          nextAdventureStart: null,                  // right side is empty
+          registrationOpen: true,
+          renewalOpenDate: null,
+        };
+      }
+    }
+
+    return p;
+  });
+
+  return { changed, programs: updated };
+}
+
 function defaultPrograms(): ProgramRenewalEntry[] {
   return RENEWAL_PROGRAMS.map((programKey) => ({
     programKey,
-    currentAdventure: 1,
+    currentAdventure: 2,
+    adventureStartDate: null,
     nextAdventureStart: null,
-    renewalOpen: false,
+    registrationOpen: true,
+    registrationAutoCloseDays: 7,
+    customClosedMessage: "",
+    renewalOpen: true,
     renewalOpenDate: null,
     virtualLink: "",
     virtualLinkOpen: false,
@@ -51,15 +144,48 @@ export async function GET() {
     const programs: ProgramRenewalEntry[] = doc?.programs ?? defaultPrograms();
 
     // Fill in any programs that might not exist in the stored doc
-    const merged = RENEWAL_PROGRAMS.map((key) => {
+    const merged: ProgramRenewalEntry[] = RENEWAL_PROGRAMS.map((key) => {
       const existing = programs.find((p) => p.programKey === key);
-      // Always spread existing so legacy records get the new currentAdventure field backfilled
       return existing
-        ? { ...existing, currentAdventure: existing.currentAdventure ?? 1 }
-        : { programKey: key, currentAdventure: 1, nextAdventureStart: null, renewalOpen: false, renewalOpenDate: null, virtualLink: "", virtualLinkOpen: false };
+        ? {
+            ...existing,
+            currentAdventure: existing.currentAdventure ?? 2,
+            adventureStartDate: existing.adventureStartDate ?? null,
+            registrationOpen: existing.registrationOpen !== false,
+            registrationAutoCloseDays: existing.registrationAutoCloseDays ?? 7,
+            customClosedMessage: existing.customClosedMessage ?? "",
+            renewalOpen: existing.renewalOpen !== false,
+          }
+        : {
+            programKey: key,
+            currentAdventure: 2,
+            adventureStartDate: null,
+            nextAdventureStart: null,
+            registrationOpen: true,
+            registrationAutoCloseDays: 7,
+            customClosedMessage: "",
+            renewalOpen: true,
+            renewalOpenDate: null,
+            virtualLink: "",
+            virtualLinkOpen: false,
+          };
     });
 
-    return NextResponse.json({ programs: merged, updatedAt: doc?.updatedAt ?? null });
+    // Check & apply automatic rollover
+    const { changed, programs: finalPrograms } = applyAutoRollover(merged);
+
+    if (changed) {
+      await db.collection("settings").updateOne(
+        { _key: SETTINGS_KEY },
+        { $set: { _key: SETTINGS_KEY, programs: finalPrograms, updatedAt: new Date().toISOString() } },
+        { upsert: true }
+      );
+    }
+
+    return NextResponse.json({
+      programs: finalPrograms,
+      updatedAt: changed ? new Date().toISOString() : (doc?.updatedAt ?? null),
+    });
   } catch (err) {
     console.error("[renewal-settings GET]", err);
     return NextResponse.json({ error: "Failed to load renewal settings" }, { status: 500 });
@@ -69,18 +195,21 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    // Expecting: { programs: ProgramRenewalEntry[] }
     const incoming: ProgramRenewalEntry[] = body.programs ?? [];
 
-    // Compute deadlines server-side
     const programs: ProgramRenewalEntry[] = RENEWAL_PROGRAMS.map((key) => {
       const p = incoming.find((x) => x.programKey === key);
       const nextAdventureStart = p?.nextAdventureStart ?? null;
-      const renewalOpen = p?.renewalOpen ?? false;
+      const renewalOpen = p?.renewalOpen !== false;
+      const registrationOpen = p?.registrationOpen !== false;
       return {
         programKey: key,
-        currentAdventure: p?.currentAdventure ?? 1,
+        currentAdventure: p?.currentAdventure ?? 2,
+        adventureStartDate: p?.adventureStartDate ?? null,
         nextAdventureStart,
+        registrationOpen,
+        registrationAutoCloseDays: p?.registrationAutoCloseDays ?? 7,
+        customClosedMessage: p?.customClosedMessage ?? "",
         renewalOpen,
         renewalOpenDate: computeDeadline(nextAdventureStart),
         virtualLink: p?.virtualLink ?? "",

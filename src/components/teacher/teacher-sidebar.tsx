@@ -343,6 +343,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
     {
       title: "Programs & Finance",
       items: [
+        { label: "Programs", href: "/admin/programs", icon: <DiscoveryDayIcon /> },
         { label: "Registrations", href: "/admin/registrations", icon: <RegistrationsIcon /> },
         { label: "Renewals", href: "/admin/renewals", icon: <RegistrationsIcon /> },
         { label: "Students", href: "/admin/students", icon: <StudentsIcon /> },

@@ -249,7 +249,7 @@ export async function POST(request: Request) {
       try {
         // Fetch program configuration & adventure start date
         const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
-        const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+        const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
         
         const programKeyMap: Record<string, string> = {
           "curious-explorer": "Discovery Club: Curious Explorer",
@@ -258,6 +258,7 @@ export async function POST(request: Request) {
           "brave-explorer": "Trailblazer: Brave Explorer",
           "ballet": "Ballet",
           "saturday-playdate": "Saturday Playdate",
+          "virtual-session": "Virtual Tutorial",
         };
 
         const readableProgramName = programKeyMap[program] || program;
@@ -266,10 +267,11 @@ export async function POST(request: Request) {
           readableProgramName.toLowerCase().includes(p.programKey.toLowerCase())
         ) || storedPrograms[0];
 
+        const isAdvProg = !["ballet", "virtual-session"].includes(program);
         const advNum = matchedProg?.currentAdventure ?? 2;
-        const advLabel = `Adventure ${advNum}`;
-        const advStartDateStr = matchedProg?.nextAdventureStart
-          ? new Date(matchedProg.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+        const advLabel = isAdvProg ? `Adventure ${advNum}` : readableProgramName;
+        const advStartDateStr = (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
+          ? new Date(matchedProg.nextAdventureStart || matchedProg.adventureStartDate!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
           : null;
 
         const auth = process.env.GMAIL_CLIENT_ID
@@ -295,23 +297,31 @@ export async function POST(request: Request) {
         const parentName = parentInfo.name || "Parent / Guardian";
         const childName = childInfo?.firstName || "Explorer";
 
+        const emailSubject = isAdvProg
+          ? `Payment Reminder & Slot Confirmation: ${readableProgramName} (${advLabel}) for ${childName} 🌈`
+          : program === "ballet"
+            ? `Payment Reminder & Slot Confirmation: Ballet (${classTime || "Saturday"}) for ${childName} 🩰`
+            : program === "saturday-playdate"
+              ? `Payment Reminder & Slot Confirmation: Saturday Playdate for ${childName} 🛝`
+              : `Payment Reminder & Slot Confirmation: Virtual Tutorial for ${childName} 💻`;
+
         await transporter.sendMail({
           from: `"Merry Explorers" <merryexplorerscenter@gmail.com>`,
           to: parentInfo.email,
-          subject: `Payment Reminder & Slot Confirmation: ${readableProgramName} (${advLabel}) for ${childName} 🌈`,
+          subject: emailSubject,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
               <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
                 <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation · ${advLabel}</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation · ${isAdvProg ? advLabel : readableProgramName}</p>
               </div>
               <div style="padding: 28px;">
                 <p>Dear <strong>${parentName}</strong>,</p>
-                <p>Thank you for submitting your renewal registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.</p>
+                <p>Thank you for submitting your registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.</p>
 
                 <!-- Specific Program & Schedule Details Box -->
                 <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-                  <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Confirmed Renewal Details</p>
+                  <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Confirmed Registration Details</p>
                   <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
                     <tr>
                       <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
@@ -327,13 +337,15 @@ export async function POST(request: Request) {
                       <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${classTime}</td>
                     </tr>
                     ` : ""}
+                    ${isAdvProg ? `
                     <tr>
                       <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
                       <td style="padding: 4px 0; font-weight: bold; color: #059669;">${advLabel}</td>
                     </tr>
+                    ` : ""}
                     ${advStartDateStr ? `
                     <tr>
-                      <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                      <td style="padding: 4px 0; color: #64748b;"><strong>${isAdvProg ? "Adventure Starts:" : "Program Starts:"}</strong></td>
                       <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${advStartDateStr}</td>
                     </tr>
                     ` : ""}
@@ -348,6 +360,7 @@ export async function POST(request: Request) {
                   </a>
                 </div>
 
+                ${isAdvProg ? `
                 <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
                   <p style="margin: 0 0 6px; font-weight: bold;">⚠️ IMPORTANT NOTE &amp; DISCLAIMER:</p>
                   <p style="margin: 0 0 8px;">Please ensure to settle your <strong>Adventure 1 Balance</strong> before you can proceed to the registration.</p>
@@ -355,6 +368,32 @@ export async function POST(request: Request) {
                     "In the event that a family has unsettled balance, your downpayment for ${advLabel} will be credited as your balance payment for the previous cycle."
                   </p>
                 </div>
+                ` : program === "ballet" ? `
+                <div style="background-color: #fdf2f8; border: 1.5px solid #fbcfe8; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #831843;">
+                  <p style="margin: 0 0 6px; font-weight: bold; font-size: 14px;">🩰 2026 BALLET RECITAL ON NOVEMBER 28</p>
+                  <p style="margin: 0 0 8px; font-weight: 600;">Recital kit is optional, but required if joining the recital.</p>
+                  <div style="background-color: white; border: 1px solid #fbcfe8; border-radius: 10px; padding: 12px; margin: 10px 0;">
+                    <p style="margin: 0 0 4px; font-weight: bold; color: #be185d;">Recital Kit · ₱1,500</p>
+                    <p style="margin: 0 0 6px; font-size: 12.5px; color: #475569;">Recital kit preorder starts on October 3. Inclusive of:</p>
+                    <p style="margin: 0; font-size: 12.5px; color: #1e293b;">🎫 <strong>2 Guest Passes</strong> &nbsp;·&nbsp; 💐 <strong>1 Mini Bouquet</strong> &nbsp;·&nbsp; 👗 <strong>1 Set of Costume</strong></p>
+                  </div>
+                  <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 12.5px; color: #475569;">
+                    <li>5 sessions total (₱2,750): 60% downpayment (₱1,650) to confirm a slot, 40% balance (₱1,100).</li>
+                    <li><strong>12 completed sessions</strong> are required to join the recital.</li>
+                    <li>The next recital will be in <strong>Q1 of 2027</strong>.</li>
+                  </ul>
+                </div>
+                ` : program === "virtual-session" ? `
+                <div style="background-color: #f5f3ff; border: 1.5px solid #ddd6fe; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #5b21b6;">
+                  <p style="margin: 0 0 6px; font-weight: bold;">💻 VIRTUAL TUTORIAL INFORMATION:</p>
+                  <p style="margin: 0;">Online classroom links and schedules will be coordinated directly with your teacher prior to your first class.</p>
+                </div>
+                ` : `
+                <div style="background-color: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #0369a1;">
+                  <p style="margin: 0 0 6px; font-weight: bold;">🛝 SATURDAY PLAYDATE REMINDERS:</p>
+                  <p style="margin: 0;">Please wear comfortable play clothes and socks. A parent or guardian is welcome to accompany little explorers!</p>
+                </div>
+                `}
 
                 <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
                   <p style="margin: 0 0 4px; font-weight: bold;">⏰ Deadline Reminder:</p>

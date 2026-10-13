@@ -188,18 +188,19 @@ export default function RenewPage() {
   }, [parentInfo?.email]);
 
   // Program renewal settings for dynamic Adventure cycle # & dates
-  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null }>>({});
+  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean }>>({});
 
   useEffect(() => {
     fetch("/api/renewal-settings")
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.programs)) {
-          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null }> = {};
+          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean }> = {};
           d.programs.forEach((p: any) => {
             map[p.programKey] = {
               currentAdventure: p.currentAdventure ?? 2,
               nextAdventureStart: p.nextAdventureStart ?? null,
+              renewalOpen: p.renewalOpen !== false,
             };
           });
           setRenewalSettings(map);
@@ -576,6 +577,7 @@ export default function RenewPage() {
                     { id: "discovery", label: "Discovery Club" },
                     { id: "trailblazer", label: "Trailblazer" },
                     { id: "weekend", label: "Weekend Adventures" },
+                    { id: "virtual", label: "Virtual Tutorial" },
                   ].map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -607,23 +609,24 @@ export default function RenewPage() {
                 {/* Program Cards */}
                 <div className="space-y-4">
                   {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
-                    .filter(p => p.id !== "ballet" && (p.id as string) !== "virtual-session")
                     .filter(p => {
                       if (activeTab === "all") return true;
                       if (activeTab === "discovery") return ["curious-explorer", "creative-explorer", "everyday-curious"].includes(p.id);
                       if (activeTab === "trailblazer") return p.id === "brave-explorer";
-                      return ["saturday-playdate"].includes(p.id);
+                      if (activeTab === "weekend") return ["saturday-playdate", "ballet"].includes(p.id);
+                      if (activeTab === "virtual") return (p.id as string) === "virtual-session";
+                      return true;
                     })
                     .map(p => {
                       const isSelected = selectedProgram === p.id;
                       const programSlotData = slots[p.id] || {};
-                      const progSettings = renewalSettings[p.name] || Object.values(renewalSettings)[0];
+                      const progSettings = renewalSettings[p.name] || renewalSettings[p.id] || Object.values(renewalSettings)[0];
                       const advNumber = progSettings?.currentAdventure ?? 2;
                       const startDateStr = progSettings?.nextAdventureStart
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : null;
 
-                      const isPlaydate = p.id === "saturday-playdate";
+                      const isUnavailable = progSettings ? progSettings.renewalOpen === false : p.id === "saturday-playdate";
                       const pEffectiveRate = isPioneer && pioneerPrices[p.id] ? pioneerPrices[p.id] : p.rate;
                       const isPioneerDiscounted = isPioneer && Boolean(pioneerPrices[p.id]);
 
@@ -631,12 +634,12 @@ export default function RenewPage() {
                         <div
                           key={p.id}
                           onClick={() => {
-                            if (isPlaydate) return;
+                            if (isUnavailable) return;
                             setSelectedProgram(p.id as ProgramId);
                             setSelectedClass("");
                           }}
                           className={`rounded-[22px] border-3 p-5 transition-all ${
-                            isPlaydate
+                            isUnavailable
                               ? "opacity-60 bg-slate-100/80 border-slate-300 cursor-not-allowed select-none"
                               : isSelected
                               ? "cursor-pointer bg-[#fff6cf] border-[#0b2a82] shadow-[0_6px_0_#0b2a82]"
@@ -647,8 +650,8 @@ export default function RenewPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-2xl">{p.icon}</span>
-                                <h3 className={`text-[17px] font-black ${isPlaydate ? "text-slate-600" : "text-[#0b2a82]"}`}>{p.name}</h3>
-                                {isPlaydate ? (
+                                <h3 className={`text-[17px] font-black ${isUnavailable ? "text-slate-600" : "text-[#0b2a82]"}`}>{p.name}</h3>
+                                {isUnavailable ? (
                                   <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10.5px] font-black uppercase text-amber-800">
                                     Not Yet Available for Renewal
                                   </span>
@@ -666,9 +669,9 @@ export default function RenewPage() {
                                 )}
                               </div>
                               <p className="text-[12.5px] font-medium text-[#3d5a99] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
-                              {isPlaydate ? (
+                              {isUnavailable ? (
                                 <p className="text-[12px] font-bold text-amber-700 bg-amber-50 rounded-lg p-2 mt-2 border border-amber-200/60">
-                                  Saturday Playdate is not yet open for renewal. For inquiries, please reach out via our Facebook page or inquiry form.
+                                  {p.name} is not yet open for renewal. For inquiries, please reach out via our Facebook page or inquiry form.
                                 </p>
                               ) : isPioneerDiscounted ? (
                                 <div className="flex items-center gap-2 flex-wrap mt-1">
@@ -689,17 +692,17 @@ export default function RenewPage() {
                               )}
                             </div>
                             <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${
-                              isPlaydate
+                              isUnavailable
                                 ? "border-slate-300 bg-slate-200 text-slate-400"
                                 : isSelected
                                 ? "border-[#0b2a82] bg-[#ffd23f]"
                                 : "border-[#b6dcf5] bg-white"
                             }`}>
-                              {isSelected && !isPlaydate && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
+                              {isSelected && !isUnavailable && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
                             </div>
                           </div>
 
-                          {!isPlaydate && isSelected && (
+                          {!isUnavailable && isSelected && (
                             <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
                               <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
                               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -712,7 +715,7 @@ export default function RenewPage() {
                                   const isClassSelected = selectedClass === cls.name;
                                   return (
                                     <button
-                                      key={cls.name}
+                                      key={`${cls.name}-${cls.time}`}
                                       type="button"
                                       disabled={isFull}
                                       onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
@@ -733,6 +736,19 @@ export default function RenewPage() {
                                   );
                                 })}
                               </div>
+
+                              {"notes" in p && Array.isArray((p as any).notes) && (
+                                <div className="mt-4 rounded-2xl bg-pink-50 border-2 border-pink-200 p-4 text-[12.5px] text-pink-950 space-y-1.5 shadow-sm">
+                                  <p className="font-black text-pink-900 flex items-center gap-1.5 text-[13px]">
+                                    <span>🩰</span> Important Program &amp; Recital Information:
+                                  </p>
+                                  <ul className="list-disc pl-4 space-y-1 text-[12px] font-semibold text-pink-900/90 leading-relaxed">
+                                    {((p as any).notes as string[]).map((note, idx) => (
+                                      <li key={idx}>{note}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

@@ -1400,6 +1400,7 @@ export default function RenewalsPage() {
                   <option value="everyday">Everyday Curious</option>
                   <option value="ballet">Ballet (Baby/Basic)</option>
                   <option value="playdate">Saturday Playdate</option>
+                  <option value="virtual">Virtual Tutorial</option>
                 </select>
               </div>
 
@@ -1782,6 +1783,9 @@ export default function RenewalsPage() {
                     <option value="Creative Explorer">Creative Explorer</option>
                     <option value="Everyday Curious">Everyday Curious</option>
                     <option value="Trailblazer (Brave Explorer)">Trailblazer (Brave Explorer)</option>
+                    <option value="Ballet">Ballet</option>
+                    <option value="Saturday Playdate">Saturday Playdate</option>
+                    <option value="Virtual Tutorial">Virtual Tutorial</option>
                   </select>
                 </div>
 
@@ -1796,6 +1800,9 @@ export default function RenewalsPage() {
                     <option value="Creative Explorer">Creative Explorer</option>
                     <option value="Everyday Curious">Everyday Curious</option>
                     <option value="Trailblazer (Brave Explorer)">Trailblazer (Brave Explorer)</option>
+                    <option value="Ballet">Ballet</option>
+                    <option value="Saturday Playdate">Saturday Playdate</option>
+                    <option value="Virtual Tutorial">Virtual Tutorial</option>
                   </select>
                 </div>
               </div>

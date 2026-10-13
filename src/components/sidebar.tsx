@@ -18,6 +18,7 @@ const navItems = [
   { label: "Discovery Day", href: "/admin/discovery-day" },
   { label: "Reports", href: "/admin/reports" },
   { label: "Announcements", href: "/admin/announcements" },
+  { label: "Programs", href: "/admin/programs" },
   { label: "Registrations", href: "/admin/registrations" },
   { label: "Students", href: "/admin/students" },
   { label: "Renewals", href: "/admin/renewals" },
@@ -242,6 +243,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   "Discovery Day": DiscoveryDayIcon,
   Reports: ReportsIcon,
   Announcements: AnnouncementsIcon,
+  Programs: DiscoveryDayIcon,
   Registrations: RegistrationsIcon,
   Students: StudentsIcon,
   Renewals: RenewalsIcon,
@@ -389,7 +391,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = [
     { title: "HR & People", items: ["Teachers", "Accounts", "Parents", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Programs & Finance", items: ["Registrations", "Renewals", "Students", "Payments", "Pioneer Families", "Virtual Sessions", "Discovery Day"] },
+    { title: "Programs & Finance", items: ["Programs", "Registrations", "Renewals", "Students", "Payments", "Pioneer Families", "Virtual Sessions", "Discovery Day"] },
     { title: "Content & Logs", items: ["Inquiries", "Reports", "Announcements", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
     ...g,

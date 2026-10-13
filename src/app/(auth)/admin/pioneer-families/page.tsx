@@ -23,6 +23,11 @@ interface RenewalFamily {
 const PROGRAMS = [
   { key: "curious-explorer", label: "Curious Explorer", regular: 4395, color: "#b45309", bg: "#fffbeb", accent: "#fde68a" },
   { key: "creative-explorer", label: "Creative Explorer", regular: 4985, color: "#1d4ed8", bg: "#eff6ff", accent: "#bfdbfe" },
+  { key: "everyday-curious", label: "Everyday Curious", regular: 7518, color: "#15803d", bg: "#f0fdf4", accent: "#bbf7d0" },
+  { key: "brave-explorer", label: "Trailblazer (Brave Explorer)", regular: 6900, color: "#1e1b4b", bg: "#eef2ff", accent: "#c7d2fe" },
+  { key: "ballet", label: "Ballet", regular: 4400, color: "#be185d", bg: "#fdf2f8", accent: "#fbcfe8" },
+  { key: "saturday-playdate", label: "Saturday Playdate", regular: 2190, color: "#0369a1", bg: "#f0f9ff", accent: "#bae6fd" },
+  { key: "virtual-session", label: "Virtual Tutorial", regular: 450, color: "#6d28d9", bg: "#f5f3ff", accent: "#ddd6fe" },
 ];
 
 const fmtDate = (iso?: string) =>
