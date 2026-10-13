@@ -124,9 +124,13 @@ export async function POST(request: Request) {
     }
 
     const rawPromoCode = (promoCode || "").trim();
-    const cleanPromoCode = rawPromoCode.toUpperCase();
-    const isScholar = rawPromoCode === "A1JesusLovesMe2026";
-    const isPromo = isScholar || Boolean(isPromoRegistration && cleanPromoCode === "A1RENEWAL2026");
+    const cleanPromoCode = rawPromoCode.replace(/^[“"']+|[”"':]+$/g, "").trim();
+    const isScholar =
+      cleanPromoCode === "A1JesusLovesMe2026" ||
+      rawPromoCode === "A1JesusLovesMe2026" ||
+      rawPromoCode === "A1JesusLovesMe2026:”" ||
+      rawPromoCode === 'A1JesusLovesMe2026:"';
+    const isPromo = isScholar || Boolean(isPromoRegistration && cleanPromoCode.toUpperCase() === "A1RENEWAL2026");
     // All unpaid slots as of October 16, 1:00 PM will be released for promo reservations; standard reservations get 1 hour; scholars are permanent
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")

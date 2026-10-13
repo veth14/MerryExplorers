@@ -12,10 +12,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false, error: "Please enter a promo code." }, { status: 400 });
     }
 
-    // All promo codes are case-sensitive — codes must be entered exactly as issued.
+    // Clean any accidental surrounding/trailing quotes or colons from copy-pasting (e.g. A1JesusLovesMe2026:”)
+    const cleanCode = rawCode.replace(/^[“"']+|[”"':]+$/g, "").trim();
 
     // Special scholar promo code — does not expire, 100% scholarship, no payment required
-    if (rawCode === "A1JesusLovesMe2026") {
+    if (
+      cleanCode === "A1JesusLovesMe2026" ||
+      rawCode === "A1JesusLovesMe2026" ||
+      rawCode === "A1JesusLovesMe2026:”" ||
+      rawCode === 'A1JesusLovesMe2026:"'
+    ) {
       return NextResponse.json({
         valid: true,
         isScholar: true,
@@ -30,11 +36,16 @@ export async function POST(request: Request) {
     const period = await db.collection("renewal_periods").findOne({
       $or: [
         { promoCode: rawCode },
-        { isDefault: true, promoCode: rawCode }
+        { promoCode: cleanCode },
+        { isDefault: true, promoCode: rawCode },
+        { isDefault: true, promoCode: cleanCode }
       ]
     });
 
-    const isMatch = rawCode === "A1RENEWAL2026" || (period && period.promoCode === rawCode);
+    const isMatch =
+      cleanCode === "A1RENEWAL2026" ||
+      rawCode === "A1RENEWAL2026" ||
+      (period && (period.promoCode === rawCode || period.promoCode === cleanCode));
 
     if (!isMatch) {
       return NextResponse.json({ valid: false, error: "This code is not valid." }, { status: 400 });

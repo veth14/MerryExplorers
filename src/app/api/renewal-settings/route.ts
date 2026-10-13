@@ -38,6 +38,7 @@ export type ProgramRenewalEntry = {
   renewalOpenDate: string | null;     // auto-computed: 2 weeks before start
   virtualLink?: string;
   virtualLinkOpen?: boolean;
+  newFamilyRegistrationOpenDate?: string | null; // optional: date when /register opens for new families
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -96,6 +97,7 @@ function applyAutoRollover(programs: ProgramRenewalEntry[]): {
         nextAdventureStart: null,          // right side is empty and ready to be set again
         registrationOpen: true,            // new adventure starts open for registration
         renewalOpenDate: null,
+        newFamilyRegistrationOpenDate: null,
       };
     }
 
@@ -110,6 +112,7 @@ function applyAutoRollover(programs: ProgramRenewalEntry[]): {
           nextAdventureStart: null,                  // right side is empty
           registrationOpen: true,
           renewalOpenDate: null,
+          newFamilyRegistrationOpenDate: null,
         };
       }
     }
@@ -133,6 +136,7 @@ function defaultPrograms(): ProgramRenewalEntry[] {
     renewalOpenDate: null,
     virtualLink: "",
     virtualLinkOpen: false,
+    newFamilyRegistrationOpenDate: null,
   }));
 }
 
@@ -155,6 +159,7 @@ export async function GET() {
             registrationAutoCloseDays: existing.registrationAutoCloseDays ?? 7,
             customClosedMessage: existing.customClosedMessage ?? "",
             renewalOpen: existing.renewalOpen !== false,
+            newFamilyRegistrationOpenDate: existing.newFamilyRegistrationOpenDate ?? null,
           }
         : {
             programKey: key,
@@ -168,6 +173,7 @@ export async function GET() {
             renewalOpenDate: null,
             virtualLink: "",
             virtualLinkOpen: false,
+            newFamilyRegistrationOpenDate: null,
           };
     });
 
@@ -214,6 +220,7 @@ export async function PUT(req: NextRequest) {
         renewalOpenDate: computeDeadline(nextAdventureStart),
         virtualLink: p?.virtualLink ?? "",
         virtualLinkOpen: p?.virtualLinkOpen ?? false,
+        newFamilyRegistrationOpenDate: p?.newFamilyRegistrationOpenDate ?? null,
       };
     });
 

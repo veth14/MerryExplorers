@@ -237,6 +237,7 @@ export default function RegisterPage() {
     registrationOpen: boolean;
     registrationAutoCloseDays: number | null;
     customClosedMessage?: string;
+    newFamilyRegistrationOpenDate?: string | null;
   };
 
   const [renewalSettings, setRenewalSettings] = useState<Record<string, ProgramSetting>>({});
@@ -244,6 +245,17 @@ export default function RegisterPage() {
   function checkIsRegistrationClosed(setting?: ProgramSetting): boolean {
     if (!setting) return false;
     if (setting.registrationOpen === false) return true;
+
+    // If an open date is set for new families:
+    if (setting.newFamilyRegistrationOpenDate) {
+      const openDateStr = setting.newFamilyRegistrationOpenDate.slice(0, 10);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      // If open date has arrived or passed, it overrides past auto-close -> NOT closed!
+      if (openDateStr <= todayStr) return false;
+      // If in the future, it is handled by isNotYetOpen ("Opens Soon" card)
+      return false;
+    }
+
     if (setting.adventureStartDate && setting.registrationAutoCloseDays) {
       const started = new Date(setting.adventureStartDate).getTime();
       const threshold = started + setting.registrationAutoCloseDays * 86400000;
@@ -266,6 +278,7 @@ export default function RegisterPage() {
               registrationOpen: p.registrationOpen !== false,
               registrationAutoCloseDays: p.registrationAutoCloseDays ?? 7,
               customClosedMessage: p.customClosedMessage || "",
+              newFamilyRegistrationOpenDate: p.newFamilyRegistrationOpenDate ?? null,
             };
           });
           setRenewalSettings(map);
@@ -329,6 +342,7 @@ export default function RegisterPage() {
       const data = await res.json();
       if (data.valid) {
         setPromoAccepted(true);
+        if (data.promoCode) setPromoCode(data.promoCode);
         setPromoError("");
       } else {
         setPromoAccepted(false);
@@ -787,6 +801,60 @@ export default function RegisterPage() {
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : null;
 
+                      // 1) New-family registration scheduled for a future date
+                      const openDateRaw = progSettings?.newFamilyRegistrationOpenDate ?? null;
+                      const openDateStr = openDateRaw ? openDateRaw.slice(0, 10) : "";
+                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const isNotYetOpen = openDateStr ? openDateStr > todayStr : false;
+
+                      if (isNotYetOpen) {
+                        const openDateFmt = new Date(openDateRaw!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+                        return (
+                          <div
+                            key={p.id}
+                            className="relative rounded-[22px] border-3 border-blue-200 bg-blue-50/60 p-5 shadow-sm overflow-hidden select-none"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <span className="text-2xl">{p.icon}</span>
+                                  <h3 className="text-[17px] font-black text-slate-700">{p.name}</h3>
+                                  <span className="rounded-full bg-blue-100 border border-blue-300 px-2.5 py-0.5 text-[10.5px] font-black uppercase text-blue-900 tracking-wider">
+                                    📅 Opens Soon
+                                  </span>
+                                </div>
+                                <p className="text-[12.5px] font-medium text-slate-500 mb-1">
+                                  {p.ageRange} · {p.schedule} · {p.sessions} sessions
+                                </p>
+                                <p className="text-[15px] font-black text-slate-400">₱{p.rate.toLocaleString()}</p>
+                              </div>
+                              <div className="h-6 w-6 rounded-full border-2 border-blue-300 bg-blue-100 shrink-0 mt-1 flex items-center justify-center text-[11px]">
+                                📅
+                              </div>
+                            </div>
+
+                            <div className="mt-4 pt-3.5 border-t border-blue-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/80 -mx-5 -mb-5 p-4 rounded-b-[19px]">
+                              <div className="space-y-0.5 max-w-lg">
+                                <p className="text-[13px] font-extrabold text-blue-950">
+                                  🗓️ New family registration opens on {openDateFmt}!
+                                </p>
+                                <p className="text-[12px] font-medium text-slate-600 leading-snug">
+                                  Returning families can still renew anytime via their priority renewal link. New families, please check back on the opening date!
+                                </p>
+                              </div>
+                              <Link
+                                href={`/inquire?program=${encodeURIComponent(p.name)}`}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 text-white text-[12px] font-black hover:bg-blue-700 transition-all shadow-sm shrink-0"
+                              >
+                                <span>Inquire Now</span>
+                                <span>→</span>
+                              </Link>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // 2) Registration closed
                       const isClosed = checkIsRegistrationClosed(progSettings);
 
                       if (isClosed) {
@@ -852,8 +920,6 @@ export default function RegisterPage() {
                           </div>
                         );
                       }
-
-
 
                       return (
                         <div
@@ -993,7 +1059,7 @@ export default function RegisterPage() {
                         <span className="text-[13px] font-black text-white uppercase tracking-wider">THIS CODE HAS BEEN ACCEPTED</span>
                       </div>
                       {/* Note body */}
-                      {promoCode.trim() === "A1JesusLovesMe2026" ? (
+                      {promoCode.trim().replace(/^[“"']+|[”"':]+$/g, "") === "A1JesusLovesMe2026" || promoCode.trim().startsWith("A1JesusLovesMe2026") ? (
                         <div className="p-4 space-y-2 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
                           <p className="font-extrabold text-[13.5px] text-emerald-950 flex items-center gap-1.5">
                             <span>🎓</span> Full Scholarship Code Applied!

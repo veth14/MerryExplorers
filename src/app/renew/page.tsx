@@ -251,6 +251,7 @@ export default function RenewPage() {
       const data = await res.json();
       if (data.valid) {
         setPromoAccepted(true);
+        if (data.promoCode) setPromoCode(data.promoCode);
         setPromoError("");
       } else {
         setPromoAccepted(false);
@@ -826,7 +827,7 @@ export default function RenewPage() {
                         <span className="text-[13px] font-black text-white uppercase tracking-wider">THIS CODE HAS BEEN ACCEPTED</span>
                       </div>
                       {/* Note body */}
-                      {promoCode.trim() === "A1JesusLovesMe2026" ? (
+                      {promoCode.trim().replace(/^[“"']+|[”"':]+$/g, "") === "A1JesusLovesMe2026" || promoCode.trim().startsWith("A1JesusLovesMe2026") ? (
                         <div className="p-4 space-y-2 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
                           <p className="font-extrabold text-[13.5px] text-emerald-950 flex items-center gap-1.5">
                             <span>🎓</span> Full Scholarship Code Applied!

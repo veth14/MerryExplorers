@@ -79,6 +79,7 @@ export type ProgramRenewalEntry = {
   customClosedMessage?: string;       // optional override for closed notice
   renewalOpen: boolean;               // whether priority renewal is open
   renewalOpenDate: string | null;     // auto-computed: 2 weeks before start
+  newFamilyRegistrationOpenDate?: string | null; // optional: date when /register opens for new families
   virtualLink?: string;
   virtualLinkOpen?: boolean;
 };
@@ -112,6 +113,18 @@ export const DEFAULT_PROGRAMS: string[] = [
 
 export function isRegistrationClosedForProgram(p: ProgramRenewalEntry): boolean {
   if (p.registrationOpen === false) return true;
+
+  // If a new family registration open date is specified:
+  if (p.newFamilyRegistrationOpenDate) {
+    const openDateStr = p.newFamilyRegistrationOpenDate.slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    // If open date has arrived or passed, it overrides past auto-close -> it is OPEN!
+    if (openDateStr <= todayStr) return false;
+    // If open date is in the future, it is scheduled to open (handled by isFuture / not-yet-open state)
+    return false;
+  }
+
+  // Auto-close rule: close N days after current adventure started
   if (p.adventureStartDate && p.registrationAutoCloseDays) {
     const started = new Date(p.adventureStartDate).getTime();
     const closeThreshold = started + p.registrationAutoCloseDays * 86400000;
@@ -158,6 +171,7 @@ export function RenewalSettingsManager() {
             customClosedMessage: "",
             renewalOpen: true,
             renewalOpenDate: null,
+            newFamilyRegistrationOpenDate: null,
             virtualLink: "",
             virtualLinkOpen: false,
           };
@@ -444,6 +458,10 @@ export function RenewalSettingsManager() {
 
             const isClosed = isRegistrationClosedForProgram(prog);
             const isAdventureProg = ADVENTURE_PROGRAMS.has(prog.programKey);
+            const isFuture = Boolean(
+              prog.newFamilyRegistrationOpenDate &&
+              prog.newFamilyRegistrationOpenDate.slice(0, 10) > new Date().toISOString().slice(0, 10)
+            );
 
             const nextStartDateDisplay = prog.nextAdventureStart
               ? fmtDate(prog.nextAdventureStart) ?? "Not scheduled"
@@ -460,7 +478,11 @@ export function RenewalSettingsManager() {
               <div
                 key={prog.programKey}
                 className={`rounded-3xl bg-white border-2 transition-all overflow-hidden flex flex-col justify-between ${
-                  isClosed ? "border-amber-300 shadow-sm" : "border-slate-200/80 shadow-sm hover:shadow-md"
+                  isClosed
+                    ? "border-amber-300 shadow-sm"
+                    : isFuture
+                    ? "border-blue-300 shadow-sm hover:shadow-md"
+                    : "border-slate-200/80 shadow-sm hover:shadow-md"
                 }`}
               >
                 {/* Card Header Strip */}
@@ -487,10 +509,16 @@ export function RenewalSettingsManager() {
                             className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                               isClosed
                                 ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                : isFuture
+                                ? "bg-blue-100 text-blue-900 border border-blue-300"
                                 : "bg-emerald-100 text-emerald-900 border border-emerald-300"
                             }`}
                           >
-                            {isClosed ? "🔒 Registration Closed" : "🟢 Registration Open"}
+                            {isClosed
+                              ? "🔒 Registration Closed"
+                              : isFuture
+                              ? `📅 Opens ${fmtDate(prog.newFamilyRegistrationOpenDate)}`
+                              : "🟢 Registration Open"}
                           </span>
                         </div>
                         <h3 className="font-headline text-[17px] font-black text-[#002f76]">
@@ -503,18 +531,24 @@ export function RenewalSettingsManager() {
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          const willOpen = isClosed;
                           updateProgram(prog.programKey, {
-                            registrationOpen: isClosed ? true : false,
-                          })
-                        }
+                            registrationOpen: willOpen,
+                            ...(willOpen
+                              ? { newFamilyRegistrationOpenDate: new Date().toISOString() }
+                              : { newFamilyRegistrationOpenDate: null }),
+                          });
+                        }}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer shadow-xs ${
                           isClosed
                             ? "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
+                            : isFuture
+                            ? "bg-blue-100 text-blue-900 border border-blue-300 hover:bg-blue-200"
                             : "bg-emerald-600 text-white hover:bg-emerald-700"
                         }`}
                       >
-                        <span>{isClosed ? "🔒 Closed" : "🟢 Open"}</span>
+                        <span>{isClosed ? "🔒 Closed" : isFuture ? "📅 Scheduled" : "🟢 Open"}</span>
                       </button>
                       <span className="text-[10px] text-slate-400 font-semibold">
                         Public Form
@@ -671,11 +705,15 @@ export function RenewalSettingsManager() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            const willOpen = isClosed;
                             updateProgram(prog.programKey, {
-                              registrationOpen: !isClosed,
-                            })
-                          }
+                              registrationOpen: willOpen,
+                              ...(willOpen
+                                ? { newFamilyRegistrationOpenDate: new Date().toISOString() }
+                                : { newFamilyRegistrationOpenDate: null }),
+                            });
+                          }}
                           className={`px-3 py-1 rounded-xl text-[11px] font-extrabold cursor-pointer transition-colors ${
                             isClosed
                               ? "bg-emerald-600 text-white hover:bg-emerald-700"
@@ -709,31 +747,93 @@ export function RenewalSettingsManager() {
                     </div>
                     )}
 
+                    {/* New Family Registration Open Date */}
+                    {(() => {
+                      const openDateStr = prog.newFamilyRegistrationOpenDate ? prog.newFamilyRegistrationOpenDate.slice(0, 10) : "";
+                      const openDateFmt = prog.newFamilyRegistrationOpenDate ? fmtDate(prog.newFamilyRegistrationOpenDate) : null;
+                      const isFuture = openDateStr ? openDateStr > new Date().toISOString().slice(0, 10) : false;
+                      return (
+                        <div className={`rounded-xl border p-3 space-y-2 ${
+                          isFuture ? "border-blue-200 bg-blue-50/60" : "border-slate-200 bg-white"
+                        }`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <label className="text-[10.5px] font-black uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                              <span>📅</span> New Family Registration Opens On
+                            </label>
+                            {openDateStr && (
+                              <button
+                                type="button"
+                                onClick={() => updateProgram(prog.programKey, { newFamilyRegistrationOpenDate: null })}
+                                className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors"
+                              >
+                                ✕ Clear
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="date"
+                            value={openDateStr}
+                            onChange={(e) =>
+                              updateProgram(prog.programKey, {
+                                newFamilyRegistrationOpenDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
+                                ...(e.target.value ? { registrationOpen: true } : {}),
+                              })
+                            }
+                            className="w-full h-8 rounded-lg border border-blue-200 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
+                          />
+                          {isFuture ? (
+                            <p className="text-[10px] font-bold text-blue-700">
+                              🔒 /register will show &quot;Opens on {openDateFmt}&quot; to new families until this date.
+                            </p>
+                          ) : openDateStr ? (
+                            <p className="text-[10px] font-semibold text-emerald-700">
+                              ✅ Open date has passed — registration is visible to new families.
+                            </p>
+                          ) : (
+                            <p className="text-[10px] font-semibold text-slate-400">
+                              Leave blank to allow registration immediately when the form is open.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Public Live Preview Banner */}
-                    <div className="rounded-xl border border-dashed border-slate-300 p-3 bg-white space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Visitor Preview on /register:
-                      </p>
-                      {isClosed ? (
-                        <div className="text-[12px] font-medium text-amber-800 leading-snug">
-                          🔒{" "}
-                          {isAdventureProg ? (
-                            <><strong>Current Adventure {currentAdv} is starting!</strong> Online registration for Adventure {currentAdv} is now closed. Please wait for the next <strong>Adventure {nextAdv}</strong>{prog.nextAdventureStart ? ` (Starts ${nextStartDateDisplay})` : ""}!</>
+                    {(() => {
+                      const openDateStr = prog.newFamilyRegistrationOpenDate ? prog.newFamilyRegistrationOpenDate.slice(0, 10) : "";
+                      const openDateFmt = prog.newFamilyRegistrationOpenDate ? fmtDate(prog.newFamilyRegistrationOpenDate) : null;
+                      const isFuture = openDateStr ? openDateStr > new Date().toISOString().slice(0, 10) : false;
+                      return (
+                        <div className="rounded-xl border border-dashed border-slate-300 p-3 bg-white space-y-1">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Visitor Preview on /register:
+                          </p>
+                          {isClosed ? (
+                            <div className="text-[12px] font-medium text-amber-800 leading-snug">
+                              🔒{" "}
+                              {isAdventureProg ? (
+                                <><strong>Current Adventure {currentAdv} is starting!</strong> Online registration for Adventure {currentAdv} is now closed. Please wait for the next <strong>Adventure {nextAdv}</strong>{prog.nextAdventureStart ? ` (Starts ${nextStartDateDisplay})` : ""}!</>
+                              ) : (
+                                <><strong>Registration for {meta.short} is currently closed.</strong>{prog.adventureStartDate ? ` Started ${currentStartDateDisplay}.` : ""} Please check back soon or inquire for the next batch!</>
+                              )}
+                            </div>
+                          ) : isFuture ? (
+                            <div className="text-[12px] font-medium text-blue-800 leading-snug">
+                              📅 <strong>Registration for new families opens on {openDateFmt}.</strong> Returning families can still renew anytime.
+                            </div>
                           ) : (
-                            <><strong>Registration for {meta.short} is currently closed.</strong>{prog.adventureStartDate ? ` Started ${currentStartDateDisplay}.` : ""} Please check back soon or inquire for the next batch!</>
+                            <div className="text-[12px] font-medium text-emerald-800 leading-snug">
+                              ✓{" "}
+                              {isAdventureProg ? (
+                                <><strong>Adventure {currentAdv} is Open for Registration!</strong> Families can select classes and reserve slots online.</>
+                              ) : (
+                                <><strong>{meta.short} is Open for Registration!</strong> Families can sign up online.</>
+                              )}
+                            </div>
                           )}
                         </div>
-                      ) : (
-                        <div className="text-[12px] font-medium text-emerald-800 leading-snug">
-                          ✓{" "}
-                          {isAdventureProg ? (
-                            <><strong>Adventure {currentAdv} is Open for Registration!</strong> Families can select classes and reserve slots online.</>
-                          ) : (
-                            <><strong>{meta.short} is Open for Registration!</strong> Families can sign up online.</>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Row 3: Priority Renewal Access */}
@@ -818,8 +918,8 @@ export function RenewalSettingsManager() {
                       <>{prog.adventureStartDate ? `Starts: ${currentStartDateDisplay}` : "No start date set"}</>
                     )}
                   </span>
-                  <span className={`font-bold ${isClosed ? "text-amber-700" : "text-emerald-700"}`}>
-                    {isClosed ? "● Registration Closed" : "● Registration Open"}
+                  <span className={`font-bold ${isClosed ? "text-amber-700" : isFuture ? "text-blue-700" : "text-emerald-700"}`}>
+                    {isClosed ? "● Registration Closed" : isFuture ? "● Scheduled to Open" : "● Registration Open"}
                   </span>
                 </div>
               </div>
