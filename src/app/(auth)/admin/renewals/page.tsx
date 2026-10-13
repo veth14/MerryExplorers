@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import * as XLSX from "xlsx";
 import { RenewalSettingsManager } from "@/components/admin/RenewalSettingsManager";
@@ -88,6 +89,7 @@ type SlotInfo = {
 };
 
 export default function RenewalsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"renewals" | "families" | "settings">("renewals");
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<any[]>([]);
@@ -1201,15 +1203,30 @@ export default function RenewalsPage() {
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => {
-                                setPaymentModalRecord(r);
-                                setPaymentAmount(r.expectedDownpayment ? String(r.expectedDownpayment) : "");
-                              }}
-                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm"
-                            >
-                              💵 Record Payment
-                            </button>
+                            {r.renewalStatus === "confirmed" || r.paymentStatus === "fully_paid" ? (
+                              <a
+                                href={`/admin/payments?search=${encodeURIComponent(r.childName)}`}
+                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm inline-flex items-center gap-1"
+                              >
+                                ✓ Verify Payment
+                              </a>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  const params = new URLSearchParams({
+                                    record_payment: "true",
+                                    regId: r.registrationId,
+                                    childName: r.childName,
+                                    parentName: r.parentName,
+                                    ...(r.expectedDownpayment ? { amount: String(r.expectedDownpayment) } : {}),
+                                  });
+                                  router.push(`/admin/payments?${params.toString()}`);
+                                }}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm"
+                              >
+                                💵 Record Payment
+                              </button>
+                            )}
 
                             {r.renewalStatus === "for_release" && (
                               <button

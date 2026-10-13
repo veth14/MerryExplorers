@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { m } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -407,6 +408,8 @@ function dpToPayment(acc: Account): Payment {
 const PAY_GRID = "2fr 1.4fr 1.3fr 1.1fr 1.3fr";
 
 export default function AdminPaymentsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
@@ -509,6 +512,41 @@ export default function AdminPaymentsPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // ── Auto-open the manual modal when redirected from the Renewals page ──
+  useEffect(() => {
+    const trigger = searchParams.get("record_payment");
+    if (trigger !== "true") return;
+
+    const regId = searchParams.get("regId") ?? "";
+    const amount = searchParams.get("amount") ?? "";
+
+    // Reset the form and pre-populate the known fields
+    setForm({
+      ...EMPTY_FORM,
+      paidOn: todayIso(),
+      type: "registration",
+      registrationId: regId,
+      amountPaid: amount,
+    });
+    setParentFilter(searchParams.get("childName") ?? searchParams.get("parentName") ?? "");
+    setReceipt(null);
+    setReceiptName("");
+    setManualError("");
+    setOcrLoading(false);
+    setOcrAmount(null);
+    setOcrInfo(null);
+    ocrRunRef.current++;
+    lastOcrRef.current = null;
+    paidOnTouched.current = false;
+    methodTouched.current = false;
+    setManualOpen(true);
+
+    // Clean the query params so a page refresh doesn't re-open the modal
+    router.replace("/admin/payments", { scroll: false });
+  // Only run once after data has loaded and searchParams are available
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // ── Dynamic ADVENTURES derived from renewal settings ──
   const { ADVENTURES, advNumbers } = useMemo(() => {
