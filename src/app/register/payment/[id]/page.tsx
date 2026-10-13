@@ -179,9 +179,15 @@ export default function PaymentPage() {
   const prog = regData ? PROGRAM_SLOTS[regData.program] : null;
 
   const isBallet = regData?.program === "ballet";
+  const isNoUniformProg =
+    regData?.program === "ballet" ||
+    regData?.program === "saturday-playdate" ||
+    regData?.program === "virtual-session";
 
   const addonCost = isBallet
     ? (recitalKitOrdered ? 1500 : 0)
+    : isNoUniformProg
+    ? 0
     : (isNewFamily
       ? UNIFORM_KIT.welcomeKitPrice
       : (welcomeKitOrdered ? UNIFORM_KIT.welcomeKitPrice : 0) +
@@ -577,19 +583,19 @@ export default function PaymentPage() {
                     <span className="font-extrabold">₱1,500</span>
                   </div>
                 )}
-                {!isBallet && isNewFamily && (
+                {!isNoUniformProg && isNewFamily && (
                   <div className="flex justify-between">
                     <span className="text-white/80">Welcome Kit</span>
                     <span className="font-extrabold">₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</span>
                   </div>
                 )}
-                {!isBallet && !isNewFamily && uniformOrdered && (
+                {!isNoUniformProg && !isNewFamily && uniformOrdered && (
                   <div className="flex justify-between">
                     <span className="text-white/80">Uniform Set</span>
                     <span className="font-extrabold">₱{UNIFORM_KIT.price.toLocaleString()}</span>
                   </div>
                 )}
-                {!isBallet && !isNewFamily && lanyardOrdered && (
+                {!isNoUniformProg && !isNewFamily && lanyardOrdered && (
                   <div className="flex justify-between">
                     <span className="text-white/80">Lanyard & Name Tag</span>
                     <span className="font-extrabold">₱{UNIFORM_KIT.lanyardPrice.toLocaleString()}</span>

@@ -322,8 +322,15 @@ export default function RegisterPage() {
     ? (renewalSettings[PROGRAM_SLOTS[selectedProgram]?.name] || renewalSettings[selectedProgram])
     : undefined;
   const isSelectedProgClosed = checkIsRegistrationClosed(selectedProgSetting);
+  const requiresUniformDay = Boolean(
+    selectedProgram && !["ballet", "saturday-playdate", "virtual-session"].includes(selectedProgram)
+  );
 
-  const canProceedStep0 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged && !isSelectedProgClosed;
+  const canProceedStep0 =
+    selectedProgram !== "" &&
+    selectedClass !== "" &&
+    (!requiresUniformDay || uniformDayAcknowledged) &&
+    !isSelectedProgClosed;
 
   async function applyPromoCode() {
     const trimmed = promoCode.trim();
@@ -1099,23 +1106,25 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Uniform Day Acknowledgment */}
-                <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
-                  <p className="text-[13.5px] font-black text-[#0b2a82] flex items-center gap-2">
-                    <span>👕</span> Every Wednesday & Friday is Merry Explorers&apos; official uniform day.
-                  </p>
-                  <label className="flex items-start gap-3 cursor-pointer pt-1 group">
-                    <input
-                      type="checkbox"
-                      checked={uniformDayAcknowledged}
-                      onChange={(e) => setUniformDayAcknowledged(e.target.checked)}
-                      className="mt-1 h-5 w-5 rounded-md border-2 border-[#0b2a82] accent-[#0b2a82] cursor-pointer"
-                    />
-                    <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
-                      <strong className="text-red-500">*</strong> I understand that every Wednesday & Friday is Merry Explorers&apos; official uniform day.
-                    </span>
-                  </label>
-                </div>
+                {/* Uniform Day Acknowledgment (only for weekday explorer programs with Wed/Fri uniform) */}
+                {requiresUniformDay && (
+                  <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
+                    <p className="text-[13.5px] font-black text-[#0b2a82] flex items-center gap-2">
+                      <span>👕</span> Every Wednesday & Friday is Merry Explorers&apos; official uniform day.
+                    </p>
+                    <label className="flex items-start gap-3 cursor-pointer pt-1 group">
+                      <input
+                        type="checkbox"
+                        checked={uniformDayAcknowledged}
+                        onChange={(e) => setUniformDayAcknowledged(e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded-md border-2 border-[#0b2a82] accent-[#0b2a82] cursor-pointer"
+                      />
+                      <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
+                        <strong className="text-red-500">*</strong> I understand that every Wednesday & Friday is Merry Explorers&apos; official uniform day.
+                      </span>
+                    </label>
+                  </div>
+                )}
 
                 <div className="mt-8 flex justify-between items-center">
                   <button onClick={() => setStep(0)} className="vp-btn ghost small">← Back</button>

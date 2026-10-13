@@ -231,7 +231,15 @@ export default function RenewPage() {
   const addonCost = (uniformOrdered ? UNIFORM_KIT.price : 0) + (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0);
   const amountDue = prog ? effectiveDownpayment + addonCost : 0;
 
-  const canProceedStep1 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged && promoAccepted;
+  const requiresUniformDay = Boolean(
+    selectedProgram && !["ballet", "saturday-playdate", "virtual-session"].includes(selectedProgram)
+  );
+
+  const canProceedStep1 =
+    selectedProgram !== "" &&
+    selectedClass !== "" &&
+    (!requiresUniformDay || uniformDayAcknowledged) &&
+    promoAccepted;
   const canProceedStep2 = photoConsent !== "" && (selectedProgram === "brave-explorer" || (waiverRead && signatureBase64 !== ""));
 
   async function applyPromoCode() {
@@ -759,7 +767,7 @@ export default function RenewPage() {
                 </div>
 
                 {/* Optional Uniform Add-ons for Returning Families */}
-                {selectedProgram && (
+                {selectedProgram && requiresUniformDay && (
                   <div className="mt-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-3">
                     <h3 className="vp-h3 text-[15px] text-[#0b2a82]">👕 Optional Uniform Add-ons</h3>
                     <p className="text-[12.5px] font-medium text-[#3d5a99]">As a returning family, you already have the Welcome Kit. These add-ons are completely optional.</p>
@@ -867,23 +875,25 @@ export default function RenewPage() {
                   )}
                 </div>
 
-                {/* Uniform Day Acknowledgment */}
-                <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
-                  <p className="text-[13.5px] font-black text-[#0b2a82] flex items-center gap-2">
-                    <span>👕</span> Every Wednesday & Friday is Merry Explorers&apos; official uniform day.
-                  </p>
-                  <label className="flex items-start gap-3 cursor-pointer pt-1 group">
-                    <input
-                      type="checkbox"
-                      checked={uniformDayAcknowledged}
-                      onChange={e => setUniformDayAcknowledged(e.target.checked)}
-                      className="mt-1 h-5 w-5 rounded-md border-2 border-[#0b2a82] accent-[#0b2a82] cursor-pointer"
-                    />
-                    <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
-                      <strong className="text-red-500">*</strong> I understand that every Wednesday & Friday is Merry Explorers&apos; official uniform day.
-                    </span>
-                  </label>
-                </div>
+                {/* Uniform Day Acknowledgment (only for weekday explorer programs with Wed/Fri uniform) */}
+                {requiresUniformDay && (
+                  <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
+                    <p className="text-[13.5px] font-black text-[#0b2a82] flex items-center gap-2">
+                      <span>👕</span> Every Wednesday & Friday is Merry Explorers&apos; official uniform day.
+                    </p>
+                    <label className="flex items-start gap-3 cursor-pointer pt-1 group">
+                      <input
+                        type="checkbox"
+                        checked={uniformDayAcknowledged}
+                        onChange={e => setUniformDayAcknowledged(e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded-md border-2 border-[#0b2a82] accent-[#0b2a82] cursor-pointer"
+                      />
+                      <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
+                        <strong className="text-red-500">*</strong> I understand that every Wednesday & Friday is Merry Explorers&apos; official uniform day.
+                      </span>
+                    </label>
+                  </div>
+                )}
 
                 <div className="mt-8 flex justify-between items-center">
                   <button onClick={() => setStep(0)} className="vp-btn ghost small">← Back</button>
