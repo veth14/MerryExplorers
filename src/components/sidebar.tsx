@@ -22,6 +22,7 @@ const navItems = [
   { label: "Students", href: "/admin/students" },
   { label: "Renewals", href: "/admin/renewals" },
   { label: "Payments", href: "/admin/payments" },
+  { label: "Pioneer Families", href: "/admin/pioneer-families" },
   { label: "Virtual Sessions", href: "/admin/virtual-sessions" },
   { label: "Gallery", href: "/admin/gallery" },
   { label: "Photo Albums", href: "/admin/photo-albums" },
@@ -221,6 +222,14 @@ function RenewalsIcon({ active }: { active?: boolean }) {
   );
 }
 
+function StarIcon({ active }: { active?: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <path strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+    </svg>
+  );
+}
+
 const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   Teachers: TeachersIcon,
@@ -237,6 +246,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Students: StudentsIcon,
   Renewals: RenewalsIcon,
   Payments: CreditCardIcon,
+  "Pioneer Families": StarIcon,
   "Virtual Sessions": VideoIcon,
   Gallery: GalleryIcon,
   "Photo Albums": GalleryIcon,
@@ -379,7 +389,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const adminGroups = [
     { title: "HR & People", items: ["Teachers", "Accounts", "Parents", "Payroll"] },
     { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Programs & Finance", items: ["Registrations", "Renewals", "Students", "Payments", "Virtual Sessions", "Discovery Day"] },
+    { title: "Programs & Finance", items: ["Registrations", "Renewals", "Students", "Payments", "Pioneer Families", "Virtual Sessions", "Discovery Day"] },
     { title: "Content & Logs", items: ["Inquiries", "Reports", "Announcements", "Gallery", "Photo Albums", "Audit Log"] },
   ].map((g) => ({
     ...g,

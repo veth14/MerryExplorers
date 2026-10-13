@@ -35,6 +35,13 @@ export async function POST(request: Request) {
     const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
 
+    // Fetch pioneer settings + check if this family is a pioneer
+    const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+    const pioneerPrice: number | null = pioneerSettingsDoc?.pioneerPrice ?? null;
+    const pioneerFamily = await db.collection("pioneer_families").findOne({ email: (family.parentEmail || "").toLowerCase() });
+    const isPioneer = !!pioneerFamily;
+    const displayPrice = isPioneer && pioneerPrice ? pioneerPrice : null;
+
     // Match the family's renewingTo or previousProgram
     const targetProgramName = family.renewingTo || family.previousProgram || "Curious Explorer";
     const matchedProgramEntry = storedPrograms.find((p) =>
@@ -91,6 +98,12 @@ export async function POST(request: Request) {
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
                   <td style="padding: 4px 0; font-weight: 800; color: #ffb800;">🚀 ${formattedStartDate}</td>
+                </tr>
+                ` : ""}
+                ${displayPrice ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Your Price:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 900; color: #059669;">⭐ ₱${displayPrice.toLocaleString()} <span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800;">PIONEER FAMILY</span></td>
                 </tr>
                 ` : ""}
               </table>
@@ -171,6 +184,12 @@ export async function POST(request: Request) {
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
                   <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${formattedStartDate}</td>
+                </tr>
+                ` : ""}
+                ${displayPrice ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Your Price:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 900; color: #059669;">⭐ ₱${displayPrice.toLocaleString()} <span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800;">PIONEER FAMILY</span></td>
                 </tr>
                 ` : ""}
               </table>

@@ -30,6 +30,8 @@ type Payment = {
   amountDue?: number;
   adminNote?: string;
   reviewedAt?: string;
+  /** true when this registration came from the renewal flow (isNewFamily === false) */
+  isRenewal?: boolean;
 };
 
 type Account = {
@@ -79,16 +81,23 @@ const TYPE_OPTIONS = [
   { id: "session", label: "Virtual session" },
 ];
 
-// ── CONFIG: fill in your real values ─────────────────────────────
-const ADVENTURES = {
-  current: { label: "Current Adventure", start: "2026-06-01", end: "2026-10-31" }, // TODO: real dates
-  next: { label: "Next Adventure", start: "2026-11-01", end: "2027-03-31" }, // TODO: real dates
+// ── CONFIG ─────────────────────────────────────────────────────
+// Adventure dates are fetched dynamically from /api/renewal-settings.
+// The earliest `nextAdventureStart` across all programs becomes the global transition date.
+// Everything before that date = current adventure; after = next adventure.
+// Hardcoded fallback only used while settings are loading.
+const ADVENTURES_FALLBACK = {
+  current: { label: "Current Adventure", start: "2026-06-01", end: "2026-10-31" },
+  next: { label: "Next Adventure", start: "2026-11-01", end: "2027-03-31" },
 };
 
 // Tuition for the NEXT adventure, by program name (as stored in account.program)
 const NEXT_TUITION: Record<string, number> = {
   "Trailblazer: Brave Explorer": 0, // TODO: real fee
 };
+
+// ~5 months per adventure cycle (approximate, used for deriving past adventure ranges)
+const ADVENTURE_DURATION_MONTHS = 5;
 
 // Payment terms (60% reservation, 40% balance on the 6th session, 4% weekly interest),
 // program fees, Welcome Kit / Uniform Set prices and the schedule fallbacks all live in
@@ -259,6 +268,20 @@ const regAccountOf = (r: any): Account => ({
   childName: fullChildName(r), // full name so two siblings are never mixed up
   program: r.program,
 });
+// Must match the same criteria as the Renewals API (api/renewals/route.ts):
+// - isPromoRegistration: true  (renewal promo flow)
+// - promoCode: "A1RENEWAL2026" (specific renewal code, NOT any promo code)
+// - parentInfo.isRenewal: true (explicit renewal flag from /renew page)
+// - renewalPeriod is set       (tagged by admin or system)
+// NOTE: isNewFamily === false is NOT used — it's too broad. A returning family's
+// original Adventure 1 registration also has isNewFamily:false, which would wrongly
+// tag all their payments as Adventure 2. The /renew page sets parentInfo.isRenewal instead.
+const isRenewalReg = (r: any): boolean =>
+  Boolean(r.isPromoRegistration) ||
+  r.promoCode === "A1RENEWAL2026" ||
+  Boolean(r.parentInfo?.isRenewal) ||
+  Boolean(r.renewalPeriod);
+
 const firstPaymentOf = (r: any): Payment => ({
   id: "reg-" + r.id,
   amountPaid: firstPaymentAmount(r),
@@ -271,6 +294,8 @@ const firstPaymentOf = (r: any): Payment => ({
   amountDue: r.amountDue,
   adminNote: r.adminNote,
   reviewedAt: r.reviewedAt || r.approvedAt,
+  // renewal registrations are always for the NEXT adventure, same as downpayments
+  isRenewal: isRenewalReg(r),
 });
 const balancePaymentOf = (r: any, b: any): Payment => ({
   id: "bal-" + b.id,
@@ -283,6 +308,7 @@ const balancePaymentOf = (r: any, b: any): Payment => ({
   rejected: false,
   adminNote: b.adminNote,
   reviewedAt: b.recordedAt,
+  isRenewal: isRenewalReg(r),
 });
 const sortedBalancesOf = (r: any): any[] =>
   [...balancePaymentsOf(r)].sort(
@@ -303,20 +329,29 @@ type PaymentGroup = {
 
 // Which Adventure a payment belongs to. A renewal downpayment is always for the NEXT adventure,
 // even though it is paid during the current one; everything else is decided by the date paid.
+// Renewal registrations (isNewFamily === false) also belong to the NEXT adventure.
 type AdventureKey = "current" | "next";
-function adventureOf(kind: PaymentKind, iso: string | undefined): AdventureKey | null {
+function adventureOf(kind: PaymentKind, iso: string | undefined, isRenewal?: boolean, adventures?: { current: { start: string; end: string }; next: { start: string; end: string } }): AdventureKey | null {
+  const adv = adventures || ADVENTURES_FALLBACK;
   if (kind === "downpayment") return "next";
-  if (inRange(iso, ADVENTURES.current)) return "current";
-  if (inRange(iso, ADVENTURES.next)) return "next";
+  if (kind === "registration" && isRenewal) return "next";
+  if (inRange(iso, adv.current)) return "current";
+  if (inRange(iso, adv.next)) return "next";
   return null;
 }
+// Dynamic adventure badge — labels use actual adventure numbers from settings
+function advBadge(k: AdventureKey, advNumbers: { current: number; next: number }): { label: string; short: string; bg: string; color: string } {
+  if (k === "current") return { label: `Adventure ${advNumbers.current}`, short: `ADVENTURE ${advNumbers.current}`, bg: "#eff6ff", color: "#0050d5" };
+  return { label: `Adventure ${advNumbers.next}`, short: `ADVENTURE ${advNumbers.next}`, bg: "#f5f3ff", color: "#7c3aed" };
+}
+// Fallback for static references
 const ADV_BADGE: Record<AdventureKey, { label: string; short: string; bg: string; color: string }> = {
   current: { label: "Current Adventure", short: "CURRENT", bg: "#eff6ff", color: "#0050d5" },
   next: { label: "Next Adventure", short: "NEXT", bg: "#f5f3ff", color: "#7c3aed" },
 };
 const advTagStyle = (k: AdventureKey): CSSProperties => ({
   display: "inline-flex", padding: "2px 7px", borderRadius: "20px", fontSize: "10px", fontWeight: 800,
-  background: ADV_BADGE[k].bg, color: ADV_BADGE[k].color, letterSpacing: "0.3px",
+  background: advBadge(k, { current: 1, next: 2 }).bg, color: advBadge(k, { current: 1, next: 2 }).color, letterSpacing: "0.3px",
 });
 
 // small coloured label used in the list rows
@@ -329,7 +364,8 @@ const tagStyle = (bg: string, color: string): CSSProperties => ({
 function kindTag(type: PaymentKind, payment: Payment) {
   if (type === "session") return { label: "VIRTUAL SESSION", bg: "#ecfeff", color: "#0e7490" };
   if (type === "downpayment") return { label: "RENEWAL DOWNPAYMENT", bg: "#f5f3ff", color: "#7c3aed" };
-  if (isBalanceRow(payment)) return { label: "BALANCE PAYMENT", bg: "#fff7ed", color: "#c2410c" };
+  if (isBalanceRow(payment)) return { label: payment.isRenewal ? "RENEWAL BALANCE" : "BALANCE PAYMENT", bg: "#fff7ed", color: "#c2410c" };
+  if (payment.isRenewal) return { label: "RENEWAL (ADVENTURE 2)", bg: "#f5f3ff", color: "#7c3aed" };
   return { label: "REGISTRATION · 1ST PAYMENT", bg: "#eff6ff", color: "#0050d5" };
 }
 
@@ -376,7 +412,8 @@ export default function AdminPaymentsPage() {
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<any[]>([]); // includes registrations with no payment yet (for manual encoding)
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"current" | "next">("current");
+  const [view, setView] = useState<"current" | "next" | "past">("current");
+  const [renewalSettings, setRenewalSettings] = useState<any[]>([]); // ProgramRenewalEntry[]
   const [activeFilter, setActiveFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
@@ -433,16 +470,15 @@ export default function AdminPaymentsPage() {
     Promise.all([
       fetch("/api/accounts").then((res) => res.json()),
       fetch("/api/registrations?status=all").then((res) => res.json()),
+      fetch("/api/renewal-settings").then((res) => res.json()).catch(() => ({ programs: [] })),
     ])
-      .then(([accountsData, regData]) => {
+      .then(([accountsData, regData, settingsData]) => {
         if (Array.isArray(accountsData)) {
-          // every parent account (needed to see who has NOT renewed)
           setAllAccounts(
             accountsData.filter(
               (acc: Account) => (!acc.role || acc.role === "parent") && !isExcluded(acc.childName)
             )
           );
-          // accounts that have payments
           setAccounts(
             accountsData.filter(
               (acc: Account) =>
@@ -466,10 +502,65 @@ export default function AdminPaymentsPage() {
             )
           );
         }
+        if (Array.isArray(settingsData?.programs)) {
+          setRenewalSettings(settingsData.programs);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // ── Dynamic ADVENTURES derived from renewal settings ──
+  const { ADVENTURES, advNumbers } = useMemo(() => {
+    const starts = renewalSettings
+      .filter((p: any) => p.nextAdventureStart)
+      .map((p: any) => ({ date: new Date(p.nextAdventureStart), num: p.currentAdventure || 2 }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    const earliest = starts[0];
+    const now = new Date();
+
+    if (!earliest) {
+      return { ADVENTURES: ADVENTURES_FALLBACK, advNumbers: { current: 1, next: 2 } };
+    }
+
+    const nextAdvNum = earliest.num;
+    const curAdvNum = nextAdvNum - 1;
+    const nextStart = earliest.date.toISOString().slice(0, 10);
+
+    const curStartDate = new Date(earliest.date);
+    curStartDate.setMonth(curStartDate.getMonth() - ADVENTURE_DURATION_MONTHS);
+    const curStart = curStartDate.toISOString().slice(0, 10);
+
+    const curEndDate = new Date(earliest.date);
+    curEndDate.setDate(curEndDate.getDate() - 1);
+    const curEnd = curEndDate.toISOString().slice(0, 10);
+
+    const nextEndDate = new Date(earliest.date);
+    nextEndDate.setMonth(nextEndDate.getMonth() + ADVENTURE_DURATION_MONTHS);
+    const nextEnd = nextEndDate.toISOString().slice(0, 10);
+
+    const nextHasStarted = now >= earliest.date;
+
+    if (nextHasStarted) {
+      return {
+        ADVENTURES: {
+          current: { label: `Adventure ${nextAdvNum}`, start: nextStart, end: nextEnd },
+          next: { label: `Adventure ${nextAdvNum + 1}`, start: nextEnd, end: "2099-12-31" },
+          past: [{ label: `Adventure ${curAdvNum}`, start: curStart, end: curEnd, num: curAdvNum }],
+        },
+        advNumbers: { current: nextAdvNum, next: nextAdvNum + 1 },
+      };
+    }
+
+    return {
+      ADVENTURES: {
+        current: { label: `Adventure ${curAdvNum}`, start: curStart, end: curEnd },
+        next: { label: `Adventure ${nextAdvNum}`, start: nextStart, end: nextEnd },
+      },
+      advNumbers: { current: curAdvNum, next: nextAdvNum },
+    };
+  }, [renewalSettings]);
 
   // ── CURRENT ADVENTURE: session + registration payments only ──
   const allPayments = useMemo(() => {
@@ -599,40 +690,55 @@ export default function AdminPaymentsPage() {
     return list; // already newest first
   }, [allGroups, activeFilter, typeFilter, sortBy, search]);
 
-  // ── NEXT ADVENTURE: renewals + balances ──
+  // ── NEXT ADVENTURE: payment tracking for submitted renewal registrations ──
+  // Source of truth: allRegistrations filtered by isRenewalReg — same as the Renewals page.
+  // Does NOT pull from allAccounts so it shows all programs, not just Trailblazer.
   const renewalRowsAll = useMemo(() => {
-    return allAccounts.map((acc) => {
-      const dp = acc.renewalStatus?.downpayment;
-      const state = getRenewal(acc);
-      const fee = NEXT_TUITION[acc.program || ""] || 0;
-      const paid =
-        (dp?.verified ? dp.amountPaid || 0 : 0) +
-        (acc.sessionPayments || [])
-          .filter((p) => p.verified && inRange(p.submittedAt, ADVENTURES.next))
-          .reduce((s, p) => s + p.amountPaid, 0);
-      const balance = fee > 0 ? Math.max(0, fee - paid) : null;
-      return { acc, state, fee, paid, balance, dp };
-    });
-  }, [allAccounts]);
+    return allRegistrations
+      .filter((r) => isRenewalReg(r) && !isExcluded(
+        r.childInfo?.firstName,
+        r.childInfo?.lastName,
+        `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""}`
+      ))
+      .map((r) => {
+        const payment = firstPaymentOf(r);
+        const hasReceipt = !!(r.receiptUrl || r.receiptBase64 || r.amountPaid > 0);
+        let state: RenewalState;
+        if (!hasReceipt) state = "intent";
+        else if (isRegistrationVerified(r.status)) state = "renewed";
+        else if (r.status === "rejected") state = "rejected";
+        else state = "pending";
+
+        const amountPaid = (Number(r.amountPaid) || 0);
+        const paidVerified = isRegistrationVerified(r.status) ? amountPaid : 0;
+        const acc = regAccountOf(r);
+        return { r, acc, payment, state, paidVerified, hasReceipt };
+      });
+  }, [allRegistrations]);
 
   const renewalRows = useMemo(() => {
     const q = search.toLowerCase();
-    return renewalRowsAll.filter(({ acc }) =>
-      !q ||
-      (acc.fullName || "").toLowerCase().includes(q) ||
-      (acc.email || "").toLowerCase().includes(q) ||
-      (acc.childName || "").toLowerCase().includes(q)
-    );
+    return renewalRowsAll.filter(({ r, acc }) => {
+      if (isTestAccount(acc)) return false;
+      if (!q) return true;
+      const child = `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""}`.toLowerCase();
+      return (
+        child.includes(q) ||
+        (acc.fullName || "").toLowerCase().includes(q) ||
+        (r.parentInfo?.email || "").toLowerCase().includes(q) ||
+        (r.referenceNumber || "").toLowerCase().includes(q)
+      );
+    });
   }, [renewalRowsAll, search]);
 
   const nextStats = useMemo(() => {
-    const statRows = renewalRowsAll.filter((r) => !isTestAccount(r.acc));
-    const total = statRows.length;
-    const renewed = statRows.filter((r) => r.state === "renewed").length;
-    const awaiting = statRows.filter((r) => r.state === "pending").length;
-    const notRenewed = statRows.filter((r) => r.state === "not-renewed" || r.state === "intent").length;
-    const collected = statRows.reduce((s, r) => s + r.paid, 0);
-    return { total, renewed, awaiting, notRenewed, collected };
+    const rows = renewalRowsAll.filter(({ acc }) => !isTestAccount(acc));
+    const total = rows.length;
+    const renewed = rows.filter((r) => r.state === "renewed").length;
+    const awaiting = rows.filter((r) => r.state === "pending").length;
+    const pending = rows.filter((r) => r.state === "intent").length;
+    const collected = rows.filter((r) => r.state === "renewed").reduce((s, r) => s + r.paidVerified, 0);
+    return { total, renewed, awaiting, pending, collected };
   }, [renewalRowsAll]);
 
   // Verify runs immediately; reject opens the custom reason modal first
@@ -765,10 +871,19 @@ export default function AdminPaymentsPage() {
     return allRegistrations.filter((r) => (r.parentInfo?.email || "").toLowerCase() === e);
   }, [selectedAcc, allRegistrations]);
 
-  const nextRow = useMemo(
-    () => (form.type === "downpayment" ? renewalRowsAll.find((r) => r.acc.id === form.accountId) ?? null : null),
-    [form.type, form.accountId, renewalRowsAll]
-  );
+  const nextRow = useMemo(() => {
+    if (form.type !== "downpayment") return null;
+    const row = renewalRowsAll.find((rr) => {
+      const email = (rr.r?.parentInfo?.email || "").toLowerCase();
+      const accEmail = (rr.acc?.email || "").toLowerCase();
+      return rr.acc.id === form.accountId || (form.accountId && accEmail === (accounts.find((a) => a.id === form.accountId)?.email || "").toLowerCase());
+    });
+    if (!row) return null;
+    const fee = NEXT_TUITION[row.r.program || ""] || 0;
+    const paid = row.paidVerified;
+    const balance = fee > 0 ? Math.max(0, fee - paid) : null;
+    return { ...row, fee, paid, balance };
+  }, [form.type, form.accountId, renewalRowsAll, accounts]);
 
   // Amount due for the FIRST registration payment (program rate/downpayment + kits), same as the parent page
   const regCalc = useMemo(() => {
@@ -1181,7 +1296,12 @@ export default function AdminPaymentsPage() {
 
   function paymentTypeLabel(type: PaymentKind, payment: Payment) {
     if (type === "session") return "Virtual Session Payment";
-    if (type === "registration") return isBalanceRow(payment) ? "Registration Balance Payment" : "Registration Payment (1st payment)";
+    if (type === "registration") {
+      if (isBalanceRow(payment)) {
+        return payment.isRenewal ? "Renewal Balance Payment" : "Registration Balance Payment";
+      }
+      return payment.isRenewal ? "Renewal Registration (Adventure 2 Downpayment)" : "Registration Payment (1st payment)";
+    }
     return "Renewal Downpayment";
   }
 
@@ -1239,9 +1359,9 @@ export default function AdminPaymentsPage() {
         { label: "Total Revenue", value: fmtCurrency(stats.totalRevenue), sub: "Verified payments only", icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
       ]
       : [
-        { label: "Renewed", value: `${nextStats.renewed} / ${nextStats.total}`, sub: "Downpayment verified", icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+        { label: "Confirmed", value: `${nextStats.renewed} / ${nextStats.total}`, sub: "Payment verified", icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
         { label: "Awaiting Verify", value: nextStats.awaiting, sub: nextStats.awaiting > 0 ? "Needs your action" : "All caught up 🎉", icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
-        { label: "Not Renewed", value: nextStats.notRenewed, sub: "No verified downpayment yet", icon: "📭", color: "#64748b", bg: "linear-gradient(135deg,#f1f5f9,#e2e8f0)" },
+        { label: "No Receipt Yet", value: nextStats.pending, sub: "Slot held, no payment uploaded", icon: "📭", color: "#64748b", bg: "linear-gradient(135deg,#f1f5f9,#e2e8f0)" },
         { label: "Collected (Next)", value: fmtCurrency(nextStats.collected), sub: "Verified payments only", icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
       ];
 
@@ -1274,7 +1394,7 @@ export default function AdminPaymentsPage() {
           pending: { bg: "#fffbeb", color: "#b45309", label: "PENDING" },
         }[status];
         const typeLabel = paymentTypeLabel(type, payment);
-        const advThis = adventureOf(type, payment.submittedAt);
+        const advThis = adventureOf(type, payment.submittedAt, payment.isRenewal, ADVENTURES);
         const bd = calcBreakdown();
         const isLink = !!payment.receiptBase64 && payment.receiptBase64.startsWith("http");
         const pctRes = Math.round(RESERVATION_RATE * 100);
@@ -1294,7 +1414,7 @@ export default function AdminPaymentsPage() {
           ["Program", acc.program || "—"],
           ["Payment type", typeLabel],
           ["Payment no.", seq && seqTotal ? seqText : "—"],
-          ["Adventure", advThis ? ADV_BADGE[advThis].label : "Outside both Adventures"],
+          ["Adventure", advThis ? advBadge(advThis, advNumbers).label : "Outside both Adventures"],
           ["Payment method", (payment.paymentMethod || "—").toUpperCase()],
           ["Reference no.", payment.referenceNumber || "—"],
           ["Date submitted", fmtDateTime(payment.submittedAt)],
@@ -1337,7 +1457,7 @@ export default function AdminPaymentsPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid #f1f5f9", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: "18px", color: "#002f76" }}>Payment Details</div>
-                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{typeLabel}{seq && seqTotal && seqTotal > 1 ? ` · ${seqText}` : ""}{advThis ? ` · ${ADV_BADGE[advThis].label}` : ""}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{typeLabel}{seq && seqTotal && seqTotal > 1 ? ` · ${seqText}` : ""}{advThis ? ` · ${advBadge(advThis, advNumbers).label}` : ""}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   {isTestAccount(acc) && (
@@ -1485,7 +1605,7 @@ export default function AdminPaymentsPage() {
                   {ledger.length === 0 ? (
                     <div style={{ padding: "16px", fontSize: "13px", color: "#94a3b8" }}>No other payments found.</div>
                   ) : ledger.map((l) => {
-                    const adv = adventureOf(l.kind, l.date);
+                    const adv = adventureOf(l.kind, l.date, l.item.payment.isRenewal, ADVENTURES);
                     if (l.verified) {
                       running += l.amount;
                       advTotals[adv ?? "other"] += l.amount;
@@ -1499,7 +1619,7 @@ export default function AdminPaymentsPage() {
                           {l.label}
                           <div style={{ marginTop: "3px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
                             {l.child && <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 600 }}>{l.child}</span>}
-                            {adv && <span style={advTagStyle(adv)}>{ADV_BADGE[adv].short}</span>}
+                            {adv && <span style={advTagStyle(adv)}>{advBadge(adv, advNumbers).short}</span>}
                             {isThis && <span style={tagStyle("#fef3c7", "#92400e")}>◀ THIS PAYMENT</span>}
                           </div>
                         </div>
@@ -1514,8 +1634,8 @@ export default function AdminPaymentsPage() {
                   <div style={{ padding: "12px 14px", borderTop: "1px solid #e8efff", background: "#f8faff", fontSize: "13px" }}>
                     {(["current", "next"] as const).map((k) =>
                       advTotals[k] > 0 ? (
-                        <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontWeight: 700, fontSize: "12px", color: ADV_BADGE[k].color }}>
-                          <span>{ADV_BADGE[k].label}</span><span>{fmtCurrency(advTotals[k])}</span>
+                        <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontWeight: 700, fontSize: "12px", color: advBadge(k as AdventureKey, advNumbers).color }}>
+                          <span>{advBadge(k as AdventureKey, advNumbers).label}</span><span>{fmtCurrency(advTotals[k])}</span>
                         </div>
                       ) : null
                     )}
@@ -1780,7 +1900,7 @@ export default function AdminPaymentsPage() {
                   {form.type === "downpayment" && nextRow && (
                     <div style={card}>
                       <span style={label}>Next Adventure balance</span>
-                      <div style={row}><span style={muted}>Program</span><span>{nextRow.acc.program || "—"}</span></div>
+                      <div style={row}><span style={muted}>Program</span><span>{nextRow.r?.program || nextRow.acc.program || "—"}</span></div>
                       <div style={row}><span style={muted}>Fee</span><span>{nextRow.fee > 0 ? fmtCurrency(nextRow.fee) : "not set"}</span></div>
                       <div style={row}><span style={muted}>Verified paid</span><span>{fmtCurrency(nextRow.paid)}</span></div>
                       <div style={{ ...row, borderTop: "1px dashed #e2e8f0", marginTop: "6px", paddingTop: "8px", fontWeight: 800, fontSize: "15px" }}>
@@ -2030,7 +2150,13 @@ export default function AdminPaymentsPage() {
       <div style={{ background: "white", borderRadius: "20px", padding: "16px 20px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", marginBottom: "20px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
         {/* Adventure toggle */}
         <div style={{ display: "flex", gap: "8px" }}>
-          {(["current", "next"] as const).map((v) => (
+          {(
+            [
+              { key: "current" as const, label: ADVENTURES.current.label },
+              { key: "next" as const, label: ADVENTURES.next.label },
+              ...((ADVENTURES as any).past?.length ? [{ key: "past" as const, label: "📁 Past Adventures" }] : []),
+            ] as { key: "current" | "next" | "past"; label: string }[]
+          ).map(({ key: v, label }) => (
             <button
               key={v}
               className="filter-pill"
@@ -2042,7 +2168,7 @@ export default function AdminPaymentsPage() {
                 color: view === v ? "white" : "#64748b",
               }}
             >
-              {ADVENTURES[v].label}
+              {label}
             </button>
           ))}
         </div>
@@ -2296,88 +2422,176 @@ export default function AdminPaymentsPage() {
           <div>Loading renewals…</div>
         </div>
       ) : (
-        /* ── Next Adventure: renewals + balances ── */
+        /* ── Next Adventure: payment tracking for submitted renewal registrations ── */
         <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,47,118,0.06)", overflow: "hidden" }}>
           <div style={{ padding: "14px 24px", fontSize: "12px", fontWeight: 700, color: "#64748b", borderBottom: "1px solid #e8efff" }}>
-            Renewed {nextStats.renewed} of {nextStats.total} families · one row per family
+            {nextStats.renewed} of {nextStats.total} renewal{nextStats.total !== 1 ? "s" : ""} confirmed · one row per registration
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: RENEWAL_GRID, padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
-            {["Parent / Child", "Renewal", "Downpayment", "Paid / Fee", "Balance", "Actions"].map((h) => (
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.3fr 1.1fr 1.1fr", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
+            {["Explorer & Parent", "Program", "Payment", "Status", "Actions"].map((h) => (
               <div key={h} style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: h === "Actions" ? "right" : "left" }}>{h}</div>
             ))}
           </div>
 
           {renewalRows.length === 0 ? (
-            <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>No families found.</div>
+            <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>No renewal registrations found.</div>
           ) : (
-            renewalRows.map(({ acc, state, fee, paid, balance, dp }, idx) => {
+            renewalRows.map(({ r, acc, payment, state, paidVerified, hasReceipt }, idx) => {
               const b = RENEWAL_BADGE[state];
-              const dpPending = !!dp?.submitted && !dp.verified && !dp.rejected;
+              const childFull = `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""}`.trim();
+              const isPending = state === "pending";
+              const amtPaid = Number(r.amountPaid) || 0;
               return (
                 <div
-                  key={acc.id}
+                  key={r.id}
                   className="pay-row"
-                  style={{ display: "grid", gridTemplateColumns: RENEWAL_GRID, padding: "15px 24px", borderBottom: idx < renewalRows.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white" }}
+                  onClick={() => hasReceipt && openDetail({ uid: r.id, acc, payment, type: "registration", seq: 1, seqTotal: 1 })}
+                  style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.3fr 1.1fr 1.1fr", padding: "15px 24px", borderBottom: idx < renewalRows.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white", cursor: hasReceipt ? "pointer" : "default" }}
                 >
+                  {/* Explorer & Parent */}
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>{acc.fullName || acc.email}</div>
+                    <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>{childFull || "—"}</div>
                     <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                      {acc.childName ? `${acc.childName} · ` : ""}{acc.program || "—"}
+                      {r.parentInfo?.name || acc.fullName || "—"}
                     </div>
-                    {isTestAccount(acc) && (
-                      <div style={{ marginTop: "4px" }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", letterSpacing: "0.4px" }}>
-                          🧪 TESTING ACCOUNT
-                        </span>
-                      </div>
+                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>{r.parentInfo?.email || ""}</div>
+                  </div>
+
+                  {/* Program */}
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "13px", color: "#334155" }}>
+                      {(PROGRAM_SLOTS as any)[r.program]?.name || r.program || "—"}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>{r.classTime || ""}</div>
+                  </div>
+
+                  {/* Payment */}
+                  <div>
+                    {hasReceipt ? (
+                      <>
+                        <div style={{ fontWeight: 800, fontSize: "14px", color: "#334155" }}>{fmtCurrency(amtPaid)}</div>
+                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "1px" }}>
+                          {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                          {r.paymentMethod ? ` · ${r.paymentMethod.toUpperCase()}` : ""}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: "12px", color: "#94a3b8" }}>No receipt yet</div>
                     )}
                   </div>
 
+                  {/* Status */}
                   <div>
                     <span style={{ display: "inline-flex", padding: "4px 10px", background: b.bg, color: b.color, borderRadius: "20px", fontSize: "11px", fontWeight: 800 }}>
                       {b.label}
                     </span>
                   </div>
 
-                  <div>
-                    {dp?.submitted ? (
-                      <>
-                        <div style={{ fontWeight: 800, fontSize: "14px", color: "#334155" }}>{fmtCurrency(dp.amountPaid)}</div>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "1px" }}>
-                          {new Date(dp.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                          {dp.paymentMethod ? ` · ${dp.paymentMethod.toUpperCase()}` : ""}
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ fontSize: "12px", color: "#94a3b8" }}>—</div>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>
-                    {fmtCurrency(paid)} / {fee > 0 ? fmtCurrency(fee) : "set fee"}
-                  </div>
-
-                  <div style={{ fontWeight: 800, fontSize: "15px", color: balance === 0 ? "#15803d" : "#b45309" }}>
-                    {balance === null ? "—" : fmtCurrency(balance)}
-                  </div>
-
+                  {/* Actions */}
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {dp?.submitted && (
-                      <button onClick={() => openDetail({ uid: acc.id, acc, payment: dpToPayment(acc), type: "downpayment" })} style={{ padding: "6px 10px", borderRadius: "8px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }} title="Payment details">
+                    {hasReceipt && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openDetail({ uid: r.id, acc, payment, type: "registration", seq: 1, seqTotal: 1 }); }}
+                        style={{ padding: "6px 10px", borderRadius: "8px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                        title="Payment details"
+                      >
                         🧾 Details
                       </button>
                     )}
-                    {dpPending && (
+                    {isPending && (
                       <>
-                        <button onClick={() => handleAction(acc.id, null, "verify", "downpayment")} disabled={!!actioning} style={{ padding: "6px 12px", borderRadius: "8px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>
+                        <button onClick={(e) => { e.stopPropagation(); handleAction(r.id, null, "verify", "registration"); }} disabled={!!actioning} style={{ padding: "6px 12px", borderRadius: "8px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>
                           ✓ Verify
                         </button>
-                        <button onClick={() => handleAction(acc.id, null, "reject", "downpayment")} disabled={!!actioning} style={{ padding: "6px 12px", borderRadius: "8px", background: "#ef4444", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>
+                        <button onClick={(e) => { e.stopPropagation(); handleAction(r.id, null, "reject", "registration"); }} disabled={!!actioning} style={{ padding: "6px 12px", borderRadius: "8px", background: "#ef4444", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>
                           ✕
                         </button>
                       </>
                     )}
                   </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ── Past Adventures ── */}
+      {view === "past" && (
+        <div style={{ background: "white", borderRadius: "20px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", overflow: "hidden" }}>
+          {!(ADVENTURES as any).past?.length ? (
+            <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
+              No past adventures yet. When the next adventure starts, the current adventure's payments will be archived here.
+            </div>
+          ) : (
+            ((ADVENTURES as any).past as { label: string; start: string; end: string; num: number }[]).map((pastAdv: { label: string; start: string; end: string; num: number }) => {
+              // Filter all payments that fall within this past adventure's date range
+              const pastPayments = allPayments.filter(({ payment }) => inRange(payment.submittedAt, pastAdv));
+              // Group by student
+              const grouped = new Map<string, PaymentItem[]>();
+              pastPayments.forEach((item) => {
+                const key = item.acc.email || item.uid;
+                if (!grouped.has(key)) grouped.set(key, []);
+                grouped.get(key)!.push(item);
+              });
+
+              return (
+                <div key={pastAdv.num}>
+                  {/* Adventure header */}
+                  <div style={{ padding: "16px 24px", background: "linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)", borderBottom: "1px solid #e8efff", display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg, #0050d5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "16px", fontWeight: 800 }}>
+                      {pastAdv.num}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: "15px", color: "#002f76" }}>{pastAdv.label}</div>
+                      <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+                        {new Date(pastAdv.start).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} — {new Date(pastAdv.end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {" · "}{pastPayments.length} payment{pastPayments.length !== 1 ? "s" : ""} from {grouped.size} {grouped.size !== 1 ? "families" : "family"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Column headers */}
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 0.8fr 1fr", padding: "10px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
+                    {["Student & Parent", "Type", "Amount", "Status", "Date"].map((h) => (
+                      <div key={h} style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px" }}>{h}</div>
+                    ))}
+                  </div>
+
+                  {pastPayments.length === 0 ? (
+                    <div style={{ padding: "40px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>No payments found for this adventure.</div>
+                  ) : (
+                    pastPayments
+                      .sort((a, b) => new Date(b.payment.submittedAt || 0).getTime() - new Date(a.payment.submittedAt || 0).getTime())
+                      .map(({ uid, acc, payment, type }, idx) => {
+                        const status = getStatus(payment);
+                        const statusColors = { verified: "#15803d", rejected: "#b91c1c", pending: "#b45309" };
+                        return (
+                          <div
+                            key={payment.id + idx}
+                            className="pay-row"
+                            onClick={() => openDetail({ uid, acc, payment, type, seq: 1, seqTotal: 1 })}
+                            style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 0.8fr 1fr", padding: "12px 24px", borderBottom: "1px solid #f1f5f9", alignItems: "center", background: "white", cursor: "pointer" }}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{acc.childName || acc.fullName || acc.email}</div>
+                              <div style={{ fontSize: "11px", color: "#94a3b8" }}>{acc.fullName || "—"}</div>
+                            </div>
+                            <div>
+                              <span style={tagStyle(
+                                type === "session" ? "#ecfeff" : payment.isRenewal ? "#f5f3ff" : "#eff6ff",
+                                type === "session" ? "#0e7490" : payment.isRenewal ? "#7c3aed" : "#0050d5"
+                              )}>
+                                {type === "session" ? "SESSION" : payment.isRenewal ? "RENEWAL" : "REGISTRATION"}
+                              </span>
+                            </div>
+                            <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{fmtCurrency(payment.amountPaid || 0)}</div>
+                            <div style={{ fontWeight: 700, fontSize: "12px", color: statusColors[status], textTransform: "uppercase" }}>{status}</div>
+                            <div style={{ fontSize: "12px", color: "#64748b" }}>{fmtDate(payment.submittedAt)}</div>
+                          </div>
+                        );
+                      })
+                  )}
                 </div>
               );
             })
