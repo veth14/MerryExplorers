@@ -129,6 +129,10 @@ export default function RenewPage() {
   const [promoError, setPromoError] = useState("");
   const [validatingPromo, setValidatingPromo] = useState(false);
 
+  // Pioneer pricing state
+  const [isPioneer, setIsPioneer] = useState(false);
+  const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
+
   useEffect(() => { setMounted(true); }, []);
 
   // Fetch prefill data from URL param
@@ -155,6 +159,8 @@ export default function RenewPage() {
           setParentInfo(d.parentInfo);
           setEmergencyContact(d.emergencyContact);
           setPreviousProgram(d.previousProgram || "Trailblazer: Brave Explorer");
+          if (d.isPioneer) setIsPioneer(true);
+          if (d.pioneerPrices) setPioneerPrices(d.pioneerPrices);
         } else {
           setLoadError("We couldn't find your registration record. Please contact Teacher Angel.");
         }
@@ -162,6 +168,24 @@ export default function RenewPage() {
       .catch(() => setLoadError("Network error. Please check your connection and try again."))
       .finally(() => setLoading(false));
   }, []);
+
+  // Secondary fetch of pioneer families & settings to ensure latest pioneer prices and matching
+  useEffect(() => {
+    fetch("/api/pioneer-families")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.pioneerPrices && Object.keys(d.pioneerPrices).length > 0) {
+          setPioneerPrices((prev) => ({ ...d.pioneerPrices, ...prev }));
+        }
+        if (parentInfo?.email && Array.isArray(d.families)) {
+          const emailLower = parentInfo.email.toLowerCase().trim();
+          if (d.families.some((f: any) => (f.email || "").toLowerCase().trim() === emailLower)) {
+            setIsPioneer(true);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [parentInfo?.email]);
 
   // Program renewal settings for dynamic Adventure cycle # & dates
   const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null }>>({});
@@ -194,8 +218,17 @@ export default function RenewPage() {
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
 
+  // Effective pricing: Pioneer families receive their set pioneer prices
+  const effectiveRate = prog
+    ? (isPioneer && pioneerPrices[prog.id] ? pioneerPrices[prog.id] : prog.rate)
+    : 0;
+  const effectiveDownpayment = prog
+    ? (isPioneer && pioneerPrices[prog.id] ? Math.round(effectiveRate * 0.6) : prog.downpayment)
+    : 0;
+  const effectiveBalance = effectiveRate - effectiveDownpayment;
+
   const addonCost = (uniformOrdered ? UNIFORM_KIT.price : 0) + (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0);
-  const amountDue = prog ? prog.downpayment + addonCost : 0;
+  const amountDue = prog ? effectiveDownpayment + addonCost : 0;
 
   const canProceedStep1 = selectedProgram !== "" && selectedClass !== "" && uniformDayAcknowledged && promoAccepted;
   const canProceedStep2 = photoConsent !== "" && (selectedProgram === "brave-explorer" || (waiverRead && signatureBase64 !== ""));
@@ -249,6 +282,9 @@ export default function RenewPage() {
           promoCode: promoAccepted ? promoCode.trim().toUpperCase() : undefined,
           isPromoRegistration: promoAccepted,
           isNewFamily: false,
+          isPioneer,
+          customRate: effectiveRate,
+          amountDue,
           uniformOrdered,
           lanyardOrdered,
           welcomeKitOrdered: false,
@@ -385,8 +421,15 @@ export default function RenewPage() {
 
         {/* Hero Card */}
         <div className="text-center flex flex-col items-center gap-2 -mb-2">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
-            <span>✨</span> PRIORITY RENEWAL ACCESS
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-1">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82]">
+              <span>✨</span> PRIORITY RENEWAL ACCESS
+            </div>
+            {isPioneer && (
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900">
+                <span>⭐</span> PIONEER FAMILY SPECIAL PRICING
+              </div>
+            )}
           </div>
           <h1 className="vp-title text-[32px] sm:text-[42px]">
             Adventure 2 Renewal
@@ -548,6 +591,19 @@ export default function RenewPage() {
                   })}
                 </div>
 
+                {/* Pioneer privilege notice */}
+                {isPioneer && (
+                  <div className="mb-5 rounded-[22px] bg-gradient-to-r from-emerald-50 to-teal-50 border-3 border-emerald-500 p-4 shadow-[0_4px_0_#059669] flex items-start gap-3">
+                    <span className="text-2xl mt-0.5">⭐</span>
+                    <div>
+                      <p className="font-black text-[14px] text-emerald-950">Pioneer Family Privilege Active</p>
+                      <p className="text-[12.5px] font-medium text-emerald-800 leading-relaxed">
+                        Your exclusive pioneer rate and adjusted 60% downpayment are automatically unlocked below.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Program Cards */}
                 <div className="space-y-4">
                   {(Object.values(PROGRAM_SLOTS) as typeof PROGRAM_SLOTS[ProgramId][])
@@ -568,6 +624,8 @@ export default function RenewPage() {
                         : null;
 
                       const isPlaydate = p.id === "saturday-playdate";
+                      const pEffectiveRate = isPioneer && pioneerPrices[p.id] ? pioneerPrices[p.id] : p.rate;
+                      const isPioneerDiscounted = isPioneer && Boolean(pioneerPrices[p.id]);
 
                       return (
                         <div
@@ -612,6 +670,20 @@ export default function RenewPage() {
                                 <p className="text-[12px] font-bold text-amber-700 bg-amber-50 rounded-lg p-2 mt-2 border border-amber-200/60">
                                   Saturday Playdate is not yet open for renewal. For inquiries, please reach out via our Facebook page or inquiry form.
                                 </p>
+                              ) : isPioneerDiscounted ? (
+                                <div className="flex items-center gap-2 flex-wrap mt-1">
+                                  <p className="text-[16px] font-black text-emerald-600">
+                                    ⭐ ₱{pEffectiveRate.toLocaleString()}
+                                  </p>
+                                  {pEffectiveRate !== p.rate && (
+                                    <span className="text-[12px] font-bold text-slate-400 line-through">
+                                      ₱{p.rate.toLocaleString()}
+                                    </span>
+                                  )}
+                                  <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-800">
+                                    Pioneer Rate
+                                  </span>
+                                </div>
                               ) : (
                                 <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
                               )}
@@ -899,9 +971,9 @@ export default function RenewPage() {
                       ["Class Time", selectedClass],
                       ["Schedule", prog.schedule],
                       ["Sessions", `${prog.sessions} sessions`],
-                      ["Total Rate", `₱${prog.rate.toLocaleString()}`],
-                      ["Downpayment (60%)", `₱${prog.downpayment.toLocaleString()}`],
-                      ["Balance (40% on session 6)", `₱${prog.balance.toLocaleString()}`],
+                      ["Total Rate", isPioneer && effectiveRate !== prog.rate ? `₱${effectiveRate.toLocaleString()} (Pioneer Special)` : `₱${prog.rate.toLocaleString()}`],
+                      ["Downpayment (60%)", `₱${effectiveDownpayment.toLocaleString()}`],
+                      ["Balance (40% on session 6)", `₱${effectiveBalance.toLocaleString()}`],
                     ],
                   },
                   {

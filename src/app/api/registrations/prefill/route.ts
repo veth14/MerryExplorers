@@ -130,11 +130,37 @@ export async function GET(request: Request) {
       familyDoc?.previousProgram ||
       "Trailblazer: Brave Explorer";
 
+    // ── 5. Pioneer status & prices ──────────────────────────────────────────
+    let isPioneer = false;
+    const finalEmail = (parentInfo.email || lookupEmail || "").toLowerCase().trim();
+    const finalChildFirst = (childInfo.firstName || familyChildFirst || "").trim();
+
+    const pioneerOr: any[] = [];
+    if (finalEmail) {
+      pioneerOr.push({ email: finalEmail });
+      pioneerOr.push({ email: { $regex: new RegExp(`^${finalEmail.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") } });
+    }
+    if (finalChildFirst) {
+      pioneerOr.push({ childName: { $regex: new RegExp(`^${finalChildFirst.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`, "i") } });
+    }
+
+    if (pioneerOr.length > 0) {
+      const pioneerDoc = await db.collection("pioneer_families").findOne({ $or: pioneerOr });
+      if (pioneerDoc) isPioneer = true;
+    }
+
+    const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+    const pioneerPrices = pioneerSettingsDoc?.pioneerPrices || {};
+    const pioneerPrice = pioneerSettingsDoc?.pioneerPrice ?? null;
+
     const prefillData = {
       isPrefilled: true,
       familyId: familyDoc?._id?.toString() || null,
       promoCode: "A1RENEWAL2026",
       isNewFamily: false,
+      isPioneer,
+      pioneerPrices,
+      pioneerPrice,
       previousProgram,
       parentInfo,
       childInfo,

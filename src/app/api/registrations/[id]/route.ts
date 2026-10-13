@@ -36,6 +36,9 @@ export async function GET(
       uniformOrdered: registration.uniformOrdered || false,
       lanyardOrdered: registration.lanyardOrdered || false,
       welcomeKitOrdered: registration.welcomeKitOrdered || false,
+      isPioneer: registration.isPioneer || false,
+      customRate: registration.customRate || null,
+      amountDue: registration.amountDue || null,
     };
 
     return NextResponse.json({ success: true, data: publicData });

@@ -35,19 +35,32 @@ export async function POST(request: Request) {
     const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
 
-    // Fetch pioneer settings + check if this family is a pioneer
-    const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
-    const pioneerPrice: number | null = pioneerSettingsDoc?.pioneerPrice ?? null;
-    const pioneerFamily = await db.collection("pioneer_families").findOne({ email: (family.parentEmail || "").toLowerCase() });
-    const isPioneer = !!pioneerFamily;
-    const displayPrice = isPioneer && pioneerPrice ? pioneerPrice : null;
-
     // Match the family's renewingTo or previousProgram
     const targetProgramName = family.renewingTo || family.previousProgram || "Curious Explorer";
     const matchedProgramEntry = storedPrograms.find((p) =>
       p.programKey.toLowerCase().includes(targetProgramName.toLowerCase()) ||
       targetProgramName.toLowerCase().includes(p.programKey.toLowerCase())
     ) || storedPrograms[0];
+
+    const targetProgramKey = (targetProgramName || "").toLowerCase().includes("creative")
+      ? "creative-explorer"
+      : "curious-explorer";
+
+    // Fetch pioneer settings + check if this family is a pioneer
+    const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+    const cleanEmail = (family.parentEmail || "").toLowerCase().trim();
+    const pioneerFamily = await db.collection("pioneer_families").findOne({
+      $or: [
+        { email: cleanEmail },
+        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") } }
+      ]
+    });
+    const isPioneer = !!pioneerFamily;
+    const resolvedPioneerPrice: number | null =
+      pioneerSettingsDoc?.pioneerPrices?.[targetProgramKey] ??
+      pioneerSettingsDoc?.pioneerPrice ??
+      null;
+    const displayPrice = isPioneer && resolvedPioneerPrice ? resolvedPioneerPrice : null;
 
     const currentAdventureNum = matchedProgramEntry?.currentAdventure ?? 2;
     const adventureLabel = `Adventure ${currentAdventureNum}`;

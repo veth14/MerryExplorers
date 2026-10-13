@@ -17,6 +17,9 @@ type RegData = {
   reservedUntil: string;
   paymentDeadline?: string;
   isPromoRegistration?: boolean;
+  isPioneer?: boolean;
+  customRate?: number;
+  amountDue?: number;
 };
 
 // ─── Design Tokens (aligned with Parent Portal / TrailblazerDashboard) ───────
@@ -182,8 +185,13 @@ export default function PaymentPage() {
       (uniformOrdered ? UNIFORM_KIT.price : 0) +
       (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0));
 
+  const effectiveRate = regData?.customRate || (prog ? prog.rate : 0);
+  const effectiveDownpayment = regData?.isPioneer && effectiveRate > 0
+    ? Math.round(effectiveRate * 0.6)
+    : (prog ? prog.downpayment : 0);
+
   const amountDue = prog
-    ? (paymentType === "full" ? prog.rate : prog.downpayment) + addonCost
+    ? (paymentType === "full" ? effectiveRate : effectiveDownpayment) + addonCost
     : 0;
 
   const parsedAmountPaid = parseFloat(amountPaid.replace(/,/g, "")) || 0;
@@ -447,7 +455,7 @@ export default function PaymentPage() {
                 >
                   <span className="text-2xl">💳</span>
                   <p className="text-[13px] font-extrabold text-[#0b2a82]">Downpayment (60%)</p>
-                  <p className="text-[18px] font-black text-[#1f7ae0]">₱{(prog.downpayment + addonCost).toLocaleString()}</p>
+                  <p className="text-[18px] font-black text-[#1f7ae0]">₱{(effectiveDownpayment + addonCost).toLocaleString()}</p>
                   {paymentType === "downpayment" && <span className="vp-tag text-[10px] py-0.5">✓ Selected</span>}
                 </button>
                 <button
@@ -460,7 +468,7 @@ export default function PaymentPage() {
                 >
                   <span className="text-2xl">🏆</span>
                   <p className="text-[13px] font-extrabold text-[#0b2a82]">Full Payment (100%)</p>
-                  <p className="text-[18px] font-black text-emerald-600">₱{(prog.rate + addonCost).toLocaleString()}</p>
+                  <p className="text-[18px] font-black text-emerald-600">₱{(effectiveRate + addonCost).toLocaleString()}</p>
                   {paymentType === "full" && <span className="vp-tag text-[10px] py-0.5 bg-emerald-100 text-emerald-800 border-emerald-400">✓ Selected</span>}
                 </button>
               </div>
@@ -473,16 +481,25 @@ export default function PaymentPage() {
                   <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/80">Total Due Today</p>
                   <p className="text-[36px] font-black leading-none mt-1">₱{amountDue.toLocaleString()}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end gap-1">
                   <span className="rounded-full bg-[#ffd23f] text-[#0b2a82] px-3 py-1 text-[11px] font-black uppercase">
                     {prog.name}
                   </span>
+                  {regData?.isPioneer && (
+                    <span className="rounded-full bg-emerald-300 text-emerald-950 px-2.5 py-0.5 text-[10px] font-black uppercase shadow-sm">
+                      ⭐ Pioneer Family
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="space-y-1.5 bg-white/15 rounded-xl p-3.5 text-[13px] border border-white/20">
                 <div className="flex justify-between">
-                  <span className="text-white/80">{paymentType === "full" ? "Full Program Rate" : "Downpayment (60%)"}</span>
-                  <span className="font-extrabold">₱{(paymentType === "full" ? prog.rate : prog.downpayment).toLocaleString()}</span>
+                  <span className="text-white/80">
+                    {paymentType === "full"
+                      ? (regData?.isPioneer ? "Pioneer Program Rate" : "Full Program Rate")
+                      : (regData?.isPioneer ? "Pioneer Downpayment (60%)" : "Downpayment (60%)")}
+                  </span>
+                  <span className="font-extrabold">₱{(paymentType === "full" ? effectiveRate : effectiveDownpayment).toLocaleString()}</span>
                 </div>
                 {isBallet && recitalKitOrdered && (
                   <div className="flex justify-between">

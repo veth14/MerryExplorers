@@ -129,6 +129,30 @@ export async function POST(request: Request) {
       ? new Date("2026-10-16T13:00:00+08:00")
       : new Date(Date.now() + 60 * 60 * 1000);
 
+    // Auto-detect pioneer status if not explicitly passed
+    let isPioneer = Boolean(data.isPioneer);
+    let customRate = data.customRate ? Number(data.customRate) : undefined;
+    const parentEmailClean = (parentInfo?.email || "").toLowerCase().trim();
+    if (!isPioneer && parentEmailClean) {
+      const pioneerCheck = await db.collection("pioneer_families").findOne({
+        $or: [
+          { email: parentEmailClean },
+          { email: { $regex: new RegExp(`^${parentEmailClean.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") } },
+        ],
+      });
+      if (pioneerCheck) {
+        isPioneer = true;
+        if (!customRate) {
+          const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+          if (pioneerSettingsDoc?.pioneerPrices?.[program]) {
+            customRate = pioneerSettingsDoc.pioneerPrices[program];
+          } else if (pioneerSettingsDoc?.pioneerPrice) {
+            customRate = pioneerSettingsDoc.pioneerPrice;
+          }
+        }
+      }
+    }
+
     const newRegistration = {
       status: "reserved",
       reservedUntil,
@@ -152,6 +176,8 @@ export async function POST(request: Request) {
       lanyardOrdered: lanyardOrdered || false,
       welcomeKitOrdered: welcomeKitOrdered || false,
       isNewFamily: typeof data.isNewFamily === "boolean" ? data.isNewFamily : true,
+      isPioneer,
+      customRate: customRate || null,
       notes: isPromo ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)" : "",
       submittedAt: new Date(),
       period: "adventure-2",
