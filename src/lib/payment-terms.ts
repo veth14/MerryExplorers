@@ -19,7 +19,7 @@ export const PROGRAM_SCHEDULE_FALLBACK: Record<string, string> = {
     "creative-explorer": "Tuesday, Thursday, Friday",
 };
 
-export const VERIFIED_REG_STATUSES = ["approved", "early-bird", "active"];
+export const VERIFIED_REG_STATUSES = ["approved", "early-bird", "active", "scholar"];
 export const isRegistrationVerified = (status?: string) => VERIFIED_REG_STATUSES.includes(status || "");
 
 export function fmtPeso(n: number | undefined | null) {

@@ -17,6 +17,8 @@ type RegData = {
   reservedUntil: string;
   paymentDeadline?: string;
   isPromoRegistration?: boolean;
+  promoCode?: string;
+  isScholar?: boolean;
   isPioneer?: boolean;
   customRate?: number;
   amountDue?: number;
@@ -126,7 +128,8 @@ export default function PaymentPage() {
             if (typeof data.data.uniformOrdered === "boolean") setUniformOrdered(data.data.uniformOrdered);
             if (typeof data.data.lanyardOrdered === "boolean") setLanyardOrdered(data.data.lanyardOrdered);
             if (typeof data.data.welcomeKitOrdered === "boolean") setWelcomeKitOrdered(data.data.welcomeKitOrdered);
-            if (data.data.status !== "reserved" && data.data.status !== "early-bird") {
+            const isScholar = data.data.isScholar || data.data.promoCode === "A1JesusLovesMe2026" || data.data.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || data.data.status === "scholar";
+            if (data.data.status !== "reserved" && data.data.status !== "early-bird" && !isScholar) {
               setError(
                 data.data.status === "expired"
                   ? "Your slot reservation has expired."
@@ -353,6 +356,29 @@ export default function PaymentPage() {
             <div className="flex justify-center gap-3">
               <Link href="/parent/dashboard" className="vp-btn">
                 Go to Parent Dashboard 🚀
+              </Link>
+            </div>
+          </div>
+        ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
+          <div className="vp-card text-center py-12">
+            <div className="vp-tape" />
+            <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+              🎓
+            </div>
+            <h2 className="vp-h2 text-[28px] mb-2 text-[#0b2a82]">Scholar Slot Confirmed!</h2>
+            <div className="vp-sub max-w-md mx-auto text-[15px] mb-8 space-y-3 leading-relaxed">
+              <p>You have officially registered under our <strong>Scholarship Program</strong>! Your slot is 100% guaranteed.</p>
+              <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-500 p-4 text-[13.5px] font-extrabold text-emerald-950 shadow-sm">
+                ✨ <strong>No Payment Needed</strong><br />
+                <span className="text-[12px] font-medium text-emerald-800">100% Tuition Sponsored · Welcome to Merry Explorers!</span>
+              </div>
+            </div>
+            <div className="flex justify-center gap-3">
+              <Link href="/parent/dashboard" className="vp-btn">
+                Go to Parent Dashboard 🚀
+              </Link>
+              <Link href="/" className="vp-btn ghost small">
+                Back to Home
               </Link>
             </div>
           </div>

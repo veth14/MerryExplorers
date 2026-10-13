@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import * as XLSX from "xlsx";
 import { RenewalSettingsManager } from "@/components/admin/RenewalSettingsManager";
@@ -815,6 +816,13 @@ export default function RenewalsPage() {
               </select>
             </div>
 
+            <Link
+              href="/admin/renewals/email-preview"
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-white border border-slate-300 px-4 py-2.5 text-[12.5px] font-bold text-[#002f76] shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <span>📧</span> Email Previews
+            </Link>
+
             <button
               onClick={() => setNewPeriodModal(true)}
               className="inline-flex items-center gap-1.5 rounded-2xl bg-[#0033A0] px-4 py-2.5 text-[12.5px] font-bold text-white shadow-sm hover:bg-[#002f76] transition-colors"
@@ -1156,7 +1164,9 @@ export default function RenewalsPage() {
                             {r.reservationType}
                           </span>
                           {r.promoCode && (
-                            <p className="text-[10px] font-mono text-amber-700 mt-0.5">Code: {r.promoCode}</p>
+                            <p className={`text-[10px] font-mono mt-0.5 ${r.promoCode.toUpperCase() === "JESUSLOVESME" ? "text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200" : "text-amber-700"}`}>
+                              {r.promoCode.toUpperCase() === "JESUSLOVESME" ? "🎓 Scholar" : `Code: ${r.promoCode}`}
+                            </p>
                           )}
                         </td>
                         <td className="py-3.5 px-4">

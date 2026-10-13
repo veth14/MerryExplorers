@@ -280,7 +280,8 @@ export default function RenewPage() {
           emergencyContact,
           photoConsent,
           signatureBase64,
-          promoCode: promoAccepted ? promoCode.trim().toUpperCase() : undefined,
+          // Send promo code as-is (case-sensitive) — A1JesusLovesMe2026 is case-sensitive on the server
+          promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
           isNewFamily: false,
           isPioneer,
@@ -793,10 +794,10 @@ export default function RenewPage() {
                     <input
                       type="text"
                       value={promoCode}
-                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); setPromoAccepted(false); }}
+                      onChange={(e) => { setPromoCode(e.target.value); setPromoError(""); setPromoAccepted(false); }}
                       placeholder="Enter your promo code"
                       disabled={promoAccepted}
-                      className={`flex-1 rounded-xl border-2 bg-white px-4 py-2.5 text-[14px] font-mono font-black text-[#0b2a82] uppercase tracking-wider focus:border-[#0b2a82] focus:outline-none transition-all ${promoAccepted ? "border-emerald-400 bg-emerald-50 cursor-not-allowed opacity-70" : "border-[#b6dcf5]"}`}
+                      className={`flex-1 rounded-xl border-2 bg-white px-4 py-2.5 text-[14px] font-mono font-black text-[#0b2a82] tracking-wider focus:border-[#0b2a82] focus:outline-none transition-all ${promoAccepted ? "border-emerald-400 bg-emerald-50 cursor-not-allowed opacity-70" : "border-[#b6dcf5]"}`}
                     />
                     {!promoAccepted ? (
                       <button
@@ -824,22 +825,37 @@ export default function RenewPage() {
                         <span className="text-lg">✅</span>
                         <span className="text-[13px] font-black text-white uppercase tracking-wider">THIS CODE HAS BEEN ACCEPTED</span>
                       </div>
-                      <div className="p-4 space-y-2.5 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
-                        <p>
-                          The code allows parents to submit the registration form and reserve a slot for their little one
-                          without immediate payment until <strong>October 15</strong>.
-                        </p>
-                        <p>
-                          However, <strong>using the code does not guarantee a confirmed reservation</strong>; slots will only
-                          be confirmed upon submission of payment.
-                        </p>
-                        <p>
-                          All families who use the code will receive a <strong>payment reminder via email</strong> by October 15.
-                        </p>
-                        <div className="mt-1 rounded-xl bg-amber-100 border border-amber-300 px-3 py-2.5 text-amber-900 font-bold text-[12px] leading-snug">
-                          ⚠️ Any unpaid reservations by <strong>October 16 at 1:00 PM</strong> will be released. Families who miss the payment deadline must submit a new registration form to reserve a slot again.
+                      {/* Note body */}
+                      {promoCode.trim() === "A1JesusLovesMe2026" ? (
+                        <div className="p-4 space-y-2 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
+                          <p className="font-extrabold text-[13.5px] text-emerald-950 flex items-center gap-1.5">
+                            <span>🎓</span> Full Scholarship Code Applied!
+                          </p>
+                          <p>
+                            This special code grants <strong>100% sponsored tuition</strong> for your child.
+                          </p>
+                          <div className="mt-1 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-2 text-emerald-950 font-bold text-[12px] leading-snug">
+                            ✨ <strong>No payment needed.</strong> Your slot will be automatically guaranteed and confirmed upon submission.
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="p-4 space-y-2.5 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
+                          <p>
+                            The code allows parents to submit the registration form and reserve a slot for their little one
+                            without immediate payment until <strong>October 15</strong>.
+                          </p>
+                          <p>
+                            However, <strong>using the code does not guarantee a confirmed reservation</strong>; slots will only
+                            be confirmed upon submission of payment.
+                          </p>
+                          <p>
+                            All families who use the code will receive a <strong>payment reminder via email</strong> by October 15.
+                          </p>
+                          <div className="mt-1 rounded-xl bg-amber-100 border border-amber-300 px-3 py-2.5 text-amber-900 font-bold text-[12px] leading-snug">
+                            ⚠️ Any unpaid reservations by <strong>October 16 at 1:00 PM</strong> will be released. Families who miss the payment deadline must submit a new registration form to reserve a slot again.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

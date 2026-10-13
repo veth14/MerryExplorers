@@ -123,9 +123,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const isPromo = Boolean(isPromoRegistration && promoCode === "A1RENEWAL2026");
-    // All unpaid slots as of October 16, 1:00 PM will be released for promo reservations; standard reservations get 1 hour
-    const reservedUntil = isPromo
+    const rawPromoCode = (promoCode || "").trim();
+    const cleanPromoCode = rawPromoCode.toUpperCase();
+    const isScholar = rawPromoCode === "A1JesusLovesMe2026";
+    const isPromo = isScholar || Boolean(isPromoRegistration && cleanPromoCode === "A1RENEWAL2026");
+    // All unpaid slots as of October 16, 1:00 PM will be released for promo reservations; standard reservations get 1 hour; scholars are permanent
+    const reservedUntil = isScholar
+      ? new Date("2099-12-31T23:59:59+08:00")
+      : isPromo
       ? new Date("2026-10-16T13:00:00+08:00")
       : new Date(Date.now() + 60 * 60 * 1000);
 
@@ -154,19 +159,19 @@ export async function POST(request: Request) {
     }
 
     const newRegistration = {
-      status: "reserved",
+      status: isScholar ? "approved" : "reserved",
       reservedUntil,
       program,
       classTime,
       parentInfo,
       childInfo,
       emergencyContact: emergencyContact || {},
-      paymentMethod: paymentMethod || "",
-      paymentType: paymentType || "downpayment",
-      amountDue: amountDue || 0,
-      amountPaid: amountPaid || 0,
+      paymentMethod: isScholar ? "Scholarship (A1JesusLovesMe2026)" : (paymentMethod || ""),
+      paymentType: isScholar ? "full" : (paymentType || "downpayment"),
+      amountDue: isScholar ? 0 : (amountDue || 0),
+      amountPaid: isScholar ? 0 : (amountPaid || 0),
       creditBalance: creditBalance || 0,
-      referenceNumber: referenceNumber || "",
+      referenceNumber: isScholar ? "SCHOLAR-A1JesusLovesMe2026" : (referenceNumber || ""),
       receiptUrl: "", // Uploaded in next step
       receiptPublicId: "", // Uploaded in next step
       signatureUrl,
@@ -177,16 +182,21 @@ export async function POST(request: Request) {
       welcomeKitOrdered: welcomeKitOrdered || false,
       isNewFamily: typeof data.isNewFamily === "boolean" ? data.isNewFamily : true,
       isPioneer,
-      customRate: customRate || null,
-      notes: isPromo ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)" : "",
+      customRate: isScholar ? 0 : (customRate || null),
+      notes: isScholar
+        ? "Scholar Registration (Promo code: A1JesusLovesMe2026 — 100% tuition sponsored, no payment needed)"
+        : isPromo
+        ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)"
+        : "",
       submittedAt: new Date(),
       period: "adventure-2",
-      approvedAt: null,
-      approvedBy: null,
+      approvedAt: isScholar ? new Date() : null,
+      approvedBy: isScholar ? "system (scholar code: A1JesusLovesMe2026)" : null,
       confirmationEmailSent: false,
       leadId: leadId || null,
-      promoCode: isPromo ? promoCode : null,
+      promoCode: isScholar ? "A1JesusLovesMe2026" : (isPromo ? promoCode : null),
       isPromoRegistration: isPromo,
+      isScholar,
     };
 
     const result = await db.collection("student_registrations").insertOne(newRegistration);
@@ -297,7 +307,9 @@ export async function POST(request: Request) {
         const parentName = parentInfo.name || "Parent / Guardian";
         const childName = childInfo?.firstName || "Explorer";
 
-        const emailSubject = isAdvProg
+        const emailSubject = isScholar
+          ? `Scholarship Slot Confirmed: ${readableProgramName} for ${childName} 🎓✨`
+          : isAdvProg
           ? `Payment Reminder & Slot Confirmation: ${readableProgramName} (${advLabel}) for ${childName} 🌈`
           : program === "ballet"
             ? `Payment Reminder & Slot Confirmation: Ballet (${classTime || "Saturday"}) for ${childName} 🩰`
@@ -313,11 +325,14 @@ export async function POST(request: Request) {
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
               <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
                 <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Slot Reservation & Payment Confirmation · ${isAdvProg ? advLabel : readableProgramName}</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">${isScholar ? "🎓 Scholarship Slot Confirmed" : `Slot Reservation & Payment Confirmation · ${isAdvProg ? advLabel : readableProgramName}`}</p>
               </div>
               <div style="padding: 28px;">
                 <p>Dear <strong>${parentName}</strong>,</p>
-                <p>Thank you for submitting your registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.</p>
+                <p>${isScholar
+                  ? `We are delighted to confirm that <strong>${childName}</strong> is registered under our <strong>Scholarship Program</strong>! 100% of the tuition fee is sponsored, and your slot is officially secured.`
+                  : `Thank you for submitting your registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.`
+                }</p>
 
                 <!-- Specific Program & Schedule Details Box -->
                 <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
@@ -352,6 +367,15 @@ export async function POST(request: Request) {
                   </table>
                 </div>
 
+                ${isScholar ? `
+                <div style="background-color: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
+                  <p style="margin: 0; font-size: 16px; color: #065f46; font-weight: bold;">🎓 Full Scholarship Confirmed!</p>
+                  <p style="margin: 8px 0 16px; font-size: 13.5px; color: #047857;">Your child's slot is 100% sponsored. No payment is needed.</p>
+                  <a href="${baseUrl}/parent/dashboard" style="background-color: #059669; color: white; padding: 13px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">
+                    Go to Parent Dashboard →
+                  </a>
+                </div>
+                ` : `
                 <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
                   <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold;">Ready to complete your payment?</p>
                   <p style="margin: 8px 0 16px; font-size: 13px; color: #3b82f6;">Click the button below to upload your payment receipt and confirm your child's slot:</p>
@@ -359,6 +383,7 @@ export async function POST(request: Request) {
                     Proceed to Payment Page →
                   </a>
                 </div>
+                `}
 
                 ${isAdvProg ? `
                 <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
@@ -417,7 +442,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, data: { id: result.insertedId.toString() } });
+    return NextResponse.json({ success: true, data: { id: result.insertedId.toString(), isScholar } });
   } catch (error: any) {
     console.error("[registrations POST]", error);
     return NextResponse.json({ error: error.message || "Registration failed" }, { status: 500 });
