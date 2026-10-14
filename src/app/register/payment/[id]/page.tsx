@@ -427,8 +427,8 @@ export default function PaymentPage() {
               </div>
             )}
 
-            {/* Note / Disclaimer Banner */}
-            {isBallet ? (
+            {/* Ballet Recital Kit Info */}
+            {isBallet && (
               <div className="mb-6 rounded-[22px] bg-[#fdf2f8] border-3 border-[#be185d] p-5 text-[13px] text-[#831843] shadow-[0_5px_0_rgba(190,24,93,0.2)]">
                 <div className="flex items-center gap-2 font-black text-[#be185d] mb-1 text-[15px]">
                   <span>🩰</span>
@@ -469,19 +469,6 @@ export default function PaymentPage() {
                     className="h-5 w-5 rounded border-2 border-[#be185d] text-[#be185d] focus:ring-[#be185d]"
                   />
                 </label>
-              </div>
-            ) : (
-              <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
-                <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
-                  <span>⚠️</span>
-                  <span>NOTE &amp; DISCLAIMER</span>
-                </div>
-                <p className="font-bold text-[#0b2a82] leading-snug">
-                  Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
-                </p>
-                <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
-                  &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
-                </p>
               </div>
             )}
 

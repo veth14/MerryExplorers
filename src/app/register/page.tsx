@@ -138,6 +138,7 @@ export default function RegisterPage() {
   const [emergencyContact, setEmergencyContact] = useState(draft?.emergencyContact ?? {
     name: "", phone: "", relationship: "",
   });
+  const [dataPrivacyConsent, setDataPrivacyConsent] = useState<boolean>(draft?.dataPrivacyConsent ?? false);
   const [photoConsent, setPhotoConsent] = useState<string>(draft?.photoConsent ?? "");
   const [waiverRead, setWaiverRead] = useState<boolean>(draft?.waiverRead ?? false);
   const [waiverModalOpen, setWaiverModalOpen] = useState(false);
@@ -308,13 +309,14 @@ export default function RegisterPage() {
       leadId,
       promoCode, promoAccepted,
       uniformDayAcknowledged,
+      dataPrivacyConsent,
     });
   }, [
     step, selectedProgram, selectedClass,
     childInfo, parentInfo, emergencyContact,
     photoConsent, waiverRead, signatureBase64,
     isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
-    leadId, promoCode, promoAccepted, uniformDayAcknowledged,
+    leadId, promoCode, promoAccepted, uniformDayAcknowledged, dataPrivacyConsent,
   ]);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
@@ -378,10 +380,39 @@ export default function RegisterPage() {
     ...(!emergencyContact.relationship ? ["Emergency Contact Relationship"] : []),
   ];
 
-  const canProceedStep1 = missingStep1.length === 0;
+  const canProceedStep1 = missingStep1.length === 0 && dataPrivacyConsent;
 
-  async function handleDetailsContinue() {
-    setSavingLead(true);
+  // Track lead progress across each step of registration
+  const syncLeadProgress = useCallback(async (
+    targetStep: number,
+    overrides?: {
+      stepName?: string;
+      program?: string;
+      classTime?: string;
+      photoConsentVal?: string;
+      hasSig?: boolean;
+    }
+  ) => {
+    const stepNames: Record<number, string> = {
+      0: "Step 0: Entering Details",
+      1: "Step 1: Choosing Program",
+      2: "Step 2: Consents & Waivers",
+      3: "Step 3: Review & Payment",
+    };
+
+    // Do not count renewal families in leads
+    if (!isNewFamily || promoCode.trim().toUpperCase() === "A1RENEWAL2026") {
+      return;
+    }
+
+    const hasIdentifier =
+      Boolean(parentInfo.name) ||
+      Boolean(parentInfo.email) ||
+      Boolean(parentInfo.phone) ||
+      Boolean(childInfo.firstName);
+
+    if (!hasIdentifier) return;
+
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
@@ -389,19 +420,76 @@ export default function RegisterPage() {
         body: JSON.stringify({
           leadId,
           source: "register",
+          step: targetStep,
+          stepName: overrides?.stepName || stepNames[targetStep] || `Step ${targetStep}`,
           childInfo,
           parentInfo,
           emergencyContact,
+          selectedProgram: overrides?.program !== undefined ? overrides.program : selectedProgram,
+          selectedClass: overrides?.classTime !== undefined ? overrides.classTime : selectedClass,
+          promoCode,
+          photoConsent: overrides?.photoConsentVal !== undefined ? overrides.photoConsentVal : photoConsent,
+          hasSignature: overrides?.hasSig !== undefined ? overrides.hasSig : Boolean(signatureBase64),
         }),
       });
       const data = await res.json();
-      if (data.success && data.data?.id) setLeadId(data.data.id);
+      if (data.success && data.data?.id) {
+        setLeadId(data.data.id);
+      }
     } catch {
-      // Don't block
+      // Don't block parent user experience
+    }
+  }, [
+    leadId,
+    isNewFamily,
+    childInfo,
+    parentInfo,
+    emergencyContact,
+    selectedProgram,
+    selectedClass,
+    promoCode,
+    photoConsent,
+    signatureBase64,
+  ]);
+
+  // Debounced lead capture while filling out details (saves as soon as contact info is entered)
+  // Gated behind explicit Data Privacy consent — no data is saved without it.
+  useEffect(() => {
+    if (step !== 0) return;
+    if (!dataPrivacyConsent) return; // ← DPA gate: do not capture anything without consent
+    if (!parentInfo.name || (!parentInfo.email && !parentInfo.phone)) return;
+    const timer = setTimeout(() => {
+      syncLeadProgress(0, { stepName: "Step 0: Entering Details" });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [step, dataPrivacyConsent, parentInfo.name, parentInfo.email, parentInfo.phone, childInfo.firstName, syncLeadProgress]);
+
+  async function handleDetailsContinue() {
+    setSavingLead(true);
+    try {
+      await syncLeadProgress(1, { stepName: "Step 1: Choosing Program" });
     } finally {
       setSavingLead(false);
       setStep(1);
     }
+  }
+
+  function handleProgramContinue() {
+    syncLeadProgress(2, {
+      stepName: "Step 2: Consents & Waivers",
+      program: selectedProgram,
+      classTime: selectedClass,
+    });
+    setStep(2);
+  }
+
+  function handleConsentsContinue() {
+    syncLeadProgress(3, {
+      stepName: "Step 3: Review & Payment",
+      photoConsentVal: photoConsent,
+      hasSig: Boolean(signatureBase64),
+    });
+    setStep(3);
   }
 
   async function handleSubmit() {
@@ -544,7 +632,12 @@ export default function RegisterPage() {
                 key={label}
                 type="button"
                 disabled={i > step}
-                onClick={() => i < step && setStep(i)}
+                onClick={() => {
+                  if (i < step) {
+                    setStep(i);
+                    syncLeadProgress(i);
+                  }
+                }}
                 className={`vp-tab ${isActive ? "on" : ""} ${i > step ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <span>{isDone ? "✓" : i + 1}</span>
@@ -573,20 +666,6 @@ export default function RegisterPage() {
         {/* Main Card with Playful Tape */}
         <div className="vp-card">
           <div className="vp-tape" />
-
-          {/* Note & Disclaimer Banner */}
-          <div className="mb-6 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 text-[13px] text-[#0b2a82] shadow-[0_5px_0_rgba(11,42,130,0.2)]">
-            <div className="flex items-center gap-2 font-black text-[#0b2a82] mb-1 text-[14px]">
-              <span>⚠️</span>
-              <span>NOTE &amp; DISCLAIMER</span>
-            </div>
-            <p className="font-bold text-[#0b2a82] leading-snug">
-              Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
-            </p>
-            <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
-              &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
-            </p>
-          </div>
 
           <AnimatePresence mode="wait">
 
@@ -694,7 +773,61 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {!canProceedStep1 && (
+                {/* ── Data Privacy Consent (at bottom, before Continue) ── */}
+                <div className={`mb-5 rounded-[22px] border-3 p-5 shadow-sm transition-all duration-300 ${
+                  dataPrivacyConsent
+                    ? "bg-emerald-50 border-emerald-400"
+                    : "bg-[#fff6cf] border-[#ffd23f]"
+                }`}>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl shrink-0 mt-0.5">🔒</span>
+                    <div>
+                      <p className="font-black text-[14px] text-[#0b2a82] leading-snug">Data Privacy Notice</p>
+                      <p className="text-[11px] font-bold text-[#3d5a99] uppercase tracking-wider mt-0.5">In compliance with the Data Privacy Act of 2012 (R.A. 10173)</p>
+                    </div>
+                  </div>
+                  <p className="text-[12.5px] font-medium text-[#27407f] leading-relaxed mb-4">
+                    Merry Explorers Playgroup Learning Center collects the personal information you provide on this form
+                    (including your child&apos;s details and your contact information) <strong>solely for the purpose of processing your
+                    registration, communicating program updates, and managing enrollment records</strong>. Your data will be kept
+                    confidential, stored securely, and will not be shared with third parties without your consent, except as required
+                    by law. You have the right to access, correct, or request deletion of your data at any time by contacting us directly.
+                  </p>
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <div className="relative mt-0.5 shrink-0">
+                      <input
+                        type="checkbox"
+                        id="data-privacy-consent"
+                        checked={dataPrivacyConsent}
+                        onChange={e => setDataPrivacyConsent(e.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                        dataPrivacyConsent
+                          ? "bg-emerald-500 border-emerald-500"
+                          : "bg-white border-[#0b2a82] group-hover:border-[#1f7ae0]"
+                      }`}>
+                        {dataPrivacyConsent && (
+                          <svg className="w-3 h-3 text-white" viewBox="0 0 12 10" fill="none">
+                            <path d="M1 5l3.5 3.5L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
+                      I have read and understood the Data Privacy Notice above. I consent to Merry Explorers
+                      collecting and processing my personal information for registration purposes.{" "}
+                      <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+                  {!dataPrivacyConsent && (
+                    <p className="mt-2 ml-8 text-[11px] font-bold text-amber-700">
+                      ⚠️ Please agree to the data privacy notice to continue.
+                    </p>
+                  )}
+                </div>
+
+                {!canProceedStep1 && missingStep1.length > 0 && (
                   <div className="mb-5 rounded-2xl bg-amber-50 border-2 border-amber-300 p-4 text-[12px] font-bold text-amber-900">
                     <p className="font-black text-[13px] mb-1">⚠️ Please complete the required fields:</p>
                     <div className="flex flex-wrap gap-2">
@@ -1094,10 +1227,10 @@ export default function RegisterPage() {
                 )}
 
                 <div className="mt-8 flex justify-between items-center">
-                  <button onClick={() => setStep(0)} className="vp-btn ghost small">← Back</button>
+                  <button onClick={() => { setStep(0); syncLeadProgress(0); }} className="vp-btn ghost small">← Back</button>
                   <button
                     disabled={!canProceedStep0}
-                    onClick={() => setStep(2)}
+                    onClick={handleProgramContinue}
                     className="vp-btn"
                   >
                     Continue to Consents →
@@ -1182,10 +1315,10 @@ export default function RegisterPage() {
                 )}
 
                 <div className="mt-8 flex justify-between items-center">
-                  <button onClick={() => setStep(1)} className="vp-btn ghost small">← Back</button>
+                  <button onClick={() => { setStep(1); syncLeadProgress(1); }} className="vp-btn ghost small">← Back</button>
                   <button
                     disabled={!photoConsent || (selectedProgram !== "brave-explorer" && (!waiverRead || !signatureBase64))}
-                    onClick={() => setStep(3)}
+                    onClick={handleConsentsContinue}
                     className="vp-btn"
                   >
                     Review Details →
@@ -1282,7 +1415,7 @@ export default function RegisterPage() {
                 {error && <div className="vp-error mb-4">❌ {error}</div>}
 
                 <div className="mt-8 flex justify-between items-center">
-                  <button onClick={() => setStep(2)} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
+                  <button onClick={() => { setStep(2); syncLeadProgress(2); }} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
                   <button
                     disabled={submitting}
                     onClick={handleSubmit}

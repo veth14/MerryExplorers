@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 
-type Status = "pending" | "approved" | "rejected" | "early-bird";
+type Status = "pending" | "approved" | "rejected" | "early-bird" | "expired" | "reserved";
 
 interface Registration {
   id: string;
@@ -35,6 +35,7 @@ interface Registration {
   earlyBirdAt?: string;
   earlyBirdBy?: string;
   paymentDeadline?: string;
+  reservedUntil?: string;
   paymentPortalOpen?: boolean;
   paymentPortalOpenedAt?: string;
 }
@@ -60,6 +61,8 @@ const STATUS_STYLES: Record<Status, string> = {
   approved: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-600",
   "early-bird": "bg-orange-100 text-orange-700",
+  expired: "bg-rose-100 text-rose-700",
+  reserved: "bg-blue-100 text-blue-700",
 };
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -67,9 +70,101 @@ const STATUS_LABELS: Record<Status, string> = {
   approved: "✅ Approved",
   rejected: "❌ Rejected",
   "early-bird": "🐣 Early Bird",
+  expired: "⏰ Expired Slot",
+  reserved: "🔒 Slot Reserved",
 };
 
-type FilterTab = "all" | Status | "reserved";
+function isRegExpired(r: Registration): boolean {
+  if (r.status === "expired") return true;
+  const now = new Date();
+  if (r.status === "reserved" && r.reservedUntil && new Date(r.reservedUntil) < now) return true;
+  if (r.status === "early-bird" && r.paymentDeadline && new Date(r.paymentDeadline) < now) return true;
+  return false;
+}
+
+type FilterTab = "all" | Status | "reserved" | "leads" | "expired";
+
+interface Lead {
+  id: string;
+  status: "in-progress" | "converted" | "contacted" | "archived";
+  step: number;
+  stepName: string;
+  source?: string;
+  childInfo?: {
+    firstName?: string;
+    lastName?: string;
+    nickname?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    allergies?: string;
+    specialNeeds?: string;
+    favoriteSong?: string;
+    favoriteColor?: string;
+    favoriteCharacter?: string;
+    healthProfile?: string;
+  };
+  parentInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    relationship?: string;
+  };
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relationship?: string;
+  };
+  selectedProgram?: string;
+  selectedClass?: string;
+  promoCode?: string;
+  photoConsent?: string;
+  hasSignature?: boolean;
+  history?: Array<{
+    step: number;
+    stepName: string;
+    enteredAt: string;
+  }>;
+  createdAt?: string;
+  updatedAt?: string;
+  lastActiveAt?: string;
+  notes?: string;
+  registrationId?: string;
+}
+
+const LEAD_STEP_LABELS: Record<number, { label: string; badge: string; color: string; bg: string }> = {
+  0: { label: "Step 0: Parent & Child Details", badge: "Details", color: "text-amber-800", bg: "bg-amber-100" },
+  1: { label: "Step 1: Program & Class Choice", badge: "Program Selection", color: "text-blue-800", bg: "bg-blue-100" },
+  2: { label: "Step 2: Consents & Waivers", badge: "Consents & Waivers", color: "text-purple-800", bg: "bg-purple-100" },
+  3: { label: "Step 3: Review & Payment", badge: "Review & Payment", color: "text-rose-800", bg: "bg-rose-100" },
+};
+
+const LEAD_STATUS_STYLES: Record<string, string> = {
+  "in-progress": "bg-amber-100 text-amber-700",
+  contacted: "bg-blue-100 text-blue-700",
+  converted: "bg-green-100 text-green-700",
+  archived: "bg-slate-100 text-slate-600",
+};
+
+const LEAD_STATUS_LABELS: Record<string, string> = {
+  "in-progress": "⏳ In-Progress",
+  contacted: "📞 Followed Up",
+  converted: "🎉 Converted",
+  archived: "📦 Archived",
+};
+
+function formatWhatsAppUrl(phone?: string, parentName?: string, childName?: string) {
+  if (!phone) return null;
+  let clean = phone.replace(/\D/g, "");
+  if (clean.startsWith("09")) {
+    clean = "63" + clean.substring(1);
+  } else if (clean.startsWith("9") && clean.length === 10) {
+    clean = "63" + clean;
+  }
+  const greeting = parentName ? `Hi ${parentName}!` : "Hi!";
+  const childMention = childName ? ` for ${childName}` : "";
+  const msg = encodeURIComponent(`${greeting} We noticed you started registering${childMention} at Merry Explorers Learning Center! Would you like any assistance completing your registration or choosing a class schedule? We're here to help!`);
+  return `https://wa.me/${clean}?text=${msg}`;
+}
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "blue" | "red" }) {
@@ -405,20 +500,385 @@ function DetailModal({
   );
 }
 
+// ── Lead Detail Modal ─────────────────────────────────────────────────────────
+function LeadDetailModal({
+  lead,
+  onClose,
+  onUpdate,
+  onDelete,
+  isProcessing,
+}: {
+  lead: Lead;
+  onClose: () => void;
+  onUpdate: (id: string, status: string, notes: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  isProcessing: boolean;
+}) {
+  const [currentStatus, setCurrentStatus] = useState(lead.status || "in-progress");
+  const [notes, setNotes] = useState(lead.notes || "");
+  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const accent = lead.selectedProgram && PROGRAM_ACCENTS[lead.selectedProgram]
+    ? PROGRAM_ACCENTS[lead.selectedProgram]
+    : "#0033A0";
+
+  const childName = [lead.childInfo?.firstName, lead.childInfo?.lastName].filter(Boolean).join(" ") || "Prospective Student";
+  const parentPhone = lead.parentInfo?.phone;
+  const parentEmail = lead.parentInfo?.email;
+  const whatsAppUrl = formatWhatsAppUrl(parentPhone, lead.parentInfo?.name, lead.childInfo?.firstName);
+
+  const stepMeta = LEAD_STEP_LABELS[lead.step] || {
+    label: lead.stepName || `Step ${lead.step}`,
+    badge: `Step ${lead.step}`,
+    color: "text-blue-800",
+    bg: "bg-blue-100",
+  };
+
+  const stepsList = [
+    { num: 0, label: "Child & Parent Details" },
+    { num: 1, label: "Program & Schedule" },
+    { num: 2, label: "Consents & Waivers" },
+    { num: 3, label: "Review & Payment" },
+  ];
+
+  async function handleSave() {
+    await onUpdate(lead.id, currentStatus, notes);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  }
+
+  return (
+    <AnimatePresence>
+      {/* Backdrop */}
+      <m.div
+        key="lead-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal / Sheet */}
+      <m.div
+        key="lead-modal"
+        initial={{ opacity: 0, y: "100%" }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100%" }}
+        transition={{ type: "spring", stiffness: 380, damping: 40 }}
+        className="fixed inset-x-0 bottom-0 z-50 md:inset-0 md:flex md:items-center md:justify-center md:p-6 pointer-events-none"
+      >
+        <div
+          className="pointer-events-auto w-full md:max-w-xl md:rounded-[2rem] bg-[#f4f7fb] shadow-[0_-8px_40px_rgba(0,0,0,0.15)] md:shadow-[0_30px_80px_rgba(0,0,0,0.2)] flex flex-col max-h-[92dvh] md:max-h-[88vh] rounded-t-[2rem] border-t-[8px] overflow-hidden"
+          style={{ borderColor: accent }}
+        >
+          {/* Drag handle (mobile) */}
+          <div className="md:hidden flex justify-center pt-3 pb-1 shrink-0">
+            <div className="h-1 w-10 rounded-full bg-slate-300" />
+          </div>
+
+          {/* ── Header ── */}
+          <div className="relative flex items-start gap-4 border-b border-slate-100 bg-white px-6 py-5 shrink-0 rounded-t-[1.8rem]">
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-sm border border-slate-100 text-[26px]"
+              style={{ backgroundColor: `${accent}15` }}
+            >
+              {lead.selectedProgram === "ballet" ? "🩰" : lead.selectedProgram === "brave-explorer" ? "🏆" : lead.selectedProgram === "creative-explorer" ? "🚀" : "📝"}
+            </div>
+
+            <div className="flex-1 pr-8">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-[19px] font-extrabold text-[#002f76] leading-tight">
+                  {childName}
+                </h2>
+                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${LEAD_STATUS_STYLES[lead.status] || "bg-slate-100 text-slate-700"}`}>
+                  {LEAD_STATUS_LABELS[lead.status] || lead.status}
+                </span>
+              </div>
+              <p className="mt-1 text-[13px] font-semibold text-[#64748b]">
+                Parent: <span className="text-[#1e293b] font-bold">{lead.parentInfo?.name || "Not provided"}</span>
+                {lead.parentInfo?.relationship ? ` (${lead.parentInfo.relationship})` : ""}
+              </p>
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-[#94a3b8]">
+                <span>Last active: {lead.updatedAt ? new Date(lead.updatedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "Recently"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Direct Action Buttons ── */}
+          <div className="bg-[#eef4ff] px-6 py-2.5 border-b border-slate-100 flex flex-wrap gap-2 items-center justify-between">
+            <span className="text-[12px] font-bold text-[#0033A0]">Quick Contact:</span>
+            <div className="flex flex-wrap gap-2">
+              {parentPhone && (
+                <>
+                  <a
+                    href={`tel:${parentPhone}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[12px] font-bold text-[#0033A0] shadow-sm hover:bg-[#0033A0] hover:text-white transition-all"
+                  >
+                    📞 Call
+                  </a>
+                  {whatsAppUrl && (
+                    <a
+                      href={whatsAppUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 text-white text-[12px] font-bold shadow-sm hover:bg-green-700 transition-all"
+                    >
+                      💬 WhatsApp
+                    </a>
+                  )}
+                </>
+              )}
+              {parentEmail && (
+                <a
+                  href={`mailto:${parentEmail}?subject=${encodeURIComponent("Merry Explorers Registration Assistance")}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[12px] font-bold text-[#334155] shadow-sm hover:bg-slate-50 transition-all"
+                >
+                  ✉️ Email
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* ── Scrollable Body ── */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+            {/* Funnel Step Stepper */}
+            <SectionCard emoji="🧭" title="Registration Progress">
+              <div className="py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[12px] font-extrabold text-[#0033A0]">
+                    Current Progress:
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${stepMeta.bg} ${stepMeta.color}`}>
+                    {stepMeta.label}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5 mt-3">
+                  {stepsList.map((s) => {
+                    const isDone = lead.step > s.num || lead.status === "converted";
+                    const isCurrent = lead.step === s.num && lead.status !== "converted";
+                    return (
+                      <div
+                        key={s.num}
+                        className={`rounded-xl p-2 text-center border transition-all ${
+                          isDone
+                            ? "bg-green-50 border-green-200 text-green-700"
+                            : isCurrent
+                            ? "bg-blue-50 border-[#0033A0]/30 text-[#0033A0] ring-2 ring-[#0033A0]/20"
+                            : "bg-slate-50 border-slate-200 text-slate-400"
+                        }`}
+                      >
+                        <div className="text-[11px] font-extrabold">
+                          {isDone ? "✓ Step " + s.num : "Step " + s.num}
+                        </div>
+                        <div className="text-[10px] font-medium truncate mt-0.5" title={s.label}>
+                          {s.label}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Staff Follow-up & Notes */}
+            <SectionCard emoji="📝" title="Staff Follow-Up & Notes">
+              <div className="py-3 space-y-3">
+                <div>
+                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-[#94a3b8] block mb-1.5">
+                    Lead Status
+                  </label>
+                  <select
+                    value={currentStatus}
+                    onChange={(e) => setCurrentStatus(e.target.value as any)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-[#334155] focus:outline-none focus:border-[#0033A0]"
+                  >
+                    <option value="in-progress">⏳ In-Progress / Abandoned</option>
+                    <option value="contacted">📞 Followed Up (In Contact)</option>
+                    <option value="converted">🎉 Converted (Registered)</option>
+                    <option value="archived">📦 Archived</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-[#94a3b8] block mb-1.5">
+                    Internal Follow-Up Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. Sent WhatsApp brochure, parent was asking about morning schedule availability..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-[13px] font-medium text-[#334155] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0] resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  {savedSuccess ? (
+                    <span className="text-[12px] font-bold text-green-600">✅ Changes saved!</span>
+                  ) : <span />}
+                  <button
+                    onClick={handleSave}
+                    disabled={isProcessing}
+                    className="rounded-xl bg-[#0033A0] px-4 py-2 text-[12px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002f76] disabled:opacity-50 transition-all"
+                  >
+                    {isProcessing ? "Saving..." : "Save Follow-Up"}
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Child Details */}
+            <SectionCard emoji="🧒" title="Child Information">
+              <InfoRow label="First Name" value={lead.childInfo?.firstName || "—"} />
+              <InfoRow label="Last Name" value={lead.childInfo?.lastName || "—"} />
+              <InfoRow label="Nickname" value={lead.childInfo?.nickname || "—"} />
+              <InfoRow label="Date of Birth" value={lead.childInfo?.dateOfBirth || "—"} />
+              <InfoRow label="Gender" value={lead.childInfo?.gender || "—"} />
+              {lead.childInfo?.healthProfile && (
+                <InfoRow label="Health Notes" value={lead.childInfo.healthProfile} />
+              )}
+              {lead.childInfo?.specialNeeds && (
+                <InfoRow label="Special Needs" value={lead.childInfo.specialNeeds} />
+              )}
+              {lead.childInfo?.allergies && (
+                <InfoRow label="Allergies" value={lead.childInfo.allergies} highlight="red" />
+              )}
+            </SectionCard>
+
+            {/* Parent Contact */}
+            <SectionCard emoji="👨‍👩‍👧" title="Parent / Guardian Details">
+              <InfoRow label="Parent Name" value={lead.parentInfo?.name || "—"} />
+              <InfoRow label="Relationship" value={lead.parentInfo?.relationship || "—"} />
+              <InfoRow label="Email" value={lead.parentInfo?.email || "—"} />
+              <InfoRow label="Phone" value={lead.parentInfo?.phone || "—"} />
+              {lead.emergencyContact?.name && (
+                <>
+                  <InfoRow label="Emergency Contact" value={lead.emergencyContact.name} />
+                  <InfoRow label="Emergency Phone" value={lead.emergencyContact.phone || "—"} />
+                </>
+              )}
+            </SectionCard>
+
+            {/* Selections made so far */}
+            <SectionCard emoji="🎯" title="Program & Options Reached">
+              <InfoRow
+                label="Selected Program"
+                value={lead.selectedProgram ? (PROGRAM_NAMES[lead.selectedProgram] || lead.selectedProgram) : "Not selected yet"}
+                highlight={lead.selectedProgram ? "blue" : undefined}
+              />
+              <InfoRow
+                label="Selected Class"
+                value={lead.selectedClass || "Not selected yet"}
+              />
+              {lead.promoCode && (
+                <InfoRow label="Promo Code" value={lead.promoCode} highlight="green" />
+              )}
+              <InfoRow
+                label="Photo Consent"
+                value={lead.photoConsent === "yes" ? "✅ Allowed" : lead.photoConsent === "no" ? "❌ Declined" : "Pending"}
+              />
+              <InfoRow
+                label="Digital Signature"
+                value={lead.hasSignature ? "✅ Signed" : "Pending"}
+              />
+            </SectionCard>
+
+            {/* Step Audit History */}
+            {lead.history && lead.history.length > 0 && (
+              <SectionCard emoji="⏱️" title="Step Activity Timeline">
+                <div className="py-2 space-y-2">
+                  {lead.history.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between text-[12px] py-1 border-b border-slate-100 last:border-0">
+                      <span className="font-bold text-[#334155]">{h.stepName || `Step ${h.step}`}</span>
+                      <span className="text-[11px] text-[#94a3b8]">
+                        {h.enteredAt ? new Date(h.enteredAt).toLocaleString("en-PH", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            <div className="h-2" />
+          </div>
+
+          {/* Footer actions */}
+          <div className="border-t border-slate-200 bg-white px-5 py-3 shrink-0 flex items-center justify-between gap-3">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-bold text-red-600">Permanently delete?</span>
+                <button
+                  type="button"
+                  onClick={() => onDelete(lead.id)}
+                  disabled={isProcessing}
+                  className="rounded-xl bg-red-600 px-3 py-1.5 text-[12px] font-bold text-white shadow-sm hover:bg-red-700 disabled:opacity-50 transition-all"
+                >
+                  {isProcessing ? "Deleting..." : "Yes, Delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={isProcessing}
+                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-xl border border-red-200 bg-red-50/70 px-3.5 py-2 text-[12px] font-bold text-red-600 hover:bg-red-100 transition-all flex items-center gap-1.5"
+              >
+                <span>🗑️</span>
+                <span>Delete Lead</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 px-5 py-2 text-[13px] font-bold text-[#64748b] hover:bg-slate-50 transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </m.div>
+    </AnimatePresence>
+  );
+}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AdminRegistrationsPage() {
   const { user, userProfile } = useAuth();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("pending");
   const [search, setSearch] = useState("");
   const [programFilter, setProgramFilter] = useState("all");
+  const [leadSubFilter, setLeadSubFilter] = useState<"all" | "in-progress" | "contacted">("all");
   const [selected, setSelected] = useState<Registration | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState("");
+  const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(null);
 
-  useEffect(() => { fetchRegistrations(); }, []);
+  useEffect(() => {
+    fetchRegistrations();
+    fetchLeads();
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -433,6 +893,63 @@ export default function AdminRegistrationsPage() {
       if (data.success) setRegistrations(data.data);
     } catch { /* ignore */ }
     finally { setLoading(false); }
+  }
+
+  async function fetchLeads() {
+    try {
+      const res = await fetch("/api/leads");
+      const data = await res.json();
+      if (data.success) setLeads(data.data);
+    } catch { /* ignore */ }
+  }
+
+  async function handleUpdateLead(id: string, status: string, notes: string) {
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status, notes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToast("✅ Lead updated successfully!");
+        await fetchLeads();
+        if (selectedLead && selectedLead.id === id) {
+          setSelectedLead(prev => prev ? { ...prev, status: status as any, notes } : null);
+        }
+      } else {
+        setToast(`❌ ${data.error || "Failed to update lead"}`);
+      }
+    } catch {
+      setToast("❌ Network error");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  async function handleDeleteLead(id: string) {
+    setDeleteConfirmLeadId(id);
+  }
+
+  async function executeDeleteLead(id: string) {
+    setDeleteConfirmLeadId(null);
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/leads?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setToast("🗑️ Lead deleted successfully");
+        setSelectedLead(null);
+        await fetchLeads();
+      } else {
+        setToast(`❌ ${data.error || "Failed to delete lead"}`);
+      }
+    } catch {
+      setToast("❌ Network error");
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
   async function handleApprove(id: string) {
@@ -520,26 +1037,63 @@ export default function AdminRegistrationsPage() {
     pending: registrations.filter(r => r.status === "pending").length,
     approved: registrations.filter(r => r.status === "approved").length,
     rejected: registrations.filter(r => r.status === "rejected").length,
-    "early-bird": registrations.filter(r => r.status === "early-bird").length,
+    "early-bird": registrations.filter(r => r.status === "early-bird" && !isRegExpired(r)).length,
+    expired: registrations.filter(isRegExpired).length,
   };
+
+  const prospectiveLeads = leads.filter(l => l.status !== "converted" && l.status !== "archived");
+  const inProgressLeadsCount = prospectiveLeads.filter(l => l.status === "in-progress" || (l as any).status === "new" || !l.status).length;
+  const contactedLeadsCount = prospectiveLeads.filter(l => l.status === "contacted").length;
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "pending", label: `Pending (${counts.pending})` },
     { key: "early-bird", label: `🐣 Early Bird (${counts["early-bird"]})` },
+    { key: "expired", label: `⏰ Expired Slots (${counts.expired})` },
     { key: "approved", label: `Approved (${counts.approved})` },
     { key: "rejected", label: `Rejected (${counts.rejected})` },
-    { key: "all", label: `All (${counts.all})` },
+    { key: "leads", label: `📝 In-Progress Leads (${prospectiveLeads.length})` },
+    { key: "all", label: `All Submitted (${counts.all})` },
   ];
 
   const q = search.toLowerCase();
+
   const filtered = registrations.filter(r => {
-    const matchStatus = filter === "all" || r.status === filter;
+    let matchStatus = false;
+    if (filter === "all") {
+      matchStatus = true;
+    } else if (filter === "expired") {
+      matchStatus = isRegExpired(r);
+    } else if (filter === "early-bird") {
+      matchStatus = r.status === "early-bird" && !isRegExpired(r);
+    } else {
+      matchStatus = r.status === filter;
+    }
+
     const matchProgram = programFilter === "all" || r.program === programFilter;
     const matchSearch = !q ||
       `${r.childInfo.firstName} ${r.childInfo.lastName}`.toLowerCase().includes(q) ||
       r.parentInfo.name.toLowerCase().includes(q) ||
       (PROGRAM_NAMES[r.program] || r.program).toLowerCase().includes(q);
     return matchStatus && matchProgram && matchSearch;
+  });
+
+  const filteredLeads = prospectiveLeads.filter(l => {
+    const isLeadInProgress = l.status === "in-progress" || (l as any).status === "new" || !l.status;
+    const matchSubFilter =
+      leadSubFilter === "all" ||
+      (leadSubFilter === "in-progress" ? isLeadInProgress : l.status === leadSubFilter);
+    const matchProgram =
+      programFilter === "all" ||
+      l.selectedProgram === programFilter;
+    const matchSearch =
+      !q ||
+      `${l.childInfo?.firstName || ""} ${l.childInfo?.lastName || ""}`.toLowerCase().includes(q) ||
+      (l.childInfo?.nickname || "").toLowerCase().includes(q) ||
+      (l.parentInfo?.name || "").toLowerCase().includes(q) ||
+      (l.parentInfo?.email || "").toLowerCase().includes(q) ||
+      (l.parentInfo?.phone || "").includes(q) ||
+      (PROGRAM_NAMES[l.selectedProgram || ""] || l.selectedProgram || "").toLowerCase().includes(q);
+    return matchSubFilter && matchProgram && matchSearch;
   });
 
   return (
@@ -554,7 +1108,7 @@ export default function AdminRegistrationsPage() {
             </svg>
             <input
               className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-[13px] font-semibold text-[#334155] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#0033A0]/40 focus:ring-2 focus:ring-[#0033A0]/10 transition-all"
-              placeholder="Search by student name, parent name or program…"
+              placeholder={filter === "leads" ? "Search leads by child, parent name, email, phone..." : "Search by student name, parent name or program…"}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -591,92 +1145,313 @@ export default function AdminRegistrationsPage() {
           ))}
         </div>
 
-        {loading ? (
-          <div className="flex h-64 items-center justify-center text-[#64748b] animate-pulse">Loading registrations...</div>
-        ) : filtered.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white/70 text-center p-8">
-            <span className="text-4xl mb-3">📋</span>
-            <p className="text-[16px] font-bold text-[#0033A0]">No registrations found</p>
-            <p className="mt-1 text-[13px] text-[#64748b]">{search ? "Try a different search term." : "New registrations will appear here once submitted."}</p>
+        {/* ── LEADS VIEW ── */}
+        {filter === "leads" ? (
+          <div className="space-y-4">
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#94a3b8]">Total Started</span>
+                <p className="mt-1 text-2xl font-black text-[#002f76]">{prospectiveLeads.length}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 shadow-sm">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">⏳ In Progress / Abandoned</span>
+                <p className="mt-1 text-2xl font-black text-amber-800">
+                  {inProgressLeadsCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3.5 shadow-sm">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0033A0]">📞 Followed Up</span>
+                <p className="mt-1 text-2xl font-black text-[#0033A0]">
+                  {contactedLeadsCount}
+                </p>
+              </div>
+            </div>
+
+            {/* Sub-filter chips */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {[
+                { key: "all", label: `All Leads (${prospectiveLeads.length})` },
+                { key: "in-progress", label: `⏳ In-Progress / Dropped Off (${inProgressLeadsCount})` },
+                { key: "contacted", label: `📞 Followed Up (${contactedLeadsCount})` },
+              ].map((sub) => (
+                <button
+                  key={sub.key}
+                  onClick={() => setLeadSubFilter(sub.key as any)}
+                  className={`rounded-xl px-3 py-1.5 text-[12px] font-bold transition-all ${
+                    leadSubFilter === sub.key
+                      ? "bg-[#002f76] text-white shadow-sm"
+                      : "bg-white border border-slate-200 text-[#64748b] hover:bg-slate-50"
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Leads Table */}
+            {filteredLeads.length === 0 ? (
+              <div className="flex h-64 flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white/70 text-center p-8">
+                <span className="text-4xl mb-3">📝</span>
+                <p className="text-[16px] font-bold text-[#0033A0]">No in-progress leads found</p>
+                <p className="mt-1 text-[13px] text-[#64748b]">
+                  {search ? "Try adjusting your search criteria." : "Leads will appear in real time as parents enter details and advance through registration."}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 bg-white shadow-sm">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-[#f8fafc] border-b border-slate-200">
+                      <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Student</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Parent Contact</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Furthest Step Reached</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Program Choice</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Status</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Last Active</th>
+                      <th className="px-4 py-3.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLeads.map((lead, i) => {
+                      const childTitle = [lead.childInfo?.firstName, lead.childInfo?.lastName].filter(Boolean).join(" ") || "Student (Unnamed)";
+                      const stepInfo = LEAD_STEP_LABELS[lead.step] || {
+                        label: lead.stepName || `Step ${lead.step}`,
+                        badge: `Step ${lead.step}`,
+                        color: "text-blue-800",
+                        bg: "bg-blue-100",
+                      };
+                      const waUrl = formatWhatsAppUrl(lead.parentInfo?.phone, lead.parentInfo?.name, lead.childInfo?.firstName);
+
+                      return (
+                        <m.tr
+                          key={lead.id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.03 }}
+                          onClick={() => setSelectedLead(lead)}
+                          className="border-b border-slate-100 last:border-0 hover:bg-[#f0f5ff] cursor-pointer transition-colors group"
+                        >
+                          {/* Student */}
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="h-8 w-1 rounded-full shrink-0"
+                                style={{ backgroundColor: lead.selectedProgram && PROGRAM_ACCENTS[lead.selectedProgram] ? PROGRAM_ACCENTS[lead.selectedProgram] : "#0033A0" }}
+                              />
+                              <div>
+                                <p className="font-extrabold text-[#002f76]">{childTitle}</p>
+                                {lead.childInfo?.nickname && (
+                                  <p className="text-[11px] text-[#94a3b8]">"{lead.childInfo.nickname}"</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Parent */}
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-[#334155]">{lead.parentInfo?.name || "No name"}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] text-[#94a3b8]">{lead.parentInfo?.phone || lead.parentInfo?.email || "No contact"}</span>
+                              {lead.parentInfo?.phone && (
+                                <span className="inline-flex items-center gap-1">
+                                  <a
+                                    href={`tel:${lead.parentInfo.phone}`}
+                                    onClick={e => e.stopPropagation()}
+                                    title="Call Parent"
+                                    className="text-[12px] hover:scale-125 transition-transform"
+                                  >
+                                    📞
+                                  </a>
+                                  {waUrl && (
+                                    <a
+                                      href={waUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={e => e.stopPropagation()}
+                                      title="WhatsApp Parent"
+                                      className="text-[12px] hover:scale-125 transition-transform"
+                                    >
+                                      💬
+                                    </a>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Step Reached */}
+                          <td className="px-5 py-4">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${stepInfo.bg} ${stepInfo.color}`}>
+                                {stepInfo.label}
+                              </span>
+                              <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                <div
+                                  className="h-full bg-[#0033A0] rounded-full"
+                                  style={{ width: `${Math.min(100, Math.max(20, ((lead.step + 1) / 4) * 100))}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Program Choice */}
+                          <td className="px-5 py-4">
+                            {lead.selectedProgram ? (
+                              <div>
+                                <span
+                                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                                  style={{
+                                    backgroundColor: `${PROGRAM_ACCENTS[lead.selectedProgram] || "#0033A0"}22`,
+                                    color: PROGRAM_ACCENTS[lead.selectedProgram] || "#0033A0",
+                                  }}
+                                >
+                                  {PROGRAM_NAMES[lead.selectedProgram] || lead.selectedProgram}
+                                </span>
+                                {lead.selectedClass && (
+                                  <p className="text-[11px] text-[#64748b] mt-0.5 font-medium">{lead.selectedClass}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-[#94a3b8] italic">Not selected yet</span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-5 py-4">
+                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${LEAD_STATUS_STYLES[lead.status] || "bg-slate-100 text-slate-700"}`}>
+                              {LEAD_STATUS_LABELS[lead.status] || lead.status}
+                            </span>
+                          </td>
+
+                          {/* Last Active */}
+                          <td className="px-5 py-4 text-[#94a3b8] font-medium text-[11px]">
+                            {lead.updatedAt ? new Date(lead.updatedAt).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Recently"}
+                          </td>
+
+                          {/* Arrow & Actions */}
+                          <td className="px-4 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="inline-flex items-center gap-1 text-[12px] font-extrabold text-[#0033A0] group-hover:underline">
+                                Follow Up
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                  <path d="m9 18 6-6-6-6" />
+                                </svg>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteLead(lead.id);
+                                }}
+                                title="Delete Lead"
+                                className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </m.tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="px-5 py-3 bg-[#f8fafc] border-t border-slate-200 text-[12px] font-semibold text-[#94a3b8]">
+                  {`Showing ${filteredLeads.length} of ${prospectiveLeads.length} lead${prospectiveLeads.length !== 1 ? "s" : ""}`}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          /* ── Table ── */
-          <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="bg-[#f8fafc] border-b border-slate-200">
-                  <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Student</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Parent</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Program</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Class</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Status</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Submitted</th>
-                  <th className="px-4 py-3.5"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((reg, i) => (
-                  <m.tr
-                    key={reg.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    onClick={() => setSelected(reg)}
-                    className="border-b border-slate-100 last:border-0 hover:bg-[#f0f5ff] cursor-pointer transition-colors group"
-                  >
-                    {/* Student */}
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="h-8 w-1 rounded-full shrink-0"
-                          style={{ backgroundColor: PROGRAM_ACCENTS[reg.program] || "#64748b" }}
-                        />
-                        <div>
-                          <p className="font-extrabold text-[#002f76]">{reg.childInfo.firstName} {reg.childInfo.lastName}</p>
-                          {reg.childInfo.nickname && <p className="text-[11px] text-[#94a3b8]">{reg.childInfo.nickname}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    {/* Parent */}
-                    <td className="px-5 py-4">
-                      <p className="font-semibold text-[#334155]">{reg.parentInfo.name}</p>
-                      <p className="text-[11px] text-[#94a3b8]">{reg.parentInfo.phone}</p>
-                    </td>
-                    {/* Program */}
-                    <td className="px-5 py-4">
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
-                        style={{ backgroundColor: `${PROGRAM_ACCENTS[reg.program]}22`, color: PROGRAM_ACCENTS[reg.program] || "#334155" }}
-                      >
-                        {PROGRAM_NAMES[reg.program] || reg.program}
-                      </span>
-                    </td>
-                    {/* Class */}
-                    <td className="px-5 py-4 text-[#334155] font-semibold">{reg.classTime}</td>
-                    {/* Status */}
-                    <td className="px-5 py-4">
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${STATUS_STYLES[reg.status]}`}>
-                        {STATUS_LABELS[reg.status]}
-                      </span>
-                    </td>
-                    {/* Submitted */}
-                    <td className="px-5 py-4 text-[#94a3b8] font-medium">
-                      {new Date(reg.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-                    </td>
-                    {/* Arrow */}
-                    <td className="px-4 py-4">
-                      <svg className="h-4 w-4 text-[#cbd5e1] group-hover:text-[#0033A0] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                        <path d="m9 18 6-6-6-6" />
-                      </svg>
-                    </td>
-                  </m.tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="px-5 py-3 bg-[#f8fafc] border-t border-slate-200 text-[12px] font-semibold text-[#94a3b8]">
-              Showing {filtered.length} of {registrations.length} registration{registrations.length !== 1 ? "s" : ""}
+          /* ── REGISTRATIONS TABLE ── */
+          loading ? (
+            <div className="flex h-64 items-center justify-center text-[#64748b] animate-pulse">Loading registrations...</div>
+          ) : filtered.length === 0 ? (
+            <div className="flex h-64 flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white/70 text-center p-8">
+              <span className="text-4xl mb-3">📋</span>
+              <p className="text-[16px] font-bold text-[#0033A0]">No registrations found</p>
+              <p className="mt-1 text-[13px] text-[#64748b]">{search ? "Try a different search term." : "New registrations will appear here once submitted."}</p>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 bg-white shadow-sm">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="bg-[#f8fafc] border-b border-slate-200">
+                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Student</th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Parent</th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Program</th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Class</th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Status</th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Submitted</th>
+                    <th className="px-4 py-3.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((reg, i) => (
+                    <m.tr
+                      key={reg.id}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      onClick={() => setSelected(reg)}
+                      className="border-b border-slate-100 last:border-0 hover:bg-[#f0f5ff] cursor-pointer transition-colors group"
+                    >
+                      {/* Student */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="h-8 w-1 rounded-full shrink-0"
+                            style={{ backgroundColor: PROGRAM_ACCENTS[reg.program] || "#64748b" }}
+                          />
+                          <div>
+                            <p className="font-extrabold text-[#002f76]">{reg.childInfo.firstName} {reg.childInfo.lastName}</p>
+                            {reg.childInfo.nickname && <p className="text-[11px] text-[#94a3b8]">{reg.childInfo.nickname}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      {/* Parent */}
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-[#334155]">{reg.parentInfo.name}</p>
+                        <p className="text-[11px] text-[#94a3b8]">{reg.parentInfo.phone}</p>
+                      </td>
+                      {/* Program */}
+                      <td className="px-5 py-4">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                          style={{ backgroundColor: `${PROGRAM_ACCENTS[reg.program]}22`, color: PROGRAM_ACCENTS[reg.program] || "#334155" }}
+                        >
+                          {PROGRAM_NAMES[reg.program] || reg.program}
+                        </span>
+                      </td>
+                      {/* Class */}
+                      <td className="px-5 py-4 text-[#334155] font-semibold">{reg.classTime}</td>
+                      {/* Status */}
+                      <td className="px-5 py-4">
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isRegExpired(reg) ? STATUS_STYLES.expired : STATUS_STYLES[reg.status] || "bg-slate-100 text-slate-700"}`}>
+                          {isRegExpired(reg) ? "⏰ Expired Slot" : STATUS_LABELS[reg.status] || reg.status}
+                        </span>
+                      </td>
+                      {/* Submitted */}
+                      <td className="px-5 py-4 text-[#94a3b8] font-medium">
+                        {new Date(reg.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+                      </td>
+                      {/* Arrow */}
+                      <td className="px-4 py-4">
+                        <svg className="h-4 w-4 text-[#cbd5e1] group-hover:text-[#0033A0] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                      </td>
+                    </m.tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="px-5 py-3 bg-[#f8fafc] border-t border-slate-200 text-[12px] font-semibold text-[#94a3b8]">
+                Showing {filtered.length} of {registrations.length} registration{registrations.length !== 1 ? "s" : ""}
+              </div>
+            </div>
+          )
         )}
       </AppShell>
 
@@ -692,6 +1467,63 @@ export default function AdminRegistrationsPage() {
           isProcessing={isProcessing}
         />
       )}
+
+      {/* Lead detail modal */}
+      {selectedLead && (
+        <LeadDetailModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onUpdate={handleUpdateLead}
+          onDelete={handleDeleteLead}
+          isProcessing={isProcessing}
+        />
+      )}
+
+      {/* ── Delete Lead Confirm Modal ── */}
+      <AnimatePresence>
+        {deleteConfirmLeadId && (
+          <m.div
+            key="delete-confirm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <m.div
+              initial={{ scale: 0.92, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 16 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              className="bg-white rounded-[24px] shadow-[0_24px_60px_rgba(0,0,0,0.18)] border border-slate-100 w-full max-w-sm p-6 flex flex-col items-center text-center"
+            >
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center text-[28px] mb-4">
+                🗑️
+              </div>
+              <h3 className="text-[17px] font-extrabold text-[#1e293b] mb-1">Delete This Lead?</h3>
+              <p className="text-[13px] text-[#64748b] font-medium leading-relaxed mb-6">
+                This will <span className="font-bold text-red-600">permanently delete</span> the lead record.
+                This action <span className="font-bold">cannot be undone</span>.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setDeleteConfirmLeadId(null)}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 text-[14px] font-bold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => executeDeleteLead(deleteConfirmLeadId)}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl bg-red-500 py-3 text-[14px] font-extrabold text-white shadow-[0_4px_0_#b91c1c] hover:bg-red-600 active:shadow-none active:translate-y-[2px] transition-all disabled:opacity-50"
+                >
+                  {isProcessing ? "Deleting…" : "Yes, Delete"}
+                </button>
+              </div>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast */}
       <AnimatePresence>
