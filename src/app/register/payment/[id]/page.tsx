@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
+import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import { readReceipt } from "@/lib/receipt-ocr";
 
@@ -290,41 +291,8 @@ export default function PaymentPage() {
     <div className="vp-root min-h-screen relative overflow-x-hidden">
       <PortalScene />
 
-      {/* ── Top Header ────────────────────────────────────────────────────── */}
-      <header className="relative z-20 bg-white/85 border-b-2 border-[#b6dcf5] backdrop-blur-md sticky top-0">
-        <div className="mx-auto flex h-[76px] w-full max-w-[1200px] items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border-2 border-[#0b2a82] bg-white p-1 shadow-[0_3px_0_#0b2a82]">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" />
-            </div>
-            <span className="flex flex-col leading-none">
-              <span className="text-[18px] font-black tracking-tight text-[#0b2a82]">Merry Explorers</span>
-              <span className="text-[11px] font-black tracking-wider text-[#0b2a82] bg-[#ffd23f] px-1.5 py-0.5 rounded-md border border-[#0b2a82] mt-0.5 inline-block w-fit">
-                PARENT PORTAL
-              </span>
-            </span>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1.5">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="rounded-full px-4 py-2 text-[13px] font-extrabold text-[#0b2a82] hover:bg-[#fff6cf] hover:text-[#0b2a82] transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <span className="vp-tag text-[11px] sm:text-[12px] font-black uppercase">
-              🌟 2026 ADVENTURE 2
-            </span>
-          </div>
-        </div>
-      </header>
+      {/* ── Universal Floating Pill Header ── */}
+      <SiteHeader />
 
       {/* ── Main Content Area ────────────────────────────────────────────── */}
       <main className="vp-main">
@@ -771,11 +739,13 @@ export default function PaymentPage() {
           z-index: 1;
           width: 100%;
           max-width: 900px;
-          margin: 0 auto;
-          padding: 28px 20px 100px;
+          padding: 120px 20px 100px;
           display: flex;
           flex-direction: column;
           gap: 24px;
+        }
+        @media(max-width: 640px) {
+          .vp-main { padding-top: 100px; }
         }
         .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; }
         .vp-h2 { margin: 0; font-size: 22px; font-weight: 800; color: ${NAVY}; }

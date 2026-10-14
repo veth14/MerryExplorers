@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Fredoka } from "next/font/google";
 import { m, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
 import { EmojiPalette, EmojiMagnifyingGlass, EmojiLightbulb } from "@/components/landing/icons";
+import { SiteHeader } from "@/components/landing/site-header";
 
 const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -411,11 +412,14 @@ export function DiscoveryQuiz() {
 
   return (
     <LazyMotion features={domAnimation}>
+      {/* Universal Floating Pill Header */}
+      <SiteHeader />
+
       <main className={`${fredoka.className} dq-page`}>
         {/* Decorations */}
         <div className="dq-decor" aria-hidden="true">
-          <div className="dq-pos dq-bob" style={{top:10,left:10}}><Rainbow w={230}/></div>
-          <div className="dq-pos dq-bob" style={{top:14,right:18,animationDelay:"-2s"}}><Sun s={150}/></div>
+          <div className="dq-pos dq-bob" style={{top:75,left:10}}><Rainbow w={230}/></div>
+          <div className="dq-pos dq-bob" style={{top:70,right:18,animationDelay:"-2s"}}><Sun s={150}/></div>
           <div className="dq-pos dq-cross" style={{top:"10%",animationDuration:"55s",animationDelay:"-12s"}}><Cloud w={170}/></div>
           <div className="dq-pos dq-cross" style={{top:"30%",animationDuration:"75s",animationDelay:"-48s"}}><Cloud w={120}/></div>
           <div className="dq-pos dq-cross" style={{top:"52%",animationDuration:"65s",animationDelay:"-30s"}}><Cloud w={150}/></div>
@@ -464,7 +468,7 @@ export function DiscoveryQuiz() {
         </div>
 
         <style>{`
-          .dq-page{position:relative;min-height:100vh;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:40px 16px 200px;background:radial-gradient(ellipse at 50% 0%,#b9e5fb 0%,${SKY} 60%,#74c3f1 100%);color:${NAVY};}
+          .dq-page{position:relative;min-height:100vh;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:125px 16px 200px;background:radial-gradient(ellipse at 50% 0%,#b9e5fb 0%,${SKY} 60%,#74c3f1 100%);color:${NAVY};}
           .dq-decor{position:absolute;inset:0;pointer-events:none;}
           .dq-pos{position:absolute;}
           .dq-wrap{position:relative;z-index:1;width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;}
@@ -512,7 +516,7 @@ export function DiscoveryQuiz() {
           .dq-rocket{left:0;bottom:0;animation:dq-rocket 20s ease-in infinite;animation-delay:-9s;}
           .dq-sway{animation:dq-sway 9s ease-in-out infinite;}
           @media(max-width:900px){.dq-plane,.dq-rocket{scale:.7;}}
-          @media(max-width:520px){.dq-card{padding:58px 18px 22px;}.dq-title{font-size:24px;}}
+          @media(max-width:520px){.dq-page{padding:105px 12px 180px;}.dq-card{padding:58px 18px 22px;}.dq-title{font-size:24px;}}
           @media(prefers-reduced-motion:reduce){.dq-spin,.dq-bob,.dq-cross,.dq-twinkle,.dq-sway{animation:none;}.dq-plane,.dq-rocket,.dq-bubble{display:none;}.dq-btn{transition:none;}}
           *{box-sizing:border-box;}
         `}</style>

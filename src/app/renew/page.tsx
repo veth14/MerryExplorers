@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
+import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import SignatureCanvas from "react-signature-canvas";
 
@@ -426,6 +427,9 @@ export default function RenewPage() {
         </div>
       )}
 
+
+      {/* ── Universal Floating Pill Header ── */}
+      <SiteHeader />
 
       {/* ── Main Content Area ────────────────────────────────────────────── */}
       <main className="vp-main">
@@ -1117,11 +1121,13 @@ export default function RenewPage() {
           z-index: 1;
           width: 100%;
           max-width: 900px;
-          margin: 0 auto;
-          padding: 28px 20px 100px;
+          padding: 120px 20px 100px;
           display: flex;
           flex-direction: column;
           gap: 24px;
+        }
+        @media(max-width: 640px) {
+          .vp-main { padding-top: 100px; }
         }
         .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; }
         .vp-h2 { margin: 0; font-size: 22px; font-weight: 800; color: ${NAVY}; }
