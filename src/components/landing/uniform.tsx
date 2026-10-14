@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { m, useReducedMotion } from "framer-motion";
 import { UNIFORM } from "@/data/landing";
+import { WashiTape, PlayfulStar, PlayfulRainbow, PlayfulCloud } from "./playful-decorations";
 
 const CheckIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
@@ -23,8 +24,22 @@ export function UniformSection() {
   const reduce = useReducedMotion();
 
   return (
-    <section id="uniform" className="relative py-20 sm:py-32 overflow-hidden bg-[#fafcff]">
+    <section id="uniform" className="relative py-20 sm:py-32 overflow-hidden">
       <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
+
+      {/* Playful Floating Accents */}
+      <div className="absolute top-14 right-10 sm:right-28 pointer-events-none z-0 hidden sm:block">
+        <PlayfulStar size={28} rotate={14} />
+      </div>
+      <div className="absolute bottom-12 left-6 sm:left-16 pointer-events-none z-0 hidden md:block opacity-90">
+        <PlayfulRainbow width={110} />
+      </div>
+      <div className="absolute top-10 left-8 pointer-events-none z-0 hidden lg:block opacity-75">
+        <PlayfulCloud width={150} />
+      </div>
+      <div className="absolute bottom-10 right-8 sm:right-24 pointer-events-none z-0 hidden sm:block">
+        <PlayfulStar size={22} rotate={-18} delay={1.0} />
+      </div>
 
       <div className="relative z-10 mx-auto w-full max-w-[1200px] px-6">
         {/* Header */}
@@ -56,6 +71,9 @@ export function UniformSection() {
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           className="relative mx-auto max-w-[960px] overflow-hidden rounded-[2.5rem] bg-white shadow-[0_32px_80px_-20px_rgba(0,51,160,0.12)] border border-[#eaf0fe] flex flex-col sm:flex-row"
         >
+          {/* Playful Washi Tape */}
+          <WashiTape color="#ffd23f" width={85} tilt={-5} className="top-4 left-8 hidden sm:block" />
+
           {/* Left Content */}
           <div className="relative flex flex-1 flex-col justify-between p-10 sm:p-14 lg:p-16 z-20">
             <div>
@@ -122,10 +140,8 @@ export function UniformSection() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.65, delay: 0.1, ease: "easeOut" }}
-            className="relative sm:w-[400px] lg:w-[480px] bg-[#f5f7ff] overflow-hidden flex items-center justify-center"
+            className="relative sm:w-[400px] lg:w-[480px] bg-[#eef3ff] overflow-hidden flex items-center justify-center"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl opacity-60 translate-x-1/2 -translate-y-1/2" />
-            <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#eaf0fe] rounded-full blur-3xl opacity-80 -translate-x-1/3 translate-y-1/3" />
             <div className="relative h-[400px] sm:h-[500px] lg:h-full w-full">
               <Image
                 src={UNIFORM.image}

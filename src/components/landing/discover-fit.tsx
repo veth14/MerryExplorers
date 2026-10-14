@@ -3,13 +3,29 @@
 import Link from "next/link";
 import Image from "next/image";
 import { m } from "framer-motion";
+import { PlayfulStar, PlayfulCloud, PlayfulRainbow } from "./playful-decorations";
 
 export function DiscoverFitSection() {
   return (
-    <section className="relative overflow-hidden bg-white py-16 px-4">
-      {/* Decorative Background Blob (consistent with other sections) */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/3 w-[600px] h-[600px] bg-[#7DD3FC] opacity-10 blur-[100px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-[500px] h-[500px] bg-[#FDE261] opacity-15 blur-[100px] pointer-events-none rounded-full" />
+    <section className="relative overflow-hidden py-16 sm:py-24 px-4">
+      {/* Decorative background grid (consistent with other sections) */}
+      <div
+        className="absolute inset-0 z-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }}
+      />
+
+      {/* Playful Floating Accents */}
+      <div className="absolute top-10 left-6 pointer-events-none z-0 hidden lg:block opacity-90">
+        <PlayfulRainbow width={105} />
+      </div>
+      <div className="absolute top-14 right-10 sm:right-28 pointer-events-none z-0 hidden sm:block">
+        <PlayfulStar size={28} rotate={12} />
+      </div>
+      <div className="absolute bottom-8 left-12 pointer-events-none z-0 hidden md:block opacity-75">
+        <PlayfulCloud width={130} />
+      </div>
 
       <div className="relative z-10 max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12">
 
@@ -34,7 +50,7 @@ export function DiscoverFitSection() {
             </p>
 
             <Link
-              href="/under-development"
+              href="/discovery-day"
               className="inline-flex items-center gap-3 rounded-2xl bg-[#FFC107] px-8 py-4 font-fredoka text-lg font-bold text-[#0a1835] shadow-[0_8px_20px_rgba(255,193,7,0.3)] transition-all hover:bg-[#ffb800] hover:shadow-[0_12px_24px_rgba(255,193,7,0.4)] hover:-translate-y-1 active:scale-95 ring-4 ring-white"
             >
               <span>Take the Program Fit Quiz</span>

@@ -28,7 +28,7 @@ export function HeroSection() {
   const badge = useAdventureBadge();
 
   return (
-    <section id="home" className="relative flex flex-col justify-center overflow-hidden pt-28 pb-10 lg:pt-36 lg:pb-16 lg:min-h-[92vh] bg-gradient-to-b from-[#eaf6ff]/70 via-[#f7fbff]/50 to-white">
+    <section id="home" className="relative flex flex-col justify-center overflow-hidden pt-28 pb-10 lg:pt-36 lg:pb-16 lg:min-h-[92vh]">
       {/* ── Background Subtle Pattern ── */}
       <div
         className="absolute inset-0 z-0 opacity-[0.035]"
@@ -187,7 +187,7 @@ export function HeroSection() {
           <m.div
             animate={{ borderRadius: ["60% 40% 30% 70% / 60% 30% 70% 40%", "30% 60% 70% 40% / 50% 60% 30% 60%", "60% 40% 30% 70% / 60% 30% 70% 40%"] }}
             transition={{ duration: 15, ease: "easeInOut", repeat: Infinity }}
-            className="absolute inset-4 bg-gradient-to-br from-white via-[#f0f8ff] to-[#e6f4ff] shadow-[0_32px_80px_rgba(0,51,160,0.12)] border-2 border-white"
+            className="absolute inset-4 bg-white/95 shadow-[0_32px_80px_rgba(0,51,160,0.12)] border-2 border-white"
           />
 
           {/* Cute Cloud behind logo */}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { BALLET } from "@/data/landing";
 import { ArrowRightIcon, EmojiMagnifyingGlass, EmojiPalette, EmojiLightbulb, EmojiRainbow } from "./icons";
+import { PlayfulCloud, PlayfulStar } from "./playful-decorations";
 
 // ─── Adventure 1 Program Data ────────────────────────────────────────────────
 
@@ -213,7 +214,7 @@ export function ProgramsSection() {
   const [activeTab, setActiveTab] = useState<TabCategory>("discovery");
 
   return (
-    <section id="programs" className="relative py-16 sm:py-24">
+    <section id="programs" className="relative py-16 sm:py-24 overflow-hidden">
       {/* Decorative background grid */}
       <div
         className="absolute inset-0 z-0 opacity-[0.03]"
@@ -221,6 +222,14 @@ export function ProgramsSection() {
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }}
       />
+
+      {/* Playful Floating Accents */}
+      <div className="absolute top-12 left-4 sm:left-12 pointer-events-none z-0 hidden lg:block opacity-75">
+        <PlayfulCloud width={130} />
+      </div>
+      <div className="absolute top-16 right-6 sm:right-16 pointer-events-none z-0 hidden sm:block">
+        <PlayfulStar size={28} rotate={-10} />
+      </div>
 
       <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
 
@@ -488,7 +497,7 @@ export function ProgramsSection() {
 
                     {/* Right Column: Recital */}
                     <div className="flex flex-col">
-                      <div className="flex-1 rounded-3xl bg-gradient-to-br from-[#FCE4EC] to-white p-6 sm:p-8 border border-[#F8BBD0] shadow-sm relative overflow-hidden">
+                      <div className="flex-1 rounded-3xl bg-[#FDF2F8] p-6 sm:p-8 border border-[#F8BBD0] shadow-sm relative overflow-hidden">
                         {/* Decorative ribbon */}
                         <div className="absolute -right-6 -top-6 text-[100px] opacity-10 rotate-12 pointer-events-none">🎀</div>
 

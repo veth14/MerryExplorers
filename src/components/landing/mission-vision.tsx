@@ -2,6 +2,7 @@
 
 import { m, useReducedMotion } from "framer-motion";
 import { MISSION_VISION_PURPOSE } from "@/data/landing";
+import { PlayfulAirplane, PlayfulStar } from "./playful-decorations";
 
 export function MissionVisionSection() {
   const reduce = useReducedMotion();
@@ -9,9 +10,13 @@ export function MissionVisionSection() {
   return (
     <section id="mission" className="relative py-16 sm:py-24 overflow-hidden">
       <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 top-1/4 h-[400px] w-[400px] rounded-full bg-[#0033A0] opacity-[0.04] blur-[100px]" />
-        <div className="absolute -right-32 bottom-1/4 h-[400px] w-[400px] rounded-full bg-[#FFB800] opacity-[0.06] blur-[100px]" />
+
+      {/* Playful Floating Paper Airplane */}
+      <div className="absolute top-12 right-8 sm:right-24 z-0 pointer-events-none hidden md:block">
+        <PlayfulAirplane />
+      </div>
+      <div className="absolute bottom-16 left-8 pointer-events-none z-0 hidden sm:block">
+        <PlayfulStar size={26} rotate={15} />
       </div>
 
       <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8">
@@ -69,7 +74,7 @@ export function MissionVisionSection() {
                 </h3>
                 <p className="text-[14px] font-medium leading-[1.75] text-[#475569]">{item.body}</p>
               </div>
-              <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-10 h-32 w-32 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-30" style={{ backgroundColor: item.accent }} />
+              <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-10 h-32 w-32 rounded-full opacity-0 transition-opacity duration-500 group-hover:opacity-20" style={{ backgroundColor: item.accent }} />
             </m.div>
           ))}
         </div>
