@@ -7,9 +7,7 @@ import { ArrowRightIcon } from "./icons";
 import {
   PlayfulSun,
   PlayfulCloud,
-  PlayfulAirplane,
-  PlayfulStar,
-  PlayfulRainbow,
+  PlayfulHotAirBalloon,
   CloudSectionDivider,
 } from "./playful-decorations";
 
@@ -37,17 +35,17 @@ export function HeroSection() {
         }}
       />
 
-      {/* ── Playgroup Atmospheric Accents: Sun, Clouds, Rainbow ── */}
+      {/* ── Atmospheric Accents: Sun & Clouds ── */}
       {/* Smiling Animated Sun (Top Right) */}
-      <div className="absolute top-16 right-4 sm:top-20 sm:right-12 lg:right-24 z-0 pointer-events-none">
-        <PlayfulSun size={140} className="sm:scale-110 lg:scale-125 drop-shadow-[0_12px_24px_rgba(255,193,7,0.2)]" />
+      <div className="absolute top-12 right-2 sm:top-16 sm:right-10 lg:right-20 z-0 pointer-events-none">
+        <PlayfulSun size={130} className="scale-90 sm:scale-105 lg:scale-125 drop-shadow-[0_12px_24px_rgba(255,193,7,0.2)]" />
       </div>
 
-      {/* Cheerful Floating Clouds */}
+      {/* Cheerful Floating Clouds (Positioned safely away from boundaries) */}
       <m.div
         animate={reduce ? {} : { x: [-10, 10, -10] }}
         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-20 left-4 sm:left-14 z-0 pointer-events-none opacity-85"
+        className="absolute top-28 left-4 sm:top-32 sm:left-12 lg:left-16 z-0 pointer-events-none opacity-85"
       >
         <PlayfulCloud width={180} />
       </m.div>
@@ -55,26 +53,10 @@ export function HeroSection() {
       <m.div
         animate={reduce ? {} : { x: [8, -8, 8] }}
         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-48 right-1/3 z-0 pointer-events-none opacity-60 hidden md:block"
+        className="absolute top-52 right-1/3 z-0 pointer-events-none opacity-50 hidden md:block"
       >
         <PlayfulCloud width={130} />
       </m.div>
-
-      {/* Mini Rainbow near top left */}
-      <div className="absolute top-28 left-2 sm:left-8 z-0 pointer-events-none opacity-90 hidden sm:block">
-        <PlayfulRainbow width={130} />
-      </div>
-
-      {/* Twinkling Stars */}
-      <div className="absolute top-40 left-1/4 pointer-events-none z-10 hidden lg:block">
-        <PlayfulStar size={26} rotate={12} delay={0.2} />
-      </div>
-      <div className="absolute top-28 right-1/4 pointer-events-none z-10 hidden sm:block">
-        <PlayfulStar size={32} rotate={-15} delay={0.8} />
-      </div>
-      <div className="absolute bottom-28 left-16 pointer-events-none z-10 hidden md:block">
-        <PlayfulStar size={22} rotate={25} delay={1.4} />
-      </div>
 
       <div className="relative z-10 mx-auto grid w-full max-w-[1280px] items-center gap-12 px-6 lg:grid-cols-2 lg:gap-16">
 
@@ -152,11 +134,6 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.45, ease: "easeOut" }}
             className="mt-8 flex flex-wrap items-center gap-4 mobile-no-animate relative"
           >
-            {/* Paper Airplane flying towards action */}
-            <div className="absolute -top-14 right-2 pointer-events-none hidden md:block">
-              <PlayfulAirplane />
-            </div>
-
             <Link
               href="/register"
               id="hero-register-btn"
@@ -190,9 +167,14 @@ export function HeroSection() {
             className="absolute inset-4 bg-white/95 shadow-[0_32px_80px_rgba(0,51,160,0.12)] border-2 border-white"
           />
 
-          {/* Cute Cloud behind logo */}
-          <div className="absolute -bottom-6 -left-6 z-10 pointer-events-none opacity-90 hidden sm:block">
-            <PlayfulCloud width={160} />
+          {/* Cute Cloud floating beside logo (Fully visible, not clipped) */}
+          <div className="absolute bottom-2 -left-10 sm:bottom-6 sm:-left-14 z-20 pointer-events-none opacity-90 hidden sm:block">
+            <PlayfulCloud width={145} />
+          </div>
+
+          {/* Playful Adventure Hot Air Balloon (Navy & Gold Stripes) — anchored safely away from the sun */}
+          <div className="absolute -top-10 -right-2 sm:-top-14 sm:-right-4 lg:-top-16 lg:-left-12 z-20 pointer-events-none">
+            <PlayfulHotAirBalloon width={92} tilt={14} floatDuration={6.5} className="sm:scale-110 lg:scale-125 drop-shadow-md" />
           </div>
 
           <m.div

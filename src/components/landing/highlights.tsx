@@ -3,7 +3,7 @@
 import { m, useReducedMotion } from "framer-motion";
 import { HIGHLIGHTS } from "@/data/landing";
 import { HighlightIcon } from "./icons";
-import { WashiTape, PlayfulStar } from "./playful-decorations";
+import { WashiTape, PlayfulCompass } from "./playful-decorations";
 
 const ICON_CONFIG: Record<string, { color: string; bg: string; tape: string }> = {
   book:   { color: "#0066CC", bg: "#E8F0FF", tape: "#ffd23f" },
@@ -19,12 +19,9 @@ export function HighlightsSection() {
     <section className="relative py-12 sm:py-20 overflow-hidden">
       <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
 
-      {/* Playful Floating Stars */}
-      <div className="absolute top-10 left-6 sm:left-16 pointer-events-none z-0 hidden sm:block">
-        <PlayfulStar size={26} rotate={12} />
-      </div>
-      <div className="absolute top-20 right-6 sm:right-20 pointer-events-none z-0 hidden sm:block">
-        <PlayfulStar size={30} rotate={-15} delay={0.6} />
+      {/* Signature Explorer Compass Accent (Unique to Highlights) */}
+      <div className="absolute top-6 right-4 sm:top-10 sm:right-16 pointer-events-none z-0 hidden sm:block">
+        <PlayfulCompass size={78} tilt={14} />
       </div>
 
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 relative z-10">

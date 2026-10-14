@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { m } from "framer-motion";
-import { PlayfulStar, PlayfulCloud, PlayfulRainbow } from "./playful-decorations";
+import { PlayfulSignpost } from "./playful-decorations";
 
 export function DiscoverFitSection() {
   return (
@@ -16,15 +16,9 @@ export function DiscoverFitSection() {
         }}
       />
 
-      {/* Playful Floating Accents */}
-      <div className="absolute top-10 left-6 pointer-events-none z-0 hidden lg:block opacity-90">
-        <PlayfulRainbow width={105} />
-      </div>
-      <div className="absolute top-14 right-10 sm:right-28 pointer-events-none z-0 hidden sm:block">
-        <PlayfulStar size={28} rotate={12} />
-      </div>
-      <div className="absolute bottom-8 left-12 pointer-events-none z-0 hidden md:block opacity-75">
-        <PlayfulCloud width={130} />
+      {/* Signature Trail Signpost Accent (Unique to Discover Fit / Path Finder) */}
+      <div className="absolute top-10 left-6 sm:left-14 pointer-events-none z-0 hidden sm:block">
+        <PlayfulSignpost height={95} />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12">

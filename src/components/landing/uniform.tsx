@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { m, useReducedMotion } from "framer-motion";
 import { UNIFORM } from "@/data/landing";
-import { WashiTape, PlayfulStar, PlayfulRainbow, PlayfulCloud } from "./playful-decorations";
+import { WashiTape, PlayfulBinoculars } from "./playful-decorations";
 
 const CheckIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
@@ -27,18 +27,9 @@ export function UniformSection() {
     <section id="uniform" className="relative py-20 sm:py-32 overflow-hidden">
       <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230033A0' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
 
-      {/* Playful Floating Accents */}
-      <div className="absolute top-14 right-10 sm:right-28 pointer-events-none z-0 hidden sm:block">
-        <PlayfulStar size={28} rotate={14} />
-      </div>
-      <div className="absolute bottom-12 left-6 sm:left-16 pointer-events-none z-0 hidden md:block opacity-90">
-        <PlayfulRainbow width={110} />
-      </div>
-      <div className="absolute top-10 left-8 pointer-events-none z-0 hidden lg:block opacity-75">
-        <PlayfulCloud width={150} />
-      </div>
-      <div className="absolute bottom-10 right-8 sm:right-24 pointer-events-none z-0 hidden sm:block">
-        <PlayfulStar size={22} rotate={-18} delay={1.0} />
+      {/* Signature Explorer Binoculars Accent (Unique to Uniform Kit) */}
+      <div className="absolute top-12 right-6 sm:top-16 sm:right-20 pointer-events-none z-0 hidden sm:block">
+        <PlayfulBinoculars width={85} tilt={-12} />
       </div>
 
       <div className="relative z-10 mx-auto w-full max-w-[1200px] px-6">

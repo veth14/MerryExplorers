@@ -5,7 +5,7 @@ import Link from "next/link";
 import { m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { BALLET } from "@/data/landing";
 import { ArrowRightIcon, EmojiMagnifyingGlass, EmojiPalette, EmojiLightbulb, EmojiRainbow } from "./icons";
-import { PlayfulCloud, PlayfulStar } from "./playful-decorations";
+import { PlayfulRainbow } from "./playful-decorations";
 
 // ─── Adventure 1 Program Data ────────────────────────────────────────────────
 
@@ -223,12 +223,9 @@ export function ProgramsSection() {
         }}
       />
 
-      {/* Playful Floating Accents */}
-      <div className="absolute top-12 left-4 sm:left-12 pointer-events-none z-0 hidden lg:block opacity-75">
-        <PlayfulCloud width={130} />
-      </div>
-      <div className="absolute top-16 right-6 sm:right-16 pointer-events-none z-0 hidden sm:block">
-        <PlayfulStar size={28} rotate={-10} />
+      {/* Signature Creative Rainbow Accent (Unique to Programs) */}
+      <div className="absolute top-10 right-6 sm:right-20 pointer-events-none z-0 hidden sm:block opacity-90">
+        <PlayfulRainbow width={135} />
       </div>
 
       <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
