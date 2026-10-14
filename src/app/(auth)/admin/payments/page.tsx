@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { m } from "framer-motion";
@@ -407,7 +407,7 @@ function dpToPayment(acc: Account): Payment {
 
 const PAY_GRID = "2fr 1.4fr 1.3fr 1.1fr 1.3fr";
 
-export default function AdminPaymentsPage() {
+function AdminPaymentsPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -2637,5 +2637,13 @@ export default function AdminPaymentsPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+export default function AdminPaymentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminPaymentsPageInner />
+    </Suspense>
   );
 }
