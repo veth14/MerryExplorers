@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { computeAdventureBadge } from "@/lib/adventure-badge";
 
 const SETTINGS_KEY = "renewal_settings_v2";
 
@@ -188,8 +189,13 @@ export async function GET() {
       );
     }
 
+    const heroBadgeOverride = typeof doc?.heroBadgeOverride === "string" ? doc.heroBadgeOverride : null;
+    const heroBadge = computeAdventureBadge(finalPrograms, heroBadgeOverride);
+
     return NextResponse.json({
       programs: finalPrograms,
+      heroBadgeOverride,
+      heroBadge,
       updatedAt: changed ? new Date().toISOString() : (doc?.updatedAt ?? null),
     });
   } catch (err) {
@@ -224,14 +230,27 @@ export async function PUT(req: NextRequest) {
       };
     });
 
+    const heroBadgeOverride = typeof body.heroBadgeOverride === "string" ? body.heroBadgeOverride : (body.heroBadgeOverride === null ? null : undefined);
+
+    const updateDoc: Record<string, any> = {
+      _key: SETTINGS_KEY,
+      programs,
+      updatedAt: new Date().toISOString(),
+    };
+    if (heroBadgeOverride !== undefined) {
+      updateDoc.heroBadgeOverride = heroBadgeOverride;
+    }
+
     const { db } = await connectToDatabase();
     await db.collection("settings").updateOne(
       { _key: SETTINGS_KEY },
-      { $set: { _key: SETTINGS_KEY, programs, updatedAt: new Date().toISOString() } },
+      { $set: updateDoc },
       { upsert: true }
     );
 
-    return NextResponse.json({ ok: true, programs });
+    const effectiveHeroBadge = computeAdventureBadge(programs, heroBadgeOverride);
+
+    return NextResponse.json({ ok: true, programs, heroBadgeOverride, heroBadge: effectiveHeroBadge });
   } catch (err) {
     console.error("[renewal-settings PUT]", err);
     return NextResponse.json({ error: "Failed to save renewal settings" }, { status: 500 });

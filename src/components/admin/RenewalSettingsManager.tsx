@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { computeAdventureBadge } from "@/lib/adventure-badge";
 
 // Visual metadata for programs
 export const PROGRAM_CONFIG_META: Record<string, { emoji: string; color: string; bg: string; border: string; gradient: string; short: string; badge: string }> = {
@@ -146,6 +147,7 @@ export function isRegistrationClosedForProgram(p: ProgramRenewalEntry): boolean 
 
 export function RenewalSettingsManager() {
   const [programs, setPrograms] = useState<ProgramRenewalEntry[]>([]);
+  const [heroBadgeOverride, setHeroBadgeOverride] = useState<string>("");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -169,6 +171,9 @@ export function RenewalSettingsManager() {
       setErrorMsg("");
       const res = await fetch("/api/renewal-settings");
       const d = await res.json();
+      if (typeof d.heroBadgeOverride === "string") {
+        setHeroBadgeOverride(d.heroBadgeOverride);
+      }
       if (Array.isArray(d.programs)) {
         const merged: ProgramRenewalEntry[] = DEFAULT_PROGRAMS.map((key) => {
           const existing = d.programs.find((p: ProgramRenewalEntry) => p.programKey === key);
@@ -234,11 +239,14 @@ export function RenewalSettingsManager() {
       const res = await fetch("/api/renewal-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programs }),
+        body: JSON.stringify({ programs, heroBadgeOverride: heroBadgeOverride.trim() || null }),
       });
       const data = await res.json();
       if (data.ok && Array.isArray(data.programs)) {
         setPrograms(data.programs);
+        if (data.heroBadgeOverride !== undefined) {
+          setHeroBadgeOverride(data.heroBadgeOverride || "");
+        }
         setUpdatedAt(new Date().toISOString());
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3500);
@@ -299,6 +307,9 @@ export function RenewalSettingsManager() {
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     return todayStr >= master.nextAdventureStart.slice(0, 10);
   }, [master]);
+
+  const liveBadge = useMemo(() => computeAdventureBadge(programs, heroBadgeOverride), [programs, heroBadgeOverride]);
+  const autoBadge = useMemo(() => computeAdventureBadge(programs, null), [programs]);
 
   return (
     <div className="space-y-6">
@@ -366,6 +377,67 @@ export function RenewalSettingsManager() {
             )}
           </div>
         )}
+      </div>
+
+      {/* ── Homepage Hero Badge Live Status Card ── */}
+      <div className="rounded-3xl border border-amber-200/90 bg-gradient-to-br from-amber-50/80 via-white to-orange-50/50 p-6 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-1.5 flex-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 border border-amber-200 text-[11px] font-black uppercase tracking-wider text-amber-800">
+              <span>🌐 Homepage Live Hero Announcement</span>
+            </div>
+            <h3 className="text-lg font-black text-[#002f76]">
+              Visitor Badge on Landing Page
+            </h3>
+            <p className="text-[13px] text-slate-600 leading-relaxed max-w-2xl">
+              Directly connected to <strong>Discovery Club: Curious Explorer</strong> (Master Program). When Adventure 2 (or any next adventure) has a future start date, visitors are informed it is starting soon. Once that date arrives, the badge automatically flips to <strong>Now Ongoing 🎉</strong>.
+            </p>
+          </div>
+
+          {/* Live Preview Box */}
+          <div className="shrink-0 flex flex-col items-start lg:items-end gap-2 bg-white/90 border border-amber-200/70 rounded-2xl p-4 shadow-xs">
+            <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-slate-400">
+              Live Visitor Preview
+            </span>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#FFF8E1] px-4 py-2 text-[14px] font-fredoka font-semibold text-[#B8860B] ring-2 ring-[#FFC107]/40 shadow-xs">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full animate-pulse"
+                style={{ backgroundColor: liveBadge.pulse }}
+              />
+              <span>{liveBadge.label}</span>
+            </div>
+            <p className="text-[11.5px] font-semibold text-slate-500">
+              {liveBadge.status === "upcoming"
+                ? `⏳ Scheduled — flips to "Adventure ${liveBadge.adventureNumber} · Now Ongoing 🎉" once ${fmtDate(liveBadge.targetDate)} arrives`
+                : liveBadge.status === "ongoing"
+                ? `✅ Active ongoing adventure cycle`
+                : `✏️ Custom override enabled`}
+            </p>
+          </div>
+        </div>
+
+        {/* Optional Custom Override Input */}
+        <div className="mt-5 pt-4 border-t border-amber-200/60 flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="text-[12px] font-bold text-slate-700 shrink-0">
+            Custom Badge Text (Optional override):
+          </label>
+          <input
+            type="text"
+            placeholder={`Auto: ${autoBadge.label}`}
+            value={heroBadgeOverride}
+            onChange={(e) => setHeroBadgeOverride(e.target.value)}
+            className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-[#0033A0]/40 focus:ring-2 focus:ring-[#0033A0]/10 transition-all"
+          />
+          {heroBadgeOverride && (
+            <button
+              type="button"
+              onClick={() => setHeroBadgeOverride("")}
+              className="text-[11.5px] font-bold text-slate-500 hover:text-slate-800 underline underline-offset-2 cursor-pointer"
+            >
+              Reset to Auto
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Summary Indicator Cards ── */}

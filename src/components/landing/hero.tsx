@@ -11,19 +11,35 @@ import {
   CloudSectionDivider,
 } from "./playful-decorations";
 
-const ADVENTURE_START = new Date("2026-09-28T00:00:00+08:00");
+import { useEffect, useState } from "react";
+import { AdventureBadgeInfo } from "@/lib/adventure-badge";
 
-function useAdventureBadge() {
-  const now = new Date();
-  const hasStarted = now >= ADVENTURE_START;
-  return hasStarted
-    ? { label: "Adventure 1 · Now Ongoing 🎉", pulse: "#22c55e" }
-    : { label: "Adventure 1 · Beginning September 28, 2026", pulse: "#FFC107" };
-}
+const DEFAULT_BADGE: AdventureBadgeInfo = {
+  label: "Adventure 2 · Starting October 26, 2026 🚀",
+  pulse: "#FFC107",
+  adventureNumber: 2,
+  isUpcoming: true,
+  status: "upcoming",
+};
 
-export function HeroSection() {
+export function HeroSection({ initialBadge }: { initialBadge?: AdventureBadgeInfo }) {
   const reduce = useReducedMotion();
-  const badge = useAdventureBadge();
+  const [badge, setBadge] = useState<AdventureBadgeInfo>(initialBadge || DEFAULT_BADGE);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/renewal-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (mounted && data?.heroBadge) {
+          setBadge(data.heroBadge);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <section id="home" className="relative flex flex-col justify-center overflow-hidden pt-28 pb-10 lg:pt-36 lg:pb-16 lg:min-h-[92vh]">

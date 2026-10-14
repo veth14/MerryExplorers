@@ -79,14 +79,7 @@ export function PlayfulCloud({
 
         {/* Fluffy Seamless Cloud Body with full 360-degree rounded curves */}
         <path
-          d="M 46 94 
-             C 26 94, 12 80, 16 62 
-             C 12 42, 32 26, 52 30 
-             C 64 15, 88 8, 106 14 
-             C 128 10, 150 20, 156 38 
-             C 174 36, 188 50, 184 66 
-             C 188 82, 172 94, 154 94 
-             Z"
+          d="M 46 94 C 26 94, 12 80, 16 62 C 12 42, 32 26, 52 30 C 64 15, 88 8, 106 14 C 128 10, 150 20, 156 38 C 174 36, 188 50, 184 66 C 188 82, 172 94, 154 94 Z"
           fill="#ffffff"
           stroke="#bfe0fb"
           strokeWidth="3.5"
