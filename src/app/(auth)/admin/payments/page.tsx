@@ -552,7 +552,7 @@ function AdminPaymentsPageInner() {
   const { ADVENTURES, advNumbers } = useMemo(() => {
     const starts = renewalSettings
       .filter((p: any) => p.nextAdventureStart)
-      .map((p: any) => ({ date: new Date(p.nextAdventureStart), num: p.currentAdventure || 2 }))
+      .map((p: any) => ({ date: new Date(p.nextAdventureStart), num: (p.currentAdventure || 1) + 1 }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
 
     const earliest = starts[0];
