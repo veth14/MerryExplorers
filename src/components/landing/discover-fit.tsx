@@ -21,21 +21,21 @@ export function DiscoverFitSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#F0F9FF] border border-[#7DD3FC]/50 px-4 py-1.5 text-xs font-extrabold uppercase tracking-widest text-[#0F006E]">
-              🗺️ Play & Learning Fit Score
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#F0F9FF] border border-[#7DD3FC]/60 px-4 py-1.5 font-fredoka text-xs font-semibold uppercase tracking-wider text-[#0033A0] shadow-sm">
+              🗺️ Play &amp; Learning Fit Guide
             </div>
 
-            <h2 className="font-headline text-4xl sm:text-5xl font-extrabold text-[#0F006E] leading-tight mb-4">
-              Take a Discovery
+            <h2 className="font-fredoka text-[36px] sm:text-[46px] font-bold text-[#002f76] leading-tight mb-4">
+              Find the Perfect Playgroup Fit
             </h2>
 
             <p className="text-base text-[#64748B] max-w-md mx-auto md:mx-0 leading-relaxed mb-8 font-medium">
-              Not sure which program fits your little explorer? Take our quick interactive quiz to find the perfect learning path for your child.
+              Not sure which program fits your little explorer? Take our quick interactive quiz to discover the ideal learning and play path for your child.
             </p>
 
             <Link
               href="/under-development"
-              className="inline-flex items-center gap-3 rounded-2xl bg-[#FFC107] px-8 py-4 text-lg font-extrabold text-[#0a1835] shadow-lg transition-all hover:shadow-xl hover:-translate-y-1 active:scale-95"
+              className="inline-flex items-center gap-3 rounded-2xl bg-[#FFC107] px-8 py-4 font-fredoka text-lg font-bold text-[#0a1835] shadow-[0_8px_20px_rgba(255,193,7,0.3)] transition-all hover:bg-[#ffb800] hover:shadow-[0_12px_24px_rgba(255,193,7,0.4)] hover:-translate-y-1 active:scale-95 ring-4 ring-white"
             >
               <span>Take the Program Fit Quiz</span>
               <span className="text-2xl">&#8594;</span>

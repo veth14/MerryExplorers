@@ -169,7 +169,7 @@ export default function SignWaiverPage({ params }: { params: Promise<{ id: strin
               <ul className="space-y-1 mb-4 pl-1">
                 <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
                 <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
-                <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
+                <li>🌈 <strong>Discovery Club: Everyday Explorer:</strong> Ages 1.5–4.11 | ₱7,518 | 14 sessions | 1 hr 15 mins/session</li>
               </ul>
               <p className="mb-4">Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building. It may also be a suitable starting point for children who are not yet using verbal communication.</p>
               <p className="font-bold mb-2">💡 Trailblazer: Brave Explorer — Prepare for What's Next</p>
@@ -191,15 +191,15 @@ export default function SignWaiverPage({ params }: { params: Promise<{ id: strin
               </ul>
 
               <h3 className="text-[#0050d5] font-extrabold uppercase tracking-wide text-[13px] mt-8 mb-2">4. ATTENDANCE & MAKE-UP SESSIONS</h3>
-              <p><strong>🔎 Discovery Club: Curious Explorer</strong> - If a class is suspended due to weather, the session will be moved to the next Monday or Wednesday until all required Adventure sessions are completed.</p>
-              <p className="mt-2"><strong>🎨 Discovery Club: Creative Explorer</strong> - Classes will continue according to the regular schedule, and any weather-related suspended session will automatically be made up on a Saturday. Families won't need to figure out when to insert the missed session—the Saturday make-up arrangement will continue until the required number of Adventure sessions is completed.</p>
+              <p><strong>🔎 Discovery Club: Curious Explorer</strong> - If a session is suspended due to weather, the session will be moved to the next Monday or Wednesday until all required Adventure sessions are completed.</p>
+              <p className="mt-2"><strong>🎨 Discovery Club: Creative Explorer</strong> - Sessions will continue according to the regular schedule, and any weather-related suspended session will automatically be made up on a Saturday. Families won't need to figure out when to insert the missed session—the Saturday make-up arrangement will continue until the required number of Adventure sessions is completed.</p>
               <p className="mt-2"><strong>💡 Trailblazer: Brave Explorer</strong> - Because Trailblazer follows a progressive and consistent routine, a suspended face-to-face session will shift online.</p>
               <ul className="list-disc pl-5 mt-1">
                 <li>Online session: 45 minutes</li>
                 <li>Practice worksheets will be provided</li>
                 <li>The online shift is considered a consumed session</li>
               </ul>
-              <p className="mt-2"><strong>🌈 Discovery Club: Everyday Curious</strong> - If a class is suspended, the missed session will be moved to the next learning day. Classes will continue from Monday to Friday until all 15 required Adventure sessions are completed. The number of sessions remains the same; only the schedule is adjusted.</p>
+              <p className="mt-2"><strong>🌈 Discovery Club: Everyday Explorer</strong> - If a session is suspended, the missed session will be moved to the next learning day. Sessions will continue from Monday to Friday until all 14 required Adventure sessions are completed. The number of sessions remains the same; only the schedule is adjusted.</p>
               <p className="mt-2"><strong>💛 Complimentary Free Session for All Explorers</strong> - For an excused missed session, such as sickness or other valid reasons, each child receives 1 complimentary session per Adventure. This is only one free session regardless of the number of missed sessions and the schedule will be determined by Merry Explorers.</p>
 
               <h3 className="text-[#0050d5] font-extrabold uppercase tracking-wide text-[13px] mt-8 mb-2">5. PHOTO & VIDEO HIGHLIGHTS</h3>
@@ -210,7 +210,7 @@ export default function SignWaiverPage({ params }: { params: Promise<{ id: strin
                     <li>🔎 Discovery Club: Curious Explorer - Monday</li>
                     <li>🎨 Discovery Club: Creative Explorer - Tuesday & Thursday</li>
                     <li>💡 Trailblazer: Brave Explorer - Thursday & Friday</li>
-                    <li>🌈 Discovery Club: Everyday Curious - Thursday & Friday</li>
+                    <li>🌈 Discovery Club: Everyday Explorer - Thursday & Friday</li>
                   </ul>
                 </li>
               </ul>
@@ -221,7 +221,7 @@ export default function SignWaiverPage({ params }: { params: Promise<{ id: strin
                     <li>🔎 Discovery Club: Curious Explorer - Wednesday</li>
                     <li>🎨 Discovery Club: Creative Explorer - Friday</li>
                     <li>💡 Trailblazer: Brave Explorer - Monday</li>
-                    <li>🌈 Discovery Club: Everyday Curious - Monday</li>
+                    <li>🌈 Discovery Club: Everyday Explorer - Monday</li>
                   </ul>
                 </li>
                 <li>Video Highlights will be posted on the official Merry Explorers page.</li>

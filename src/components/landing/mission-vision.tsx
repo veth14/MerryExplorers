@@ -29,10 +29,10 @@ export function MissionVisionSection() {
           >
             🕊️
           </m.span>
-          <h2 className="font-headline text-[32px] font-extrabold tracking-tight text-[#0033A0] sm:text-[42px]">
+          <h2 className="font-fredoka text-[34px] sm:text-[44px] font-bold tracking-normal text-[#002f76]">
             Who We Are
           </h2>
-          <p className="mx-auto mt-3 max-w-lg text-[15px] font-medium leading-relaxed text-[#0066CC]">
+          <p className="mx-auto mt-2 max-w-lg text-[15px] sm:text-[16px] font-medium leading-relaxed text-[#5b7294]">
             Rooted in faith, driven by love — our promise to every child and family.
           </p>
         </m.div>
@@ -58,13 +58,13 @@ export function MissionVisionSection() {
                     {item.emoji}
                   </m.span>
                   <span
-                    className="rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em]"
+                    className="font-fredoka rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
                     style={{ backgroundColor: item.accentSoft, color: item.accent }}
                   >
                     {item.label}
                   </span>
                 </div>
-                <h3 className="mb-3 font-headline text-[20px] font-extrabold leading-tight tracking-tight" style={{ color: item.accent }}>
+                <h3 className="mb-3 font-fredoka text-[22px] font-bold leading-tight tracking-normal" style={{ color: item.accent }}>
                   {item.title}
                 </h3>
                 <p className="text-[14px] font-medium leading-[1.75] text-[#475569]">{item.body}</p>

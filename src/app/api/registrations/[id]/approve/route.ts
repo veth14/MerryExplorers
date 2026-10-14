@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 const PROGRAM_NAMES: Record<string, string> = {
   "curious-explorer": "Discovery Club: Curious Explorer",
-  "everyday-curious": "Discovery Club: Everyday Curious",
+  "everyday-curious": "Discovery Club: Everyday Explorer",
   "creative-explorer": "Discovery Club: Creative Explorer",
   "brave-explorer": "Trailblazer: Brave Explorer",
 };
@@ -30,19 +30,31 @@ const PROGRAM_RATES: Record<string, { rate: number; downpayment: number; balance
 // Actual clock times for each program's class slots
 const PROGRAM_CLASS_TIMES: Record<string, Record<string, string>> = {
   "curious-explorer": {
+    "Morning Session": "9:45 AM – 11:00 AM",
     "Morning Class": "9:45 AM – 11:00 AM",
+    "Afternoon Session": "1:30 PM – 2:45 PM",
     "Afternoon Class": "1:30 PM – 2:45 PM",
   },
   "everyday-curious": {
-    "Afternoon Class": "4:25 PM – 5:25 PM",
+    "Mid-Day Session": "11:15 AM – 12:30 PM",
+    "Afternoon Session": "11:15 AM – 12:30 PM",
+    "Afternoon Class": "11:15 AM – 12:30 PM",
   },
   "creative-explorer": {
+    "Morning Session": "9:45 AM – 11:00 AM",
     "Morning Class": "9:45 AM – 11:00 AM",
+    "Mid-Day Session": "11:15 AM – 12:30 PM",
     "Mid-Day Class": "11:15 AM – 12:30 PM",
+    "Afternoon Session": "1:30 PM – 2:45 PM",
     "Afternoon Class": "1:30 PM – 2:45 PM",
   },
   "brave-explorer": {
+    "Afternoon Session": "3:00 PM – 4:15 PM",
     "Afternoon Class": "3:00 PM – 4:15 PM",
+  },
+  "saturday-playdate": {
+    "Morning Session": "10:30 AM – 11:45 AM",
+    "Morning Class": "10:30 AM – 11:45 AM",
   },
 };
 

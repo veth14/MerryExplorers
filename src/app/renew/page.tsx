@@ -714,11 +714,10 @@ export default function RenewPage() {
 
                           {!isUnavailable && isSelected && (
                             <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
-                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
+                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Session Time</p>
                               <div className="grid gap-2.5 sm:grid-cols-2">
                                 {p.classes.map((cls) => {
-                                  const isCreativeMorning = p.id === "creative-explorer" && cls.time.includes("9:45 AM");
-                                  const displayName = isCreativeMorning ? "Morning Class / Everyday Curious" : cls.name;
+                                  const displayName = cls.name;
 
                                   const slotInfo = programSlotData[cls.name];
                                   const isFull = slotInfo ? slotInfo.available === 0 : false;
@@ -1011,7 +1010,7 @@ export default function RenewPage() {
                   {
                     title: "Program Selection", emoji: "📚", rows: [
                       ["Program", prog.name],
-                      ["Class Time", selectedClass],
+                      ["Session Time", selectedClass],
                       ["Schedule", prog.schedule],
                       ["Sessions", `${prog.sessions} sessions`],
                       ["Total Rate", isPioneer && effectiveRate !== prog.rate ? `₱${effectiveRate.toLocaleString()} (Pioneer Special)` : `₱${prog.rate.toLocaleString()}`],

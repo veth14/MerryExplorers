@@ -58,8 +58,8 @@ export function SiteHeader() {
             <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="44px" className="object-contain" priority />
           </div>
           <span className="flex flex-col leading-none">
-            <span className="font-headline text-[18px] md:text-[19px] font-extrabold tracking-tight text-[#0033A0]">Merry</span>
-            <span className="font-headline text-[11px] md:text-[12px] font-bold tracking-[0.14em] text-[#FFB800]">Explorers</span>
+            <span className="font-fredoka text-[19px] md:text-[20px] font-bold tracking-tight text-[#0033A0]">Merry</span>
+            <span className="font-fredoka text-[12px] md:text-[13px] font-bold tracking-[0.14em] text-[#FFB800]">Explorers</span>
           </span>
         </Link>
 
@@ -70,7 +70,7 @@ export function SiteHeader() {
               <Link
                 key={link.label}
                 href={link.href}
-                className="relative group px-4 py-2 text-[15px] font-bold text-[#4a5f82] transition-colors hover:text-[#0033A0]"
+                className="relative group px-4 py-2 font-fredoka text-[15px] font-semibold text-[#4a5f82] transition-colors hover:text-[#0033A0]"
               >
                 {link.label.replace("Now", "").trim()}
                 <span className="absolute bottom-1 left-4 right-4 h-0.5 scale-x-0 rounded-full bg-[#0033A0] transition-transform duration-300 origin-center group-hover:scale-x-100" />
@@ -82,10 +82,10 @@ export function SiteHeader() {
 
           <Link
             href="/parent/login"
-            className="group relative overflow-hidden rounded-full bg-[#FFC107] px-6 py-2.5 text-[15px] font-bold text-[#0a1835] shadow-[0_4px_12px_rgba(255,193,7,0.3)] transition-all duration-300 hover:shadow-[0_8px_20px_rgba(255,193,7,0.4)] hover:-translate-y-0.5 will-change-transform"
+            className="group relative overflow-hidden rounded-full bg-[#FFC107] px-6 py-2.5 font-fredoka text-[15px] font-bold text-[#0a1835] shadow-[0_4px_14px_rgba(255,193,7,0.35)] ring-2 ring-white transition-all duration-300 hover:bg-[#ffb800] hover:shadow-[0_8px_20px_rgba(255,193,7,0.45)] hover:-translate-y-0.5 will-change-transform"
           >
             <span className="relative z-10 flex items-center gap-2">
-              Parent Portal
+              Parent Portal 🎈
               <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -151,7 +151,7 @@ export function SiteHeader() {
                         <Link
                           href={link.href}
                           onClick={() => setOpen(false)}
-                          className="block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors text-[#334e7a] hover:bg-[#eaf0fe] hover:text-[#0033A0]"
+                          className="block rounded-2xl px-6 py-4 font-fredoka text-[16px] font-semibold transition-colors text-[#334e7a] hover:bg-[#eaf0fe] hover:text-[#0033A0]"
                         >
                           {link.label}
                         </Link>
@@ -162,18 +162,18 @@ export function SiteHeader() {
                     <Link
                       href="/inquire"
                       onClick={() => setOpen(false)}
-                      className="block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors text-[#0033A0] hover:bg-[#eaf0fe]"
+                      className="block rounded-2xl px-6 py-4 font-fredoka text-[16px] font-bold transition-colors text-[#0033A0] hover:bg-[#eaf0fe]"
                     >
-                      Inquire
+                      Inquire 💌
                     </Link>
                   </li>
                   <li>
                     <Link
                       href="/parent/login"
                       onClick={() => setOpen(false)}
-                      className="block rounded-2xl px-6 py-4 text-[16px] font-bold transition-colors bg-[#FFC107] text-[#0a1835] mt-2 text-center shadow-md shadow-[#FFC107]/20"
+                      className="block rounded-2xl px-6 py-4 font-fredoka text-[16px] font-bold transition-colors bg-[#FFC107] text-[#0a1835] mt-2 text-center shadow-md shadow-[#FFC107]/20"
                     >
-                      Parent Portal
+                      Parent Portal 🎈
                     </Link>
                   </li>
                 </ul>

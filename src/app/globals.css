@@ -108,6 +108,7 @@ html.menu-open {
   --color-brand-sky: var(--brand-sky);
   --color-brand-green: var(--brand-green);
   --color-brand-red: var(--brand-red);
+  --font-fredoka: var(--font-fredoka);
 }
 
 .cloud-bg {
@@ -117,10 +118,23 @@ html.menu-open {
     radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 30%);
 }
 
+@keyframes me-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.me-spin {
+  animation: me-spin 26s linear infinite;
+}
+
 body {
   color: var(--on-background);
   font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   min-height: 100vh;
+}
+
+.font-fredoka {
+  font-family: var(--font-fredoka), "Comic Sans MS", cursive, sans-serif;
 }
 
 .font-headline {

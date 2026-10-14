@@ -100,21 +100,48 @@ export async function POST(request: Request) {
     const { db } = await connectToDatabase();
 
     // Check slot availability
-    const programConfig = {
-      "curious-explorer": { classes: { "Morning Class": 4, "Afternoon Class": 4 } },
-      "everyday-curious": { classes: { "Afternoon Class": 5 } },
-      "creative-explorer": { classes: { "Morning Class": 5, "Mid-Day Class": 5, "Afternoon Class": 5 } },
-      "brave-explorer": { classes: { "Afternoon Class": 6 } },
-    } as Record<string, { classes: Record<string, number> }>;
+    const programConfig: Record<string, { classes: Record<string, number> }> = {
+      "curious-explorer": {
+        classes: {
+          "Morning Session": 4, "Morning Class": 4,
+          "Afternoon Session": 4, "Afternoon Class": 4,
+        },
+      },
+      "everyday-curious": {
+        classes: {
+          "Mid-Day Session": 5, "Afternoon Session": 5, "Afternoon Class": 5,
+        },
+      },
+      "creative-explorer": {
+        classes: {
+          "Morning Session": 5, "Morning Class": 5,
+          "Mid-Day Session": 5, "Mid-Day Class": 5,
+          "Afternoon Session": 5, "Afternoon Class": 5,
+        },
+      },
+      "brave-explorer": {
+        classes: {
+          "Afternoon Session": 6, "Afternoon Class": 6,
+        },
+      },
+      "saturday-playdate": {
+        classes: {
+          "Morning Session": 10, "Morning Class": 10,
+        },
+      },
+    };
 
     // Adventure 2 start — only count registrations from this cycle onward
     const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
 
     const maxSlots = programConfig[program]?.classes[classTime];
     if (maxSlots !== undefined) {
+      const altClassTime = classTime.includes("Session")
+        ? classTime.replace("Session", "Class")
+        : classTime.replace("Class", "Session");
       const takenSlots = await db.collection("student_registrations").countDocuments({
         program,
-        classTime,
+        classTime: { $in: [classTime, altClassTime] },
         status: { $in: ["pending", "approved", "reserved"] },
         submittedAt: { $gte: ADVENTURE_2_START },
       });
@@ -268,7 +295,7 @@ export async function POST(request: Request) {
         const programKeyMap: Record<string, string> = {
           "curious-explorer": "Discovery Club: Curious Explorer",
           "creative-explorer": "Discovery Club: Creative Explorer",
-          "everyday-curious": "Discovery Club: Everyday Curious",
+          "everyday-curious": "Discovery Club: Everyday Explorer",
           "brave-explorer": "Trailblazer: Brave Explorer",
           "ballet": "Ballet",
           "saturday-playdate": "Saturday Playdate",

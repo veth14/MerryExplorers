@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
+import { Fredoka, Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PageProgress } from "@/components/ui/page-progress";
 import { AnimationProvider } from "@/components/providers/animation-provider";
@@ -13,6 +13,13 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -34,7 +41,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${plusJakartaSans.variable} ${manrope.variable} h-full antialiased`}
+      className={`${plusJakartaSans.variable} ${manrope.variable} ${fredoka.variable} h-full antialiased`}
     >
       <head>
         {/* ── Preconnects: only origins used by the landing page ── */}

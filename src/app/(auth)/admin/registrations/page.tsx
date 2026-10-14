@@ -41,7 +41,7 @@ interface Registration {
 
 const PROGRAM_NAMES: Record<string, string> = {
   "curious-explorer": "Curious Explorer",
-  "everyday-curious": "Everyday Curious",
+  "everyday-curious": "Everyday Explorer",
   "creative-explorer": "Creative Explorer",
   "brave-explorer": "Brave Explorer",
   "ballet": "Ballet",
@@ -566,7 +566,7 @@ export default function AdminRegistrationsPage() {
           >
             <option value="all">All Programs</option>
             <option value="curious-explorer">Curious Explorer</option>
-            <option value="everyday-curious">Everyday Curious</option>
+            <option value="everyday-curious">Everyday Explorer</option>
             <option value="creative-explorer">Creative Explorer</option>
             <option value="brave-explorer">Brave Explorer</option>
             <option value="ballet">Ballet</option>

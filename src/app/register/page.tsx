@@ -968,11 +968,10 @@ export default function RegisterPage() {
                                   ⚠️ Pre-requisite: {p.prerequisite}
                                 </div>
                               )}
-                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Class Time</p>
+                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Session Time</p>
                               <div className="grid gap-2.5 sm:grid-cols-2">
                                 {p.classes.map((cls) => {
-                                  const isCreativeMorning = p.id === "creative-explorer" && cls.time.includes("9:45 AM");
-                                  const displayName = isCreativeMorning ? "Morning Class / Everyday Curious" : cls.name;
+                                  const displayName = cls.name;
 
                                   const slotInfo = programSlots[cls.name];
                                   const isFull = slotInfo ? slotInfo.available === 0 : false;
@@ -1242,7 +1241,7 @@ export default function RegisterPage() {
                   {
                     title: "Program Selection", emoji: "📚", rows: [
                       ["Program", prog.name],
-                      ["Class Time", selectedClass],
+                      ["Session Time", selectedClass],
                       ["Schedule", prog.schedule],
                       ["Sessions", `${prog.sessions} sessions`],
                       ["Total Rate", `₱${prog.rate.toLocaleString()}`],

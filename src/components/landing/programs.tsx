@@ -21,10 +21,10 @@ const CURIOUS_EXPLORER = {
   pillText: "#0033A0",
   icon: "magnifying_glass",
   keywords: ["Explore", "Create", "Connect", "Together"],
-  description: "A gentle, guided class for little ones who are new to learning, still need a guardian, and are slowly transitioning to a learning environment.",
+  description: "A gentle, guided session for little ones who are new to learning, still need a guardian, and are slowly transitioning to a learning environment.",
   schedules: [
-    { label: "Morning Class", days: "Monday & Wednesday", time: "9:45 AM – 11:00 AM" },
-    { label: "Afternoon Class", days: "Monday & Wednesday", time: "1:30 PM – 2:45 PM" },
+    { label: "Morning Session", days: "Monday & Wednesday", time: "9:45 AM – 11:00 AM" },
+    { label: "Afternoon Session", days: "Monday & Wednesday", time: "1:30 PM – 2:45 PM" },
   ],
 };
 
@@ -43,9 +43,9 @@ const CREATIVE_EXPLORER = {
   keywords: ["Create", "Explore", "Build", "Grow", "Belong"],
   description: "Hands-on, engaging activities that spark curiosity and build foundational skills through play, exploration and discovery.",
   schedules: [
-    { label: "Morning Class", days: "Tuesday, Thursday & Friday", time: "9:45 AM – 11:00 AM" },
-    { label: "Mid-Day Class", days: "Tuesday, Thursday & Friday", time: "11:15 AM – 12:30 PM" },
-    { label: "Afternoon Class", days: "Tuesday, Thursday & Friday", time: "1:30 PM – 2:45 PM" },
+    { label: "Morning Session", days: "Tuesday, Thursday & Friday", time: "9:45 AM – 11:00 AM" },
+    { label: "Mid-Day Session", days: "Tuesday, Thursday & Friday", time: "11:15 AM – 12:30 PM" },
+    { label: "Afternoon Session", days: "Tuesday, Thursday & Friday", time: "1:30 PM – 2:45 PM" },
   ],
 };
 
@@ -83,13 +83,13 @@ const SATURDAY_PLAYDATE = {
   keywords: ["Creative Play", "Hands-on Activities", "Make Friends"],
   description: "A fun and engaging play experience for little explorers on their weekend adventure! Same merry heart, new adventures.",
   schedules: [
-    { label: "Morning Class", days: "Saturdays", time: "10:30 AM – 11:45 AM" },
+    { label: "Morning Session", days: "Saturdays", time: "10:30 AM – 11:45 AM" },
   ],
 };
 
-const EVERYDAY_CURIOUS = {
+const EVERYDAY_EXPLORER = {
   club: "Discovery Club",
-  name: "Everyday Curious",
+  name: "Everyday Explorer",
   tagline: "Curious Explorer Program, but make it daily! ♥",
   ageLabel: "Ages 1.5 – 4.11 years old",
   maxChildren: 4,
@@ -100,9 +100,9 @@ const EVERYDAY_CURIOUS = {
   pillText: "#14532d",
   icon: "star",
   keywords: ["Explore & Learn", "Create & Imagine", "Family & Values", "Music & Movement", "Free Play"],
-  description: "More play. More learning. More opportunities every day! A different theme each weekday afternoon so curious little explorers discover something new every session.",
+  description: "More play. More learning. More opportunities every day! A different theme each weekday so curious little explorers discover something new every session.",
   schedules: [
-    { label: "Afternoon Class", days: "Monday – Friday", time: "4:25 PM – 5:25 PM" },
+    { label: "Mid-Day Session", days: "Monday – Friday", time: "11:15 AM – 12:30 PM" },
   ],
 };
 
@@ -150,13 +150,13 @@ function ProgramCard({
         <div className="absolute left-1/2 -top-7 -translate-x-1/2 flex h-14 w-14 items-center justify-center">
           {renderIcon(data.icon)}
         </div>
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] mt-2" style={{ color: data.subtitleColor }}>
+        <p className="font-fredoka text-[12px] font-semibold uppercase tracking-[0.18em] mt-2" style={{ color: data.subtitleColor }}>
           {data.club}
         </p>
-        <h3 className="font-headline text-[22px] font-extrabold uppercase tracking-wider mt-0.5" style={{ color: data.titleColor }}>
+        <h3 className="font-fredoka text-[24px] font-bold uppercase tracking-wider mt-0.5" style={{ color: data.titleColor }}>
           {data.name}
         </h3>
-        <p className="mt-1 text-[12px] font-semibold italic" style={{ color: data.subtitleColor }}>
+        <p className="font-fredoka mt-1 text-[13px] font-medium italic" style={{ color: data.subtitleColor }}>
           {data.tagline}
         </p>
       </div>
@@ -164,7 +164,7 @@ function ProgramCard({
       {/* Age pill */}
       <div className="relative z-10 -mt-3.5 flex justify-center">
         <span
-          className="whitespace-nowrap rounded-full px-5 py-1.5 text-[11px] font-bold uppercase tracking-wider shadow-sm"
+          className="whitespace-nowrap rounded-full px-5 py-1.5 font-fredoka text-[12px] font-semibold uppercase tracking-wider shadow-sm ring-2 ring-white"
           style={{ backgroundColor: data.pillBg, color: data.pillText }}
         >
           {data.ageLabel}
@@ -239,29 +239,29 @@ export function ProgramsSection() {
           >
             🗺️
           </m.span>
-          <h2 className="font-headline text-[32px] font-extrabold tracking-tight text-[#0033A0] sm:text-[40px]">
-            Our Programs
+          <h2 className="font-fredoka text-[34px] sm:text-[44px] font-bold tracking-normal text-[#002f76]">
+            Our Playgroup Programs
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-[15px] font-medium leading-relaxed text-[#0066CC]">
-            Adventure 1 · Different Explorers. Different Paths. One Merry Adventure.
+          <p className="mx-auto mt-2 max-w-md text-[15px] sm:text-[16px] font-medium leading-relaxed text-[#5b7294]">
+            Different Explorers · Different Paths · One Merry Adventure
           </p>
         </m.div>
 
         {/* Tab Navigation */}
         <div className="mb-10 flex flex-wrap justify-center gap-3">
           {[
-            { id: "discovery", label: "Discovery Club" },
-            { id: "trailblazer", label: "Trailblazer" },
-            { id: "weekend", label: "Weekend Adventures" },
+            { id: "discovery", label: "Discovery Club 🎈" },
+            { id: "trailblazer", label: "Trailblazer 🚀" },
+            { id: "weekend", label: "Weekend Adventures 🎨" },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabCategory)}
-                className={`relative overflow-hidden rounded-full px-6 py-3 text-[14px] font-bold transition-all duration-300 ${isActive
-                  ? "text-white shadow-md shadow-[#0033A0]/20"
-                  : "bg-white text-[#475569] shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-[#0033A0] hover:shadow-md hover:-translate-y-0.5"
+                className={`relative overflow-hidden rounded-full px-6 py-3 font-fredoka text-[15px] font-semibold transition-all duration-300 ${isActive
+                  ? "text-white shadow-md shadow-[#0033A0]/25"
+                  : "bg-white text-[#475569] shadow-sm border border-[#e2e8f4] hover:bg-[#f8fbfe] hover:text-[#0033A0] hover:shadow-md hover:-translate-y-0.5"
                   }`}
               >
                 {isActive && (
@@ -273,7 +273,6 @@ export function ProgramsSection() {
                 )}
                 <span className="relative z-10 flex items-center gap-2">
                   {tab.label}
-                  {!isActive && <span className="text-[10px] opacity-60">👆</span>}
                 </span>
               </button>
             );
@@ -294,8 +293,8 @@ export function ProgramsSection() {
                 <ProgramCard data={CURIOUS_EXPLORER} delay={0} animateFrom="left" />
                 <ProgramCard data={CREATIVE_EXPLORER} delay={0.1} animateFrom="right" />
               </div>
-              {/* Everyday Curious — full-width below the two cards */}
-              <ProgramCard data={EVERYDAY_CURIOUS} delay={0.2} animateFrom="bottom" />
+              {/* Everyday Explorer — full-width below the two cards */}
+              <ProgramCard data={EVERYDAY_EXPLORER} delay={0.2} animateFrom="bottom" />
             </m.div>
           )}
 

@@ -61,7 +61,7 @@ export function ParentPortalCTA() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
-                className="font-headline text-[32px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[40px] lg:text-[44px]"
+                className="font-fredoka text-[34px] font-bold leading-[1.15] tracking-normal text-white sm:text-[42px] lg:text-[46px]"
               >
                 Interested in Our Playgroup?
               </m.h2>
@@ -71,7 +71,7 @@ export function ParentPortalCTA() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.33, ease: "easeOut" }}
-                className="mt-5 max-w-md text-[16px] font-medium leading-relaxed text-white/80"
+                className="mt-4 max-w-md text-[16px] font-medium leading-relaxed text-white/85"
               >
                 Have questions about registration, programs, or schedules? Send us an inquiry and our team will get back to you within 1–2 business days.
               </m.p>
@@ -86,7 +86,7 @@ export function ParentPortalCTA() {
                 <Link
                   href="/inquire"
                   id="inquire-now-btn"
-                  className="group inline-flex items-center gap-2 rounded-full bg-[#FFC107] px-8 py-3.5 text-[15px] font-bold text-[#0b1a3d] shadow-lg transition-all duration-300 hover:bg-[#FFB800] hover:-translate-y-0.5"
+                  className="group inline-flex items-center gap-3 rounded-full bg-[#FFC107] px-8 py-4 font-fredoka text-[17px] font-semibold text-[#0b1a3d] shadow-[0_8px_20px_rgba(255,193,7,0.3)] ring-4 ring-white/10 transition-all duration-300 hover:bg-[#ffb800] hover:shadow-[0_12px_28px_rgba(255,193,7,0.4)] hover:-translate-y-1"
                 >
                   Inquire Now
                   <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />

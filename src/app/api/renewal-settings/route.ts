@@ -7,7 +7,7 @@ const SETTINGS_KEY = "renewal_settings_v2";
 const RENEWAL_PROGRAMS = [
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
-  "Discovery Club: Everyday Curious",
+  "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
   "Ballet",
@@ -19,7 +19,7 @@ type ProgramKey = typeof RENEWAL_PROGRAMS[number];
 const ADVENTURE_PROGRAMS: readonly ProgramKey[] = [
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
-  "Discovery Club: Everyday Curious",
+  "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
 ];
@@ -149,7 +149,7 @@ export async function GET() {
 
     // Fill in any programs that might not exist in the stored doc
     const merged: ProgramRenewalEntry[] = RENEWAL_PROGRAMS.map((key) => {
-      const existing = programs.find((p) => p.programKey === key);
+      const existing = programs.find((p) => p.programKey === key || (key === "Discovery Club: Everyday Explorer" && (p.programKey as string) === "Discovery Club: Everyday Curious"));
       return existing
         ? {
             ...existing,

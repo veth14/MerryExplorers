@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { m, AnimatePresence  } from "framer-motion";
-import { NAV_LINKS } from "@/data/landing";
+import { SiteHeader } from "@/components/landing/site-header";
 import { SiteFooter } from "@/components/landing/site-footer";
+import { WashiTape, PlayfulSun, PlayfulStar } from "@/components/landing/playful-decorations";
 
 const CHILD_AGE_OPTIONS = [
   "1.6 – 2.5 years (Tiny Explorers)",
@@ -137,57 +137,36 @@ function InquirePageInner() {
   }
 
   return (
-    <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
+    <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="min-h-screen bg-gradient-to-b from-[#eaf6ff]/50 via-[#fcfdff] to-[#f8fafc] flex flex-col relative overflow-hidden">
+      {/* Universal Floating Pill Header */}
+      <SiteHeader />
 
-      {/* ── Dreamy Background Orbs ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]"></div>
-        <div aria-hidden className="absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1]"></div>
-        <div aria-hidden className="absolute -bottom-40 left-1/3 w-[700px] h-[700px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05]"></div>
+      {/* Playgroup Background Accents */}
+      <div className="absolute top-20 right-6 sm:top-24 sm:right-16 z-0 pointer-events-none opacity-85">
+        <PlayfulSun size={110} />
+      </div>
+      <div className="absolute top-52 left-10 z-0 pointer-events-none hidden md:block">
+        <PlayfulStar size={26} rotate={15} />
+      </div>
+      <div className="absolute bottom-32 right-10 z-0 pointer-events-none hidden md:block">
+        <PlayfulStar size={30} rotate={-20} delay={0.8} />
       </div>
 
-      {/* Header */}
-      <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">
-        <div className="mx-auto flex h-[80px] w-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="40px" className="object-contain" />
-            </div>
-            <span className="flex flex-col leading-none">
-              <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">Merry</span>
-              <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">Explorers</span>
-            </span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-2">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="rounded-full px-6 py-2.5 text-[15px] font-bold transition-all text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="w-10 shrink-0" aria-hidden="true" />
-        </div>
-      </header>
-
       {/* ── Main Content ── */}
-      <main className="relative z-10 flex-grow flex items-center justify-center px-5 py-16 sm:py-24">
+      <main className="relative z-10 flex-grow flex items-center justify-center px-5 pt-32 pb-16 sm:pt-40 sm:pb-24">
         <div className="w-full max-w-[760px]">
 
           {/* Header Text */}
           <div className="text-center mb-12">
             <m.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-              <span className="inline-block mb-4">
-                <span className="text-4xl">👋</span>
+              <span className="font-fredoka text-[13px] font-semibold uppercase tracking-wider text-[#0050d5] bg-[#edf5ff] px-4 py-1.5 rounded-full inline-block mb-3 border border-[#d6e7ff] shadow-sm">
+                💌 Start Your Child&apos;s Adventure
               </span>
-              <h1 className="font-headline text-[40px] sm:text-[56px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-5">
-                We&apos;d love to <br className="sm:hidden" /> hear from you.
+              <h1 className="font-fredoka text-[42px] sm:text-[54px] font-bold leading-[1.1] tracking-normal text-[#002f76] mb-3">
+                We&apos;d Love to Hear From You
               </h1>
-              <p className="text-[17px] font-medium text-[#64748b] max-w-lg mx-auto leading-relaxed">
-                Send us a message below and our friendly admissions team will get back to you within 1–2 business days.
+              <p className="text-[16px] sm:text-[17px] font-medium text-[#5b7294] max-w-lg mx-auto leading-relaxed">
+                Send us a message below and our friendly playgroup team will get back to you within 1–2 business days.
               </p>
             </m.div>
           </div>
@@ -197,23 +176,26 @@ function InquirePageInner() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
+            className="relative bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.08)] border-2 border-white"
           >
+            {/* Washi tape pin */}
+            <WashiTape color="#ffd23f" width={80} tilt={-3} className="-top-3 left-1/2 -translate-x-1/2" />
+
             <AnimatePresence mode="wait">
               {success ? (
                 <m.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="flex flex-col items-center text-center py-12">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#22c55e] to-[#4ade80] text-white flex items-center justify-center mb-6 shadow-lg shadow-green-500/30">
                     <CheckIcon />
                   </div>
-                  <h3 className="text-[32px] font-extrabold text-[#0f172a] mb-4">Message Sent!</h3>
-                  <p className="text-[17px] font-medium text-[#64748b] max-w-sm leading-relaxed mb-10">
-                    Thank you for reaching out. We have received your inquiry and will contact you shortly.
+                  <h3 className="font-fredoka text-[34px] font-bold text-[#002f76] mb-3">Message Sent!</h3>
+                  <p className="text-[16px] font-medium text-[#5b7294] max-w-sm leading-relaxed mb-8">
+                    Thank you for reaching out! We have received your inquiry and will contact you shortly.
                   </p>
                   <div className="flex flex-col w-full sm:w-auto gap-4">
-                    <button onClick={() => setSuccess(false)} className="px-8 py-4 rounded-full border-2 border-[#e2e8f0] text-[#475569] text-[16px] font-bold hover:bg-[#f8fafc] transition-colors">
+                    <button onClick={() => setSuccess(false)} className="px-8 py-4 rounded-full border-2 border-[#e2e8f0] text-[#475569] font-fredoka text-[16px] font-bold hover:bg-[#f8fafc] transition-colors">
                       Send another message
                     </button>
-                    <Link href="/" className="px-8 py-4 rounded-full bg-[#0033A0] text-white text-[16px] font-bold hover:bg-[#002080] transition-colors shadow-lg shadow-[#0033A0]/20">
+                    <Link href="/" className="px-8 py-4 rounded-full bg-[#0033A0] text-white font-fredoka text-[16px] font-bold hover:bg-[#002880] transition-colors shadow-lg shadow-[#0033A0]/20">
                       Back to Home
                     </Link>
                   </div>
@@ -264,7 +246,7 @@ function InquirePageInner() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full py-5 rounded-2xl bg-gradient-to-r from-[#0033A0] to-[#0047df] text-white text-[17px] font-extrabold hover:to-[#0033A0] disabled:opacity-60 transition-all shadow-[0_12px_32px_rgba(0,51,160,0.3)] hover:shadow-[0_16px_40px_rgba(0,51,160,0.4)] hover:-translate-y-1 flex items-center justify-center gap-3"
+                      className="w-full py-5 rounded-full bg-[#0033A0] text-white font-fredoka text-[18px] font-bold hover:bg-[#002880] disabled:opacity-60 transition-all shadow-[0_12px_32px_rgba(0,51,160,0.3)] hover:shadow-[0_16px_40px_rgba(0,51,160,0.4)] hover:-translate-y-1 flex items-center justify-center gap-3 ring-4 ring-white"
                     >
                       {submitting ? (
                         <>
@@ -272,7 +254,7 @@ function InquirePageInner() {
                           Sending...
                         </>
                       ) : (
-                        "Send Message"
+                        "Send Message 💌"
                       )}
                     </button>
                   </div>

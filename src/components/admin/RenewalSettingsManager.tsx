@@ -28,7 +28,16 @@ export const PROGRAM_CONFIG_META: Record<string, { emoji: string; color: string;
     bg: "#f0fdf4",
     border: "#bbf7d0",
     gradient: "from-emerald-500/10 to-teal-500/10",
-    short: "Everyday Curious",
+    short: "Everyday Explorer",
+    badge: "bg-emerald-100 text-emerald-900 border-emerald-300",
+  },
+  "Discovery Club: Everyday Explorer": {
+    emoji: "🌈",
+    color: "#16a34a",
+    bg: "#f0fdf4",
+    border: "#bbf7d0",
+    gradient: "from-emerald-500/10 to-teal-500/10",
+    short: "Everyday Explorer",
     badge: "bg-emerald-100 text-emerald-900 border-emerald-300",
   },
   "Trailblazer: Brave Explorer": {
@@ -94,6 +103,7 @@ const ADVENTURE_PROGRAMS = new Set([
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
   "Discovery Club: Everyday Curious",
+  "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
 ]);
@@ -105,6 +115,7 @@ export const DEFAULT_PROGRAMS: string[] = [
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
   "Discovery Club: Everyday Curious",
+  "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
   "Ballet",

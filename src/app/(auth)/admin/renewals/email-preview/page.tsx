@@ -33,8 +33,8 @@ const PROGRAMS: ProgramOption[] = [
         isAdv: true,
         advNum: 2,
         classes: [
-            { name: "Morning Class", time: "9:45 AM – 11:00 AM" },
-            { name: "Afternoon Class", time: "1:30 PM – 2:45 PM" },
+            { name: "Morning Session", time: "9:45 AM – 11:00 AM" },
+            { name: "Afternoon Session", time: "1:30 PM – 2:45 PM" },
         ],
         schedule: "Monday & Wednesday",
         startDate: "Monday, October 26, 2026",
@@ -50,8 +50,9 @@ const PROGRAMS: ProgramOption[] = [
         isAdv: true,
         advNum: 2,
         classes: [
-            { name: "Morning Class", time: "9:45 AM – 11:00 AM" },
-            { name: "Afternoon Class", time: "1:30 PM – 2:45 PM" },
+            { name: "Morning Session", time: "9:45 AM – 11:00 AM" },
+            { name: "Mid-Day Session", time: "11:15 AM – 12:30 PM" },
+            { name: "Afternoon Session", time: "1:30 PM – 2:45 PM" },
         ],
         schedule: "Tuesday & Thursday",
         startDate: "Tuesday, October 27, 2026",
@@ -61,13 +62,13 @@ const PROGRAMS: ProgramOption[] = [
     },
     {
         id: "everyday-curious",
-        name: "Discovery Club: Everyday Curious",
-        short: "Everyday Curious",
+        name: "Discovery Club: Everyday Explorer",
+        short: "Everyday Explorer",
         icon: "🌈",
         isAdv: true,
         advNum: 2,
         classes: [
-            { name: "Morning Class", time: "9:45 AM – 11:00 AM" },
+            { name: "Mid-Day Session", time: "11:15 AM – 12:30 PM" },
         ],
         schedule: "Monday – Thursday",
         startDate: "Monday, October 26, 2026",
@@ -83,7 +84,7 @@ const PROGRAMS: ProgramOption[] = [
         isAdv: true,
         advNum: 2,
         classes: [
-            { name: "Afternoon Class", time: "3:00 PM – 4:15 PM" },
+            { name: "Afternoon Session", time: "3:00 PM – 4:15 PM" },
         ],
         schedule: "Monday – Friday",
         startDate: "Monday, October 26, 2026",
@@ -99,7 +100,7 @@ const PROGRAMS: ProgramOption[] = [
         isAdv: true,
         advNum: 2,
         classes: [
-            { name: "Morning Class", time: "10:30 AM – 11:45 AM" },
+            { name: "Morning Session", time: "10:30 AM – 11:45 AM" },
         ],
         schedule: "Saturdays",
         startDate: "Saturday, October 31, 2026",
@@ -302,7 +303,7 @@ function RegistrationAllProgramsPreview() {
                                     <td style={{ padding: "4px 0", fontWeight: "bold", color: "#002f76" }}>{prog.name}</td>
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: "4px 0", color: "#64748b" }}><strong>Class / Session:</strong></td>
+                                    <td style={{ padding: "4px 0", color: "#64748b" }}><strong>Session:</strong></td>
                                     <td style={{ padding: "4px 0", fontWeight: "bold", color: "#002f76" }}>{selectedClass.name} ({selectedClass.time})</td>
                                 </tr>
                                 {prog.isAdv && (
@@ -372,7 +373,7 @@ function RegistrationAllProgramsPreview() {
                     {prog.disclaimerType === "virtual" && (
                         <div style={{ backgroundColor: "#f5f3ff", border: "1.5px solid #ddd6fe", borderRadius: 12, padding: 16, margin: "20px 0", fontSize: 13, color: "#5b21b6" }}>
                             <p style={{ margin: "0 0 6px", fontWeight: "bold" }}>💻 VIRTUAL TUTORIAL INFORMATION:</p>
-                            <p style={{ margin: 0 }}>Online classroom links and schedules will be coordinated directly with your teacher prior to your first class.</p>
+                            <p style={{ margin: 0 }}>Online classroom links and schedules will be coordinated directly with your teacher prior to your first session.</p>
                         </div>
                     )}
 

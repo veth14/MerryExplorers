@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { m } from "framer-motion";
-import { NAV_LINKS } from "@/data/landing";
+import { SiteHeader } from "@/components/landing/site-header";
 import { SiteFooter } from "@/components/landing/site-footer";
+import { WashiTape, PlayfulSun, PlayfulStar } from "@/components/landing/playful-decorations";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-8">
-      <h2 className="font-headline text-[20px] font-extrabold text-[#0033A0] mb-3">{title}</h2>
+      <h2 className="font-fredoka text-[21px] font-bold text-[#0033A0] mb-3">{title}</h2>
       <div className="text-[15px] font-medium text-[#475569] leading-relaxed space-y-2">{children}</div>
     </div>
   );
@@ -17,56 +17,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function TermsOfServicePage() {
   return (
-    <div className="min-h-screen bg-[#fdfdfd] flex flex-col relative">
-      {/* Background Orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div aria-hidden className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#0033A0] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.07]" />
-        <div aria-hidden className="absolute top-40 -right-20 w-[500px] h-[500px] bg-[#FFC107] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.1]" />
-        <div aria-hidden className="absolute -bottom-40 left-1/3 w-[700px] h-[700px] bg-[#0050d5] rounded-full mix-blend-multiply filter blur-[150px] opacity-[0.05]" />
+    <div className="min-h-screen bg-gradient-to-b from-[#eaf6ff]/50 via-[#fcfdff] to-[#f8fafc] flex flex-col relative overflow-hidden">
+      {/* Universal Floating Pill Header */}
+      <SiteHeader />
+
+      {/* Background Playgroup Accents */}
+      <div className="absolute top-20 right-6 sm:top-24 sm:right-16 z-0 pointer-events-none opacity-80">
+        <PlayfulSun size={110} />
+      </div>
+      <div className="absolute top-52 left-10 z-0 pointer-events-none hidden md:block">
+        <PlayfulStar size={26} rotate={15} />
       </div>
 
-      {/* Header */}
-      <header className="relative z-50 bg-white/60 border-b border-black/5 sticky top-0 backdrop-blur-xl">
-        <div className="mx-auto flex h-[80px] w-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 transition-transform hover:scale-[0.98]">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/LOGO-noBG.png" alt="Merry Explorers Logo" fill sizes="40px" className="object-contain" />
-            </div>
-            <span className="flex flex-col leading-none">
-              <span className="font-headline text-[18px] font-extrabold tracking-tight text-[#0033A0]">Merry</span>
-              <span className="font-headline text-[12px] font-bold tracking-[0.12em] text-[#FFB800]">Explorers</span>
-            </span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-2">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="rounded-full px-6 py-2.5 text-[15px] font-bold transition-all text-[#64748b] hover:bg-black/5 hover:text-[#0033A0]"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="w-10 shrink-0" aria-hidden="true" />
-        </div>
-      </header>
-
       {/* Main */}
-      <main className="relative z-10 flex-grow px-5 py-16 sm:py-24">
+      <main className="relative z-10 flex-grow px-5 pt-32 pb-16 sm:pt-40 sm:pb-24">
         <div className="mx-auto w-full max-w-3xl">
           {/* Header */}
           <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-14"
+            className="text-center mb-12"
           >
-            <span className="text-4xl mb-4 inline-block">📋</span>
-            <h1 className="font-headline text-[40px] sm:text-[56px] font-extrabold leading-[1.1] tracking-tight text-[#0f172a] mb-5">
+            <span className="font-fredoka text-[13px] font-semibold uppercase tracking-wider text-[#0050d5] bg-[#edf5ff] px-4 py-1.5 rounded-full inline-block mb-3 border border-[#d6e7ff] shadow-sm">
+              📋 Center Policies &amp; Agreement
+            </span>
+            <h1 className="font-fredoka text-[40px] sm:text-[52px] font-bold leading-[1.1] tracking-normal text-[#002f76] mb-3">
               Terms of Service
             </h1>
-            <p className="text-[15px] font-medium text-[#94a3b8]">Last updated: September 2026</p>
+            <p className="font-fredoka text-[14px] font-medium text-[#94a3b8]">Last updated: September 2026</p>
           </m.div>
 
           {/* Content Card */}
@@ -74,8 +53,9 @@ export default function TermsOfServicePage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.06)] border border-white"
+            className="relative bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 shadow-[0_24px_80px_rgba(0,51,160,0.08)] border-2 border-white"
           >
+            <WashiTape color="#ffd23f" width={80} tilt={-3} className="-top-3 left-1/2 -translate-x-1/2" />
             <Section title="1. Acceptance of Terms">
               <p>By registering your child at Merry Explorers Playgroup &amp; Learning Center (&quot;the Center&quot;) or by using our website and online systems, you agree to be bound by these Terms of Service. If you do not agree with these terms, please do not proceed with registration or use our services.</p>
             </Section>

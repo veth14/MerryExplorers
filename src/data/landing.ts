@@ -12,7 +12,7 @@ export const HIGHLIGHTS = [
   {
     title: "Small Group Learning",
     description:
-      "Intimate class sizes so every child gets the focused attention they deserve.",
+      "Intimate session sizes so every child gets the focused attention they deserve.",
     icon: "book",
   },
   {
@@ -47,7 +47,7 @@ export const PROGRAMS = [
     name: "Discovery Club: Curious Explorer",
     ageRange: "Ages 1.5 – 4.11",
     summary:
-      "A gentle, guided class for little ones who are new to learning, still need a guardian, and are slowly transitioning to a learning environment.",
+      "A gentle, guided session for little ones who are new to learning, still need a guardian, and are slowly transitioning to a learning environment.",
     highlights: ["Small group setting", "Guardian-assisted", "Transitional learning"],
     accent: "#FFC107",
     accentSoft: "#FFF3CD",
@@ -74,7 +74,7 @@ export const PROGRAMS = [
     icon: "rocket",
   },
   {
-    name: "Discovery Club: Everyday Curious",
+    name: "Discovery Club: Everyday Explorer",
     ageRange: "Ages 1.5 – 4.11",
     summary:
       "Curious Explorer Program, but make it daily! More play, more learning, more opportunities every day — a different theme each weekday afternoon.",
@@ -220,13 +220,13 @@ export const PROGRAM_SLOTS = {
     icon: "🔎",
     prerequisite: null,
     classes: [
-      { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 4 },
-      { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 4 },
+      { name: "Morning Session", time: "9:45 AM – 11:00 AM", maxSlots: 4 },
+      { name: "Afternoon Session", time: "1:30 PM – 2:45 PM", maxSlots: 4 },
     ],
   },
   "everyday-curious": {
     id: "everyday-curious",
-    name: "Discovery Club: Everyday Curious",
+    name: "Discovery Club: Everyday Explorer",
     ageRange: "Ages 1.5 – 4.11",
     schedule: "Monday – Friday",
     sessions: 14,
@@ -239,7 +239,7 @@ export const PROGRAM_SLOTS = {
     icon: "🌈",
     prerequisite: null,
     classes: [
-      { name: "Afternoon Class", time: "4:25 PM – 5:25 PM", maxSlots: 5 },
+      { name: "Mid-Day Session", time: "11:15 AM – 12:30 PM", maxSlots: 5 },
     ],
   },
   "creative-explorer": {
@@ -257,9 +257,9 @@ export const PROGRAM_SLOTS = {
     icon: "🎨",
     prerequisite: "Child must be able to stay independently with Teacher during sessions without a guardian.",
     classes: [
-      { name: "Morning Class", time: "9:45 AM – 11:00 AM", maxSlots: 5 },
-      { name: "Mid-Day Class", time: "11:15 AM – 12:30 PM", maxSlots: 5 },
-      { name: "Afternoon Class", time: "1:30 PM – 2:45 PM", maxSlots: 5 },
+      { name: "Morning Session", time: "9:45 AM – 11:00 AM", maxSlots: 5 },
+      { name: "Mid-Day Session", time: "11:15 AM – 12:30 PM", maxSlots: 5 },
+      { name: "Afternoon Session", time: "1:30 PM – 2:45 PM", maxSlots: 5 },
     ],
   },
   "brave-explorer": {
@@ -277,7 +277,7 @@ export const PROGRAM_SLOTS = {
     icon: "💡",
     prerequisite: null,
     classes: [
-      { name: "Afternoon Class", time: "3:00 PM – 4:15 PM", maxSlots: 6 },
+      { name: "Afternoon Session", time: "3:00 PM – 4:15 PM", maxSlots: 6 },
     ],
   },
   "ballet": {
@@ -322,7 +322,7 @@ export const PROGRAM_SLOTS = {
     icon: "🛝",
     prerequisite: null,
     classes: [
-      { name: "Morning Class", time: "10:30 AM – 11:45 AM", maxSlots: 10 },
+      { name: "Morning Session", time: "10:30 AM – 11:45 AM", maxSlots: 10 },
     ],
   },
   "virtual-session": {
@@ -340,7 +340,7 @@ export const PROGRAM_SLOTS = {
     icon: "🖥️",
     prerequisite: null,
     classes: [
-      { name: "Flexible Class", time: "TBD", maxSlots: 100 },
+      { name: "Flexible Session", time: "TBD", maxSlots: 100 },
     ],
   },
 } as const;

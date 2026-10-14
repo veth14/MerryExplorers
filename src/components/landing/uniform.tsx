@@ -40,11 +40,11 @@ export function UniformSection() {
               <path d="M21.53 5.47a1.5 1.5 0 0 0-1.6-.33l-5.4 2-2.53-2.53a1.5 1.5 0 0 0-2.12 0L7.35 7.14l-5.4-2a1.5 1.5 0 0 0-1.92 1.92l1.6 5.34a1.5 1.5 0 0 0 .58.82l6.23 4.67a1.5 1.5 0 0 0 1.8 0l6.23-4.67a1.5 1.5 0 0 0 .58-.82l1.6-5.34a1.5 1.5 0 0 0-.12-1.6z" />
             </svg>
           </div>
-          <h2 className="font-headline text-[36px] sm:text-[44px] font-extrabold tracking-tight text-[#0a1835]">
-            School Uniform
+          <h2 className="font-fredoka text-[36px] sm:text-[46px] font-bold tracking-normal text-[#002f76]">
+            Explorer Uniform Kit
           </h2>
-          <p className="mt-4 text-[17px] font-medium text-[#64748b]">
-            Look the part while exploring the world!
+          <p className="mt-3 text-[17px] font-medium text-[#5b7294]">
+            Comfortable, durable playwear designed for little explorers!
           </p>
         </m.div>
 

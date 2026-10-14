@@ -19,18 +19,18 @@ interface Student {
 }
 
 const PROGRAM_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
-  "curious-explorer":  { color: "#b45309", bg: "#fffbeb", label: "Curious Explorer",  emoji: "🔎" },
+  "curious-explorer": { color: "#b45309", bg: "#fffbeb", label: "Curious Explorer", emoji: "🔎" },
   "creative-explorer": { color: "#1d4ed8", bg: "#eff6ff", label: "Creative Explorer", emoji: "🎨" },
-  "everyday-curious":  { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Curious",  emoji: "🌈" },
-  "brave-explorer":    { color: "#047857", bg: "#f0fdf4", label: "Brave Explorer",    emoji: "💡" },
+  "everyday-explorer": { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Explorer", emoji: "🌈" },
+  "brave-explorer": { color: "#047857", bg: "#f0fdf4", label: "Brave Explorer", emoji: "💡" },
 };
 
 const FILTERS = [
-  { id: "all",              label: "All Programs" },
+  { id: "all", label: "All Programs" },
   { id: "curious-explorer", label: "Curious Explorer" },
-  { id: "everyday-curious", label: "Everyday Curious" },
-  { id: "creative-explorer",label: "Creative Explorer" },
-  { id: "brave-explorer",   label: "Brave Explorer" },
+  { id: "everyday-explorer", label: "Everyday Explorer" },
+  { id: "creative-explorer", label: "Creative Explorer" },
+  { id: "brave-explorer", label: "Brave Explorer" },
 ];
 
 function getInitials(name: string) {
@@ -69,7 +69,7 @@ export default function AdminStudentsPage() {
     fetch("/api/students")
       .then(r => r.json())
       .then(d => { if (d.success) setStudents(d.data); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -108,10 +108,10 @@ export default function AdminStudentsPage() {
       {/* ── Stats Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "24px" }}>
         {[
-          { label: "Total Explorers", value: stats.total,    icon: "🧒", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
-          { label: "Active",          value: stats.active,   icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
-          { label: "Programs",        value: stats.programs, icon: "📚", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
-          { label: "Registered Today",  value: stats.today,    icon: "🆕", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
+          { label: "Total Explorers", value: stats.total, icon: "🧒", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
+          { label: "Active", value: stats.active, icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+          { label: "Programs", value: stats.programs, icon: "📚", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
+          { label: "Registered Today", value: stats.today, icon: "🆕", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
         ].map(s => (
           <div key={s.label} style={{ background: "white", borderRadius: "20px", padding: "20px 24px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", display: "flex", alignItems: "center", gap: "16px" }}>
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>{s.icon}</div>

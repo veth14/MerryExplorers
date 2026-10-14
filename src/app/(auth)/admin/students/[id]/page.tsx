@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell";
 const PROGRAM_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
   "curious-explorer":  { color: "#b45309", bg: "#fffbeb", label: "Curious Explorer",  emoji: "🔎" },
   "creative-explorer": { color: "#1d4ed8", bg: "#eff6ff", label: "Creative Explorer", emoji: "🎨" },
-  "everyday-curious":  { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Curious",  emoji: "🌈" },
+  "everyday-curious":  { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Explorer", emoji: "🌈" },
   "brave-explorer":    { color: "#047857", bg: "#f0fdf4", label: "Brave Explorer",    emoji: "💡" },
 };
 

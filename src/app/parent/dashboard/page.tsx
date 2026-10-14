@@ -835,7 +835,7 @@ function WaiverAgreementText() {
       <ul>
         <li>🔎 <strong>Discovery Club: Curious Explorer:</strong> Ages 1.5–4.11 | ₱4,295 (Pioneer Family); ₱4,395 (New Family) | 8 sessions | 1 hr/session</li>
         <li>🎨 <strong>Discovery Club: Creative Explorer:</strong> Ages 2.6–4.11 | ₱4,820 (Pioneer Family); ₱4,985 (New Family) | 12 sessions | 1 hr 15 mins/session</li>
-        <li>🌈 <strong>Discovery Club: Everyday Curious:</strong> Ages 1.5–4.11 | ₱7,518 | 15 sessions | 1 hr/session</li>
+        <li>🌈 <strong>Discovery Club: Everyday Explorer:</strong> Ages 1.5–4.11 | ₱7,518 | 14 sessions | 1 hr 15 mins/session</li>
       </ul>
       <p>Discovery Club provides a play-based environment that encourages socialization, interaction, shared play, and confidence-building.</p>
       <p style={{ fontWeight: "700" }}>💡 Trailblazer: Brave Explorer — Prepare for What&apos;s Next</p>
@@ -843,7 +843,7 @@ function WaiverAgreementText() {
       <h3>3. REGISTRATION, PAYMENTS &amp; PENALTIES</h3>
       <p>60% non-refundable reservation fee upon registration. 40% balance due on or before the 6th session. 4% weekly interest on overdue balances. Accepted payments: Cash, GCash, BDO Bank Transfer, Credit/Debit Card (via GCash QR).</p>
       <h3>4. ATTENDANCE, ABSENCES &amp; MAKE-UP SESSIONS</h3>
-      <p>Make-up sessions are subject to availability and must be completed within the current Adventure. Unused make-ups do not carry over. Merry Explorers may reschedule classes due to force majeure with a complimentary make-up session.</p>
+      <p>Make-up sessions are subject to availability and must be completed within the current Adventure. Unused make-ups do not carry over. Merry Explorers may reschedule sessions due to force majeure with a complimentary make-up session.</p>
       <h3>5. PHOTO &amp; VIDEO HIGHLIGHTS</h3>
       <p>Photos/videos are shared privately and deleted 30 days after sharing. If you do not consent, notify us in writing before the first session.</p>
       <h3>6. UNIFORM POLICY</h3>
@@ -1461,6 +1461,7 @@ export default function ParentDashboardPage() {
                         "Discovery Club: Curious Explorer": 8,
                         "Discovery Club: Creative Explorer": 12,
                         "Discovery Club: Everyday Curious": 14,
+                        "Discovery Club: Everyday Explorer": 14,
                         "Trailblazer: Brave Explorer": 18,
                       };
                       const total = programs[profile.program];

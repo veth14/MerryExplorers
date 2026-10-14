@@ -1424,7 +1424,7 @@ export default function RenewalsPage() {
                   <option value="brave">Brave Explorer (Trailblazer)</option>
                   <option value="creative">Creative Explorer</option>
                   <option value="curious">Curious Explorer</option>
-                  <option value="everyday">Everyday Curious</option>
+                  <option value="everyday">Everyday Explorer</option>
                   <option value="ballet">Ballet (Baby/Basic)</option>
                   <option value="playdate">Saturday Playdate</option>
                   <option value="virtual">Virtual Tutorial</option>
@@ -1808,7 +1808,7 @@ export default function RenewalsPage() {
                   >
                     <option value="Curious Explorer">Curious Explorer</option>
                     <option value="Creative Explorer">Creative Explorer</option>
-                    <option value="Everyday Curious">Everyday Curious</option>
+                    <option value="Everyday Explorer">Everyday Explorer</option>
                     <option value="Trailblazer (Brave Explorer)">Trailblazer (Brave Explorer)</option>
                     <option value="Ballet">Ballet</option>
                     <option value="Saturday Playdate">Saturday Playdate</option>
@@ -1825,7 +1825,7 @@ export default function RenewalsPage() {
                   >
                     <option value="Curious Explorer">Curious Explorer</option>
                     <option value="Creative Explorer">Creative Explorer</option>
-                    <option value="Everyday Curious">Everyday Curious</option>
+                    <option value="Everyday Explorer">Everyday Explorer</option>
                     <option value="Trailblazer (Brave Explorer)">Trailblazer (Brave Explorer)</option>
                     <option value="Ballet">Ballet</option>
                     <option value="Saturday Playdate">Saturday Playdate</option>

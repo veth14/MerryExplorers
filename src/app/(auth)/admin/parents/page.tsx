@@ -27,7 +27,7 @@ const PROGRAMS: Program[] = [
     ages: "3 – 4.11",
     days: "Monday – Friday",
     sessions: 18,
-    times: [{ label: "Afternoon Class", range: "3:00 PM – 4:15 PM" }],
+    times: [{ label: "Afternoon Session", range: "3:00 PM – 4:15 PM" }],
   },
   {
     value: "Virtual Tutorial",
@@ -35,7 +35,7 @@ const PROGRAMS: Program[] = [
     ages: "All Ages",
     days: "Flexible",
     sessions: 1,
-    times: [{ label: "Flexible Class", range: "TBD" }],
+    times: [{ label: "Flexible Session", range: "TBD" }],
   },
 ];
 
@@ -262,7 +262,7 @@ function ParentModal({
     const PROGRAM_MAP: Record<string, string> = {
       "curious-explorer": "Discovery Club: Curious Explorer",
       "creative-explorer": "Discovery Club: Creative Explorer",
-      "everyday-curious": "Discovery Club: Everyday Curious",
+      "everyday-curious": "Discovery Club: Everyday Explorer",
       "brave-explorer": "Trailblazer: Brave Explorer",
       "ballet": "Ballet",
       "virtual-session": "Virtual Session",
@@ -928,7 +928,8 @@ function DownpaymentPanel({ data, onRefresh, renewalSettings }: { data: ParentAc
 const PROGRAM_META: Record<string, { emoji: string; color: string; bg: string; border: string; short: string }> = {
   "Discovery Club: Curious Explorer": { emoji: "🔍", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", short: "Curious Explorer" },
   "Discovery Club: Creative Explorer": { emoji: "🎨", color: "#0e7490", bg: "#ecfeff", border: "#a5f3fc", short: "Creative Explorer" },
-  "Discovery Club: Everyday Curious": { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Curious" },
+  "Discovery Club: Everyday Curious": { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Explorer" },
+  "Discovery Club: Everyday Explorer": { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Explorer" },
   "Trailblazer: Brave Explorer": { emoji: "🏕️", color: "#b45309", bg: "#fffbeb", border: "#fde68a", short: "Brave Explorer" },
 };
 
@@ -950,7 +951,7 @@ type RenewalCfg = {
 const RENEWAL_PROGRAMS = [
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
-  "Discovery Club: Everyday Curious",
+  "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
 ];
 
