@@ -726,6 +726,7 @@ export default function PaymentPage() {
           z-index: 1;
           width: 100%;
           max-width: 900px;
+          margin: 0 auto;
           padding: 120px 20px 100px;
           display: flex;
           flex-direction: column;
