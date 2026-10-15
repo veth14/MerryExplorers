@@ -2112,35 +2112,82 @@ export default function RenewalsPage() {
                   </div>
                 </div>
               ) : emailType === "payment_reminder" ? (
-                <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
-                  <div className="border-b border-slate-200 pb-2">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
-                    <p className="font-bold text-[#002f76] mt-0.5">
-                      Payment Reminder &amp; Slot Confirmation for {emailModalFamily.childName} 🌈
-                    </p>
-                  </div>
-                  <div className="space-y-2.5 text-slate-600 text-[12px] leading-relaxed">
-                    <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
-                    <p>
-                      Thank you for submitting your priority renewal registration for <strong>{emailModalFamily.childName}</strong>! Your slot is currently on hold under reservation.
-                    </p>
-                    <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center my-2">
-                      <p className="text-[11px] font-bold text-blue-900">Direct Payment Link Included:</p>
-                      <p className="text-[11px] text-blue-700 mt-0.5 font-mono">
-                        {emailModalFamily.registrationId
-                          ? `/register/payment/${emailModalFamily.registrationId}`
-                          : `/renew?ref=${emailModalFamily._id}`}
-                      </p>
+                (() => {
+                  const modalMatchingRecord = emailModalFamily ? (
+                    emailModalFamily.registrationId
+                      ? renewalRecords.find((r) => r.registrationId === emailModalFamily.registrationId)
+                      : renewalRecords.find((r) =>
+                          r.parentEmail?.toLowerCase() === emailModalFamily.parentEmail?.toLowerCase() &&
+                          r.childName?.toLowerCase() === emailModalFamily.childName?.toLowerCase()
+                        )
+                  ) : null;
+                  const displayProgram = modalMatchingRecord?.program || emailModalFamily.renewingTo || emailModalFamily.previousProgram || "Curious Explorer";
+                  const isTrailblazer = displayProgram.toLowerCase().includes("trailblazer") || displayProgram.toLowerCase().includes("brave");
+                  const displayTuition = modalMatchingRecord?.totalTuition || (isTrailblazer ? 6900 : 4395);
+                  const displayDownpayment = modalMatchingRecord?.expectedDownpayment || (isTrailblazer ? 4140 : 2637);
+
+                  return (
+                    <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
+                      <div className="border-b border-slate-200 pb-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
+                        <p className="font-bold text-[#002f76] mt-0.5">
+                          Payment Reminder &amp; Slot Confirmation for {emailModalFamily.childName} 🌈
+                        </p>
+                      </div>
+                      <div className="space-y-2.5 text-slate-600 text-[12px] leading-relaxed">
+                        <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
+                        <p>
+                          Thank you for submitting your priority renewal registration for <strong>{emailModalFamily.childName}</strong>! Your slot is currently on hold under reservation.
+                        </p>
+
+                        <div className="rounded-xl bg-white border border-blue-200 p-3 space-y-1.5 text-[11.5px]">
+                          <div className="flex justify-between border-b border-slate-100 pb-1">
+                            <span className="text-slate-500 font-semibold">Explorer:</span>
+                            <span className="font-bold text-[#002f76]">{emailModalFamily.childName}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-100 pb-1">
+                            <span className="text-slate-500 font-semibold">Program:</span>
+                            <span className="font-bold text-[#002f76]">{displayProgram}</span>
+                          </div>
+                          {modalMatchingRecord?.classTime && (
+                            <div className="flex justify-between border-b border-slate-100 pb-1">
+                              <span className="text-slate-500 font-semibold">Class / Session:</span>
+                              <span className="font-bold text-slate-700">{modalMatchingRecord.classTime}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between border-b border-slate-100 pb-1">
+                            <span className="text-slate-500 font-semibold">Adventure Cycle:</span>
+                            <span className="font-bold text-emerald-700">Adventure 2</span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-100 pb-1">
+                            <span className="text-slate-500 font-semibold">Total Tuition:</span>
+                            <span className="font-bold text-slate-800">₱{displayTuition.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-slate-100 pb-1">
+                            <span className="text-slate-500 font-semibold">60% Downpayment Due:</span>
+                            <span className="font-extrabold text-emerald-700">⭐ ₱{displayDownpayment.toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center my-2">
+                          <p className="text-[11px] font-bold text-blue-900">Direct Payment Link Included:</p>
+                          <p className="text-[11px] text-blue-700 mt-0.5 font-mono">
+                            {emailModalFamily.registrationId
+                              ? `/register/payment/${emailModalFamily.registrationId}`
+                              : `/renew?ref=${emailModalFamily._id}`}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-amber-900 text-[11.5px]">
+                          <p className="font-bold">⚠️ NOTE &amp; DISCLAIMER:</p>
+                          <p className="mt-0.5">Please ensure to settle your 2026 Adventure 1 Balance before you can proceed to the registration.</p>
+                          <p className="italic mt-1">
+                            &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-amber-900 text-[11.5px]">
-                      <p className="font-bold">⚠️ NOTE &amp; DISCLAIMER:</p>
-                      <p className="mt-0.5">Please ensure to settle your 2026 Adventure 1 Balance before you can proceed to the registration.</p>
-                      <p className="italic mt-1">
-                        &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()
               ) : emailType === "slot_released" ? (
                 <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
                   <div className="border-b border-slate-200 pb-2">

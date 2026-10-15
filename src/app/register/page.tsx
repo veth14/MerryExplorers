@@ -161,6 +161,14 @@ export default function RegisterPage() {
   const [promoError, setPromoError] = useState<string>("");
   const [validatingPromo, setValidatingPromo] = useState<boolean>(false);
 
+  // Pioneer pricing state
+  const [isPioneer, setIsPioneer] = useState<boolean>(false);
+  const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
+
+  // Duplicate registration detection
+  const [duplicateRegId, setDuplicateRegId] = useState<string | null>(null);
+  const [duplicateChildName, setDuplicateChildName] = useState<string>("");
+
   // Uniform day acknowledgment
   const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState<boolean>(draft?.uniformDayAcknowledged ?? false);
 
@@ -218,6 +226,10 @@ export default function RegisterPage() {
               setPromoCode(data.promoCode);
               setPromoAccepted(true);
             }
+            if (data.alreadyRegistered && data.existingRegistrationId) {
+              setDuplicateRegId(data.existingRegistrationId);
+              setDuplicateChildName(data.childInfo?.firstName || data.childName || "");
+            }
             const displayName = data.childInfo?.firstName || data.childName || "Explorer";
             setPrefilledFamilyName(displayName);
           }
@@ -230,6 +242,50 @@ export default function RegisterPage() {
         });
     }
   }, []);
+
+  // Pioneer email detection: check email against pioneer_families when email changes
+  useEffect(() => {
+    const email = (parentInfo?.email || "").toLowerCase().trim();
+    if (!email) { setIsPioneer(false); return; }
+    const timer = setTimeout(() => {
+      fetch("/api/pioneer-families")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.pioneerPrices && Object.keys(d.pioneerPrices).length > 0) {
+            setPioneerPrices(d.pioneerPrices);
+          }
+          if (Array.isArray(d.families)) {
+            const matched = d.families.some(
+              (f: any) => (f.email || "").toLowerCase().trim() === email
+            );
+            setIsPioneer(matched);
+          }
+        })
+        .catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [parentInfo?.email]);
+
+  // Proactive duplicate check: when both email + child first name are filled, check for existing registration
+  useEffect(() => {
+    const email = (parentInfo?.email || "").toLowerCase().trim();
+    const firstName = (childInfo?.firstName || "").trim();
+    if (!email || !firstName) { setDuplicateRegId(null); setDuplicateChildName(""); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`);
+        const d = await res.json();
+        if (d.exists && d.registrationId) {
+          setDuplicateRegId(d.registrationId);
+          setDuplicateChildName(firstName);
+        } else {
+          setDuplicateRegId(null);
+          setDuplicateChildName("");
+        }
+      } catch { /* ignore */ }
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [parentInfo?.email, childInfo?.firstName]);
 
   // Program renewal settings for dynamic Adventure cycle #, dates & registration open/close status
   type ProgramSetting = {
@@ -380,7 +436,7 @@ export default function RegisterPage() {
     ...(!emergencyContact.relationship ? ["Emergency Contact Relationship"] : []),
   ];
 
-  const canProceedStep1 = missingStep1.length === 0 && dataPrivacyConsent;
+  const canProceedStep1 = missingStep1.length === 0 && dataPrivacyConsent && !duplicateRegId;
 
   // Track lead progress across each step of registration
   const syncLeadProgress = useCallback(async (
@@ -493,6 +549,11 @@ export default function RegisterPage() {
   }
 
   async function handleSubmit() {
+    // If a duplicate was already detected, go directly to the existing payment page
+    if (duplicateRegId) {
+      window.location.href = `/register/payment/${duplicateRegId}`;
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -512,12 +573,20 @@ export default function RegisterPage() {
           promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
           isNewFamily,
+          // Pioneer pricing — pass flag and customRate so server stores it
+          isPioneer: isPioneer || undefined,
+          customRate: (isPioneer && selectedProgram && pioneerPrices[selectedProgram]) ? pioneerPrices[selectedProgram] : undefined,
         }),
       });
       const data = await res.json();
       if (data.success) {
         clearDraft();
         window.location.href = `/register/payment/${data.data.id}`;
+      } else if (res.status === 409 && data.duplicateRegistrationId) {
+        // Duplicate detected by server — redirect to existing payment page
+        setDuplicateRegId(data.duplicateRegistrationId);
+        setDuplicateChildName(childInfo?.firstName || "");
+        setStep(3); // Stay on review step to show the warning
       } else {
         setError(data.error || "Submission failed. Please try again.");
       }
@@ -747,6 +816,11 @@ export default function RegisterPage() {
                     </FieldRow>
                     <FieldRow label="Email Address *">
                       <input type="email" className={inputCls} value={parentInfo.email} onChange={e => setParentInfo((p: any) => ({ ...p, email: e.target.value }))} placeholder="your@email.com" />
+                      {isPioneer && (
+                        <div className="mt-1.5 flex items-center gap-1.5 rounded-xl bg-emerald-50 border-2 border-emerald-300 px-3 py-2 text-[12px] font-black text-emerald-800">
+                          ⭐ Pioneer Family detected — special pricing will apply!
+                        </div>
+                      )}
                     </FieldRow>
                     <FieldRow label="Phone Number *">
                       <input type="tel" className={inputCls} value={parentInfo.phone} onChange={e => setParentInfo((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
@@ -837,6 +911,28 @@ export default function RegisterPage() {
                         </span>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Duplicate registration warning on Step 0 */}
+                {duplicateRegId && (
+                  <div className="mb-6 rounded-[22px] bg-amber-50 border-3 border-amber-400 p-5 shadow-[0_4px_0_rgba(217,119,6,0.20)] space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">⚠️</span>
+                      <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
+                    </div>
+                    <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
+                      It looks like <strong>{duplicateChildName || childInfo.firstName || "your child"}</strong> already has an active registration for <strong>Adventure 2</strong> (e.g. submitted via the renewal form or general registration).
+                    </p>
+                    <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
+                      You do not need to register again! You can proceed directly to your payment page to upload proof of payment and confirm your slot.
+                    </p>
+                    <a
+                      href={`/register/payment/${duplicateRegId}`}
+                      className="block w-full text-center rounded-[14px] bg-amber-500 text-white py-3 font-black text-[14px] shadow-[0_4px_0_rgba(180,83,9,0.40)] hover:bg-amber-600 transition-all font-sans"
+                    >
+                      Go to Existing Payment Page →
+                    </a>
                   </div>
                 )}
 
@@ -1055,7 +1151,15 @@ export default function RegisterPage() {
                                 )}
                               </div>
                               <p className="text-[12.5px] font-medium text-[#3d5a99] mb-1">{p.ageRange} · {p.schedule} · {p.sessions} sessions</p>
-                              <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
+                              {isPioneer && pioneerPrices[p.id] ? (
+                                <p className="text-[15px] font-black text-emerald-700 flex items-center gap-2">
+                                  ₱{pioneerPrices[p.id].toLocaleString()}
+                                  <span className="text-[11px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">⭐ Pioneer</span>
+                                  <span className="text-[12px] font-medium text-slate-400 line-through">₱{p.rate.toLocaleString()}</span>
+                                </p>
+                              ) : (
+                                <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
+                              )}
                             </div>
                             <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${isSelected ? "border-[#0b2a82] bg-[#ffd23f]" : "border-[#b6dcf5] bg-white"}`}>
                               {isSelected && <span className="text-[12px] font-black text-[#0b2a82]">✓</span>}
@@ -1339,17 +1443,23 @@ export default function RegisterPage() {
                 <p className="vp-sub mb-6">Please double-check all details before reserving your slot.</p>
 
                 {[
-                  {
-                    title: "Program Selection", emoji: "📚", rows: [
-                      ["Program", prog.name],
-                      ["Session Time", selectedClass],
-                      ["Schedule", prog.schedule],
-                      ["Sessions", `${prog.sessions} sessions`],
-                      ["Total Rate", `₱${prog.rate.toLocaleString()}`],
-                      ["Downpayment (60%)", `₱${prog.downpayment.toLocaleString()}`],
-                      ["Balance (40% on session 6)", `₱${prog.balance.toLocaleString()}`],
-                    ],
-                  },
+                  (() => {
+                    const pioneerRate = isPioneer && pioneerPrices[prog.id] ? pioneerPrices[prog.id] : null;
+                    const effectiveRate = pioneerRate ?? prog.rate;
+                    const effectiveDownpayment = pioneerRate ? Math.round(pioneerRate * 0.6) : prog.downpayment;
+                    const effectiveBalance = effectiveRate - effectiveDownpayment;
+                    return {
+                      title: "Program Selection", emoji: "📚", rows: [
+                        ["Program", prog.name + (isPioneer && pioneerRate ? " ⭐ Pioneer Family" : "")],
+                        ["Session Time", selectedClass],
+                        ["Schedule", prog.schedule],
+                        ["Sessions", `${prog.sessions} sessions`],
+                        ["Total Rate", isPioneer && pioneerRate ? `₱${effectiveRate.toLocaleString()} (Pioneer Price)` : `₱${prog.rate.toLocaleString()}`],
+                        ["Downpayment (60%)", `₱${effectiveDownpayment.toLocaleString()}`],
+                        ["Balance (40% on session 6)", `₱${effectiveBalance.toLocaleString()}`],
+                      ],
+                    };
+                  })(),
                   {
                     title: "Explorer Information", emoji: "🧒", rows: [
                       ["Name", `${childInfo.firstName} ${childInfo.lastName}${childInfo.nickname ? ` (${childInfo.nickname})` : ""}`],
@@ -1412,18 +1522,44 @@ export default function RegisterPage() {
                   </div>
                 )}
 
-                {error && <div className="vp-error mb-4">❌ {error}</div>}
-
-                <div className="mt-8 flex justify-between items-center">
-                  <button onClick={() => { setStep(2); syncLeadProgress(2); }} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
-                  <button
-                    disabled={submitting}
-                    onClick={handleSubmit}
-                    className="vp-btn"
-                  >
-                    {submitting ? "Reserving..." : (promoAccepted ? "Complete Slot Reservation 🎉" : "Reserve Slot & Proceed to Pay 💳")}
-                  </button>
-                </div>
+                {/* Duplicate registration warning — shown when email+child already has an active registration */}
+                {duplicateRegId ? (
+                  <div className="rounded-[22px] bg-amber-50 border-3 border-amber-400 p-5 shadow-[0_4px_0_rgba(217,119,6,0.20)] space-y-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">⚠️</span>
+                      <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
+                    </div>
+                    <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
+                      It looks like <strong>{duplicateChildName || "your child"}</strong> already has an active registration for <strong>Adventure 2</strong> — possibly submitted via the renewal form.
+                    </p>
+                    <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
+                      You <strong>do not need to register again</strong>. Click below to go directly to your existing registration&apos;s payment page to upload your proof of payment and confirm your slot.
+                    </p>
+                    <a
+                      href={`/register/payment/${duplicateRegId}`}
+                      className="block w-full text-center rounded-[14px] bg-amber-500 text-white py-3 font-black text-[14px] shadow-[0_4px_0_rgba(180,83,9,0.40)] hover:bg-amber-600 transition-all"
+                    >
+                      Go to My Existing Payment Page →
+                    </a>
+                    <p className="text-[11.5px] text-amber-700 text-center font-medium">
+                      Need help? Ask <strong>Teacher Angel</strong> onsite.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {error && <div className="vp-error mb-4">❌ {error}</div>}
+                    <div className="mt-8 flex justify-between items-center">
+                      <button onClick={() => { setStep(2); syncLeadProgress(2); }} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
+                      <button
+                        disabled={submitting}
+                        onClick={handleSubmit}
+                        className="vp-btn"
+                      >
+                        {submitting ? "Reserving..." : (promoAccepted ? "Complete Slot Reservation 🎉" : "Reserve Slot & Proceed to Pay 💳")}
+                      </button>
+                    </div>
+                  </>
+                )}
               </m.div>
             )}
 

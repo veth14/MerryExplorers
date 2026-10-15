@@ -46,6 +46,13 @@ export async function GET(request: Request) {
       familyMap.set(key, f);
     }
 
+    // Fetch pioneer settings & pioneer families for accurate pricing
+    const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+    const pioneerPrices: Record<string, number> = pioneerSettings?.pioneerPrices || {};
+
+    const pioneerDocs = await db.collection("pioneer_families").find({}).toArray();
+    const pioneerEmails = new Set(pioneerDocs.map((p: any) => (p.email || "").toLowerCase().trim()).filter(Boolean));
+
     // 2. Fetch registrations
     // A registration is a renewal ONLY if:
     // a) It used promoCode "A1RENEWAL2026" or has isPromoRegistration: true
@@ -85,7 +92,9 @@ export async function GET(request: Request) {
 
       // Financials
       const progDef = (PROGRAM_SLOTS as Record<string, any>)[r.program];
-      const totalTuition = Number(r.amountDue || (progDef ? progDef.rate : 0)) || 0;
+      const isPioneerRecord = Boolean(r.isPioneer || pioneerEmails.has(parentEmail) || matchedFamily?.isPioneer);
+      const progPioneerRate = pioneerPrices[r.program] || (r.program === "creative-explorer" ? 4820 : null);
+      const totalTuition = Number(r.customRate) || (isPioneerRecord && progPioneerRate ? progPioneerRate : 0) || Number(r.amountDue) || (progDef ? progDef.rate : 0);
       const expectedDownpayment = Math.round(totalTuition * 0.6) || (progDef ? progDef.downpayment : 0);
       
       // Calculate total paid across initial payment + balance payments
@@ -155,6 +164,7 @@ export async function GET(request: Request) {
         receiptUrl: r.receiptUrl || "",
         isResubmission: Boolean(r.isResubmission),
         matchedFamily: Boolean(matchedFamily),
+        isPioneer: isPioneerRecord,
       };
     });
 

@@ -31,43 +31,182 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Family does not have a valid email address" }, { status: 400 });
     }
 
-    // Fetch renewal settings to dynamically populate program Adventure # and start dates
+    // 1. Fetch linked student registration if already submitted
+    let studentReg: any = null;
+    if (family.registrationId) {
+      try {
+        studentReg = await db.collection("student_registrations").findOne({
+          $or: [
+            ...(ObjectId.isValid(family.registrationId) ? [{ _id: new ObjectId(family.registrationId) }] : []),
+            { _id: family.registrationId as any }
+          ]
+        });
+      } catch {
+        // ignore
+      }
+    }
+    if (!studentReg && family.parentEmail && family.childName) {
+      try {
+        const cleanEmail = (family.parentEmail || "").toLowerCase().trim();
+        const emailRegex = new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+        const childFirst = (family.childName || "").trim().split(/\s+/)[0];
+        studentReg = await db.collection("student_registrations").findOne({
+          "parentInfo.email": emailRegex,
+          "childInfo.firstName": new RegExp(childFirst, "i"),
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Canonical program metadata registry
+    const PROGRAM_META: Record<string, {
+      slug: string;
+      displayName: string;
+      rate: number;
+      downpayment: number;
+      balance: number;
+      isAdv: boolean;
+    }> = {
+      "curious-explorer": {
+        slug: "curious-explorer",
+        displayName: "Discovery Club: Curious Explorer",
+        rate: 4395,
+        downpayment: 2637,
+        balance: 1758,
+        isAdv: true,
+      },
+      "creative-explorer": {
+        slug: "creative-explorer",
+        displayName: "Discovery Club: Creative Explorer",
+        rate: 4985,
+        downpayment: 2991,
+        balance: 1994,
+        isAdv: true,
+      },
+      "everyday-curious": {
+        slug: "everyday-curious",
+        displayName: "Discovery Club: Everyday Explorer",
+        rate: 7518,
+        downpayment: 4511,
+        balance: 3007,
+        isAdv: true,
+      },
+      "brave-explorer": {
+        slug: "brave-explorer",
+        displayName: "Trailblazer: Brave Explorer",
+        rate: 6900,
+        downpayment: 4140,
+        balance: 2760,
+        isAdv: true,
+      },
+      "ballet": {
+        slug: "ballet",
+        displayName: "Ballet",
+        rate: 2750,
+        downpayment: 1650,
+        balance: 1100,
+        isAdv: false,
+      },
+      "saturday-playdate": {
+        slug: "saturday-playdate",
+        displayName: "Saturday Playdate",
+        rate: 2190,
+        downpayment: 1314,
+        balance: 876,
+        isAdv: true,
+      },
+      "virtual-session": {
+        slug: "virtual-session",
+        displayName: "Virtual Tutorial",
+        rate: 450,
+        downpayment: 450,
+        balance: 0,
+        isAdv: false,
+      },
+    };
+
+    const resolveProgramSlug = (input?: string | null): string => {
+      if (!input) return "curious-explorer";
+      const s = input.toLowerCase().trim();
+      if (s.includes("brave") || s.includes("trailblazer")) return "brave-explorer";
+      if (s.includes("creative")) return "creative-explorer";
+      if (s.includes("everyday")) return "everyday-curious";
+      if (s.includes("curious")) return "curious-explorer";
+      if (s.includes("ballet")) return "ballet";
+      if (s.includes("playdate") || s.includes("saturday")) return "saturday-playdate";
+      if (s.includes("virtual") || s.includes("tutorial")) return "virtual-session";
+      return "curious-explorer";
+    };
+
+    // 3. Fetch renewal settings to dynamically populate program Adventure # and start dates
     const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
-    const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+    const storedPrograms: Array<{
+      programKey: string;
+      currentAdventure: number;
+      adventureStartDate?: string | null;
+      nextAdventureStart: string | null;
+    }> = renewalSettingsDoc?.programs || [];
 
-    // Match the family's renewingTo or previousProgram
-    const targetProgramName = family.renewingTo || family.previousProgram || "Curious Explorer";
+    // Match the target program (priority: student's actual registration -> renewingTo -> previousProgram)
+    const targetProgramRaw = studentReg?.program || family.renewingTo || family.previousProgram || "Curious Explorer";
+    const targetProgramSlug = resolveProgramSlug(targetProgramRaw);
+    const meta = PROGRAM_META[targetProgramSlug] || PROGRAM_META["curious-explorer"];
+
     const matchedProgramEntry = storedPrograms.find((p) =>
-      p.programKey.toLowerCase().includes(targetProgramName.toLowerCase()) ||
-      targetProgramName.toLowerCase().includes(p.programKey.toLowerCase())
-    ) || storedPrograms[0];
+      resolveProgramSlug(p.programKey) === targetProgramSlug
+    );
+    const programDisplayName = matchedProgramEntry?.programKey || meta.displayName;
+    const isAdvProg = meta.isAdv;
 
-    const targetProgramKey = (targetProgramName || "").toLowerCase().includes("creative")
-      ? "creative-explorer"
-      : "curious-explorer";
+    // Adventure cycle determination:
+    let advNumber = 2;
+    const periodStr = String(studentReg?.period || family.renewingTo || "");
+    const matchNum = periodStr.match(/adventure\s*[-_]?\s*(\d+)/i);
+    if (matchNum) {
+      advNumber = parseInt(matchNum[1], 10);
+    } else if (matchedProgramEntry) {
+      const curr = matchedProgramEntry.currentAdventure ?? 1;
+      advNumber = matchedProgramEntry.nextAdventureStart ? curr + 1 : curr;
+    }
+    const adventureLabel = isAdvProg ? `Adventure ${advNumber}` : programDisplayName;
 
-    // Fetch pioneer settings + check if this family is a pioneer
+    const rawStartDate = matchedProgramEntry?.nextAdventureStart || matchedProgramEntry?.adventureStartDate;
+    const formattedStartDate = rawStartDate
+      ? new Date(rawStartDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+      : null;
+
+    const classTime = studentReg?.classTime || "";
+
+    // 4. Pioneer verification & Financials
     const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
     const cleanEmail = (family.parentEmail || "").toLowerCase().trim();
     const pioneerFamily = await db.collection("pioneer_families").findOne({
       $or: [
         { email: cleanEmail },
-        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") } }
+        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }
       ]
     });
-    const isPioneer = !!pioneerFamily;
-    const resolvedPioneerPrice: number | null =
-      pioneerSettingsDoc?.pioneerPrices?.[targetProgramKey] ??
-      pioneerSettingsDoc?.pioneerPrice ??
-      null;
-    const displayPrice = isPioneer && resolvedPioneerPrice ? resolvedPioneerPrice : null;
+    const isPioneer = Boolean(pioneerFamily || studentReg?.isPioneer);
 
-    const currentAdventureNum = matchedProgramEntry?.currentAdventure ?? 2;
-    const adventureLabel = `Adventure ${currentAdventureNum}`;
-    const formattedStartDate = matchedProgramEntry?.nextAdventureStart
-      ? new Date(matchedProgramEntry.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-      : null;
-    const programDisplayName = matchedProgramEntry?.programKey || targetProgramName;
+    const pioneerPrices: Record<string, number> = pioneerSettingsDoc?.pioneerPrices || {};
+    const specificPioneerPrice: number | undefined = pioneerPrices[targetProgramSlug];
+    const hasPioneerDiscount = isPioneer && typeof specificPioneerPrice === "number" && specificPioneerPrice > 0;
+
+    const totalTuition: number = hasPioneerDiscount
+      ? specificPioneerPrice!
+      : (Number(studentReg?.customRate) || meta.rate);
+
+    const expectedDownpayment: number = hasPioneerDiscount
+      ? Math.round(specificPioneerPrice! * 0.6)
+      : (Number(studentReg?.amountDue) || meta.downpayment);
+
+    const initialPaid = Number(studentReg?.amountPaid) || 0;
+    const balancePaid = Array.isArray(studentReg?.balancePayments)
+      ? studentReg.balancePayments.reduce((acc: number, b: any) => acc + (Number(b.amountPaid) || 0), 0)
+      : 0;
+    const totalPaid = initialPaid + balancePaid;
+    const remainingToConfirm = Math.max(0, expectedDownpayment - totalPaid);
 
     // Default configuration
     const promoCode = "A1RENEWAL2026";
@@ -96,29 +235,36 @@ export async function POST(request: Request) {
               <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Program & Schedule Information</p>
               <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
+                  <td style="padding: 4px 0; color: #64748b; width: 150px;"><strong>Explorer:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${childName}</td>
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${programDisplayName}</td>
                 </tr>
+                ${isAdvProg ? `
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #059669;">${adventureLabel}</td>
                 </tr>
+                ` : ""}
                 ${formattedStartDate ? `
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>${isAdvProg ? "Adventure Starts:" : "Program Starts:"}</strong></td>
                   <td style="padding: 4px 0; font-weight: 800; color: #ffb800;">🚀 ${formattedStartDate}</td>
                 </tr>
                 ` : ""}
-                ${displayPrice ? `
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Your Price:</strong></td>
-                  <td style="padding: 4px 0; font-weight: 900; color: #059669;">⭐ ₱${displayPrice.toLocaleString()} <span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800;">PIONEER FAMILY</span></td>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Tuition Fee:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #1e293b;">
+                    ₱${totalTuition.toLocaleString()}
+                    ${hasPioneerDiscount ? `<span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800; margin-left: 6px;">PIONEER FAMILY</span>` : ""}
+                  </td>
                 </tr>
-                ` : ""}
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>60% Downpayment:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 900; color: #059669;">⭐ ₱${expectedDownpayment.toLocaleString()}</td>
+                </tr>
               </table>
             </div>
 
@@ -164,7 +310,7 @@ export async function POST(request: Request) {
         </div>
       `;
     } else if (emailType === "payment_reminder") {
-      const regId = family.registrationId || "";
+      const regId = studentReg?._id?.toString() || family.registrationId || "";
       const paymentUrl = regId ? `${baseUrl}/register/payment/${regId}` : `${baseUrl}/renew?ref=${family._id.toString()}`;
       subject = subject || `Payment Reminder & Slot Confirmation: ${programDisplayName} (${adventureLabel}) for ${childName} 🌈`;
       htmlContent = `
@@ -182,27 +328,50 @@ export async function POST(request: Request) {
               <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Confirmed Reservation Details</p>
               <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b; width: 140px;"><strong>Explorer:</strong></td>
+                  <td style="padding: 4px 0; color: #64748b; width: 150px;"><strong>Explorer:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${childName}</td>
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${programDisplayName}</td>
                 </tr>
+                ${classTime ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Class / Session:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${classTime}</td>
+                </tr>
+                ` : ""}
+                ${isAdvProg ? `
                 <tr>
                   <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #059669;">${adventureLabel}</td>
                 </tr>
+                ` : ""}
                 ${formattedStartDate ? `
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Starts:</strong></td>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>${isAdvProg ? "Adventure Starts:" : "Program Starts:"}</strong></td>
                   <td style="padding: 4px 0; font-weight: 800; color: #d97706;">🚀 ${formattedStartDate}</td>
                 </tr>
                 ` : ""}
-                ${displayPrice ? `
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Your Price:</strong></td>
-                  <td style="padding: 4px 0; font-weight: 900; color: #059669;">⭐ ₱${displayPrice.toLocaleString()} <span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800;">PIONEER FAMILY</span></td>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Total Tuition:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #1e293b;">
+                    ₱${totalTuition.toLocaleString()}
+                    ${hasPioneerDiscount ? `<span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800; margin-left: 6px;">PIONEER FAMILY</span>` : ""}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>60% Downpayment Due:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 900; color: #059669; font-size: 15px;">⭐ ₱${expectedDownpayment.toLocaleString()}</td>
+                </tr>
+                ${totalPaid > 0 ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Amount Paid:</strong></td>
+                  <td style="padding: 4px 0; font-weight: bold; color: #0284c7;">₱${totalPaid.toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Remaining to Confirm:</strong></td>
+                  <td style="padding: 4px 0; font-weight: 900; color: #dc2626;">₱${remainingToConfirm.toLocaleString()}</td>
                 </tr>
                 ` : ""}
               </table>

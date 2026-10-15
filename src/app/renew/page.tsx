@@ -134,6 +134,9 @@ export default function RenewPage() {
   const [isPioneer, setIsPioneer] = useState(false);
   const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
 
+  // Duplicate registration tracking
+  const [duplicateRegId, setDuplicateRegId] = useState<string | null>(null);
+
   useEffect(() => { setMounted(true); }, []);
 
   // Fetch prefill data from URL param
@@ -162,6 +165,9 @@ export default function RenewPage() {
           setPreviousProgram(d.previousProgram || "Trailblazer: Brave Explorer");
           if (d.isPioneer) setIsPioneer(true);
           if (d.pioneerPrices) setPioneerPrices(d.pioneerPrices);
+          if (d.alreadyRegistered && d.existingRegistrationId) {
+            setDuplicateRegId(d.existingRegistrationId);
+          }
         } else {
           setLoadError("We couldn't find your registration record. Please contact Teacher Angel.");
         }
@@ -305,6 +311,9 @@ export default function RenewPage() {
       const data = await res.json();
       if (data.success) {
         window.location.href = `/register/payment/${data.data.id}`;
+      } else if (res.status === 409 && data.duplicateRegistrationId) {
+        setDuplicateRegId(data.duplicateRegistrationId);
+        setStep(2);
       } else {
         setSubmitError(data.error || "Submission failed. Please try again.");
       }
@@ -348,6 +357,32 @@ export default function RenewPage() {
 
   const childName = childInfo ? `${childInfo.firstName} ${childInfo.lastName}`.trim() : "Your Explorer";
   const childNick = childInfo?.nickname || childInfo?.firstName || "Explorer";
+
+  if (duplicateRegId || (prefillData?.alreadyRegistered && prefillData?.existingRegistrationId)) {
+    const payId = duplicateRegId || prefillData?.existingRegistrationId;
+    return (
+      <div className="vp-root min-h-screen flex items-center justify-center p-6">
+        <PortalScene />
+        <div className="relative z-10 max-w-md w-full bg-white rounded-[28px] border-4 border-[#0b2a82] p-8 shadow-[0_0_0_6px_#fff,0_12px_0_6px_rgba(11,42,130,0.18)] text-center space-y-4">
+          <div className="text-5xl">🎉</div>
+          <h2 className="font-extrabold text-[22px] text-[#0b2a82]">Already Registered for Adventure 2!</h2>
+          <p className="text-[14px] text-[#3d5a99] font-medium leading-relaxed">
+            Good news! A registration for <strong>{childName}</strong> is already active for <strong>Adventure 2</strong>.
+          </p>
+          <p className="text-[13px] text-[#3d5a99] font-medium leading-relaxed">
+            You don&apos;t need to submit the renewal form again. Click below to view your registration status or upload proof of payment.
+          </p>
+          <a
+            href={`/register/payment/${payId}`}
+            className="block w-full py-3.5 px-6 rounded-2xl bg-[#1f7ae0] text-white font-extrabold text-[15px] shadow-[0_4px_0_#0b2a82] hover:bg-[#1864b8] transition-all text-center"
+          >
+            Go to My Payment Page →
+          </a>
+          <p className="text-[12px] text-[#3d5a99]">Need help? Ask <strong>Teacher Angel</strong> onsite.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="vp-root min-h-screen relative overflow-x-hidden">
@@ -1081,20 +1116,44 @@ export default function RenewPage() {
                   </p>
                 </div>
 
-                {submitError && (
-                  <div className="vp-error mb-4">❌ {submitError}</div>
-                )}
+                {/* Duplicate registration warning — shown when email+child already has an active registration */}
+                {duplicateRegId ? (
+                  <div className="rounded-[22px] bg-amber-50 border-3 border-amber-400 p-5 shadow-[0_4px_0_rgba(217,119,6,0.20)] space-y-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">⚠️</span>
+                      <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
+                    </div>
+                    <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
+                      It looks like <strong>{childName}</strong> already has an active registration for <strong>Adventure 2</strong>.
+                    </p>
+                    <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
+                      You do not need to register again. Click below to go directly to your payment page to upload your proof of payment.
+                    </p>
+                    <a
+                      href={`/register/payment/${duplicateRegId}`}
+                      className="block w-full text-center rounded-[14px] bg-amber-500 text-white py-3 font-black text-[14px] shadow-[0_4px_0_rgba(180,83,9,0.40)] hover:bg-amber-600 transition-all font-sans"
+                    >
+                      Go to Existing Payment Page →
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    {submitError && (
+                      <div className="vp-error mb-4">❌ {submitError}</div>
+                    )}
 
-                <div className="mt-8 flex justify-between items-center">
-                  <button onClick={() => setStep(2)} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
-                  <button
-                    disabled={submitting}
-                    onClick={handleSubmit}
-                    className="vp-btn"
-                  >
-                    {submitting ? "Reserving Slot..." : "Complete Slot Reservation 🎉"}
-                  </button>
-                </div>
+                    <div className="mt-8 flex justify-between items-center">
+                      <button onClick={() => setStep(1)} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
+                      <button
+                        disabled={submitting}
+                        onClick={handleSubmit}
+                        className="vp-btn"
+                      >
+                        {submitting ? "Reserving Slot..." : "Complete Slot Reservation 🎉"}
+                      </button>
+                    </div>
+                  </>
+                )}
               </m.div>
             )}
 

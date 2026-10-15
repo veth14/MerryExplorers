@@ -90,6 +90,29 @@ export async function GET(request: Request) {
       ? await db.collection("student_registrations").findOne({ $or: regOr })
       : null;
 
+    // Check if an active Adventure 2 registration already exists for this child / family
+    const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
+    const activeAdv2Reg = regOr.length > 0
+      ? await db.collection("student_registrations").findOne({
+          $or: regOr,
+          status: { $in: ["pending", "approved", "reserved"] },
+          $and: [
+            {
+              $or: [
+                { period: "adventure-2" },
+                { submittedAt: { $gte: ADVENTURE_2_START } },
+              ],
+            },
+          ],
+        })
+      : null;
+
+    // Also check if familyDoc has an existing registrationId
+    let existingRegistrationId = activeAdv2Reg?._id?.toString() || null;
+    if (!existingRegistrationId && familyDoc?.registrationId) {
+      existingRegistrationId = familyDoc.registrationId;
+    }
+
     // ── Nothing found ─────────────────────────────────────────────────────────
     if (!familyDoc && !studentDoc && !accountDoc && !prevReg) {
       return NextResponse.json({ success: false, error: "Family not found" }, { status: 404 });
@@ -165,6 +188,9 @@ export async function GET(request: Request) {
       parentInfo,
       childInfo,
       emergencyContact,
+      alreadyRegistered: Boolean(existingRegistrationId),
+      existingRegistrationId,
+      existingProgram: activeAdv2Reg?.program || null,
     };
 
     return NextResponse.json({ success: true, data: prefillData });

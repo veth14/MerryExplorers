@@ -150,6 +150,28 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── Duplicate registration guard ──────────────────────────────────────────
+    // Prevent the same child from being registered twice for the current period.
+    // Match on parent email + child first name (case-insensitive).
+    const emailForDupe = (parentInfo?.email || "").toLowerCase().trim();
+    const childFirstForDupe = (childInfo?.firstName || "").trim();
+    if (emailForDupe && childFirstForDupe) {
+      const existing = await db.collection("student_registrations").findOne({
+        "parentInfo.email": { $regex: new RegExp(`^${emailForDupe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        "childInfo.firstName": { $regex: new RegExp(`^${childFirstForDupe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        period: "adventure-2",
+        status: { $in: ["pending", "approved", "reserved"] },
+      });
+      if (existing) {
+        const existingId = existing._id.toString();
+        return NextResponse.json({
+          error: `${childFirstForDupe} already has an active registration for Adventure 2. If you submitted the renewal form, please check your email for a payment reminder link, or visit: /register/payment/${existingId}`,
+          duplicateRegistrationId: existingId,
+        }, { status: 409 });
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const rawPromoCode = (promoCode || "").trim();
     const cleanPromoCode = rawPromoCode.replace(/^[“"']+|[”"':]+$/g, "").trim();
     const isScholar =
