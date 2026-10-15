@@ -228,8 +228,14 @@ export async function GET(request: Request) {
     for (const r of registrations) {
       if (r.status === "rejected" || r.status === "expired" || r.renewalStatus === "released") continue;
       const prog = slotOverview[r.program];
-      if (prog && prog.sessions[r.classTime]) {
-        prog.sessions[r.classTime].taken += 1;
+      if (!prog) continue;
+      // Normalise "Session" ↔ "Class" aliases
+      const altClassTime = r.classTime?.includes("Session")
+        ? r.classTime.replace("Session", "Class")
+        : r.classTime?.replace("Class", "Session");
+      const sessionKey = prog.sessions[r.classTime] ? r.classTime : (altClassTime && prog.sessions[altClassTime] ? altClassTime : null);
+      if (sessionKey) {
+        prog.sessions[sessionKey].taken += 1;
       }
     }
 

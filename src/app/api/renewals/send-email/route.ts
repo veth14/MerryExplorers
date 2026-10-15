@@ -161,13 +161,17 @@ export async function POST(request: Request) {
 
     // Adventure cycle determination:
     let advNumber = 2;
-    const periodStr = String(studentReg?.period || family.renewingTo || "");
-    const matchNum = periodStr.match(/adventure\s*[-_]?\s*(\d+)/i);
-    if (matchNum) {
-      advNumber = parseInt(matchNum[1], 10);
-    } else if (matchedProgramEntry) {
-      const curr = matchedProgramEntry.currentAdventure ?? 1;
-      advNumber = matchedProgramEntry.nextAdventureStart ? curr + 1 : curr;
+    const regPeriod = String(studentReg?.period || "");
+    const regMatch = regPeriod.match(/adventure\s*[-_]?\s*(\d+)/i);
+    const renewingToMatch = String(family.renewingTo || "").match(/adventure\s*[-_]?\s*(\d+)/i);
+    if (regMatch) {
+      advNumber = parseInt(regMatch[1], 10);
+    } else if (renewingToMatch) {
+      advNumber = parseInt(renewingToMatch[1], 10);
+    } else if (matchedProgramEntry?.nextAdventureStart) {
+      advNumber = (matchedProgramEntry.currentAdventure ?? 1) + 1;
+    } else {
+      advNumber = 2;
     }
     const adventureLabel = isAdvProg ? `Adventure ${advNumber}` : programDisplayName;
 

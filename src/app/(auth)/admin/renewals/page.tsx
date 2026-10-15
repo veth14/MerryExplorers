@@ -29,6 +29,7 @@ type Family = {
   notes?: string;
   renewalPeriod?: string;
   registrationId?: string | null;
+  isPioneer?: boolean;
   createdAt?: string;
 };
 
@@ -138,6 +139,7 @@ export default function RenewalsPage() {
   const [formChildName, setFormChildName] = useState("");
   const [formPreviousProgram, setFormPreviousProgram] = useState("Curious Explorer");
   const [formRenewingTo, setFormRenewingTo] = useState("Creative Explorer");
+  const [formIsPioneer, setFormIsPioneer] = useState(false);
   const [formNotes, setFormNotes] = useState("");
   const [familyFormError, setFamilyFormError] = useState("");
 
@@ -246,7 +248,9 @@ export default function RenewalsPage() {
         f.parentEmail.toLowerCase().includes(q) ||
         f.phone.toLowerCase().includes(q);
 
-      const matchStatus = familyStatusFilter === "all" || f.renewalStatus === familyStatusFilter;
+      const matchStatus =
+        familyStatusFilter === "all" ||
+        (familyStatusFilter === "pioneer" ? Boolean(f.isPioneer) : f.renewalStatus === familyStatusFilter);
 
       // Match program category (either from adventures history, previousProgram, or renewingTo)
       let matchProgram = true;
@@ -421,12 +425,14 @@ export default function RenewalsPage() {
             childName: formChildName,
             previousProgram: formPreviousProgram,
             renewingTo: formRenewingTo,
+            isPioneer: formIsPioneer,
             notes: formNotes,
           }),
         });
         if (res.ok) {
           setEditingFamily(null);
           setAddFamilyModal(false);
+          resetFamilyForm();
           fetchData();
         } else {
           const d = await res.json();
@@ -443,6 +449,7 @@ export default function RenewalsPage() {
             childName: formChildName,
             previousProgram: formPreviousProgram,
             renewingTo: formRenewingTo,
+            isPioneer: formIsPioneer,
             notes: formNotes,
             renewalPeriod: selectedPeriod,
           }),
@@ -468,6 +475,7 @@ export default function RenewalsPage() {
     setFormChildName("");
     setFormPreviousProgram("Curious Explorer");
     setFormRenewingTo("Creative Explorer");
+    setFormIsPioneer(false);
     setFormNotes("");
     setFamilyFormError("");
   };
@@ -1409,6 +1417,7 @@ export default function RenewalsPage() {
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-700"
                 >
                   <option value="all">All Renewal Statuses</option>
+                  <option value="pioneer">⭐ Pioneer Families Only</option>
                   <option value="not_yet_submitted">Not Yet Submitted</option>
                   <option value="reserved">Reserved</option>
                   <option value="confirmed">Confirmed</option>
@@ -1502,7 +1511,14 @@ export default function RenewalsPage() {
                           {f.phone && <p className="text-[11px] text-slate-500">{f.phone}</p>}
                         </td>
                         <td className="py-3.5 px-4 font-bold text-slate-900">
-                          {f.childName}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{f.childName}</span>
+                            {f.isPioneer && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 shadow-xs" title="Pioneer Family (Special discounted rate applies)">
+                                ⭐ Pioneer
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-[12px]">
                           <div className="flex flex-wrap gap-1 min-w-[160px]">
@@ -1597,6 +1613,7 @@ export default function RenewalsPage() {
                                 setFormChildName(f.childName);
                                 setFormPreviousProgram(f.previousProgram || "Curious Explorer");
                                 setFormRenewingTo(f.renewingTo || "Creative Explorer");
+                                setFormIsPioneer(Boolean(f.isPioneer));
                                 setFormNotes(f.notes || "");
                                 setAddFamilyModal(true);
                               }}
@@ -1832,6 +1849,22 @@ export default function RenewalsPage() {
                     <option value="Virtual Tutorial">Virtual Tutorial</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="formIsPioneer"
+                  checked={formIsPioneer}
+                  onChange={(e) => setFormIsPioneer(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <label htmlFor="formIsPioneer" className="text-[12.5px] font-medium text-slate-800 cursor-pointer">
+                  <span className="font-bold text-amber-900 flex items-center gap-1">⭐ Pioneer Family</span>
+                  <span className="text-[11.5px] text-amber-800/90 block mt-0.5">
+                    Syncs with Pioneer Families list. Grants special pioneer discounted tuition rates during registration.
+                  </span>
+                </label>
               </div>
 
               <div>

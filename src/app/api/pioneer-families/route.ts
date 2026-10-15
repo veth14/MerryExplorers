@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
@@ -73,9 +73,17 @@ export async function POST(req: NextRequest) {
 
     if (id && ObjectId.isValid(id)) {
       await db.collection("pioneer_families").updateOne({ _id: new ObjectId(id) }, { $set: doc });
+      await db.collection("renewal_families").updateMany(
+        { parentEmail: { $regex: new RegExp(`^${doc.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
+        { $set: { isPioneer: true } }
+      );
       return NextResponse.json({ ok: true, id });
     }
     const result = await db.collection("pioneer_families").insertOne({ ...doc, createdAt: new Date().toISOString() });
+    await db.collection("renewal_families").updateMany(
+      { parentEmail: { $regex: new RegExp(`^${doc.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
+      { $set: { isPioneer: true } }
+    );
     return NextResponse.json({ ok: true, id: result.insertedId.toString() });
   } catch (err) {
     console.error("[pioneer-families POST]", err);
@@ -89,7 +97,14 @@ export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get("id");
     if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     const { db } = await connectToDatabase();
+    const existing = await db.collection("pioneer_families").findOne({ _id: new ObjectId(id) });
     await db.collection("pioneer_families").deleteOne({ _id: new ObjectId(id) });
+    if (existing?.email) {
+      await db.collection("renewal_families").updateMany(
+        { parentEmail: { $regex: new RegExp(`^${existing.email.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
+        { $set: { isPioneer: false } }
+      );
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[pioneer-families DELETE]", err);

@@ -164,6 +164,7 @@ export default function RegisterPage() {
   // Pioneer pricing state
   const [isPioneer, setIsPioneer] = useState<boolean>(false);
   const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
+  const [pioneerFamiliesList, setPioneerFamiliesList] = useState<Array<{ email: string; parentName?: string; childName?: string }>>([]);
 
   // Duplicate registration detection
   const [duplicateRegId, setDuplicateRegId] = useState<string | null>(null);
@@ -241,12 +242,38 @@ export default function RegisterPage() {
           setPrefillLoading(false);
         });
     }
+
+    // Preload pioneer families and prices on mount
+    fetch("/api/pioneer-families")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.pioneerPrices && Object.keys(d.pioneerPrices).length > 0) {
+          setPioneerPrices(d.pioneerPrices);
+        }
+        if (Array.isArray(d.families)) {
+          setPioneerFamiliesList(d.families);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Pioneer email detection: check email against pioneer_families when email changes
   useEffect(() => {
     const email = (parentInfo?.email || "").toLowerCase().trim();
     if (!email) { setIsPioneer(false); return; }
+
+    // Instant match against preloaded list
+    if (pioneerFamiliesList.length > 0) {
+      const matched = pioneerFamiliesList.some(
+        (f) => (f.email || "").toLowerCase().trim() === email
+      );
+      setIsPioneer(matched);
+      if (matched) {
+        setIsNewFamily(false);
+        setWelcomeKitOrdered(false);
+      }
+    }
+
     const timer = setTimeout(() => {
       fetch("/api/pioneer-families")
         .then((r) => r.json())
@@ -255,16 +282,21 @@ export default function RegisterPage() {
             setPioneerPrices(d.pioneerPrices);
           }
           if (Array.isArray(d.families)) {
+            setPioneerFamiliesList(d.families);
             const matched = d.families.some(
               (f: any) => (f.email || "").toLowerCase().trim() === email
             );
             setIsPioneer(matched);
+            if (matched) {
+              setIsNewFamily(false);
+              setWelcomeKitOrdered(false);
+            }
           }
         })
         .catch(() => {});
-    }, 800);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [parentInfo?.email]);
+  }, [parentInfo?.email, pioneerFamiliesList]);
 
   // Proactive duplicate check: when both email + child first name are filled, check for existing registration
   useEffect(() => {
@@ -572,7 +604,8 @@ export default function RegisterPage() {
           // Send promo code as-is (case-sensitive) — A1JesusLovesMe2026 is case-sensitive on the server
           promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
-          isNewFamily,
+          isNewFamily: isPioneer ? false : isNewFamily,
+          welcomeKitOrdered: isPioneer ? false : welcomeKitOrdered,
           // Pioneer pricing — pass flag and customRate so server stores it
           isPioneer: isPioneer || undefined,
           customRate: (isPioneer && selectedProgram && pioneerPrices[selectedProgram]) ? pioneerPrices[selectedProgram] : undefined,

@@ -59,12 +59,31 @@ export async function GET(request: Request) {
       );
     });
 
+    // Load pioneer families to link isPioneer flag dynamically
+    const pioneerDocs = await db.collection("pioneer_families").find({}).toArray();
+    const pioneerEmails = new Set(pioneerDocs.map((p) => (p.email || "").toLowerCase().trim()).filter(Boolean));
+    const pioneerChildFirsts = new Set(
+      pioneerDocs
+        .map((p) => (p.childName || "").toLowerCase().trim().split(/\s+/)[0])
+        .filter(Boolean)
+    );
+
     return NextResponse.json({
       success: true,
-      data: families.map((f) => ({
-        ...f,
-        _id: f._id.toString(),
-      })),
+      data: families.map((f) => {
+        const emailLower = (f.parentEmail || "").toLowerCase().trim();
+        const childFirst = (f.childName || "").toLowerCase().trim().split(/\s+/)[0];
+        const isPioneer = Boolean(
+          f.isPioneer ||
+          pioneerEmails.has(emailLower) ||
+          (childFirst && pioneerChildFirsts.has(childFirst))
+        );
+        return {
+          ...f,
+          _id: f._id.toString(),
+          isPioneer,
+        };
+      }),
     });
   } catch (error: any) {
     console.error("[renewal_families GET]", error);
@@ -178,6 +197,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const isPioneer = Boolean(body.isPioneer);
+
     const newFamily = {
       parentName: (parentName || "").trim(),
       parentEmail: cleanEmail,
@@ -186,6 +207,7 @@ export async function POST(request: Request) {
       previousProgram: (previousProgram || "Adventure 1").trim(),
       renewingTo: (renewingTo || "Adventure 2").trim(),
       renewalStatus: renewalStatus || "not_yet_submitted",
+      isPioneer,
       lastEmailSent: null,
       lastEmailDate: null,
       emailHistory: [],
@@ -197,6 +219,24 @@ export async function POST(request: Request) {
     };
 
     const res = await db.collection("renewal_families").insertOne(newFamily);
+
+    if (isPioneer) {
+      await db.collection("pioneer_families").updateOne(
+        { email: cleanEmail },
+        {
+          $set: {
+            parentName: (parentName || "").trim(),
+            childName: cleanChild,
+            email: cleanEmail,
+            updatedAt: new Date().toISOString(),
+          },
+          $setOnInsert: {
+            createdAt: new Date().toISOString(),
+          },
+        },
+        { upsert: true }
+      );
+    }
 
     return NextResponse.json({
       success: true,

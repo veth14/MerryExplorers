@@ -57,9 +57,11 @@ export type FeeItem = { key: string; label: string; amount: number };
 export function getRegistrationItems(reg: any): FeeItem[] {
     const prog = reg ? PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS] : undefined;
     if (!reg || !prog) return [];
-    const items: FeeItem[] = [{ key: "program", label: "Program fee", amount: prog.rate }];
+    const isPioneer = Boolean(reg.isPioneer);
+    const progRate = reg.customRate || (isPioneer && reg.program === "creative-explorer" ? 4820 : (isPioneer && reg.program === "curious-explorer" ? 4295 : prog.rate));
+    const items: FeeItem[] = [{ key: "program", label: isPioneer ? "Program fee (Pioneer)" : "Program fee", amount: progRate }];
 
-    const welcome = on(reg.welcomeKit) || on(reg.isNewFamily) || on(reg.newFamily) || on(reg.welcomeKitOrdered);
+    const welcome = !isPioneer && (on(reg.welcomeKit) || on(reg.isNewFamily) || on(reg.newFamily) || on(reg.welcomeKitOrdered));
     const uniformSet = on(reg.uniformSetOnly) || on(reg.uniformSet) || on(reg.uniformSetOrdered);
     if (welcome) items.push({ key: "welcome", label: "Welcome Kit", amount: WELCOME_KIT_PRICE });
     if (uniformSet) items.push({ key: "uniform", label: "Uniform Set", amount: UNIFORM_SET_PRICE });

@@ -27,6 +27,10 @@ interface Registration {
   signatureUrl?: string;
   photoConsent?: string;
   uniformOrdered: boolean;
+  welcomeKitOrdered?: boolean;
+  isPioneer?: boolean;
+  customRate?: number | null;
+  isNewFamily?: boolean;
   submittedAt: string;
   approvedAt?: string;
   approvedBy?: string;
@@ -214,8 +218,11 @@ function DetailModal({
   
   // Calculate true remaining balance for the whole program
   const programDetails = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
-  const totalCost = programDetails ? programDetails.rate + (reg.uniformOrdered ? UNIFORM_KIT.price : 0) : null;
-  const realRemainingBalance = totalCost ? totalCost - (reg.amountPaid || 0) : null;
+  const isPioneer = Boolean(reg.isPioneer);
+  const effectiveProgramRate = reg.customRate || (isPioneer && reg.program === "creative-explorer" ? 4820 : (isPioneer && reg.program === "curious-explorer" ? 4295 : (programDetails ? programDetails.rate : 0)));
+  const totalCost = effectiveProgramRate > 0 ? effectiveProgramRate + (reg.uniformOrdered ? UNIFORM_KIT.price : 0) : null;
+  const realRemainingBalance = totalCost !== null ? totalCost - (reg.amountPaid || 0) : null;
+  const requiredDownpayment = effectiveProgramRate > 0 ? Math.round(effectiveProgramRate * 0.6) : (programDetails ? programDetails.downpayment : 0);
 
   return (
     <AnimatePresence>
@@ -280,6 +287,11 @@ function DetailModal({
                 <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold shadow-sm ${STATUS_STYLES[reg.status]}`}>
                   {STATUS_LABELS[reg.status]}
                 </span>
+                {isPioneer && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-800 shadow-sm">
+                    ⭐ Pioneer Family
+                  </span>
+                )}
                 <span className="text-[11px] text-[#94a3b8] font-medium">
                   Submitted {new Date(reg.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
@@ -314,13 +326,20 @@ function DetailModal({
                 value={reg.paymentType === "full" ? "Full Payment ✓" : "Downpayment"} 
                 highlight={reg.paymentType === "full" ? "green" : "blue"} 
               />
-              <InfoRow label={reg.paymentType === "full" ? "Amount Due" : "Required Downpayment"} value={reg.amountDue ? `₱${reg.amountDue.toLocaleString()}` : "—"} />
+              <InfoRow 
+                label={reg.paymentType === "full" ? "Amount Due" : "Required Downpayment"} 
+                value={
+                  reg.amountDue && reg.amountDue > 0
+                    ? `₱${reg.amountDue.toLocaleString()}` 
+                    : (requiredDownpayment > 0 ? `₱${requiredDownpayment.toLocaleString()} (60% Downpayment)` : "—")
+                } 
+              />
               <InfoRow label="Amount Paid" value={reg.amountPaid ? `₱${reg.amountPaid.toLocaleString()}` : "—"} highlight={reg.amountPaid && reg.amountDue && reg.amountPaid >= reg.amountDue ? "green" : undefined} />
               
               {reg.paymentType !== "full" && realRemainingBalance !== null && (
                 <InfoRow 
                   label="Remaining Balance" 
-                  value={`₱${Math.max(0, realRemainingBalance).toLocaleString()}`} 
+                  value={`₱${Math.max(0, realRemainingBalance).toLocaleString()}${isPioneer ? " (Pioneer Rate)" : ""}`} 
                   highlight="red" 
                 />
               )}

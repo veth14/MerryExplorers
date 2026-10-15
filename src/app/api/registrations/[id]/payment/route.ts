@@ -164,16 +164,19 @@ export async function POST(
 
       // Fetch dynamic adventure number & start date
       const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
-      const storedPrograms: Array<{ programKey: string; currentAdventure: number; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+      const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
       const matchedProg = storedPrograms.find((p) =>
         p.programKey.toLowerCase().includes(resolvedProgramTitle.toLowerCase()) ||
         resolvedProgramTitle.toLowerCase().includes(p.programKey.toLowerCase())
       ) || storedPrograms[0];
 
-      const advNumber = matchedProg?.currentAdventure ?? 2;
+      const periodNumMatch = (registration.period || "").match(/adventure\s*[-_]?\s*(\d+)/i);
+      const advNumber = periodNumMatch
+        ? parseInt(periodNumMatch[1], 10)
+        : (matchedProg?.nextAdventureStart ? ((matchedProg.currentAdventure ?? 1) + 1) : 2);
       const advLabel = `Adventure ${advNumber}`;
-      const advStartDateStr = matchedProg?.nextAdventureStart
-        ? new Date(matchedProg.nextAdventureStart).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+      const advStartDateStr = (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
+        ? new Date(matchedProg.nextAdventureStart || matchedProg.adventureStartDate!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
         : null;
 
       await transporter.sendMail({

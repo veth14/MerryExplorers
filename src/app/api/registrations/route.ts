@@ -232,8 +232,8 @@ export async function POST(request: Request) {
       photoConsent,
       uniformOrdered: uniformOrdered || false,
       lanyardOrdered: lanyardOrdered || false,
-      welcomeKitOrdered: welcomeKitOrdered || false,
-      isNewFamily: typeof data.isNewFamily === "boolean" ? data.isNewFamily : true,
+      welcomeKitOrdered: isPioneer ? false : (welcomeKitOrdered || false),
+      isNewFamily: isPioneer ? false : (typeof data.isNewFamily === "boolean" ? data.isNewFamily : true),
       isPioneer,
       customRate: isScholar ? 0 : (customRate || null),
       notes: isScholar
@@ -331,7 +331,10 @@ export async function POST(request: Request) {
         ) || storedPrograms[0];
 
         const isAdvProg = !["ballet", "virtual-session"].includes(program);
-        const advNum = matchedProg?.currentAdventure ?? 2;
+        const periodNumMatch = (newRegistration.period || "").match(/adventure\s*[-_]?\s*(\d+)/i);
+        const advNum = periodNumMatch
+          ? parseInt(periodNumMatch[1], 10)
+          : (matchedProg?.nextAdventureStart ? ((matchedProg.currentAdventure ?? 1) + 1) : 2);
         const advLabel = isAdvProg ? `Adventure ${advNum}` : readableProgramName;
         const advStartDateStr = (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
           ? new Date(matchedProg.nextAdventureStart || matchedProg.adventureStartDate!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
@@ -440,10 +443,10 @@ export async function POST(request: Request) {
 
                 ${isAdvProg ? `
                 <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #92400e;">
-                  <p style="margin: 0 0 6px; font-weight: bold;">⚠️ IMPORTANT NOTE &amp; DISCLAIMER:</p>
-                  <p style="margin: 0 0 8px;">Please ensure to settle your <strong>Adventure 1 Balance</strong> before you can proceed to the registration.</p>
+                  <p style="margin: 0 0 6px; font-weight: bold;">⚠️ RETURNING FAMILY BALANCE REMINDER:</p>
+                  <p style="margin: 0 0 8px;">Please ensure any outstanding account balance from previous cycles (Adventure 1) has been settled.</p>
                   <p style="margin: 0; font-style: italic;">
-                    "In the event that a family has unsettled balance, your downpayment for ${advLabel} will be credited as your balance payment for the previous cycle."
+                    "In the event that a family has an unsettled Adventure 1 balance, any payment submitted for ${advLabel} will be credited toward that previous balance first."
                   </p>
                 </div>
                 ` : program === "ballet" ? `

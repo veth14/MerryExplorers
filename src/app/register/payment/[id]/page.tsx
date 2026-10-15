@@ -123,12 +123,15 @@ export default function PaymentPage() {
         .then((data) => {
           if (data.success) {
             setRegData(data.data);
-            if (typeof data.data.isNewFamily === "boolean") {
+            if (data.data.isPioneer) {
+              setIsNewFamily(false);
+              setWelcomeKitOrdered(false);
+            } else if (typeof data.data.isNewFamily === "boolean") {
               setIsNewFamily(data.data.isNewFamily);
             }
             if (typeof data.data.uniformOrdered === "boolean") setUniformOrdered(data.data.uniformOrdered);
             if (typeof data.data.lanyardOrdered === "boolean") setLanyardOrdered(data.data.lanyardOrdered);
-            if (typeof data.data.welcomeKitOrdered === "boolean") setWelcomeKitOrdered(data.data.welcomeKitOrdered);
+            if (typeof data.data.welcomeKitOrdered === "boolean") setWelcomeKitOrdered(data.data.isPioneer ? false : data.data.welcomeKitOrdered);
             const isScholar = data.data.isScholar || data.data.promoCode === "A1JesusLovesMe2026" || data.data.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || data.data.status === "scholar";
             if (data.data.status !== "reserved" && data.data.status !== "early-bird" && !isScholar) {
               setError(
@@ -185,10 +188,12 @@ export default function PaymentPage() {
     regData?.program === "saturday-playdate" ||
     regData?.program === "virtual-session";
 
+  const isPioneer = Boolean(regData?.isPioneer);
+
   const addonCost = isBallet
     ? (recitalKitOrdered ? 1500 : 0)
-    : isNoUniformProg
-    ? 0
+    : isNoUniformProg || isPioneer
+    ? (uniformOrdered ? UNIFORM_KIT.price : 0) + (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0)
     : (isNewFamily
       ? UNIFORM_KIT.welcomeKitPrice
       : (welcomeKitOrdered ? UNIFORM_KIT.welcomeKitPrice : 0) +
@@ -259,9 +264,9 @@ export default function PaymentPage() {
           receiptBase64,
           uniformOrdered,
           lanyardOrdered,
-          welcomeKitOrdered,
+          welcomeKitOrdered: isPioneer ? false : welcomeKitOrdered,
           recitalKitOrdered,
-          isNewFamily,
+          isNewFamily: isPioneer ? false : isNewFamily,
           paymentType,
           amountDue,
           amountPaid: parsedAmountPaid,
@@ -538,7 +543,7 @@ export default function PaymentPage() {
                     <span className="font-extrabold">₱1,500</span>
                   </div>
                 )}
-                {!isNoUniformProg && isNewFamily && (
+                {!isNoUniformProg && !isPioneer && isNewFamily && (
                   <div className="flex justify-between">
                     <span className="text-white/80">Welcome Kit</span>
                     <span className="font-extrabold">₱{UNIFORM_KIT.welcomeKitPrice.toLocaleString()}</span>

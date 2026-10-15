@@ -38,6 +38,36 @@ export async function PATCH(
     if (body.notes !== undefined) updateFields.notes = body.notes.trim();
     if (body.renewalPeriod !== undefined) updateFields.renewalPeriod = body.renewalPeriod;
 
+    if (body.isPioneer !== undefined) {
+      updateFields.isPioneer = Boolean(body.isPioneer);
+
+      // Bidirectional sync with pioneer_families
+      const familyDoc = await db.collection("renewal_families").findOne({ _id: new ObjectId(id) });
+      const targetEmail = (updateFields.parentEmail || familyDoc?.parentEmail || "").trim().toLowerCase();
+      const targetParent = updateFields.parentName || familyDoc?.parentName || "";
+      const targetChild = updateFields.childName || familyDoc?.childName || "";
+
+      if (targetEmail) {
+        if (body.isPioneer) {
+          await db.collection("pioneer_families").updateOne(
+            { email: targetEmail },
+            {
+              $set: {
+                parentName: targetParent.trim(),
+                childName: targetChild.trim(),
+                email: targetEmail,
+                updatedAt: new Date().toISOString(),
+              },
+              $setOnInsert: { createdAt: new Date().toISOString() },
+            },
+            { upsert: true }
+          );
+        } else {
+          await db.collection("pioneer_families").deleteMany({ email: targetEmail });
+        }
+      }
+    }
+
     await db.collection("renewal_families").updateOne(
       { _id: new ObjectId(id) },
       { $set: updateFields }

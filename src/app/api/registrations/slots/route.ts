@@ -17,9 +17,13 @@ export async function GET() {
     for (const [programId, config] of Object.entries(PROGRAM_SLOTS)) {
       result[programId] = {};
       for (const cls of config.classes) {
+        // Normalise "Session" ↔ "Class" aliases stored in the DB
+        const altName = cls.name.includes("Session")
+          ? cls.name.replace("Session", "Class")
+          : cls.name.replace("Class", "Session");
         const taken = await db.collection("student_registrations").countDocuments({
           program: programId,
-          classTime: cls.name,
+          classTime: { $in: [cls.name, altName] },
           status: { $in: ["pending", "approved", "reserved"] },
           submittedAt: { $gte: ADVENTURE_2_START },
         });
