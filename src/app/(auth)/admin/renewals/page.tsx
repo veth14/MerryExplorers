@@ -60,6 +60,11 @@ type RenewalRecord = {
   receiptUrl?: string;
   isResubmission?: boolean;
   matchedFamily?: boolean;
+  isPioneer?: boolean;
+  isVerified?: boolean;
+  status?: string;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 };
 
 type Stats = {
@@ -76,6 +81,8 @@ type Stats = {
   conversionRate: number;
   countExpiringSoon: number;
   deadlineIso: string;
+  minStudentsPerSession?: number;
+  downpaymentRate?: number;
   totalCollected: number;
   totalExpectedDownpayment: number;
   totalOutstandingBalance: number;
@@ -88,6 +95,8 @@ type SlotInfo = {
   totalMax: number;
   sessions: Record<string, { max: number; taken: number; belowMin: boolean }>;
 };
+
+const FALLBACK_DEADLINE_ISO = "2026-10-16T13:00:00+08:00";
 
 export default function RenewalsPage() {
   const router = useRouter();
@@ -123,14 +132,6 @@ export default function RenewalsPage() {
   const [importPreview, setImportPreview] = useState<{ total: number; valid: number; duplicates: number }>({ total: 0, valid: 0, duplicates: 0 });
   const [importing, setImporting] = useState(false);
   const [newPeriodModal, setNewPeriodModal] = useState(false);
-
-  // Payment Recording Modal
-  const [paymentModalRecord, setPaymentModalRecord] = useState<RenewalRecord | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("gcash");
-  const [paymentRef, setPaymentRef] = useState("");
-  const [paymentNotes, setPaymentNotes] = useState("");
-  const [recordingPayment, setRecordingPayment] = useState(false);
 
   // Family form fields
   const [formParentName, setFormParentName] = useState("");
@@ -176,6 +177,8 @@ export default function RenewalsPage() {
         setRenewalRecords(rData.data.records);
         setStats(rData.data.stats);
         setSlotOverview(rData.data.slotOverview);
+      } else {
+        console.error("Renewals API error:", rData.error || rRes.status);
       }
       if (fData.success) setFamilies(fData.data);
     } catch (err) {
@@ -192,10 +195,15 @@ export default function RenewalsPage() {
   const [mounted, setMounted] = useState(false);
   const [deadlineText, setDeadlineText] = useState("");
 
+  // Deadline comes from the API (single source of truth), with a fallback until it loads
+  const deadlineIso = stats?.deadlineIso || FALLBACK_DEADLINE_ISO;
+  const minStudents = stats?.minStudentsPerSession ?? 3;
+  const deadlinePassed = new Date(deadlineIso).getTime() < Date.now();
+
   useEffect(() => {
     setMounted(true);
     const computeDeadline = () => {
-      const target = new Date("2026-10-16T13:00:00+08:00").getTime();
+      const target = new Date(deadlineIso).getTime();
       const diff = target - Date.now();
       if (diff <= 0) return "Deadline has passed (Oct 16, 1:00 PM)";
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -206,7 +214,7 @@ export default function RenewalsPage() {
     setDeadlineText(computeDeadline());
     const timer = setInterval(() => setDeadlineText(computeDeadline()), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [deadlineIso]);
 
   // Filtered Renewals
   const filteredRenewals = useMemo(() => {
@@ -214,10 +222,10 @@ export default function RenewalsPage() {
       const q = renewalSearch.toLowerCase().trim();
       const matchSearch =
         !q ||
-        r.childName.toLowerCase().includes(q) ||
-        r.parentName.toLowerCase().includes(q) ||
-        r.parentEmail.toLowerCase().includes(q) ||
-        r.referenceNumber.toLowerCase().includes(q);
+        (r.childName || "").toLowerCase().includes(q) ||
+        (r.parentName || "").toLowerCase().includes(q) ||
+        (r.parentEmail || "").toLowerCase().includes(q) ||
+        (r.referenceNumber || "").toLowerCase().includes(q);
 
       const matchStatus = renewalStatusFilter === "all" || r.renewalStatus === renewalStatusFilter;
       const matchProgram = renewalProgramFilter === "all" || r.program === renewalProgramFilter;
@@ -237,16 +245,16 @@ export default function RenewalsPage() {
     [filteredRenewals]
   );
 
-  // Filtered Families
+  // Filtered Families (null-safe: a missing phone/name no longer crashes the page)
   const filteredFamilies = useMemo(() => {
     return families.filter((f) => {
       const q = familySearch.toLowerCase().trim();
       const matchSearch =
         !q ||
-        f.childName.toLowerCase().includes(q) ||
-        f.parentName.toLowerCase().includes(q) ||
-        f.parentEmail.toLowerCase().includes(q) ||
-        f.phone.toLowerCase().includes(q);
+        (f.childName || "").toLowerCase().includes(q) ||
+        (f.parentName || "").toLowerCase().includes(q) ||
+        (f.parentEmail || "").toLowerCase().includes(q) ||
+        String(f.phone || "").toLowerCase().includes(q);
 
       const matchStatus =
         familyStatusFilter === "all" ||
@@ -330,7 +338,8 @@ export default function RenewalsPage() {
             showModalNotice("Status Updated", `Renewal status successfully changed to "${newStatus}".`, "success");
             fetchData();
           } else {
-            showModalNotice("Error", "Failed to update status. Please try again.", "error");
+            const d = await res.json().catch(() => ({}));
+            showModalNotice("Error", d.error || "Failed to update status. Please try again.", "error");
           }
         } catch {
           showModalNotice("Error", "Failed to update status.", "error");
@@ -355,7 +364,8 @@ export default function RenewalsPage() {
             showModalNotice("Slot Released", "The slot has been successfully released and freed up for waitlisted families.", "success");
             fetchData();
           } else {
-            showModalNotice("Error", "Failed to release slot.", "error");
+            const d = await res.json().catch(() => ({}));
+            showModalNotice("Error", d.error || "Failed to release slot.", "error");
           }
         } catch {
           showModalNotice("Error", "Failed to release slot.", "error");
@@ -363,46 +373,6 @@ export default function RenewalsPage() {
       },
       "Yes, Release Slot"
     );
-  };
-
-  // Record payment submit
-  const handleRecordPaymentSubmit = async () => {
-    if (!paymentModalRecord) return;
-    const amount = parseFloat(paymentAmount);
-    if (!amount || amount <= 0) {
-      showModalNotice("Invalid Amount", "Please enter a valid positive payment amount.", "error");
-      return;
-    }
-
-    setRecordingPayment(true);
-    try {
-      const res = await fetch(`/api/renewals/${paymentModalRecord.registrationId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "record_payment",
-          amountPaid: amount,
-          paymentMethod,
-          referenceNumber: paymentRef,
-          notes: paymentNotes,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPaymentModalRecord(null);
-        setPaymentAmount("");
-        setPaymentRef("");
-        setPaymentNotes("");
-        fetchData();
-        showModalNotice("Payment Synced", data.message || "Payment recorded and synced successfully!", "success");
-      } else {
-        showModalNotice("Error", data.error || "Failed to record payment", "error");
-      }
-    } catch {
-      showModalNotice("Error", "A network error occurred while recording the payment.", "error");
-    } finally {
-      setRecordingPayment(false);
-    }
   };
 
   // Add / Edit Family submit
@@ -524,24 +494,27 @@ export default function RenewalsPage() {
         const ws = wb.Sheets[wsName];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
+        // String() guards against Excel giving numbers (e.g. phone numbers)
+        const str = (v: any) => String(v ?? "").trim();
+
         const parsed = data.map((row) => ({
-          parentName: row["Parent Name"] || row["parentName"] || row["Parent/Guardian Name"] || "",
-          parentEmail: row["Parent Email"] || row["parentEmail"] || row["Email"] || "",
-          phone: row["Phone Number"] || row["Phone"] || row["phone"] || "",
-          childName: row["Child Name"] || row["childName"] || row["Explorer"] || "",
-          previousProgram: row["Previous Program"] || row["previousProgram"] || "Adventure 1",
-          renewingTo: row["Renewing To"] || row["renewingTo"] || "Adventure 2",
-          notes: row["Notes"] || row["notes"] || "",
+          parentName: str(row["Parent Name"] || row["parentName"] || row["Parent/Guardian Name"]),
+          parentEmail: str(row["Parent Email"] || row["parentEmail"] || row["Email"]),
+          phone: str(row["Phone Number"] || row["Phone"] || row["phone"]),
+          childName: str(row["Child Name"] || row["childName"] || row["Explorer"]),
+          previousProgram: str(row["Previous Program"] || row["previousProgram"]) || "Adventure 1",
+          renewingTo: str(row["Renewing To"] || row["renewingTo"]) || "Adventure 2",
+          notes: str(row["Notes"] || row["notes"]),
         }));
 
         // check duplicates against current state
         let dups = 0;
         const validRows: any[] = [];
         parsed.forEach((row) => {
-          const email = (row.parentEmail || "").trim().toLowerCase();
-          const child = (row.childName || "").trim().toLowerCase();
+          const email = row.parentEmail.toLowerCase();
+          const child = row.childName.toLowerCase();
           const isDup = families.some(
-            (f) => f.parentEmail.toLowerCase() === email && f.childName.toLowerCase() === child
+            (f) => (f.parentEmail || "").toLowerCase() === email && (f.childName || "").toLowerCase() === child
           );
           if (isDup) dups++;
           if (email && child) validRows.push(row);
@@ -657,15 +630,63 @@ export default function RenewalsPage() {
     }
   };
 
+  // ── Bulk email helpers ─────────────────────────────────────────────────
+  // A record counts as "unpaid" if it hasn't met its downpayment.
+  // NOTE: the API returns "—" (truthy!) when an email is missing, so check for it.
+  const isUnpaid = (r: RenewalRecord) =>
+    r.expectedDownpayment ? r.amountPaid < r.expectedDownpayment : r.amountPaid === 0;
+  const hasEmail = (r: RenewalRecord) => Boolean(r.parentEmail) && r.parentEmail !== "—";
+
+  // Sends one email per record and reports what actually happened.
+  const sendBulkEmail = async (
+    items: RenewalRecord[],
+    type: "payment_reminder" | "slot_released"
+  ) => {
+    let sent = 0;
+    const failed: string[] = [];
+    for (const item of items) {
+      if (!item.familyId) {
+        failed.push(`${item.childName} (not in contact list)`);
+        continue;
+      }
+      try {
+        const res = await fetch("/api/renewals/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ familyId: item.familyId, emailType: type }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (res.ok && d.success) sent++;
+        else failed.push(`${item.childName}${d.error ? ` (${d.error})` : ""}`);
+      } catch {
+        failed.push(item.childName);
+      }
+    }
+    return { sent, failed };
+  };
+
+  const reportBulkResult = (label: string, sent: number, failed: string[]) => {
+    if (failed.length === 0) {
+      showModalNotice(`${label} Sent`, `Successfully sent to ${sent} family/families.`, "success");
+    } else {
+      const shown = failed.slice(0, 8).join(", ");
+      const more = failed.length > 8 ? ` …and ${failed.length - 8} more` : "";
+      showModalNotice(
+        `${label}: ${sent} sent, ${failed.length} failed`,
+        `Not delivered: ${shown}${more}. Check these families and retry individually.`,
+        "error"
+      );
+    }
+  };
+
   // Remind All Unpaid Families (October 16, 1:00 PM Deadline Reminder)
   const [remindingAll, setRemindingAll] = useState(false);
   const handleRemindAllUnpaid = async () => {
-    // Only send to those who haven't paid the exact expected downpayment
     const unpaidList = renewalRecords.filter(
       (r) =>
         (r.renewalStatus === "reserved" || r.renewalStatus === "for_release") &&
-        (r.expectedDownpayment ? r.amountPaid < r.expectedDownpayment : r.amountPaid === 0) &&
-        r.parentEmail
+        isUnpaid(r) &&
+        hasEmail(r)
     );
     if (unpaidList.length === 0) {
       showModalNotice("All Set", "There are currently no unpaid reservations to remind.", "info");
@@ -676,31 +697,16 @@ export default function RenewalsPage() {
       open: true,
       type: "confirm",
       title: "Send Oct 16 1:00 PM Payment Reminder?",
-      message: `Send an automated Oct 16 1:00 PM Payment Deadline Reminder email with direct payment links & Adventure 1 balance disclaimer to ${unpaidList.length} family/families who have not yet paid the exact downpayment?`,
-      confirmLabel: `Send Oct 16 Reminders (${unpaidList.length})`,
+      message: `Send the payment deadline reminder (with payment link and Adventure 1 balance disclaimer) to ${unpaidList.length} family/families who have not yet paid the downpayment?`,
+      confirmLabel: `Send Reminders (${unpaidList.length})`,
       cancelLabel: "Cancel",
       onConfirm: async () => {
         setFeedbackDialog((prev) => ({ ...prev, open: false }));
         setRemindingAll(true);
-        let sentCount = 0;
         try {
-          for (const item of unpaidList) {
-            if (item.familyId) {
-              await fetch("/api/renewals/send-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  familyId: item.familyId,
-                  emailType: "payment_reminder",
-                }),
-              });
-              sentCount++;
-            }
-          }
+          const { sent, failed } = await sendBulkEmail(unpaidList, "payment_reminder");
           fetchData();
-          showModalNotice("Reminders Dispatched", `Successfully delivered Oct 16 deadline reminders to ${sentCount} family/families!`, "success");
-        } catch {
-          showModalNotice("Error", "An issue occurred while sending some email reminders.", "error");
+          reportBulkResult("Reminders", sent, failed);
         } finally {
           setRemindingAll(false);
         }
@@ -708,50 +714,54 @@ export default function RenewalsPage() {
     });
   };
 
-  // Notify Released Slots (Unpaid families whose slots have been released after Oct 16 1:00 PM)
+  // Notify Released Slots.
+  // Only for records that are ACTUALLY for_release / released, and only AFTER the deadline.
+  // (The old version also included "reserved", i.e. slots still being held.)
   const [releasingAll, setReleasingAll] = useState(false);
   const handleNotifyReleasedSlots = async () => {
-    // Only send to families who haven't paid the exact required amount
+    if (!deadlinePassed) {
+      showModalNotice(
+        "Too Early",
+        "Release notices can only be sent after the deadline (Oct 16, 1:00 PM). Until then, these slots are still being held.",
+        "error"
+      );
+      return;
+    }
+
+    // Skip families already sent a release notice (ASSUMPTION: lastEmailSent contains "release").
+    // Confirm against what /api/renewals/send-email actually stores.
+    const alreadyNotified = new Set(
+      families
+        .filter((f) => String(f.lastEmailSent || "").toLowerCase().includes("release"))
+        .map((f) => f._id)
+    );
+
     const unpaidList = renewalRecords.filter(
       (r) =>
-        (r.renewalStatus === "reserved" || r.renewalStatus === "for_release" || r.renewalStatus === "released") &&
-        (r.expectedDownpayment ? r.amountPaid < r.expectedDownpayment : r.amountPaid === 0) &&
-        r.parentEmail
+        (r.renewalStatus === "for_release" || r.renewalStatus === "released") &&
+        isUnpaid(r) &&
+        hasEmail(r) &&
+        !(r.familyId && alreadyNotified.has(r.familyId))
     );
     if (unpaidList.length === 0) {
-      showModalNotice("All Set", "There are no unpaid families eligible for slot release notifications.", "info");
+      showModalNotice("All Set", "No unpaid families are waiting for a slot release notice.", "info");
       return;
     }
 
     setFeedbackDialog({
       open: true,
       type: "confirm",
-      title: "Send 'Slot Released' Notice to Unpaid Families?",
-      message: `Send the official 'Your slot has been released' email to ${unpaidList.length} family/families who have not paid the exact amount? They will be informed that the reservation has expired and they must submit a new registration form to re-reserve.`,
+      title: "Send 'Slot Released' Notice?",
+      message: `Send the official "Your slot has been released" email to ${unpaidList.length} family/families? They'll be told the reservation expired and they must submit a new registration form.`,
       confirmLabel: `Send Release Notices (${unpaidList.length})`,
       cancelLabel: "Cancel",
       onConfirm: async () => {
         setFeedbackDialog((prev) => ({ ...prev, open: false }));
         setReleasingAll(true);
-        let sentCount = 0;
         try {
-          for (const item of unpaidList) {
-            if (item.familyId) {
-              await fetch("/api/renewals/send-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  familyId: item.familyId,
-                  emailType: "slot_released",
-                }),
-              });
-              sentCount++;
-            }
-          }
+          const { sent, failed } = await sendBulkEmail(unpaidList, "slot_released");
           fetchData();
-          showModalNotice("Notices Dispatched", `Successfully notified ${sentCount} family/families that their slot has been released.`, "success");
-        } catch {
-          showModalNotice("Error", "An issue occurred while sending slot release notices.", "error");
+          reportBulkResult("Release Notices", sent, failed);
         } finally {
           setReleasingAll(false);
         }
@@ -941,7 +951,7 @@ export default function RenewalsPage() {
                     Class Size &amp; Session Tracker
                   </h2>
                   <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                    Min. 3 students rule
+                    Min. {minStudents} students rule
                   </span>
                 </div>
                 <p className="text-[12px] text-[#64748b]">
@@ -955,10 +965,10 @@ export default function RenewalsPage() {
             <div className="flex items-center gap-2.5 mt-2 sm:mt-0">
               <div className="flex items-center gap-1.5 text-[11px] font-bold">
                 <span className="flex items-center gap-1 text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-xl">
-                  ⚠️ Below Min (&lt;3)
+                  ⚠️ Below Min (&lt;{minStudents})
                 </span>
                 <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-                  ✓ Proceeding (3+)
+                  ✓ Proceeding ({minStudents}+)
                 </span>
               </div>
               <button
@@ -983,11 +993,10 @@ export default function RenewalsPage() {
                       {Object.entries(progData.sessions).map(([sessName, sessInfo]) => (
                         <div
                           key={sessName}
-                          className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] transition-all ${
-                            sessInfo.belowMin
+                          className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] transition-all ${sessInfo.belowMin
                               ? "bg-orange-50/70 border-orange-200 text-orange-950 font-medium"
                               : "bg-emerald-50/40 border-emerald-200/60 text-slate-700"
-                          }`}
+                            }`}
                         >
                           <div>
                             <p className="font-bold text-[12px]">{sessName}</p>
@@ -997,18 +1006,17 @@ export default function RenewalsPage() {
                           </div>
                           <div className="text-right">
                             <span
-                              className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${
-                                sessInfo.belowMin
+                              className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${sessInfo.belowMin
                                   ? "bg-orange-200 text-orange-800"
                                   : sessInfo.taken >= sessInfo.max
-                                  ? "bg-slate-200 text-slate-800"
-                                  : "bg-emerald-100 text-emerald-800"
-                              }`}
+                                    ? "bg-slate-200 text-slate-800"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
                             >
                               {sessInfo.taken} / {sessInfo.max}
                             </span>
                             {sessInfo.belowMin && (
-                              <p className="text-[10px] text-orange-700 font-bold mt-0.5">Needs {3 - sessInfo.taken} more</p>
+                              <p className="text-[10px] text-orange-700 font-bold mt-0.5">Needs {Math.max(0, minStudents - sessInfo.taken)} more</p>
                             )}
                           </div>
                         </div>
@@ -1025,11 +1033,10 @@ export default function RenewalsPage() {
         <div className="flex border-b border-slate-200">
           <button
             onClick={() => setActiveTab("renewals")}
-            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${
-              activeTab === "renewals"
+            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "renewals"
                 ? "border-[#0033A0] text-[#0033A0]"
                 : "border-transparent text-[#64748b] hover:text-[#002f76]"
-            }`}
+              }`}
           >
             <span>📋</span> Active Renewals ({activeRenewals.length})
             {archivedRenewals.length > 0 && (
@@ -1040,21 +1047,19 @@ export default function RenewalsPage() {
           </button>
           <button
             onClick={() => setActiveTab("families")}
-            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${
-              activeTab === "families"
+            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "families"
                 ? "border-[#0033A0] text-[#0033A0]"
                 : "border-transparent text-[#64748b] hover:text-[#002f76]"
-            }`}
+              }`}
           >
             <span>👨‍👩‍👧</span> Families Contact List ({filteredFamilies.length})
           </button>
           <button
             onClick={() => setActiveTab("settings")}
-            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${
-              activeTab === "settings"
+            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "settings"
                 ? "border-[#0033A0] text-[#0033A0]"
                 : "border-transparent text-[#64748b] hover:text-[#002f76]"
-            }`}
+              }`}
           >
             <span>⚙️</span> Renewal Settings
           </button>
@@ -1112,10 +1117,14 @@ export default function RenewalsPage() {
                 </button>
 
                 <button
-                  disabled={releasingAll}
+                  disabled={releasingAll || !deadlinePassed}
                   onClick={handleNotifyReleasedSlots}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 text-[12px] font-bold transition-colors shadow-sm disabled:opacity-50"
-                  title="Send official slot released email to families who haven't paid the exact amount by Oct 16 1:00 PM"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 text-[12px] font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={
+                    deadlinePassed
+                      ? "Send official slot released email to unpaid families whose slots are for release / released"
+                      : "Available after the Oct 16 1:00 PM deadline"
+                  }
                 >
                   <span>📢</span>
                   <span>{releasingAll ? "Notifying..." : "Notify Slot Released (Oct 16)"}</span>
@@ -1160,16 +1169,15 @@ export default function RenewalsPage() {
                           <p className="text-[11px] text-slate-400 font-mono">{r.parentEmail}</p>
                         </td>
                         <td className="py-3.5 px-4">
-                          <p className="font-medium capitalize text-slate-800">{r.program.replace(/-/g, " ")}</p>
+                          <p className="font-medium capitalize text-slate-800">{(r.program || "").replace(/-/g, " ")}</p>
                           <p className="text-[11.5px] text-slate-500">{r.classTime}</p>
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                              r.isPromo
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${r.isPromo
                                 ? "bg-amber-100 text-amber-800"
                                 : "bg-blue-100 text-blue-800"
-                            }`}
+                              }`}
                           >
                             {r.reservationType}
                           </span>
@@ -1189,17 +1197,17 @@ export default function RenewalsPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11.5px] font-bold ${
-                              r.renewalStatus === "confirmed"
+                            className={`inline-block px-2.5 py-1 rounded-full text-[11.5px] font-bold ${r.renewalStatus === "confirmed"
                                 ? "bg-emerald-100 text-emerald-800"
                                 : r.renewalStatus === "for_release"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-amber-100 text-amber-800"
-                            }`}
+                                  ? "bg-orange-100 text-orange-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
                           >
-                            {r.renewalStatus === "confirmed" && "🟢 Confirmed"}
+                            {r.renewalStatus === "confirmed" && (r.isVerified ? "🟢 Confirmed (Verified)" : "🟢 Confirmed")}
                             {r.renewalStatus === "reserved" && "🟡 Reserved (Unpaid)"}
                             {r.renewalStatus === "for_release" && "🟠 For Release"}
+                            {r.renewalStatus === "released" && "⚪ Released"}
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
@@ -1211,10 +1219,18 @@ export default function RenewalsPage() {
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {r.renewalStatus === "confirmed" || r.paymentStatus === "fully_paid" ? (
+                            {r.isVerified ? (
                               <a
                                 href={`/admin/payments?search=${encodeURIComponent(r.childName)}`}
-                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm inline-flex items-center gap-1"
+                                title={`Payment verified${r.approvedAt ? ` on ${new Date(r.approvedAt).toLocaleDateString()}` : ""}`}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm inline-flex items-center gap-1 transition-colors"
+                              >
+                                ✅ Verified
+                              </a>
+                            ) : r.renewalStatus === "confirmed" || r.paymentStatus === "fully_paid" || r.amountPaid > 0 ? (
+                              <a
+                                href={`/admin/payments?search=${encodeURIComponent(r.childName)}`}
+                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 text-[11.5px] font-bold shadow-sm inline-flex items-center gap-1 transition-colors"
                               >
                                 ✓ Verify Payment
                               </a>
@@ -1329,13 +1345,12 @@ export default function RenewalsPage() {
                                 <p className="text-[10.5px] text-slate-400 font-mono">{r.parentEmail}</p>
                               </td>
                               <td className="py-3 px-4">
-                                <p className="font-medium capitalize text-slate-600">{r.program.replace(/-/g, " ")}</p>
+                                <p className="font-medium capitalize text-slate-600">{(r.program || "").replace(/-/g, " ")}</p>
                                 <p className="text-[11px] text-slate-400">{r.classTime}</p>
                               </td>
                               <td className="py-3 px-4">
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
-                                  r.isPromo ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-700 border border-blue-200"
-                                }`}>
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10.5px] font-bold ${r.isPromo ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-700 border border-blue-200"
+                                  }`}>
                                   {r.isPromo ? "Promo" : "Direct"}
                                 </span>
                                 {r.promoCode && (
@@ -1487,7 +1502,7 @@ export default function RenewalsPage() {
                 <tbody className="divide-y divide-slate-100 text-[#334155]">
                   {filteredFamilies.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                      <td colSpan={9} className="py-8 text-center text-slate-400">
                         No family records found. Click &quot;Add Family&quot; or &quot;Import CSV/Excel&quot; to populate your contact list.
                       </td>
                     </tr>
@@ -1560,15 +1575,14 @@ export default function RenewalsPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                              f.renewalStatus === "confirmed"
+                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${f.renewalStatus === "confirmed"
                                 ? "bg-emerald-100 text-emerald-800"
                                 : f.renewalStatus === "reserved"
-                                ? "bg-amber-100 text-amber-800"
-                                : f.renewalStatus === "released"
-                                ? "bg-slate-200 text-slate-700"
-                                : "bg-rose-50 text-rose-700 border border-rose-200"
-                            }`}
+                                  ? "bg-amber-100 text-amber-800"
+                                  : f.renewalStatus === "released"
+                                    ? "bg-slate-200 text-slate-700"
+                                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
                           >
                             {f.renewalStatus === "not_yet_submitted" && "Not Yet Submitted"}
                             {f.renewalStatus === "reserved" && "Reserved"}
@@ -1644,108 +1658,6 @@ export default function RenewalsPage() {
         {activeTab === "settings" && (
           <div className="pt-2">
             <RenewalSettingsManager />
-          </div>
-        )}
-
-        {/* ── MODAL: RECORD PAYMENT ── */}
-        {paymentModalRecord && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
-                  Record Payment (2-Way Sync)
-                </h3>
-                <button
-                  onClick={() => setPaymentModalRecord(null)}
-                  className="text-slate-400 hover:text-slate-600 font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-1 bg-slate-50 p-3 rounded-2xl text-[12.5px] text-slate-700">
-                <p><strong>Explorer:</strong> {paymentModalRecord.childName}</p>
-                <p><strong>Parent:</strong> {paymentModalRecord.parentName} ({paymentModalRecord.parentEmail})</p>
-                <p><strong>Total Tuition:</strong> ₱{paymentModalRecord.totalTuition.toLocaleString()}</p>
-                <p><strong>Expected 60% Downpayment:</strong> ₱{paymentModalRecord.expectedDownpayment.toLocaleString()}</p>
-                <p><strong>Current Paid:</strong> ₱{paymentModalRecord.amountPaid.toLocaleString()}</p>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
-                    Payment Amount (₱) *
-                  </label>
-                  <input
-                    type="number"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="Enter amount"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[14px] font-bold text-[#002f76]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
-                    Payment Method
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800"
-                  >
-                    <option value="gcash">GCash</option>
-                    <option value="bpi">BPI Bank Transfer</option>
-                    <option value="mari-bank">Mari Bank</option>
-                    <option value="cash">Cash Onsite</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
-                    Reference / Transaction #
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentRef}
-                    onChange={(e) => setPaymentRef(e.target.value)}
-                    placeholder="e.g. 100029384729"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
-                    Admin Notes
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentNotes}
-                    onChange={(e) => setPaymentNotes(e.target.value)}
-                    placeholder="e.g. Paid onsite directly to admin"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setPaymentModalRecord(null)}
-                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={recordingPayment}
-                  onClick={handleRecordPaymentSubmit}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 text-[12.5px] font-bold shadow-sm transition-colors disabled:opacity-50"
-                >
-                  {recordingPayment ? "Saving..." : "Save & Sync Payment"}
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -2065,11 +1977,10 @@ export default function RenewalsPage() {
                     setEmailType("promo_code");
                     setEmailSubject(`Priority Renewal & Slot Reservation Code for ${emailModalFamily.childName} 🌈`);
                   }}
-                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
-                    emailType === "promo_code"
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "promo_code"
                       ? "bg-white text-[#0033A0] shadow-sm"
                       : "text-slate-600 hover:text-[#002f76]"
-                  }`}
+                    }`}
                 >
                   🎟️ Priority Code
                 </button>
@@ -2079,11 +1990,10 @@ export default function RenewalsPage() {
                     setEmailType("payment_reminder");
                     setEmailSubject(`Payment Reminder & Slot Confirmation for ${emailModalFamily.childName} 🌈`);
                   }}
-                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
-                    emailType === "payment_reminder"
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "payment_reminder"
                       ? "bg-white text-[#0033A0] shadow-sm"
                       : "text-slate-600 hover:text-[#002f76]"
-                  }`}
+                    }`}
                 >
                   ⏰ Payment Reminder
                 </button>
@@ -2093,11 +2003,10 @@ export default function RenewalsPage() {
                     setEmailType("slot_released");
                     setEmailSubject(`Notice of Released Slot: Priority Reservation Expired for ${emailModalFamily.childName} ⏳`);
                   }}
-                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
-                    emailType === "slot_released"
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "slot_released"
                       ? "bg-white text-[#0033A0] shadow-sm"
                       : "text-slate-600 hover:text-[#002f76]"
-                  }`}
+                    }`}
                 >
                   🚪 Slot Released
                 </button>
@@ -2107,11 +2016,10 @@ export default function RenewalsPage() {
                     setEmailType("custom");
                     setEmailSubject(`Merry Explorers: Message regarding ${emailModalFamily.childName}`);
                   }}
-                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${
-                    emailType === "custom"
+                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "custom"
                       ? "bg-white text-[#0033A0] shadow-sm"
                       : "text-slate-600 hover:text-[#002f76]"
-                  }`}
+                    }`}
                 >
                   📝 Custom Notice
                 </button>
@@ -2150,9 +2058,9 @@ export default function RenewalsPage() {
                     emailModalFamily.registrationId
                       ? renewalRecords.find((r) => r.registrationId === emailModalFamily.registrationId)
                       : renewalRecords.find((r) =>
-                          r.parentEmail?.toLowerCase() === emailModalFamily.parentEmail?.toLowerCase() &&
-                          r.childName?.toLowerCase() === emailModalFamily.childName?.toLowerCase()
-                        )
+                        r.parentEmail?.toLowerCase() === emailModalFamily.parentEmail?.toLowerCase() &&
+                        r.childName?.toLowerCase() === emailModalFamily.childName?.toLowerCase()
+                      )
                   ) : null;
                   const displayProgram = modalMatchingRecord?.program || emailModalFamily.renewingTo || emailModalFamily.previousProgram || "Curious Explorer";
                   const isTrailblazer = displayProgram.toLowerCase().includes("trailblazer") || displayProgram.toLowerCase().includes("brave");
@@ -2307,28 +2215,26 @@ export default function RenewalsPage() {
             <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
               {/* Decorative top color bar */}
               <div
-                className={`absolute top-0 left-0 right-0 h-2 ${
-                  feedbackDialog.type === "success"
+                className={`absolute top-0 left-0 right-0 h-2 ${feedbackDialog.type === "success"
                     ? "bg-emerald-500"
                     : feedbackDialog.type === "error"
-                    ? "bg-rose-500"
-                    : feedbackDialog.type === "confirm"
-                    ? "bg-amber-500"
-                    : "bg-[#0033A0]"
-                }`}
+                      ? "bg-rose-500"
+                      : feedbackDialog.type === "confirm"
+                        ? "bg-amber-500"
+                        : "bg-[#0033A0]"
+                  }`}
               />
 
               <div className="flex items-start gap-4 pt-1">
                 <div
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl shadow-sm ${
-                    feedbackDialog.type === "success"
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl shadow-sm ${feedbackDialog.type === "success"
                       ? "bg-emerald-50 text-emerald-600 border border-emerald-200/80"
                       : feedbackDialog.type === "error"
-                      ? "bg-rose-50 text-rose-600 border border-rose-200/80"
-                      : feedbackDialog.type === "confirm"
-                      ? "bg-amber-50 text-amber-600 border border-amber-200/80"
-                      : "bg-blue-50 text-[#0033A0] border border-blue-200/80"
-                  }`}
+                        ? "bg-rose-50 text-rose-600 border border-rose-200/80"
+                        : feedbackDialog.type === "confirm"
+                          ? "bg-amber-50 text-amber-600 border border-amber-200/80"
+                          : "bg-blue-50 text-[#0033A0] border border-blue-200/80"
+                    }`}
                 >
                   {feedbackDialog.type === "success" && "✓"}
                   {feedbackDialog.type === "error" && "✕"}
@@ -2359,15 +2265,14 @@ export default function RenewalsPage() {
                 <button
                   type="button"
                   onClick={feedbackDialog.onConfirm}
-                  className={`rounded-xl px-5 py-2 text-[13px] font-bold text-white shadow-md transition-all ${
-                    feedbackDialog.type === "error"
+                  className={`rounded-xl px-5 py-2 text-[13px] font-bold text-white shadow-md transition-all ${feedbackDialog.type === "error"
                       ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20"
                       : feedbackDialog.type === "confirm"
-                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
-                      : feedbackDialog.type === "success"
-                      ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
-                      : "bg-[#0033A0] hover:bg-[#002f76] shadow-[#0033A0]/20"
-                  }`}
+                        ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                        : feedbackDialog.type === "success"
+                          ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+                          : "bg-[#0033A0] hover:bg-[#002f76] shadow-[#0033A0]/20"
+                    }`}
                 >
                   {feedbackDialog.confirmLabel || "OK"}
                 </button>
