@@ -86,6 +86,16 @@ function isRegExpired(r: Registration): boolean {
   return false;
 }
 
+function isTestRegistration(r: Registration): boolean {
+  const email = (r.parentInfo?.email || "").toLowerCase().trim();
+  const name = `${r.parentInfo?.name || ""} ${r.childInfo?.firstName || ""} ${r.childInfo?.lastName || ""}`.toLowerCase();
+  return (
+    email === "iangelovalmores@gmail.com" ||
+    email === "ian.valmores@gmail.com" ||
+    name.includes("ian angelo valmores")
+  );
+}
+
 type FilterTab = "all" | Status | "reserved" | "leads" | "expired";
 
 interface Lead {
@@ -220,7 +230,7 @@ function DetailModal({
   const programDetails = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
   const isPioneer = Boolean(reg.isPioneer);
   const effectiveProgramRate = reg.customRate || (isPioneer && reg.program === "creative-explorer" ? 4820 : (isPioneer && reg.program === "curious-explorer" ? 4295 : (programDetails ? programDetails.rate : 0)));
-  const totalCost = effectiveProgramRate > 0 ? effectiveProgramRate + (reg.uniformOrdered ? UNIFORM_KIT.price : 0) : null;
+  const totalCost = effectiveProgramRate > 0 ? effectiveProgramRate + (!isPioneer && reg.uniformOrdered ? UNIFORM_KIT.price : 0) : null;
   const realRemainingBalance = totalCost !== null ? totalCost - (reg.amountPaid || 0) : null;
   const requiredDownpayment = effectiveProgramRate > 0 ? Math.round(effectiveProgramRate * 0.6) : (programDetails ? programDetails.downpayment : 0);
 
@@ -290,6 +300,11 @@ function DetailModal({
                 {isPioneer && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-800 shadow-sm">
                     ⭐ Pioneer Family
+                  </span>
+                )}
+                {isTestRegistration(reg) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2.5 py-0.5 text-[11px] font-extrabold text-slate-700 shadow-sm">
+                    🧪 Test Account
                   </span>
                 )}
                 <span className="text-[11px] text-[#94a3b8] font-medium">
@@ -1054,10 +1069,11 @@ export default function AdminRegistrationsPage() {
   const counts = {
     all: registrations.length,
     pending: registrations.filter(r => r.status === "pending").length,
-    approved: registrations.filter(r => r.status === "approved").length,
-    rejected: registrations.filter(r => r.status === "rejected").length,
+    reserved: registrations.filter(r => r.status === "reserved" && !isRegExpired(r)).length,
     "early-bird": registrations.filter(r => r.status === "early-bird" && !isRegExpired(r)).length,
     expired: registrations.filter(isRegExpired).length,
+    approved: registrations.filter(r => r.status === "approved").length,
+    rejected: registrations.filter(r => r.status === "rejected").length,
   };
 
   const prospectiveLeads = leads.filter(l => l.status !== "converted" && l.status !== "archived");
@@ -1066,6 +1082,7 @@ export default function AdminRegistrationsPage() {
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "pending", label: `Pending (${counts.pending})` },
+    { key: "reserved", label: `🔒 Reserved (${counts.reserved})` },
     { key: "early-bird", label: `🐣 Early Bird (${counts["early-bird"]})` },
     { key: "expired", label: `⏰ Expired Slots (${counts.expired})` },
     { key: "approved", label: `Approved (${counts.approved})` },
@@ -1084,6 +1101,8 @@ export default function AdminRegistrationsPage() {
       matchStatus = isRegExpired(r);
     } else if (filter === "early-bird") {
       matchStatus = r.status === "early-bird" && !isRegExpired(r);
+    } else if (filter === "reserved") {
+      matchStatus = r.status === "reserved" && !isRegExpired(r);
     } else {
       matchStatus = r.status === filter;
     }
@@ -1425,7 +1444,14 @@ export default function AdminRegistrationsPage() {
                             style={{ backgroundColor: PROGRAM_ACCENTS[reg.program] || "#64748b" }}
                           />
                           <div>
-                            <p className="font-extrabold text-[#002f76]">{reg.childInfo.firstName} {reg.childInfo.lastName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-extrabold text-[#002f76]">{reg.childInfo.firstName} {reg.childInfo.lastName}</p>
+                              {isTestRegistration(reg) && (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-extrabold text-slate-500 border border-slate-200">
+                                  TEST
+                                </span>
+                              )}
+                            </div>
                             {reg.childInfo.nickname && <p className="text-[11px] text-[#94a3b8]">{reg.childInfo.nickname}</p>}
                           </div>
                         </div>

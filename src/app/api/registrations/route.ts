@@ -139,11 +139,19 @@ export async function POST(request: Request) {
       const altClassTime = classTime.includes("Session")
         ? classTime.replace("Session", "Class")
         : classTime.replace("Class", "Session");
+      const now = new Date();
       const takenSlots = await db.collection("student_registrations").countDocuments({
         program,
         classTime: { $in: [classTime, altClassTime] },
         status: { $in: ["pending", "approved", "reserved"] },
         submittedAt: { $gte: ADVENTURE_2_START },
+        "parentInfo.email": { $nin: ["vianangelo.14@gmail.com", "valmores.ianangelo00@gmail.com"] },
+        $or: [
+          { status: { $in: ["pending", "approved"] } },
+          { reservedUntil: { $exists: false } },
+          { reservedUntil: null },
+          { reservedUntil: { $gte: now } },
+        ],
       });
       if (takenSlots >= maxSlots) {
         return NextResponse.json({ error: `Sorry, ${classTime} for this program is now full.` }, { status: 409 });
@@ -184,8 +192,8 @@ export async function POST(request: Request) {
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")
       : isPromo
-      ? new Date("2026-10-16T13:00:00+08:00")
-      : new Date(Date.now() + 60 * 60 * 1000);
+        ? new Date("2026-10-16T13:00:00+08:00")
+        : new Date(Date.now() + 60 * 60 * 1000);
 
     // Auto-detect pioneer status if not explicitly passed
     let isPioneer = Boolean(data.isPioneer);
@@ -239,8 +247,8 @@ export async function POST(request: Request) {
       notes: isScholar
         ? "Scholar Registration (Promo code: A1JesusLovesMe2026 — 100% tuition sponsored, no payment needed)"
         : isPromo
-        ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)"
-        : "",
+          ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)"
+          : "",
       submittedAt: new Date(),
       period: "adventure-2",
       approvedAt: isScholar ? new Date() : null,
@@ -313,7 +321,7 @@ export async function POST(request: Request) {
         // Fetch program configuration & adventure start date
         const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
         const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
-        
+
         const programKeyMap: Record<string, string> = {
           "curious-explorer": "Discovery Club: Curious Explorer",
           "creative-explorer": "Discovery Club: Creative Explorer",
@@ -366,12 +374,12 @@ export async function POST(request: Request) {
         const emailSubject = isScholar
           ? `Scholarship Slot Confirmed: ${readableProgramName} for ${childName} 🎓✨`
           : isAdvProg
-          ? `Payment Reminder & Slot Confirmation: ${readableProgramName} (${advLabel}) for ${childName} 🌈`
-          : program === "ballet"
-            ? `Payment Reminder & Slot Confirmation: Ballet (${classTime || "Saturday"}) for ${childName} 🩰`
-            : program === "saturday-playdate"
-              ? `Payment Reminder & Slot Confirmation: Saturday Playdate for ${childName} 🛝`
-              : `Payment Reminder & Slot Confirmation: Virtual Tutorial for ${childName} 💻`;
+            ? `Payment Reminder & Slot Confirmation: ${readableProgramName} (${advLabel}) for ${childName} 🌈`
+            : program === "ballet"
+              ? `Payment Reminder & Slot Confirmation: Ballet (${classTime || "Saturday"}) for ${childName} 🩰`
+              : program === "saturday-playdate"
+                ? `Payment Reminder & Slot Confirmation: Saturday Playdate for ${childName} 🛝`
+                : `Payment Reminder & Slot Confirmation: Virtual Tutorial for ${childName} 💻`;
 
         await transporter.sendMail({
           from: `"Merry Explorers" <merryexplorerscenter@gmail.com>`,
@@ -386,9 +394,9 @@ export async function POST(request: Request) {
               <div style="padding: 28px;">
                 <p>Dear <strong>${parentName}</strong>,</p>
                 <p>${isScholar
-                  ? `We are delighted to confirm that <strong>${childName}</strong> is registered under our <strong>Scholarship Program</strong>! 100% of the tuition fee is sponsored, and your slot is officially secured.`
-                  : `Thank you for submitting your registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.`
-                }</p>
+              ? `We are delighted to confirm that <strong>${childName}</strong> is registered under our <strong>Scholarship Program</strong>! 100% of the tuition fee is sponsored, and your slot is officially secured.`
+              : `Thank you for submitting your registration for <strong>${childName}</strong>! Your slot has been received and is currently held on reservation.`
+            }</p>
 
                 <!-- Specific Program & Schedule Details Box -->
                 <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">

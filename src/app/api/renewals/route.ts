@@ -224,9 +224,12 @@ export async function GET(request: Request) {
       }
     }
 
-    // Count slots taken from confirmed + reserved registrations
+    // Count slots taken from confirmed + active (unexpired) reserved registrations
+    const now = new Date();
     for (const r of registrations) {
       if (r.status === "rejected" || r.status === "expired" || r.renewalStatus === "released") continue;
+      const reservedUntil = r.reservedUntil ? new Date(r.reservedUntil) : null;
+      if (r.status === "reserved" && reservedUntil && reservedUntil < now) continue;
       const prog = slotOverview[r.program];
       if (!prog) continue;
       // Normalise "Session" ↔ "Class" aliases
