@@ -235,6 +235,37 @@ export default function RenewalsPage() {
     });
   }, [renewalRecords, renewalSearch, renewalStatusFilter, renewalProgramFilter, renewalPaymentFilter]);
 
+  // ── KPIs computed from live records ──────────────────────────────────
+  // Released/expired slots that were never paid are excluded from every KPI
+  // (they no longer represent a real reservation or money owed).
+  // Released slots that DID pay something still count toward "Collected",
+  // but never toward balance due / expected downpayment.
+  const kpi = useMemo(() => {
+    const isReleasedUnpaid = (r: RenewalRecord) =>
+      r.renewalStatus === "released" && !(r.amountPaid > 0);
+    const counted = renewalRecords.filter((r) => !isReleasedUnpaid(r));
+    const live = renewalRecords.filter((r) => r.renewalStatus !== "released");
+
+    const totalFamilies = stats?.totalFamilies ?? families.length;
+    const submittedCount = counted.length;
+    const countReserved = live.filter((r) => r.renewalStatus === "reserved").length;
+    const countConfirmed = live.filter((r) => r.renewalStatus === "confirmed").length;
+    const promoReservations = live.filter((r) => r.isPromo).length;
+
+    return {
+      totalFamilies,
+      submittedCount,
+      countReserved,
+      countConfirmed,
+      promoReservations,
+      renewalRate: totalFamilies > 0 ? Math.round((submittedCount / totalFamilies) * 1000) / 10 : 0,
+      conversionRate: live.length > 0 ? Math.round((countConfirmed / live.length) * 1000) / 10 : 0,
+      totalCollected: counted.reduce((s, r) => s + (r.amountPaid || 0), 0),
+      totalExpectedDownpayment: live.reduce((s, r) => s + (r.expectedDownpayment || 0), 0),
+      totalOutstandingBalance: live.reduce((s, r) => s + (r.remainingBalance || 0), 0),
+    };
+  }, [renewalRecords, stats, families.length]);
+
   // Split into active vs archived (released)
   const activeRenewals = useMemo(
     () => filteredRenewals.filter((r) => r.renewalStatus !== "released"),
@@ -244,6 +275,55 @@ export default function RenewalsPage() {
     () => filteredRenewals.filter((r) => r.renewalStatus === "released"),
     [filteredRenewals]
   );
+
+  // ── Link families ↔ renewal records ──────────────────────────────────
+  // Parents sometimes use /register instead of /renew, so the registration isn't
+  // linked to the family record, and names are typed differently
+  // ("Knoa Andrae B. Erasga" vs "Knoa Andrae Erasga"). Match loosely:
+  //   1) registrationId or familyId   2) same email + same first & last name
+  // (middle names / initials / punctuation / case are ignored).
+  const nameKey = (s: string) => {
+    const t = (s || "")
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter((x) => x.length > 1); // drop middle initials
+    return t.length === 0 ? "" : `${t[0]}|${t[t.length - 1]}`;
+  };
+
+  const familyRecordMap = useMemo(() => {
+    const map = new Map<string, RenewalRecord>();
+    const rank = (r: RenewalRecord) => (r.renewalStatus === "released" ? 0 : 1);
+    families.forEach((f) => {
+      const candidates = renewalRecords.filter((r) => {
+        if (f.registrationId && r.registrationId === f.registrationId) return true;
+        if (r.familyId && r.familyId === f._id) return true;
+        const sameEmail =
+          (r.parentEmail || "").trim().toLowerCase() === (f.parentEmail || "").trim().toLowerCase();
+        const k = nameKey(f.childName);
+        return sameEmail && k !== "" && nameKey(r.childName) === k;
+      });
+      if (candidates.length === 0) return;
+      // Prefer a live (non-released) record, then the most recently submitted one
+      candidates.sort(
+        (a, b) =>
+          rank(b) - rank(a) ||
+          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+      map.set(f._id, candidates[0]);
+    });
+    return map;
+  }, [families, renewalRecords]);
+
+  // The status shown in the contact list: the renewal record is the source of truth
+  // whenever one exists, even if the family record still says "not yet submitted".
+  const getFamilyStatus = (f: Family): Family["renewalStatus"] => {
+    const rec = familyRecordMap.get(f._id);
+    if (!rec) return f.renewalStatus;
+    if (rec.renewalStatus === "confirmed") return "confirmed";
+    if (rec.renewalStatus === "released") return "released";
+    return "reserved"; // reserved + for_release
+  };
 
   // Filtered Families (null-safe: a missing phone/name no longer crashes the page)
   const filteredFamilies = useMemo(() => {
@@ -258,7 +338,7 @@ export default function RenewalsPage() {
 
       const matchStatus =
         familyStatusFilter === "all" ||
-        (familyStatusFilter === "pioneer" ? Boolean(f.isPioneer) : f.renewalStatus === familyStatusFilter);
+        (familyStatusFilter === "pioneer" ? Boolean(f.isPioneer) : getFamilyStatus(f) === familyStatusFilter);
 
       // Match program category (either from adventures history, previousProgram, or renewingTo)
       let matchProgram = true;
@@ -272,7 +352,7 @@ export default function RenewalsPage() {
 
       return matchSearch && matchStatus && matchProgram;
     });
-  }, [families, familySearch, familyStatusFilter, familyProgramFilter]);
+  }, [families, familySearch, familyStatusFilter, familyProgramFilter, familyRecordMap]);
 
   // Custom Dialog Modal State (Replaces native browser alerts/confirms)
   const [feedbackDialog, setFeedbackDialog] = useState<{
@@ -879,7 +959,7 @@ export default function RenewalsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Master Families</span>
                 <span className="text-sm">👨‍👩‍👧</span>
               </div>
-              <p className="mt-1 text-2xl font-black text-[#002f76]">{stats.totalFamilies}</p>
+              <p className="mt-1 text-2xl font-black text-[#002f76]">{kpi.totalFamilies}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">In contact directory</p>
             </div>
 
@@ -889,8 +969,8 @@ export default function RenewalsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Submitted</span>
                 <span className="text-sm">📝</span>
               </div>
-              <p className="mt-1 text-2xl font-black text-emerald-600">{stats.submittedCount}</p>
-              <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">{stats.renewalRate}% renewal rate</p>
+              <p className="mt-1 text-2xl font-black text-emerald-600">{kpi.submittedCount}</p>
+              <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">{kpi.renewalRate}% renewal rate</p>
             </div>
 
             {/* Reserved Unpaid */}
@@ -899,8 +979,8 @@ export default function RenewalsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserved (Hold)</span>
                 <span className="text-sm">⏳</span>
               </div>
-              <p className="mt-1 text-2xl font-black text-amber-600">{stats.countReserved}</p>
-              <p className="text-[11px] text-amber-700 mt-0.5">{stats.promoReservations} via promo code</p>
+              <p className="mt-1 text-2xl font-black text-amber-600">{kpi.countReserved}</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">{kpi.promoReservations} via promo code</p>
             </div>
 
             {/* Confirmed (60% Downpayment) */}
@@ -909,8 +989,8 @@ export default function RenewalsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Confirmed (60%)</span>
                 <span className="text-sm">✅</span>
               </div>
-              <p className="mt-1 text-2xl font-black text-blue-600">{stats.countConfirmed}</p>
-              <p className="text-[11px] text-blue-700 mt-0.5">{stats.conversionRate}% converted</p>
+              <p className="mt-1 text-2xl font-black text-blue-600">{kpi.countConfirmed}</p>
+              <p className="text-[11px] text-blue-700 mt-0.5">{kpi.conversionRate}% converted</p>
             </div>
 
             {/* Total Collected */}
@@ -919,8 +999,8 @@ export default function RenewalsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Collected</span>
                 <span className="text-sm">💰</span>
               </div>
-              <p className="mt-1 text-2xl font-black text-emerald-900">₱{stats.totalCollected.toLocaleString()}</p>
-              <p className="text-[11px] text-emerald-700 mt-0.5">Expected: ₱{stats.totalExpectedDownpayment.toLocaleString()}</p>
+              <p className="mt-1 text-2xl font-black text-emerald-900">₱{kpi.totalCollected.toLocaleString()}</p>
+              <p className="text-[11px] text-emerald-700 mt-0.5">Expected: ₱{kpi.totalExpectedDownpayment.toLocaleString()}</p>
             </div>
 
             {/* Outstanding Balance */}
@@ -929,7 +1009,7 @@ export default function RenewalsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Balance Due</span>
                 <span className="text-sm">⚖️</span>
               </div>
-              <p className="mt-1 text-2xl font-black text-amber-900">₱{stats.totalOutstandingBalance.toLocaleString()}</p>
+              <p className="mt-1 text-2xl font-black text-amber-900">₱{kpi.totalOutstandingBalance.toLocaleString()}</p>
               <p className="text-[11px] text-amber-700 mt-0.5">Remaining tuition</p>
             </div>
           </div>
@@ -994,8 +1074,8 @@ export default function RenewalsPage() {
                         <div
                           key={sessName}
                           className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] transition-all ${sessInfo.belowMin
-                              ? "bg-orange-50/70 border-orange-200 text-orange-950 font-medium"
-                              : "bg-emerald-50/40 border-emerald-200/60 text-slate-700"
+                            ? "bg-orange-50/70 border-orange-200 text-orange-950 font-medium"
+                            : "bg-emerald-50/40 border-emerald-200/60 text-slate-700"
                             }`}
                         >
                           <div>
@@ -1007,10 +1087,10 @@ export default function RenewalsPage() {
                           <div className="text-right">
                             <span
                               className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${sessInfo.belowMin
-                                  ? "bg-orange-200 text-orange-800"
-                                  : sessInfo.taken >= sessInfo.max
-                                    ? "bg-slate-200 text-slate-800"
-                                    : "bg-emerald-100 text-emerald-800"
+                                ? "bg-orange-200 text-orange-800"
+                                : sessInfo.taken >= sessInfo.max
+                                  ? "bg-slate-200 text-slate-800"
+                                  : "bg-emerald-100 text-emerald-800"
                                 }`}
                             >
                               {sessInfo.taken} / {sessInfo.max}
@@ -1034,8 +1114,8 @@ export default function RenewalsPage() {
           <button
             onClick={() => setActiveTab("renewals")}
             className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "renewals"
-                ? "border-[#0033A0] text-[#0033A0]"
-                : "border-transparent text-[#64748b] hover:text-[#002f76]"
+              ? "border-[#0033A0] text-[#0033A0]"
+              : "border-transparent text-[#64748b] hover:text-[#002f76]"
               }`}
           >
             <span>📋</span> Active Renewals ({activeRenewals.length})
@@ -1048,8 +1128,8 @@ export default function RenewalsPage() {
           <button
             onClick={() => setActiveTab("families")}
             className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "families"
-                ? "border-[#0033A0] text-[#0033A0]"
-                : "border-transparent text-[#64748b] hover:text-[#002f76]"
+              ? "border-[#0033A0] text-[#0033A0]"
+              : "border-transparent text-[#64748b] hover:text-[#002f76]"
               }`}
           >
             <span>👨‍👩‍👧</span> Families Contact List ({filteredFamilies.length})
@@ -1057,8 +1137,8 @@ export default function RenewalsPage() {
           <button
             onClick={() => setActiveTab("settings")}
             className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "settings"
-                ? "border-[#0033A0] text-[#0033A0]"
-                : "border-transparent text-[#64748b] hover:text-[#002f76]"
+              ? "border-[#0033A0] text-[#0033A0]"
+              : "border-transparent text-[#64748b] hover:text-[#002f76]"
               }`}
           >
             <span>⚙️</span> Renewal Settings
@@ -1107,30 +1187,6 @@ export default function RenewalsPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  disabled={remindingAll}
-                  onClick={handleRemindAllUnpaid}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-[12px] font-bold transition-colors shadow-sm disabled:opacity-50"
-                  title="Send payment reminder email for Oct 16 1:00 PM deadline to unpaid families"
-                >
-                  <span>⏰</span>
-                  <span>{remindingAll ? "Sending Reminders..." : "Remind: Oct 16 1PM"}</span>
-                </button>
-
-                <button
-                  disabled={releasingAll || !deadlinePassed}
-                  onClick={handleNotifyReleasedSlots}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 text-[12px] font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    deadlinePassed
-                      ? "Send official slot released email to unpaid families whose slots are for release / released"
-                      : "Available after the Oct 16 1:00 PM deadline"
-                  }
-                >
-                  <span>📢</span>
-                  <span>{releasingAll ? "Notifying..." : "Notify Slot Released (Oct 16)"}</span>
-                </button>
-
-                <button
                   onClick={handleExportRenewals}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[12px] font-bold text-[#002f76] hover:bg-slate-50 transition-colors shadow-sm"
                 >
@@ -1175,8 +1231,8 @@ export default function RenewalsPage() {
                         <td className="py-3.5 px-4">
                           <span
                             className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${r.isPromo
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-blue-100 text-blue-800"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-blue-100 text-blue-800"
                               }`}
                           >
                             {r.reservationType}
@@ -1198,10 +1254,10 @@ export default function RenewalsPage() {
                         <td className="py-3.5 px-4">
                           <span
                             className={`inline-block px-2.5 py-1 rounded-full text-[11.5px] font-bold ${r.renewalStatus === "confirmed"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : r.renewalStatus === "for_release"
-                                  ? "bg-orange-100 text-orange-800"
-                                  : "bg-amber-100 text-amber-800"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : r.renewalStatus === "for_release"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-amber-100 text-amber-800"
                               }`}
                           >
                             {r.renewalStatus === "confirmed" && (r.isVerified ? "🟢 Confirmed (Verified)" : "🟢 Confirmed")}
@@ -1574,21 +1630,37 @@ export default function RenewalsPage() {
                           )}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${f.renewalStatus === "confirmed"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : f.renewalStatus === "reserved"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : f.renewalStatus === "released"
-                                    ? "bg-slate-200 text-slate-700"
-                                    : "bg-rose-50 text-rose-700 border border-rose-200"
-                              }`}
-                          >
-                            {f.renewalStatus === "not_yet_submitted" && "Not Yet Submitted"}
-                            {f.renewalStatus === "reserved" && "Reserved"}
-                            {f.renewalStatus === "confirmed" && "Confirmed"}
-                            {f.renewalStatus === "released" && "Released"}
-                          </span>
+                          {(() => {
+                            const status = getFamilyStatus(f);
+                            const viaRegister = status !== f.renewalStatus && f.renewalStatus === "not_yet_submitted";
+                            return (
+                              <div className="flex flex-col items-start gap-1">
+                                <span
+                                  className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${status === "confirmed"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : status === "reserved"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : status === "released"
+                                        ? "bg-slate-200 text-slate-700"
+                                        : "bg-rose-50 text-rose-700 border border-rose-200"
+                                    }`}
+                                >
+                                  {status === "not_yet_submitted" && "Not Yet Submitted"}
+                                  {status === "reserved" && "Reserved"}
+                                  {status === "confirmed" && "Confirmed"}
+                                  {status === "released" && "Released"}
+                                </span>
+                                {viaRegister && (
+                                  <span
+                                    className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[9.5px] font-bold text-blue-700"
+                                    title="This family submitted through the /register form instead of the renewal page. Matched by email + child name."
+                                  >
+                                    via Register form
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="py-3.5 px-4 text-[11px] text-slate-500">
                           {f.lastEmailSent ? (
@@ -1978,8 +2050,8 @@ export default function RenewalsPage() {
                     setEmailSubject(`Priority Renewal & Slot Reservation Code for ${emailModalFamily.childName} 🌈`);
                   }}
                   className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "promo_code"
-                      ? "bg-white text-[#0033A0] shadow-sm"
-                      : "text-slate-600 hover:text-[#002f76]"
+                    ? "bg-white text-[#0033A0] shadow-sm"
+                    : "text-slate-600 hover:text-[#002f76]"
                     }`}
                 >
                   🎟️ Priority Code
@@ -1991,8 +2063,8 @@ export default function RenewalsPage() {
                     setEmailSubject(`Payment Reminder & Slot Confirmation for ${emailModalFamily.childName} 🌈`);
                   }}
                   className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "payment_reminder"
-                      ? "bg-white text-[#0033A0] shadow-sm"
-                      : "text-slate-600 hover:text-[#002f76]"
+                    ? "bg-white text-[#0033A0] shadow-sm"
+                    : "text-slate-600 hover:text-[#002f76]"
                     }`}
                 >
                   ⏰ Payment Reminder
@@ -2004,8 +2076,8 @@ export default function RenewalsPage() {
                     setEmailSubject(`Notice of Released Slot: Priority Reservation Expired for ${emailModalFamily.childName} ⏳`);
                   }}
                   className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "slot_released"
-                      ? "bg-white text-[#0033A0] shadow-sm"
-                      : "text-slate-600 hover:text-[#002f76]"
+                    ? "bg-white text-[#0033A0] shadow-sm"
+                    : "text-slate-600 hover:text-[#002f76]"
                     }`}
                 >
                   🚪 Slot Released
@@ -2017,8 +2089,8 @@ export default function RenewalsPage() {
                     setEmailSubject(`Merry Explorers: Message regarding ${emailModalFamily.childName}`);
                   }}
                   className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "custom"
-                      ? "bg-white text-[#0033A0] shadow-sm"
-                      : "text-slate-600 hover:text-[#002f76]"
+                    ? "bg-white text-[#0033A0] shadow-sm"
+                    : "text-slate-600 hover:text-[#002f76]"
                     }`}
                 >
                   📝 Custom Notice
@@ -2054,14 +2126,9 @@ export default function RenewalsPage() {
                 </div>
               ) : emailType === "payment_reminder" ? (
                 (() => {
-                  const modalMatchingRecord = emailModalFamily ? (
-                    emailModalFamily.registrationId
-                      ? renewalRecords.find((r) => r.registrationId === emailModalFamily.registrationId)
-                      : renewalRecords.find((r) =>
-                        r.parentEmail?.toLowerCase() === emailModalFamily.parentEmail?.toLowerCase() &&
-                        r.childName?.toLowerCase() === emailModalFamily.childName?.toLowerCase()
-                      )
-                  ) : null;
+                  const modalMatchingRecord = emailModalFamily
+                    ? familyRecordMap.get(emailModalFamily._id) || null
+                    : null;
                   const displayProgram = modalMatchingRecord?.program || emailModalFamily.renewingTo || emailModalFamily.previousProgram || "Curious Explorer";
                   const isTrailblazer = displayProgram.toLowerCase().includes("trailblazer") || displayProgram.toLowerCase().includes("brave");
                   const displayTuition = modalMatchingRecord?.totalTuition || (isTrailblazer ? 6900 : 4395);
@@ -2216,24 +2283,24 @@ export default function RenewalsPage() {
               {/* Decorative top color bar */}
               <div
                 className={`absolute top-0 left-0 right-0 h-2 ${feedbackDialog.type === "success"
-                    ? "bg-emerald-500"
-                    : feedbackDialog.type === "error"
-                      ? "bg-rose-500"
-                      : feedbackDialog.type === "confirm"
-                        ? "bg-amber-500"
-                        : "bg-[#0033A0]"
+                  ? "bg-emerald-500"
+                  : feedbackDialog.type === "error"
+                    ? "bg-rose-500"
+                    : feedbackDialog.type === "confirm"
+                      ? "bg-amber-500"
+                      : "bg-[#0033A0]"
                   }`}
               />
 
               <div className="flex items-start gap-4 pt-1">
                 <div
                   className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl shadow-sm ${feedbackDialog.type === "success"
-                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200/80"
-                      : feedbackDialog.type === "error"
-                        ? "bg-rose-50 text-rose-600 border border-rose-200/80"
-                        : feedbackDialog.type === "confirm"
-                          ? "bg-amber-50 text-amber-600 border border-amber-200/80"
-                          : "bg-blue-50 text-[#0033A0] border border-blue-200/80"
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200/80"
+                    : feedbackDialog.type === "error"
+                      ? "bg-rose-50 text-rose-600 border border-rose-200/80"
+                      : feedbackDialog.type === "confirm"
+                        ? "bg-amber-50 text-amber-600 border border-amber-200/80"
+                        : "bg-blue-50 text-[#0033A0] border border-blue-200/80"
                     }`}
                 >
                   {feedbackDialog.type === "success" && "✓"}
@@ -2266,12 +2333,12 @@ export default function RenewalsPage() {
                   type="button"
                   onClick={feedbackDialog.onConfirm}
                   className={`rounded-xl px-5 py-2 text-[13px] font-bold text-white shadow-md transition-all ${feedbackDialog.type === "error"
-                      ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20"
-                      : feedbackDialog.type === "confirm"
-                        ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
-                        : feedbackDialog.type === "success"
-                          ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
-                          : "bg-[#0033A0] hover:bg-[#002f76] shadow-[#0033A0]/20"
+                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20"
+                    : feedbackDialog.type === "confirm"
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                      : feedbackDialog.type === "success"
+                        ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+                        : "bg-[#0033A0] hover:bg-[#002f76] shadow-[#0033A0]/20"
                     }`}
                 >
                   {feedbackDialog.confirmLabel || "OK"}
