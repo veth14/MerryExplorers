@@ -12,12 +12,21 @@ export const RESERVATION_RATE = 0.6;
 export const WEEKLY_INTEREST_RATE = 0.04;
 export const BALANCE_DUE_SESSION = 6;
 
-// Class days per program. Only used when the student's own record has no schedule saved.
-export const PROGRAM_SCHEDULE_FALLBACK: Record<string, string> = {
-    "brave-explorer": "Monday – Friday", // Trailblazer
+// Class days per program. The PROGRAM decides the schedule, so it is the same for every student.
+//  - Curious Explorer ........ Monday, Wednesday
+//  - Creative Explorer ....... Tuesday, Thursday, Friday
+//  - Trailblazer (Brave) ..... Monday to Friday
+//  - Everyday Explorer ....... Monday to Friday
+// Written as a comma list (no "–" range) so getNthSessionDate can always read it.
+export const PROGRAM_SCHEDULE: Record<string, string> = {
     "curious-explorer": "Monday, Wednesday",
     "creative-explorer": "Tuesday, Thursday, Friday",
+    "brave-explorer": "Monday, Tuesday, Wednesday, Thursday, Friday", // Trailblazer
+    "everyday-explorer": "Monday, Tuesday, Wednesday, Thursday, Friday",
 };
+
+// Old name kept so any file that still imports it keeps working.
+export const PROGRAM_SCHEDULE_FALLBACK = PROGRAM_SCHEDULE;
 
 export const VERIFIED_REG_STATUSES = ["approved", "early-bird", "active", "scholar"];
 export const isRegistrationVerified = (status?: string) => VERIFIED_REG_STATUSES.includes(status || "");
@@ -89,13 +98,27 @@ export function getRegistrationTotal(reg: any, fallback?: number): number | unde
     return items.reduce((sum, i) => sum + i.amount, 0);
 }
 
+// CHANGED: new optional 3rd parameter `adventureStart`.
 // Enrolled date + schedule for a student. `account` is the parent account / profile.
-export function getStudentSessionInfo(reg: any, account?: any) {
+// `adventureStart` ("YYYY-MM-DD") = first day of the Adventure this registration belongs to.
+// Sessions are never counted before it, so a family that pays early is not charged for
+// sessions that have not happened yet.
+// The schedule comes from the PROGRAM first (PROGRAM_SCHEDULE above). Only programs that
+// are not in that list fall back to whatever is saved on the student / account.
+export function getStudentSessionInfo(reg: any, account?: any, adventureStart?: string) {
     const info = account?.studentInfo;
-    const enrolledAt: string | undefined = info?.enrolledAt || reg?.approvedAt;
+    let enrolledAt: string | undefined = info?.enrolledAt || reg?.approvedAt;
     const schedule: string =
-        info?.schedule || account?.schedule || PROGRAM_SCHEDULE_FALLBACK[reg?.program] || (PROGRAM_SLOTS as any)?.[reg?.program]?.schedule || "";
+        PROGRAM_SCHEDULE[reg?.program] || info?.schedule || account?.schedule || (PROGRAM_SLOTS as any)?.[reg?.program]?.schedule || "";
     const classTime: string = info?.classTime || account?.classTime || reg?.classTime || "";
+
+    if (adventureStart) {
+        const base = enrolledAt ? String(enrolledAt).slice(0, 10) : null;
+        const d = new Date();
+        const todayIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (base && base < adventureStart) enrolledAt = adventureStart;           // approved before classes started
+        else if (!base && adventureStart > todayIso) enrolledAt = adventureStart; // still pending, Adventure not started yet
+    }
     return { enrolledAt, schedule, classTime };
 }
 
