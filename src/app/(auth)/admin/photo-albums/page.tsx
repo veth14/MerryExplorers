@@ -14,11 +14,12 @@ import { prepareImage, uploadAll, keepAwake, isSupportedImage } from "@/lib/phot
 
 interface Student {
   id: string;
-  childInfo: { firstName: string; lastName: string; nickname?: string };
-  parentInfo: { name: string; email: string };
+  childInfo: { firstName: string; lastName: string; nickname?: string; dateOfBirth?: string };
+  parentInfo: { name: string; email: string; phone?: string };
   program: string;
   classTime: string;
   status: string;
+  enrolledAt?: string;
 }
 
 interface PhotoAlbum {
@@ -120,6 +121,30 @@ function fmtDate(d: string) {
 }
 
 const PROGRAMS = Object.values(PROGRAM_SLOTS);
+
+function canonicalProgramId(program?: string) {
+  const normalized = normalizeStudentIdentity(program);
+  if (normalized === "everyday-explorer" || normalized === "discovery club everyday explorer") {
+    return "everyday-curious";
+  }
+  if (normalized === "ballet") return "ballet";
+  if (normalized === "saturday playdate") return "saturday-playdate";
+  return program || "";
+}
+
+function normalizeStudentIdentity(value?: string) {
+  return (value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function getStudentProgram(program?: string) {
+  const id = canonicalProgramId(program);
+  return PROGRAMS.find((item) => item.id === id);
+}
 
 function fmtDateTime(d?: string | null) {
   if (!d) return "";
@@ -627,12 +652,14 @@ function CreatePanel({
 }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState("");
+  const [programFilter, setProgramFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split("T")[0]);
   const noteTouched = useRef(false);
   // Program-specific note if one exists, otherwise the "All Programs" note
-  const defaultNote = resolveNote(generalNotes, selectedStudent?.program);
-  const usingProgramNote = !!(selectedStudent && generalNotes[selectedStudent.program]?.note);
+  const selectedProgramId = canonicalProgramId(selectedStudent?.program);
+  const defaultNote = resolveNote(generalNotes, selectedProgramId);
+  const usingProgramNote = !!(selectedStudent && generalNotes[selectedProgramId]?.note);
   const [note, setNote] = useState(defaultNote);
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [step, setStep] = useState<"select" | "upload" | "confirm">("select");
@@ -663,13 +690,64 @@ function CreatePanel({
       .catch(() => { });
   }, []);
 
-  const filtered = students.filter((s) => {
-    const q = search.toLowerCase();
-    return (
-      s.childInfo.firstName.toLowerCase().includes(q) ||
-      s.childInfo.lastName.toLowerCase().includes(q) ||
-      (s.childInfo.nickname || "").toLowerCase().includes(q)
-    );
+  const programIds = Array.from(new Set([
+    ...PROGRAMS.map((program) => program.id),
+    ...students.map((student) => canonicalProgramId(student.program)).filter(Boolean),
+  ])).filter((programId) => programId !== "virtual-session");
+  const programOptions = [
+    { value: "all", label: "All Programs" },
+    ...programIds.map((programId) => {
+      const name = PROGRAMS.find((item) => item.id === programId)?.name || programId;
+      return { value: programId, label: name.includes(":") ? name.split(":")[1].trim() : name };
+    }),
+  ];
+
+  // The students collection can contain repeated enrollment rows for the same child.
+  // Keep one current picker option per child, family, program, and class.
+  const uniqueStudentsByIdentity = new Map<string, Student>();
+  for (const student of students) {
+    const childName = normalizeStudentIdentity(`${student.childInfo?.firstName || ""} ${student.childInfo?.lastName || ""}`);
+    const familyIdentity = normalizeStudentIdentity(student.parentInfo?.email) || normalizeStudentIdentity(student.parentInfo?.phone);
+    const identity = childName && familyIdentity
+      ? JSON.stringify([
+          familyIdentity,
+          childName,
+          normalizeStudentIdentity(student.childInfo?.dateOfBirth),
+          canonicalProgramId(student.program),
+          normalizeStudentIdentity(student.classTime),
+        ])
+      : `registration:${student.id}`;
+    const existing = uniqueStudentsByIdentity.get(identity);
+    const studentTime = new Date(student.enrolledAt || 0).getTime() || 0;
+    const existingTime = existing ? new Date(existing.enrolledAt || 0).getTime() || 0 : 0;
+    if (!existing || (student.status === "active" && existing.status !== "active") ||
+      (student.status === existing.status && studentTime > existingTime)) {
+      uniqueStudentsByIdentity.set(identity, student);
+    }
+  }
+  const uniqueStudents = Array.from(uniqueStudentsByIdentity.values()).filter(
+    (student) => canonicalProgramId(student.program) !== "virtual-session"
+  );
+
+  const duplicateNameCounts = uniqueStudents.reduce<Record<string, number>>((counts, student) => {
+    const key = `${student.childInfo.firstName} ${student.childInfo.lastName}`.trim().toLowerCase();
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+
+  const filtered = uniqueStudents.filter((s) => {
+    const q = search.trim().toLowerCase();
+    const matchesProgram = programFilter === "all" || canonicalProgramId(s.program) === programFilter;
+    const searchable = [
+      s.childInfo.firstName,
+      s.childInfo.lastName,
+      s.childInfo.nickname,
+      s.parentInfo?.name,
+      s.parentInfo?.email,
+      s.classTime,
+      getStudentProgram(s.program)?.name,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return matchesProgram && (!q || searchable.includes(q));
   });
 
   const handleFiles = useCallback(
@@ -724,7 +802,8 @@ function CreatePanel({
     const release = await keepAwake(); // stop iOS from suspending the upload
 
     try {
-      const prog = PROGRAMS.find((p) => p.id === selectedStudent.program);
+      const prog = getStudentProgram(selectedStudent.program);
+      const programId = canonicalProgramId(selectedStudent.program);
 
       // Resized files, limited concurrency, retries, fresh signature per file
       const uploaded = await uploadAll(
@@ -745,7 +824,7 @@ function CreatePanel({
           childFirstName: selectedStudent.childInfo.firstName,
           childNickname: selectedStudent.childInfo.nickname || "",
           parentEmail: selectedStudent.parentInfo.email,
-          program: selectedStudent.program,
+          program: programId,
           programName: prog?.name || selectedStudent.program,
           classTime: selectedStudent.classTime,
           sessionDate,
@@ -767,7 +846,7 @@ function CreatePanel({
     }
   }
 
-  const prog = selectedStudent ? PROGRAMS.find((p) => p.id === selectedStudent.program) : null;
+  const prog = selectedStudent ? getStudentProgram(selectedStudent.program) : null;
   const selectedIsTrailblazer = selectedStudent
     ? isTrailblazerProgram(selectedStudent.program, prog?.name)
     : false;
@@ -815,12 +894,17 @@ function CreatePanel({
                 />
               </div>
 
+              <div>
+                <label className="block text-[12px] font-black uppercase tracking-widest text-[#0033A0]/60 mb-2">Program</label>
+                <CustomSelect options={programOptions} value={programFilter} onChange={setProgramFilter} />
+              </div>
+
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {filtered.length === 0 && (
                   <p className="text-center text-[13px] text-[#94a3b8] py-8">No students found</p>
                 )}
                 {filtered.map((s) => {
-                  const p = PROGRAMS.find((p) => p.id === s.program);
+                  const p = getStudentProgram(s.program);
                   const isSelected = selectedStudent?.id === s.id;
 
                   const shortName = p?.name?.includes(":") ? p.name.split(":")[1].trim() : p?.name;
@@ -845,6 +929,12 @@ function CreatePanel({
                         <p className={`text-[11px] truncate ${isSelected ? "text-white/70" : "text-[#94a3b8]"}`}>
                           {shortName} · {s.classTime}{timeStr}
                         </p>
+                        {duplicateNameCounts[`${s.childInfo.firstName} ${s.childInfo.lastName}`.trim().toLowerCase()] > 1 && (
+                          <p className={`text-[10px] truncate ${isSelected ? "text-white/70" : "text-[#64748b]"}`}>
+                            Parent: {s.parentInfo?.name || "Name unavailable"}
+                            {s.parentInfo?.email ? ` · ${s.parentInfo.email}` : ""}
+                          </p>
+                        )}
                       </div>
                       {isSelected && <span className="text-white text-[16px]">✓</span>}
                     </button>
@@ -865,7 +955,7 @@ function CreatePanel({
                       <p className="font-bold text-[#0f172a]">
                         {selectedStudent.classTime}
                         {(() => {
-                          const p = PROGRAMS.find((x) => x.id === selectedStudent.program);
+                          const p = getStudentProgram(selectedStudent.program);
                           const c = (p as any)?.classes?.find((x: any) => x.name === selectedStudent.classTime);
                           return c ? ` (${c.time})` : "";
                         })()}
