@@ -31,8 +31,10 @@ type Payment = {
   amountDue?: number;
   adminNote?: string;
   reviewedAt?: string;
-  /** true when this registration came from the renewal flow (isNewFamily === false) */
+  /** true when this registration belongs to Adventure 2 or later (kept for older code paths) */
   isRenewal?: boolean;
+  /** which Adventure this registration belongs to (1, 2, 3 ...) */
+  advNum?: number;
 };
 
 type Account = {
@@ -83,21 +85,40 @@ const TYPE_OPTIONS = [
 ];
 
 // ── CONFIG ─────────────────────────────────────────────────────
-// Adventure dates are fetched dynamically from /api/renewal-settings.
-// The earliest `nextAdventureStart` across all programs becomes the global transition date.
-// Everything before that date = current adventure; after = next adventure.
-// Hardcoded fallback only used while settings are loading.
+// Adventure dates come from /api/renewal-settings (Curious Explorer is the master program).
+// The settings route auto-rolls the cycle when the next start date arrives:
+//   BEFORE: currentAdventure = 1, adventureStartDate = Adv 1 start, nextAdventureStart = Adv 2 start
+//   AFTER : currentAdventure = 2, adventureStartDate = Adv 2 start, nextAdventureStart = null
+// so this page reads all three fields. The fallback below is ONLY used when the settings have no dates
+// or could not be loaded (a red banner is shown in that case).
 const ADVENTURES_FALLBACK = {
-  current: { label: "Current Adventure", start: "2026-06-01", end: "2026-10-31" },
-  next: { label: "Next Adventure", start: "2026-11-01", end: "2027-03-31" },
+  current: { label: "Adventure 1", start: "2026-06-01", end: "2026-10-31" },
+  next: { label: "Adventure 2", start: "2026-11-01", end: "2027-03-31" },
 };
+
+const MASTER_PROGRAM = "Discovery Club: Curious Explorer";
+const ADVENTURE_PROGRAMS = new Set([
+  "Discovery Club: Curious Explorer",
+  "Discovery Club: Creative Explorer",
+  "Discovery Club: Everyday Explorer",
+  "Trailblazer: Brave Explorer",
+  "Saturday Playdate",
+]);
+
+// Same rule as api/renewal-settings (computeDeadline): renewals open 14 days before an Adventure starts.
+// New-family registrations for the next Adventure open at the same time or later, so this date is the
+// cut-off: a registration made on/after it is for the NEXT Adventure.
+const RENEWAL_OPEN_LEAD_DAYS = 14;
+
+// The Renewals page links here with ?search=<name>. Those links are always about Adventure 2.
+const SEARCH_LINK_ADVENTURE = 2;
 
 // Tuition for the NEXT adventure, by program name (as stored in account.program)
 const NEXT_TUITION: Record<string, number> = {
   "Trailblazer: Brave Explorer": 0, // TODO: real fee
 };
 
-// ~5 months per adventure cycle (approximate, used for deriving past adventure ranges)
+// ~5 months per adventure cycle (approximate, used for deriving date ranges that are not in the settings)
 const ADVENTURE_DURATION_MONTHS = 5;
 
 // Payment terms (60% reservation, 40% balance on the 6th session, 4% weekly interest),
@@ -191,7 +212,7 @@ function getRenewal(acc: Account): RenewalState {
 }
 
 const RENEWAL_BADGE: Record<RenewalState, { label: string; bg: string; color: string }> = {
-  renewed: { label: "RENEWED", bg: "#f0fdf4", color: "#15803d" },
+  renewed: { label: "CONFIRMED", bg: "#f0fdf4", color: "#15803d" },
   pending: { label: "AWAITING VERIFY", bg: "#fffbeb", color: "#b45309" },
   rejected: { label: "DP REJECTED", bg: "#fef2f2", color: "#b91c1c" },
   intent: { label: "NO DOWNPAYMENT", bg: "#eff6ff", color: "#0050d5" },
@@ -261,6 +282,203 @@ const isTestAccount = (acc?: Account | null) => {
   return testPattern.test(acc.fullName || "") || testPattern.test(acc.childName || "");
 };
 
+// ── ADVENTURE TIMELINE (built from the renewal settings) ────────────────────────
+type Tab = "current" | "next" | "past";
+type AdvRange = { label: string; start: string; end: string };
+type PastAdv = AdvRange & { num: number };
+type Timeline = {
+  ADVENTURES: { current: AdvRange; next: AdvRange; past: PastAdv[] };
+  advNumbers: { current: number; next: number };
+  curNum: number;
+  curStart: string;          // YYYY-MM-DD, start of the current Adventure
+  curStartKnown: boolean;    // false when curStart is only an estimate
+  nextStart: string | null;  // YYYY-MM-DD, start of the next Adventure (null = not scheduled yet)
+  curOpen: string | null;    // registrations for the CURRENT Adventure opened on this day
+  nextOpen: string | null;   // registrations for the NEXT Adventure open on this day
+  fromSettings: boolean;     // true = every date came from the renewal settings
+  issues: string[];
+};
+type RegCtx = { tl: Timeline; renewalIds: Set<string> };
+
+const isoDay = (v?: string | null) => (v ? String(v).slice(0, 10) : null);
+function addDaysIso(iso: string, days: number) {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function addMonthsIso(iso: string, months: number) {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+const manilaFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" });
+const manilaToday = () => manilaFmt.format(new Date());
+function manilaDay(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : manilaFmt.format(d);
+}
+
+function pickMaster(programs: any[]) {
+  const hasDates = (p: any) => !!(isoDay(p?.nextAdventureStart) || isoDay(p?.adventureStartDate));
+  return (
+    programs.find((p) => p.programKey === MASTER_PROGRAM && hasDates(p)) ??
+    programs.find((p) => ADVENTURE_PROGRAMS.has(p.programKey) && hasDates(p)) ??
+    null
+  );
+}
+
+function buildTimeline(programs: any[], today: string): Timeline {
+  const fb = ADVENTURES_FALLBACK;
+  const fallback = (why: string): Timeline => ({
+    ADVENTURES: { current: { ...fb.current }, next: { ...fb.next }, past: [] },
+    advNumbers: { current: 1, next: 2 },
+    curNum: 1,
+    curStart: fb.current.start,
+    curStartKnown: false,
+    nextStart: fb.next.start,
+    curOpen: null,
+    nextOpen: addDaysIso(fb.next.start, -RENEWAL_OPEN_LEAD_DAYS),
+    fromSettings: false,
+    issues: [why],
+  });
+
+  const m = pickMaster(programs);
+  if (!m) {
+    return fallback(
+      programs.length
+        ? "Renewal Settings has no Adventure dates saved yet (Curious Explorer → “Adv N Started” / “Adv N Starts”). Built-in fallback dates are being used."
+        : "Renewal Settings could not be loaded. Built-in fallback dates are being used."
+    );
+  }
+
+  const issues: string[] = [];
+  const n = Number(m.currentAdventure);
+  let curNum = Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+  let curStart = isoDay(m.adventureStartDate);
+  let nextStart = isoDay(m.nextAdventureStart);
+  let curStartKnown = !!curStart;
+
+  // The settings route rolls the cycle when the next start date arrives, but only when it is called.
+  // If this page has been open past that date, do the same roll here so the switch still happens.
+  if (nextStart && today >= nextStart) {
+    curNum += 1;
+    curStart = nextStart;
+    curStartKnown = true;
+    nextStart = null;
+  }
+
+  if (!curStart) {
+    curStart = addMonthsIso(nextStart!, -ADVENTURE_DURATION_MONTHS);
+    issues.push(
+      `Adventure ${curNum}’s start date is not set in Renewal Settings (“Adv ${curNum} Started”). It is being estimated as ${fmtDate(curStart)}.`
+    );
+  }
+
+  const curEnd = nextStart ? addDaysIso(nextStart, -1) : addDaysIso(addMonthsIso(curStart, ADVENTURE_DURATION_MONTHS), -1);
+  const nStart = nextStart ?? addMonthsIso(curStart, ADVENTURE_DURATION_MONTHS);
+  const nEnd = addDaysIso(addMonthsIso(nStart, ADVENTURE_DURATION_MONTHS), -1);
+  const past: PastAdv[] =
+    curNum > 1
+      ? [{ label: `Adventure ${curNum - 1}`, start: addMonthsIso(curStart, -ADVENTURE_DURATION_MONTHS), end: addDaysIso(curStart, -1), num: curNum - 1 }]
+      : [];
+
+  return {
+    ADVENTURES: {
+      current: { label: `Adventure ${curNum}`, start: curStart, end: curEnd },
+      next: { label: `Adventure ${curNum + 1}`, start: nStart, end: nEnd },
+      past,
+    },
+    advNumbers: { current: curNum, next: curNum + 1 },
+    curNum,
+    curStart,
+    curStartKnown,
+    nextStart,
+    curOpen: curStartKnown ? addDaysIso(curStart, -RENEWAL_OPEN_LEAD_DAYS) : null,
+    nextOpen: nextStart ? addDaysIso(nextStart, -RENEWAL_OPEN_LEAD_DAYS) : null,
+    fromSettings: issues.length === 0,
+    issues,
+  };
+}
+
+const tabOfNum = (n: number, cur: number): Tab => (n === cur ? "current" : n < cur ? "past" : "next");
+
+// Adventure a virtual-session payment belongs to (sessions have no registration, so the date decides)
+function sessionAdvNum(tl: Timeline, day: string | null): number {
+  if (!day) return tl.curNum;
+  if (tl.nextStart && day >= tl.nextStart) return tl.curNum + 1;
+  let n = tl.curNum;
+  let s = tl.curStart;
+  while (day < s && n > 1) {
+    n -= 1;
+    s = addMonthsIso(s, -ADVENTURE_DURATION_MONTHS);
+  }
+  return n;
+}
+
+// Adventure a registration made on `day` is for, going only by the "registrations open" dates
+function advByOpenDate(tl: Timeline, day: string): number {
+  if (tl.nextOpen && day >= tl.nextOpen) return tl.curNum + 1;
+  if (tl.curNum > 1 && tl.curOpen && day < tl.curOpen) return tl.curNum - 1;
+  return tl.curNum;
+}
+
+// For a registration that is known to be a renewal: the first Adventure that had NOT started yet on `day`
+function firstUnstartedAdv(tl: Timeline, day: string): number | null {
+  if (tl.curStartKnown && day < tl.curStart && day >= addMonthsIso(tl.curStart, -ADVENTURE_DURATION_MONTHS)) return tl.curNum;
+  if (tl.nextStart && day < tl.nextStart && day >= tl.curStart) return tl.curNum + 1;
+  return null;
+}
+
+// Earliest of created/submitted, so a registration made in September and paid in October stays in its own Adventure
+function regDay(r: any): string | null {
+  const days = [manilaDay(r?.createdAt), manilaDay(r?.submittedAt)].filter(Boolean) as string[];
+  return days.sort()[0] ?? null;
+}
+
+// Must match the same criteria as the Renewals API (api/renewals/route.ts):
+// - isPromoRegistration: true  (renewal promo flow)
+// - promoCode: "A1RENEWAL2026" (specific renewal code, NOT any promo code)
+// - parentInfo.isRenewal: true (explicit renewal flag from /renew page)
+// - renewalPeriod is set       (tagged by admin or system)
+// NOTE: isNewFamily === false is NOT used — it's too broad. A returning family's
+// original Adventure 1 registration also has isNewFamily:false.
+const isRenewalReg = (r: any): boolean =>
+  Boolean(r.isPromoRegistration) ||
+  r.promoCode === "A1RENEWAL2026" ||
+  Boolean(r.parentInfo?.isRenewal) ||
+  Boolean(r.renewalPeriod);
+
+// Which Adventure number is this registration for? The registration decides, never the payment date:
+//   1. it carries an `adventure` number of 2 or more
+//   2. it is listed in the Renewals records, or has a renewal marker (isRenewalReg)  -> the Adventure after the one running when it was made
+//   3. otherwise the date it was made vs. the "registrations open" date of each Adventure (new families)
+function regAdventureNum(r: any, ctx: RegCtx): number {
+  const { tl } = ctx;
+  const explicit = Math.floor(Number(r?.adventure));
+  if (Number.isFinite(explicit) && explicit >= 2) return explicit;
+
+  const day = regDay(r);
+  let n = day ? advByOpenDate(tl, day) : tl.curNum;
+  if (ctx.renewalIds.has(String(r?.id)) || isRenewalReg(r)) {
+    const up = day ? firstUnstartedAdv(tl, day) : tl.nextStart ? tl.curNum + 1 : tl.curNum;
+    if (up != null) n = Math.max(n, up);
+  }
+  return n;
+}
+
+// Dynamic adventure badge — number based, so it keeps working after the switch
+function advNumBadge(num: number, curNum: number): { label: string; short: string; bg: string; color: string } {
+  const base = { label: `Adventure ${num}`, short: `ADVENTURE ${num}` };
+  if (num === curNum) return { ...base, bg: "#eff6ff", color: "#0050d5" };
+  if (num > curNum) return { ...base, bg: "#f5f3ff", color: "#7c3aed" };
+  return { ...base, bg: "#f1f5f9", color: "#64748b" };
+}
+const advTagStyle = (num: number, curNum: number): CSSProperties => ({
+  display: "inline-flex", padding: "2px 7px", borderRadius: "20px", fontSize: "10px", fontWeight: 800,
+  background: advNumBadge(num, curNum).bg, color: advNumBadge(num, curNum).color, letterSpacing: "0.3px",
+});
+
 // Builders shared by the list AND the ledger, so a payment looks the same wherever it is opened from
 const regAccountOf = (r: any): Account => ({
   id: r.id,
@@ -269,21 +487,8 @@ const regAccountOf = (r: any): Account => ({
   childName: fullChildName(r), // full name so two siblings are never mixed up
   program: r.program,
 });
-// Must match the same criteria as the Renewals API (api/renewals/route.ts):
-// - isPromoRegistration: true  (renewal promo flow)
-// - promoCode: "A1RENEWAL2026" (specific renewal code, NOT any promo code)
-// - parentInfo.isRenewal: true (explicit renewal flag from /renew page)
-// - renewalPeriod is set       (tagged by admin or system)
-// NOTE: isNewFamily === false is NOT used — it's too broad. A returning family's
-// original Adventure 1 registration also has isNewFamily:false, which would wrongly
-// tag all their payments as Adventure 2. The /renew page sets parentInfo.isRenewal instead.
-const isRenewalReg = (r: any): boolean =>
-  Boolean(r.isPromoRegistration) ||
-  r.promoCode === "A1RENEWAL2026" ||
-  Boolean(r.parentInfo?.isRenewal) ||
-  Boolean(r.renewalPeriod);
 
-const firstPaymentOf = (r: any): Payment => ({
+const firstPaymentOf = (r: any, advNum?: number): Payment => ({
   id: "reg-" + r.id,
   amountPaid: firstPaymentAmount(r),
   paymentMethod: r.paymentMethod || "",
@@ -295,10 +500,10 @@ const firstPaymentOf = (r: any): Payment => ({
   amountDue: r.amountDue,
   adminNote: r.adminNote,
   reviewedAt: r.reviewedAt || r.approvedAt,
-  // renewal registrations are always for the NEXT adventure, same as downpayments
-  isRenewal: isRenewalReg(r),
+  advNum,
+  isRenewal: (advNum ?? 1) >= 2,
 });
-const balancePaymentOf = (r: any, b: any): Payment => ({
+const balancePaymentOf = (r: any, b: any, advNum?: number): Payment => ({
   id: "bal-" + b.id,
   amountPaid: b.amountPaid || 0,
   paymentMethod: b.paymentMethod || "",
@@ -309,7 +514,8 @@ const balancePaymentOf = (r: any, b: any): Payment => ({
   rejected: false,
   adminNote: b.adminNote,
   reviewedAt: b.recordedAt,
-  isRenewal: isRenewalReg(r),
+  advNum,
+  isRenewal: (advNum ?? 1) >= 2,
 });
 const sortedBalancesOf = (r: any): any[] =>
   [...balancePaymentsOf(r)].sort(
@@ -318,8 +524,8 @@ const sortedBalancesOf = (r: any): any[] =>
 
 type PaymentKind = "session" | "downpayment" | "registration";
 type DetailItem = { uid: string; acc: Account; payment: Payment; type: PaymentKind; seq?: number; seqTotal?: number };
-type PaymentItem = { uid: string; acc: Account; payment: Payment; type: "session" | "registration"; seq: number; seqTotal: number };
-type LedgerRow = { key: string; kind: PaymentKind; label: string; date: string; method: string; ref: string; amount: number; verified: boolean; rejected: boolean; regId?: string; child?: string; item: DetailItem };
+type PaymentItem = { uid: string; acc: Account; payment: Payment; type: "session" | "registration"; seq: number; seqTotal: number; advNum: number; tab: Tab };
+type LedgerRow = { key: string; kind: PaymentKind; label: string; date: string; method: string; ref: string; amount: number; verified: boolean; rejected: boolean; regId?: string; child?: string; advNum: number | null; item: DetailItem };
 // One row of the list = one student (all of that student's payments grouped together)
 type PaymentGroup = {
   key: string; uid: string; acc: Account; type: "session" | "registration";
@@ -327,33 +533,6 @@ type PaymentGroup = {
   latest: PaymentItem; pendingItem: PaymentItem | null; verifiedCount: number;
   total: number; lastTime: number; firstTime: number;
 };
-
-// Which Adventure a payment belongs to. A renewal downpayment is always for the NEXT adventure,
-// even though it is paid during the current one; everything else is decided by the date paid.
-// Renewal registrations (isNewFamily === false) also belong to the NEXT adventure.
-type AdventureKey = "current" | "next";
-function adventureOf(kind: PaymentKind, iso: string | undefined, isRenewal?: boolean, adventures?: { current: { start: string; end: string }; next: { start: string; end: string } }): AdventureKey | null {
-  const adv = adventures || ADVENTURES_FALLBACK;
-  if (kind === "downpayment") return "next";
-  if (kind === "registration" && isRenewal) return "next";
-  if (inRange(iso, adv.current)) return "current";
-  if (inRange(iso, adv.next)) return "next";
-  return null;
-}
-// Dynamic adventure badge — labels use actual adventure numbers from settings
-function advBadge(k: AdventureKey, advNumbers: { current: number; next: number }): { label: string; short: string; bg: string; color: string } {
-  if (k === "current") return { label: `Adventure ${advNumbers.current}`, short: `ADVENTURE ${advNumbers.current}`, bg: "#eff6ff", color: "#0050d5" };
-  return { label: `Adventure ${advNumbers.next}`, short: `ADVENTURE ${advNumbers.next}`, bg: "#f5f3ff", color: "#7c3aed" };
-}
-// Fallback for static references
-const ADV_BADGE: Record<AdventureKey, { label: string; short: string; bg: string; color: string }> = {
-  current: { label: "Current Adventure", short: "CURRENT", bg: "#eff6ff", color: "#0050d5" },
-  next: { label: "Next Adventure", short: "NEXT", bg: "#f5f3ff", color: "#7c3aed" },
-};
-const advTagStyle = (k: AdventureKey): CSSProperties => ({
-  display: "inline-flex", padding: "2px 7px", borderRadius: "20px", fontSize: "10px", fontWeight: 800,
-  background: advBadge(k, { current: 1, next: 2 }).bg, color: advBadge(k, { current: 1, next: 2 }).color, letterSpacing: "0.3px",
-});
 
 // small coloured label used in the list rows
 const tagStyle = (bg: string, color: string): CSSProperties => ({
@@ -363,10 +542,11 @@ const tagStyle = (bg: string, color: string): CSSProperties => ({
 
 // what kind of payment is this row? (label + colours used everywhere so admins always read it the same way)
 function kindTag(type: PaymentKind, payment: Payment) {
+  const adv2 = (payment.advNum ?? 1) >= 2;
   if (type === "session") return { label: "VIRTUAL SESSION", bg: "#ecfeff", color: "#0e7490" };
   if (type === "downpayment") return { label: "RENEWAL DOWNPAYMENT", bg: "#f5f3ff", color: "#7c3aed" };
-  if (isBalanceRow(payment)) return { label: payment.isRenewal ? "RENEWAL BALANCE" : "BALANCE PAYMENT", bg: "#fff7ed", color: "#c2410c" };
-  if (payment.isRenewal) return { label: "RENEWAL (ADVENTURE 2)", bg: "#f5f3ff", color: "#7c3aed" };
+  if (isBalanceRow(payment)) return { label: adv2 ? `ADVENTURE ${payment.advNum} BALANCE` : "BALANCE PAYMENT", bg: "#fff7ed", color: "#c2410c" };
+  if (adv2) return { label: `ADVENTURE ${payment.advNum} REGISTRATION`, bg: "#f5f3ff", color: "#7c3aed" };
   return { label: "REGISTRATION · 1ST PAYMENT", bg: "#eff6ff", color: "#0050d5" };
 }
 
@@ -407,26 +587,47 @@ function dpToPayment(acc: Account): Payment {
 
 const PAY_GRID = "2fr 1.4fr 1.3fr 1.1fr 1.3fr";
 
+// numbers shown in the four stat cards of the Current and Past tabs
+function calcStats(items: PaymentItem[]) {
+  const statPayments = items.filter((p) => !isTestAccount(p.acc));
+  const total = statPayments.length;
+  const pending = statPayments.filter((p) => !p.payment.verified && !p.payment.rejected).length;
+  const verified = statPayments.filter((p) => p.payment.verified).length;
+  const totalRevenue = statPayments.filter((p) => p.payment.verified).reduce((s, p) => s + p.payment.amountPaid, 0);
+  const students = new Set(statPayments.map((p) => `${p.type}-${p.uid}`)).size;
+  return { total, pending, verified, totalRevenue, students };
+}
+
 function AdminPaymentsPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
-  const [allRegistrations, setAllRegistrations] = useState<any[]>([]); // includes registrations with no payment yet (for manual encoding)
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"current" | "next" | "past">("current");
+  const [allRegistrations, setAllRegistrations] = useState<any[]>([]); // includes registrations with no payment yet (for manual encoding + the Next tab)
+  const [mainLoading, setMainLoading] = useState(true);
+  const [view, setView] = useState<Tab>("current");
   const [renewalSettings, setRenewalSettings] = useState<any[]>([]); // ProgramRenewalEntry[]
+  const [settingsOk, setSettingsOk] = useState(false);
+  const [today, setToday] = useState(manilaToday());
+  const [renewalIds, setRenewalIds] = useState<Set<string>>(new Set());
+  const [renewalsFeed, setRenewalsFeed] = useState<"loading" | "ok" | "empty" | "failed">("loading");
   const [activeFilter, setActiveFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [search, setSearch] = useState("");
+  const [urlSearch, setUrlSearch] = useState<string | null>(null); // ?search= from the Renewals page
+  const searchApplied = useRef(false);
+  const prevCurNum = useRef<number | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailItem | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [rejectTarget, setRejectTarget] = useState<{ uid: string; paymentId: string | null; type: PaymentKind } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+
+  // the page is "loading" until the main data AND the Renewals records are in, so rows never jump between tabs
+  const loading = mainLoading || renewalsFeed === "loading";
 
   // ── Manual encoding state ──
   const [manualOpen, setManualOpen] = useState(false);
@@ -455,6 +656,12 @@ function AdminPaymentsPageInner() {
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // re-check the date every 5 minutes so the page switches Adventures even if it is left open overnight
+  useEffect(() => {
+    const t = setInterval(() => setToday(manilaToday()), 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -505,12 +712,55 @@ function AdminPaymentsPageInner() {
             )
           );
         }
-        if (Array.isArray(settingsData?.programs)) {
+        if (Array.isArray(settingsData?.programs) && settingsData.programs.length > 0 && !settingsData.error) {
           setRenewalSettings(settingsData.programs);
+          setSettingsOk(true);
         }
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => setMainLoading(false));
+  }, []);
+
+  // ── Registration ids that appear on the Renewals page ──
+  // /api/renewals/periods -> one /api/renewals?period=<slug> per period -> records[].registrationId
+  // The response shapes are read defensively because those two routes were never shared.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pRes = await fetch("/api/renewals/periods");
+        if (!pRes.ok) throw new Error(`periods ${pRes.status}`);
+        const pData = await pRes.json();
+        const list: any[] = Array.isArray(pData) ? pData : Array.isArray(pData?.periods) ? pData.periods : Array.isArray(pData?.data) ? pData.data : [];
+        const slugs = list
+          .map((p) => (typeof p === "string" ? p : p?.slug ?? p?.id ?? p?.period ?? p?.key))
+          .filter(Boolean) as string[];
+        const ids = new Set<string>();
+        let failed = false;
+        await Promise.all(
+          slugs.map(async (slug) => {
+            try {
+              const res = await fetch(`/api/renewals?period=${encodeURIComponent(slug)}`);
+              if (!res.ok) { failed = true; return; }
+              const d = await res.json();
+              const recs: any[] = Array.isArray(d?.records) ? d.records : Array.isArray(d?.data?.records) ? d.data.records : Array.isArray(d) ? d : [];
+              recs.forEach((rec) => {
+                const id = rec?.registrationId ?? rec?.regId;
+                if (id) ids.add(String(id));
+              });
+            } catch {
+              failed = true;
+            }
+          })
+        );
+        if (cancelled) return;
+        setRenewalIds(ids);
+        setRenewalsFeed(failed ? "failed" : ids.size === 0 ? "empty" : "ok");
+      } catch {
+        if (!cancelled) setRenewalsFeed("failed");
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // ── Auto-open the manual modal when redirected from the Renewals page ──
@@ -544,84 +794,89 @@ function AdminPaymentsPageInner() {
 
     // Clean the query params so a page refresh doesn't re-open the modal
     router.replace("/admin/payments", { scroll: false });
-  // Only run once after data has loaded and searchParams are available
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only run once after data has loaded and searchParams are available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // ── Dynamic ADVENTURES derived from renewal settings ──
-  const { ADVENTURES, advNumbers } = useMemo(() => {
-    const starts = renewalSettings
-      .filter((p: any) => p.nextAdventureStart)
-      .map((p: any) => ({ date: new Date(p.nextAdventureStart), num: (p.currentAdventure || 1) + 1 }))
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    const earliest = starts[0];
-    const now = new Date();
-
-    if (!earliest) {
-      return { ADVENTURES: ADVENTURES_FALLBACK, advNumbers: { current: 1, next: 2 } };
+  // ── ?search=<name> (links from the Renewals page): remember it, apply it once the data is loaded ──
+  useEffect(() => {
+    const s = searchParams.get("search");
+    if (s) {
+      searchApplied.current = false;
+      setUrlSearch(s);
     }
+  }, [searchParams]);
 
-    const nextAdvNum = earliest.num;
-    const curAdvNum = nextAdvNum - 1;
-    const nextStart = earliest.date.toISOString().slice(0, 10);
+  // ── The Adventure timeline, built from the renewal settings ──
+  const tl = useMemo(() => buildTimeline(renewalSettings, today), [renewalSettings, today]);
+  const { ADVENTURES, advNumbers } = tl;
 
-    const curStartDate = new Date(earliest.date);
-    curStartDate.setMonth(curStartDate.getMonth() - ADVENTURE_DURATION_MONTHS);
-    const curStart = curStartDate.toISOString().slice(0, 10);
+  const regCtx = useMemo<RegCtx>(() => ({ tl, renewalIds }), [tl, renewalIds]);
+  const regAdvMap = useMemo(() => {
+    const map = new Map<string, number>();
+    allRegistrations.forEach((r) => map.set(String(r.id), regAdventureNum(r, regCtx)));
+    return map;
+  }, [allRegistrations, regCtx]);
+  const advOf = (r: any): number => regAdvMap.get(String(r?.id)) ?? regAdventureNum(r, regCtx);
 
-    const curEndDate = new Date(earliest.date);
-    curEndDate.setDate(curEndDate.getDate() - 1);
-    const curEnd = curEndDate.toISOString().slice(0, 10);
+  // everything that is not coming from the renewal settings or the Renewals records (shown in the red banner)
+  const dateIssues = useMemo(() => {
+    const out = [...tl.issues];
+    if (renewalsFeed === "failed") out.push("The Renewals records could not be loaded (/api/renewals), so some Adventure 2 registrations may be showing under the wrong tab.");
+    if (renewalsFeed === "empty") out.push("The Renewals records came back empty. Registrations are being sorted by their dates and renewal markers only.");
+    return out;
+  }, [tl, renewalsFeed]);
 
-    const nextEndDate = new Date(earliest.date);
-    nextEndDate.setMonth(nextEndDate.getMonth() + ADVENTURE_DURATION_MONTHS);
-    const nextEnd = nextEndDate.toISOString().slice(0, 10);
+  // when the Adventures switch (current moves up by one), a user sitting on the old "Next" tab is moved to "Current"
+  useEffect(() => {
+    if (prevCurNum.current != null && tl.curNum > prevCurNum.current) setView((v) => (v === "next" ? "current" : v));
+    prevCurNum.current = tl.curNum;
+  }, [tl.curNum]);
 
-    const nextHasStarted = now >= earliest.date;
+  // apply ?search= and open the Adventure 2 tab (the "Current" tab once Adventure 2 has started)
+  useEffect(() => {
+    if (loading || urlSearch === null || searchApplied.current) return;
+    searchApplied.current = true;
+    setSearch(urlSearch);
+    setView(tabOfNum(SEARCH_LINK_ADVENTURE, tl.curNum));
+  }, [loading, urlSearch, tl.curNum]);
 
-    if (nextHasStarted) {
-      return {
-        ADVENTURES: {
-          current: { label: `Adventure ${nextAdvNum}`, start: nextStart, end: nextEnd },
-          next: { label: `Adventure ${nextAdvNum + 1}`, start: nextEnd, end: "2099-12-31" },
-          past: [{ label: `Adventure ${curAdvNum}`, start: curStart, end: curEnd, num: curAdvNum }],
-        },
-        advNumbers: { current: nextAdvNum, next: nextAdvNum + 1 },
-      };
+  // which Adventure a payment shown in the details modal belongs to
+  function advNumOfDetail(d: DetailItem): number | null {
+    if (d.type === "registration") {
+      const r = allRegistrations.find((x) => x.id === d.uid);
+      return r ? advOf(r) : null;
     }
+    if (d.type === "downpayment") return tl.curNum + 1;
+    return sessionAdvNum(tl, manilaDay(d.payment.submittedAt));
+  }
 
-    return {
-      ADVENTURES: {
-        current: { label: `Adventure ${curAdvNum}`, start: curStart, end: curEnd },
-        next: { label: `Adventure ${nextAdvNum}`, start: nextStart, end: nextEnd },
-      },
-      advNumbers: { current: curAdvNum, next: nextAdvNum },
-    };
-  }, [renewalSettings]);
-
-  // ── CURRENT ADVENTURE: session + registration payments only ──
-  const allPayments = useMemo(() => {
+  // ── EVERY payment (all Adventures), each tagged with the tab it belongs to ──
+  const everyPayment = useMemo(() => {
     const flat: PaymentItem[] = [];
-    accounts.forEach(acc => {
-      (acc.sessionPayments || []).forEach(p => flat.push({ uid: acc.id, acc, payment: p, type: "session", seq: 1, seqTotal: 1 }));
+    accounts.forEach((acc) => {
+      (acc.sessionPayments || []).forEach((p) => {
+        const advNum = sessionAdvNum(tl, manilaDay(p.submittedAt));
+        flat.push({ uid: acc.id, acc, payment: { ...p, advNum }, type: "session", seq: 1, seqTotal: 1, advNum, tab: tabOfNum(advNum, tl.curNum) });
+      });
     });
 
-    registrations.forEach(r => {
+    registrations.forEach((r) => {
       const regAcc = regAccountOf(r);
+      const advNum = advOf(r);
+      const tab = tabOfNum(advNum, tl.curNum);
 
       // the first payment
-      flat.push({ uid: r.id, acc: regAcc, type: "registration", seq: 1, seqTotal: 1, payment: firstPaymentOf(r) });
+      flat.push({ uid: r.id, acc: regAcc, type: "registration", seq: 1, seqTotal: 1, payment: firstPaymentOf(r, advNum), advNum, tab });
 
-      // later payments of the remaining balance (encoded by the admin)
+      // later payments of the remaining balance (encoded by the admin) stay with their registration
       balancePaymentsOf(r).forEach((b: any) => {
-        flat.push({ uid: r.id, acc: regAcc, type: "registration", seq: 1, seqTotal: 1, payment: balancePaymentOf(r, b) });
+        flat.push({ uid: r.id, acc: regAcc, type: "registration", seq: 1, seqTotal: 1, payment: balancePaymentOf(r, b, advNum), advNum, tab });
       });
     });
 
     // Number the payments of each student ("Payment 2 of 3"): the first payment is always #1,
-    // balance payments follow in the order they were paid. Done BEFORE the adventure filter so
-    // the numbers stay correct.
+    // balance payments follow in the order they were paid.
     const groups = new Map<string, PaymentItem[]>();
     flat.forEach((it) => {
       const k = `${it.type}-${it.uid}`;
@@ -637,20 +892,17 @@ function AdminPaymentsPageInner() {
       items.forEach((it, i) => { it.seq = i + 1; it.seqTotal = items.length; });
     });
 
-    return flat
-      .filter(({ payment }) => inRange(payment.submittedAt, ADVENTURES.current))
-      .sort((a, b) => new Date(b.payment.submittedAt).getTime() - new Date(a.payment.submittedAt).getTime());
-  }, [accounts, registrations]);
+    return flat.sort((a, b) => new Date(b.payment.submittedAt).getTime() - new Date(a.payment.submittedAt).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, registrations, tl, regAdvMap]);
 
-  const stats = useMemo(() => {
-    const statPayments = allPayments.filter((p) => !isTestAccount(p.acc));
-    const total = statPayments.length;
-    const pending = statPayments.filter((p) => !p.payment.verified && !p.payment.rejected).length;
-    const verified = statPayments.filter((p) => p.payment.verified).length;
-    const totalRevenue = statPayments.filter((p) => p.payment.verified).reduce((s, p) => s + p.payment.amountPaid, 0);
-    const students = new Set(statPayments.map((p) => `${p.type}-${p.uid}`)).size;
-    return { total, pending, verified, totalRevenue, students };
-  }, [allPayments]);
+  // CURRENT tab: session + registration payments of the current Adventure
+  const allPayments = useMemo(() => everyPayment.filter((p) => p.tab === "current"), [everyPayment]);
+  // PAST tab: everything from Adventures that already ended
+  const pastItems = useMemo(() => everyPayment.filter((p) => p.tab === "past"), [everyPayment]);
+
+  const stats = useMemo(() => calcStats(allPayments), [allPayments]);
+  const pastStats = useMemo(() => calcStats(pastItems), [pastItems]);
 
   // One group per student: all of that student's payments in one place
   const allGroups = useMemo<PaymentGroup[]>(() => {
@@ -686,10 +938,10 @@ function AdminPaymentsPageInner() {
     return c;
   }, [allGroups]);
 
-  // reference numbers used by more than one payment (possible double-encoding or re-used receipt)
+  // reference numbers used by more than one payment (possible double-encoding or re-used receipt) — across ALL Adventures
   const dupRefs = useMemo(() => {
     const counts = new Map<string, number>();
-    allPayments.forEach(({ payment }) => {
+    everyPayment.forEach(({ payment }) => {
       const r = normRef(payment.referenceNumber);
       if (r.length < 4 || IGNORED_REFS.has(r)) return;
       counts.set(r, (counts.get(r) || 0) + 1);
@@ -697,7 +949,7 @@ function AdminPaymentsPageInner() {
     const dups = new Set<string>();
     counts.forEach((n, r) => { if (n > 1) dups.add(r); });
     return dups;
-  }, [allPayments]);
+  }, [everyPayment]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -728,18 +980,42 @@ function AdminPaymentsPageInner() {
     return list; // already newest first
   }, [allGroups, activeFilter, typeFilter, sortBy, search]);
 
-  // ── NEXT ADVENTURE: payment tracking for submitted renewal registrations ──
-  // Source of truth: allRegistrations filtered by isRenewalReg — same as the Renewals page.
-  // Does NOT pull from allAccounts so it shows all programs, not just Trailblazer.
+  // ── PAST tab: payments of Adventures that already ended, one block per Adventure ──
+  const pastGroups = useMemo(() => {
+    const q = search.toLowerCase();
+    const rows = pastItems.filter(({ acc, payment }) =>
+      !q ||
+      (acc.fullName || "").toLowerCase().includes(q) ||
+      (acc.email || "").toLowerCase().includes(q) ||
+      (acc.childName || "").toLowerCase().includes(q) ||
+      (acc.program || "").toLowerCase().includes(q) ||
+      (payment.referenceNumber || "").toLowerCase().includes(q)
+    );
+    const map = new Map<number, PaymentItem[]>();
+    rows.forEach((it) => {
+      if (!map.has(it.advNum)) map.set(it.advNum, []);
+      map.get(it.advNum)!.push(it);
+    });
+    const out = Array.from(map.entries()).map(([num, items]) => ({
+      num,
+      items: [...items].sort((a, b) => new Date(b.payment.submittedAt || 0).getTime() - new Date(a.payment.submittedAt || 0).getTime()),
+    }));
+    out.sort((a, b) => b.num - a.num);
+    return { groups: out, count: rows.length };
+  }, [pastItems, search]);
+
+  // ── NEXT tab: every registration for the next Adventure (new OR existing family), paid or not ──
+  // Source of truth: allRegistrations, assigned to this tab by the registration itself (regAdventureNum),
+  // so families who have not paid yet still show up as "No receipt yet".
   const renewalRowsAll = useMemo(() => {
     return allRegistrations
-      .filter((r) => isRenewalReg(r) && !isExcluded(
+      .filter((r) => tabOfNum(advOf(r), tl.curNum) === "next" && !isExcluded(
         r.childInfo?.firstName,
         r.childInfo?.lastName,
         `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""}`
       ))
       .map((r) => {
-        const payment = firstPaymentOf(r);
+        const payment = firstPaymentOf(r, advOf(r));
         const hasReceipt = !!(r.receiptUrl || r.receiptBase64 || r.amountPaid > 0);
         let state: RenewalState;
         if (!hasReceipt) state = "intent";
@@ -752,7 +1028,8 @@ function AdminPaymentsPageInner() {
         const acc = regAccountOf(r);
         return { r, acc, payment, state, paidVerified, hasReceipt };
       });
-  }, [allRegistrations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRegistrations, tl, regAdvMap]);
 
   const renewalRows = useMemo(() => {
     const q = search.toLowerCase();
@@ -976,8 +1253,8 @@ function AdminPaymentsPageInner() {
   const dupRefMatch = useMemo(() => {
     const r = normRef(form.referenceNumber);
     if (r.length < 4 || IGNORED_REFS.has(r)) return null;
-    return allPayments.find((p) => normRef(p.payment.referenceNumber) === r) ?? null;
-  }, [form.referenceNumber, allPayments]);
+    return everyPayment.find((p) => normRef(p.payment.referenceNumber) === r) ?? null;
+  }, [form.referenceNumber, everyPayment]);
 
   async function handleReceiptFile(file: File | undefined) {
     if (!file) return;
@@ -1030,14 +1307,15 @@ function AdminPaymentsPageInner() {
     }
   }
 
-  // which adventure tab will this payment show up in? (decided by the date paid)
+  // which Adventure tab will this payment show up in?
+  // Registration payments follow their REGISTRATION; session payments follow the date paid.
   const landsIn = useMemo(() => {
+    if (form.type === "registration") return selectedReg ? `Adventure ${advOf(selectedReg)}` : null;
+    if (form.type === "downpayment") return `Adventure ${tl.curNum + 1}`;
     if (!form.paidOn) return null;
-    const iso = new Date(form.paidOn + "T12:00:00").toISOString();
-    if (inRange(iso, ADVENTURES.current)) return ADVENTURES.current.label;
-    if (inRange(iso, ADVENTURES.next)) return ADVENTURES.next.label;
-    return null;
-  }, [form.paidOn]);
+    return `Adventure ${sessionAdvNum(tl, form.paidOn)}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.type, form.paidOn, selectedReg, tl, regAdvMap]);
 
   async function postJson(url: string, method: string, body: any) {
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1245,6 +1523,7 @@ function AdminPaymentsPageInner() {
         rows.push({
           key: "s-" + p.id, kind: "session", label: "Virtual Session", date: p.submittedAt, method: p.paymentMethod, ref: p.referenceNumber || "",
           amount: p.amountPaid, verified: p.verified, rejected: p.rejected, child: a.childName,
+          advNum: sessionAdvNum(tl, manilaDay(p.submittedAt)),
           item: { uid: a.id, acc: a, payment: p, type: "session", seq: i + 1, seqTotal: sp.length },
         })
       );
@@ -1253,6 +1532,7 @@ function AdminPaymentsPageInner() {
         rows.push({
           key: "dp-" + a.id, kind: "downpayment", label: "Renewal Downpayment", date: dp.submittedAt, method: dp.paymentMethod || "", ref: dp.referenceNumber || "",
           amount: dp.amountPaid || 0, verified: dp.verified, rejected: dp.rejected, child: a.childName,
+          advNum: tl.curNum + 1,
           item: { uid: a.id, acc: a, payment: dpToPayment(a), type: "downpayment", seq: 1, seqTotal: 1 },
         });
     });
@@ -1260,29 +1540,31 @@ function AdminPaymentsPageInner() {
       const rEmail = (r.parentInfo?.email || "").toLowerCase();
       if (r.id !== detail.uid && !(email && rEmail === email)) return;
       const regAcc = regAccountOf(r);
+      const advNum = advOf(r);
       const bals = sortedBalancesOf(r);
       const total = 1 + bals.length;
-      const first = firstPaymentOf(r);
+      const first = firstPaymentOf(r, advNum);
       rows.push({
         key: "r-" + r.id, kind: "registration", label: "Registration (1st payment)",
         date: first.submittedAt, method: first.paymentMethod, ref: first.referenceNumber || "",
         amount: first.amountPaid, verified: first.verified, rejected: first.rejected,
-        regId: r.id, child: fullChildName(r),
+        regId: r.id, child: fullChildName(r), advNum,
         item: { uid: r.id, acc: regAcc, payment: first, type: "registration", seq: 1, seqTotal: total },
       });
       bals.forEach((b: any, i: number) => {
-        const bp = balancePaymentOf(r, b);
+        const bp = balancePaymentOf(r, b, advNum);
         rows.push({
           key: "b-" + b.id, kind: "registration", label: "Registration balance",
           date: bp.submittedAt, method: bp.paymentMethod, ref: bp.referenceNumber || "",
           amount: bp.amountPaid, verified: bp.verified, rejected: false,
-          regId: r.id, child: fullChildName(r),
+          regId: r.id, child: fullChildName(r), advNum,
           item: { uid: r.id, acc: regAcc, payment: bp, type: "registration", seq: i + 2, seqTotal: total },
         });
       });
     });
     return rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [detail, accounts, registrations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail, accounts, registrations, tl, regAdvMap]);
 
   type Breakdown = {
     due: number | null;
@@ -1333,12 +1615,13 @@ function AdminPaymentsPageInner() {
   }
 
   function paymentTypeLabel(type: PaymentKind, payment: Payment) {
+    const adv2 = (payment.advNum ?? 1) >= 2;
     if (type === "session") return "Virtual Session Payment";
     if (type === "registration") {
       if (isBalanceRow(payment)) {
-        return payment.isRenewal ? "Renewal Balance Payment" : "Registration Balance Payment";
+        return adv2 ? `Adventure ${payment.advNum} Balance Payment` : "Registration Balance Payment";
       }
-      return payment.isRenewal ? "Renewal Registration (Adventure 2 Downpayment)" : "Registration Payment (1st payment)";
+      return adv2 ? `Adventure ${payment.advNum} Registration (1st payment)` : "Registration Payment (1st payment)";
     }
     return "Renewal Downpayment";
   }
@@ -1388,20 +1671,24 @@ function AdminPaymentsPageInner() {
     navigator.clipboard.writeText(lines.join("\n")).then(() => showToast("Copied! Paste it into your SOA.")).catch(() => showToast("Copy failed. Please try again.", "error"));
   }
 
+  const currentCards = (s: typeof stats) => [
+    { label: "Total Payments", value: s.total, sub: `from ${s.students} student${s.students === 1 ? "" : "s"} / famil${s.students === 1 ? "y" : "ies"}`, icon: "📋", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
+    { label: "Pending Review", value: s.pending, sub: s.pending > 0 ? "Needs your action" : "All caught up 🎉", icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
+    { label: "Verified", value: s.verified, sub: "Counted in revenue", icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+    { label: "Total Revenue", value: fmtCurrency(s.totalRevenue), sub: "Verified payments only", icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
+  ];
+
   const statCards =
     view === "current"
-      ? [
-        { label: "Total Payments", value: stats.total, sub: `from ${stats.students} student${stats.students === 1 ? "" : "s"} / famil${stats.students === 1 ? "y" : "ies"}`, icon: "📋", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
-        { label: "Pending Review", value: stats.pending, sub: stats.pending > 0 ? "Needs your action" : "All caught up 🎉", icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
-        { label: "Verified", value: stats.verified, sub: "Counted in revenue", icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
-        { label: "Total Revenue", value: fmtCurrency(stats.totalRevenue), sub: "Verified payments only", icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
-      ]
-      : [
-        { label: "Confirmed", value: `${nextStats.renewed} / ${nextStats.total}`, sub: "Payment verified", icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
-        { label: "Awaiting Verify", value: nextStats.awaiting, sub: nextStats.awaiting > 0 ? "Needs your action" : "All caught up 🎉", icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
-        { label: "No Receipt Yet", value: nextStats.pending, sub: "Slot held, no payment uploaded", icon: "📭", color: "#64748b", bg: "linear-gradient(135deg,#f1f5f9,#e2e8f0)" },
-        { label: "Collected (Next)", value: fmtCurrency(nextStats.collected), sub: "Verified payments only", icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
-      ];
+      ? currentCards(stats)
+      : view === "past"
+        ? currentCards(pastStats)
+        : [
+          { label: "Confirmed", value: `${nextStats.renewed} / ${nextStats.total}`, sub: "Payment verified", icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+          { label: "Awaiting Verify", value: nextStats.awaiting, sub: nextStats.awaiting > 0 ? "Needs your action" : "All caught up 🎉", icon: "⏳", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
+          { label: "No Receipt Yet", value: nextStats.pending, sub: "Slot held, no payment uploaded", icon: "📭", color: "#64748b", bg: "linear-gradient(135deg,#f1f5f9,#e2e8f0)" },
+          { label: "Collected (Next)", value: fmtCurrency(nextStats.collected), sub: "Verified payments only", icon: "💰", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
+        ];
 
   const RENEWAL_GRID = "1.7fr 1.1fr 1.1fr 1.1fr 1fr 1fr";
 
@@ -1409,6 +1696,8 @@ function AdminPaymentsPageInner() {
     padding: "8px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: 700, border: "1.5px solid #e2e8f0",
     background: "white", color: "#64748b", cursor: "pointer", outline: "none", fontFamily: "inherit",
   };
+
+  const showPastTab = tl.curNum > 1 || pastItems.length > 0;
 
   return (
     <AppShell title="Payment Tracking">
@@ -1432,7 +1721,7 @@ function AdminPaymentsPageInner() {
           pending: { bg: "#fffbeb", color: "#b45309", label: "PENDING" },
         }[status];
         const typeLabel = paymentTypeLabel(type, payment);
-        const advThis = adventureOf(type, payment.submittedAt, payment.isRenewal, ADVENTURES);
+        const advThis = advNumOfDetail(detail);
         const bd = calcBreakdown();
         const isLink = !!payment.receiptBase64 && payment.receiptBase64.startsWith("http");
         const pctRes = Math.round(RESERVATION_RATE * 100);
@@ -1452,7 +1741,7 @@ function AdminPaymentsPageInner() {
           ["Program", acc.program || "—"],
           ["Payment type", typeLabel],
           ["Payment no.", seq && seqTotal ? seqText : "—"],
-          ["Adventure", advThis ? advBadge(advThis, advNumbers).label : "Outside both Adventures"],
+          ["Adventure", advThis != null ? advNumBadge(advThis, tl.curNum).label : "Not assigned"],
           ["Payment method", (payment.paymentMethod || "—").toUpperCase()],
           ["Reference no.", payment.referenceNumber || "—"],
           ["Date submitted", fmtDateTime(payment.submittedAt)],
@@ -1479,7 +1768,7 @@ function AdminPaymentsPageInner() {
         const tileValue: CSSProperties = { fontSize: "15px", fontWeight: 800, color: "#002f76", marginTop: "3px", wordBreak: "break-word" };
         const tileSub: CSSProperties = { fontSize: "11px", color: "#94a3b8", marginTop: "2px", fontWeight: 600 };
         let running = 0;
-        const advTotals = { current: 0, next: 0, other: 0 };
+        const advTotals: Record<string, number> = {}; // key = Adventure number, or "other" when none could be assigned
 
         const pendingHelp =
           type === "registration"
@@ -1495,7 +1784,7 @@ function AdminPaymentsPageInner() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid #f1f5f9", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: "18px", color: "#002f76" }}>Payment Details</div>
-                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{typeLabel}{seq && seqTotal && seqTotal > 1 ? ` · ${seqText}` : ""}{advThis ? ` · ${advBadge(advThis, advNumbers).label}` : ""}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{typeLabel}{seq && seqTotal && seqTotal > 1 ? ` · ${seqText}` : ""}{advThis != null ? ` · ${advNumBadge(advThis, tl.curNum).label}` : ""}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   {isTestAccount(acc) && (
@@ -1643,10 +1932,11 @@ function AdminPaymentsPageInner() {
                   {ledger.length === 0 ? (
                     <div style={{ padding: "16px", fontSize: "13px", color: "#94a3b8" }}>No other payments found.</div>
                   ) : ledger.map((l) => {
-                    const adv = adventureOf(l.kind, l.date, l.item.payment.isRenewal, ADVENTURES);
+                    const adv = l.advNum;
                     if (l.verified) {
                       running += l.amount;
-                      advTotals[adv ?? "other"] += l.amount;
+                      const k = adv != null ? String(adv) : "other";
+                      advTotals[k] = (advTotals[k] || 0) + l.amount;
                     }
                     const ls = l.verified ? "Verified" : l.rejected ? "Rejected" : "Pending";
                     const lc = l.verified ? "#15803d" : l.rejected ? "#b91c1c" : "#b45309";
@@ -1657,7 +1947,7 @@ function AdminPaymentsPageInner() {
                           {l.label}
                           <div style={{ marginTop: "3px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
                             {l.child && <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 600 }}>{l.child}</span>}
-                            {adv && <span style={advTagStyle(adv)}>{advBadge(adv, advNumbers).short}</span>}
+                            {adv != null && <span style={advTagStyle(adv, tl.curNum)}>{advNumBadge(adv, tl.curNum).short}</span>}
                             {isThis && <span style={tagStyle("#fef3c7", "#92400e")}>◀ THIS PAYMENT</span>}
                           </div>
                         </div>
@@ -1670,16 +1960,17 @@ function AdminPaymentsPageInner() {
                     );
                   })}
                   <div style={{ padding: "12px 14px", borderTop: "1px solid #e8efff", background: "#f8faff", fontSize: "13px" }}>
-                    {(["current", "next"] as const).map((k) =>
-                      advTotals[k] > 0 ? (
-                        <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontWeight: 700, fontSize: "12px", color: advBadge(k as AdventureKey, advNumbers).color }}>
-                          <span>{advBadge(k as AdventureKey, advNumbers).label}</span><span>{fmtCurrency(advTotals[k])}</span>
+                    {Object.keys(advTotals)
+                      .filter((k) => k !== "other" && advTotals[k] > 0)
+                      .sort((a, b) => Number(a) - Number(b))
+                      .map((k) => (
+                        <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontWeight: 700, fontSize: "12px", color: advNumBadge(Number(k), tl.curNum).color }}>
+                          <span>{advNumBadge(Number(k), tl.curNum).label}</span><span>{fmtCurrency(advTotals[k])}</span>
                         </div>
-                      ) : null
-                    )}
-                    {advTotals.other > 0 && (
+                      ))}
+                    {(advTotals.other || 0) > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontWeight: 700, fontSize: "12px", color: "#94a3b8" }}>
-                        <span>Outside both Adventures</span><span>{fmtCurrency(advTotals.other)}</span>
+                        <span>No Adventure assigned</span><span>{fmtCurrency(advTotals.other)}</span>
                       </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", paddingTop: "8px", borderTop: "1px dashed #e2e8f0", fontWeight: 800, color: "#002f76" }}>
@@ -1833,6 +2124,7 @@ function AdminPaymentsPageInner() {
                       <div style={row}><span style={muted}>Email</span><span style={{ wordBreak: "break-all", textAlign: "right" }}>{selectedReg.parentInfo?.email || "—"}</span></div>
                       <div style={row}><span style={muted}>Child</span><span>{`${selectedReg.childInfo?.firstName ?? ""} ${selectedReg.childInfo?.lastName ?? ""}`.trim() || "—"}</span></div>
                       <div style={row}><span style={muted}>Program</span><span>{selectedReg.program || "—"}</span></div>
+                      <div style={row}><span style={muted}>Adventure</span><span>{`Adventure ${advOf(selectedReg)}`}</span></div>
                       <div style={row}><span style={muted}>Status</span><span style={{ textTransform: "uppercase" }}>{selectedReg.status || "—"}</span></div>
                       <div style={row}>
                         <span style={muted}>This will be recorded as</span>
@@ -2014,9 +2306,9 @@ function AdminPaymentsPageInner() {
                   {creditBalance > 0 && (
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "#15803d", marginBottom: "6px" }}>Overpaid by {fmtCurrency(creditBalance)} (recorded as credit balance)</div>
                   )}
-                  {form.paidOn && (
-                    <div style={{ fontSize: "11px", marginBottom: "14px", color: landsIn ? "#15803d" : "#b45309" }}>
-                      {landsIn ? `Will appear under: ${landsIn}` : "This date is outside both Adventures, so it won't show in either list."}
+                  {landsIn && (
+                    <div style={{ fontSize: "11px", marginBottom: "14px", color: "#15803d" }}>
+                      Will appear under: {landsIn}
                     </div>
                   )}
 
@@ -2170,6 +2462,19 @@ function AdminPaymentsPageInner() {
         </div>
       )}
 
+      {/* ── Red banner: the Adventure dates are not fully coming from the Renewal Settings ── */}
+      {!loading && dateIssues.length > 0 && (
+        <div style={{ marginBottom: "16px", padding: "14px 18px", borderRadius: "14px", background: "#fef2f2", border: "1.5px solid #fca5a5", color: "#991b1b", fontSize: "13px", fontWeight: 600 }}>
+          <div style={{ fontWeight: 800, marginBottom: "4px" }}>⚠ Adventure dates are not fully coming from Renewal Settings</div>
+          <ul style={{ margin: 0, paddingLeft: "18px" }}>
+            {dateIssues.map((msg, i) => <li key={i} style={{ marginBottom: "2px" }}>{msg}</li>)}
+          </ul>
+          <div style={{ marginTop: "6px", fontWeight: 500, color: "#b91c1c" }}>
+            Fix it in Admin → Programs &amp; Registration Control (Curious Explorer), then save and refresh this page.
+          </div>
+        </div>
+      )}
+
       {/* ── Stats Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "24px" }}>
         {statCards.map(s => (
@@ -2190,10 +2495,10 @@ function AdminPaymentsPageInner() {
         <div style={{ display: "flex", gap: "8px" }}>
           {(
             [
-              { key: "current" as const, label: ADVENTURES.current.label },
-              { key: "next" as const, label: ADVENTURES.next.label },
-              ...((ADVENTURES as any).past?.length ? [{ key: "past" as const, label: "📁 Past Adventures" }] : []),
-            ] as { key: "current" | "next" | "past"; label: string }[]
+              { key: "current" as const, label: `${ADVENTURES.current.label} (Current)` },
+              { key: "next" as const, label: `${ADVENTURES.next.label} (Next)` },
+              ...(showPastTab ? [{ key: "past" as const, label: "📁 Past Adventures" }] : []),
+            ] as { key: Tab; label: string }[]
           ).map(({ key: v, label }) => (
             <button
               key={v}
@@ -2261,7 +2566,9 @@ function AdminPaymentsPageInner() {
             ? "Loading…"
             : view === "current"
               ? `${filtered.length} of ${allGroups.length} students`
-              : `${renewalRows.length} of ${renewalRowsAll.length} families`}
+              : view === "next"
+                ? `${renewalRows.length} of ${renewalRowsAll.length} registrations`
+                : `${pastGroups.count} of ${pastItems.length} payments`}
         </div>
       </div>
 
@@ -2312,6 +2619,7 @@ function AdminPaymentsPageInner() {
                 const rejectedNote = items.find((i) => i.payment.rejected && i.payment.adminNote)?.payment.adminNote;
                 const latestRef = g.latest.payment.referenceNumber;
                 const accent = g.status === "pending" ? "#f59e0b" : g.status === "rejected" ? "#ef4444" : "transparent";
+                const regTag = kindTag("registration", items[0].payment);
 
                 let balanceLine = "";
                 let balanceColor = "#b45309";
@@ -2352,7 +2660,10 @@ function AdminPaymentsPageInner() {
                           )}
                           {type === "session"
                             ? <span style={tagStyle("#ecfeff", "#0e7490")}>VIRTUAL SESSION</span>
-                            : <span style={tagStyle("#eff6ff", "#0050d5")}>REGISTRATION</span>}
+                            : <span style={tagStyle(
+                              (items[0].advNum >= 2) ? regTag.bg : "#eff6ff",
+                              (items[0].advNum >= 2) ? regTag.color : "#0050d5"
+                            )}>{items[0].advNum >= 2 ? `ADVENTURE ${items[0].advNum} REGISTRATION` : "REGISTRATION"}</span>}
                           {items.length > 1 && <span style={tagStyle("#f1f5f9", "#475569")}>{items.length} payments</span>}
                           {isTest && !isTestAccount(acc) && <span style={tagStyle("#f1f5f9", "#64748b")}>TEST</span>}
                         </div>
@@ -2457,13 +2768,14 @@ function AdminPaymentsPageInner() {
       ) : loading ? (
         <div style={{ background: "white", borderRadius: "20px", padding: "80px 24px", textAlign: "center", color: "#94a3b8", fontSize: "15px", fontWeight: 600, border: "1px solid #e2e8f0" }}>
           <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
-          <div>Loading renewals…</div>
+          <div>Loading…</div>
         </div>
-      ) : (
-        /* ── Next Adventure: payment tracking for submitted renewal registrations ── */
+      ) : view === "next" ? (
+        /* ── Next Adventure: every registration for it (new + existing families), with or without a payment ── */
         <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,47,118,0.06)", overflow: "hidden" }}>
           <div style={{ padding: "14px 24px", fontSize: "12px", fontWeight: 700, color: "#64748b", borderBottom: "1px solid #e8efff" }}>
-            {nextStats.renewed} of {nextStats.total} renewal{nextStats.total !== 1 ? "s" : ""} confirmed · one row per registration
+            {nextStats.renewed} of {nextStats.total} Adventure {advNumbers.next} registration{nextStats.total !== 1 ? "s" : ""} confirmed · one row per registration (new and existing families)
+            {tl.nextStart ? ` · starts ${fmtDate(tl.nextStart)}` : " · start date not set yet"}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.3fr 1.1fr 1.1fr", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
             {["Explorer & Parent", "Program", "Payment", "Status", "Actions"].map((h) => (
@@ -2472,7 +2784,7 @@ function AdminPaymentsPageInner() {
           </div>
 
           {renewalRows.length === 0 ? (
-            <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>No renewal registrations found.</div>
+            <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>No Adventure {advNumbers.next} registrations found.</div>
           ) : (
             renewalRows.map(({ r, acc, payment, state, paidVerified, hasReceipt }, idx) => {
               const b = RENEWAL_BADGE[state];
@@ -2552,39 +2864,31 @@ function AdminPaymentsPageInner() {
             })
           )}
         </div>
-      )}
-
-      {/* ── Past Adventures ── */}
-      {view === "past" && (
+      ) : (
+        /* ── Past Adventures: payments of Adventures that already ended ── */
         <div style={{ background: "white", borderRadius: "20px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", overflow: "hidden" }}>
-          {!(ADVENTURES as any).past?.length ? (
+          {pastGroups.groups.length === 0 ? (
             <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
-              No past adventures yet. When the next adventure starts, the current adventure's payments will be archived here.
+              {pastItems.length === 0
+                ? "No payments from earlier Adventures yet. When an Adventure ends, its payments move here."
+                : "No past payments match your search."}
             </div>
           ) : (
-            ((ADVENTURES as any).past as { label: string; start: string; end: string; num: number }[]).map((pastAdv: { label: string; start: string; end: string; num: number }) => {
-              // Filter all payments that fall within this past adventure's date range
-              const pastPayments = allPayments.filter(({ payment }) => inRange(payment.submittedAt, pastAdv));
-              // Group by student
-              const grouped = new Map<string, PaymentItem[]>();
-              pastPayments.forEach((item) => {
-                const key = item.acc.email || item.uid;
-                if (!grouped.has(key)) grouped.set(key, []);
-                grouped.get(key)!.push(item);
-              });
-
+            pastGroups.groups.map(({ num, items }) => {
+              const range = ADVENTURES.past.find((p) => p.num === num);
+              const families = new Set(items.map((i) => i.acc.email || i.uid)).size;
               return (
-                <div key={pastAdv.num}>
+                <div key={num}>
                   {/* Adventure header */}
                   <div style={{ padding: "16px 24px", background: "linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)", borderBottom: "1px solid #e8efff", display: "flex", alignItems: "center", gap: "12px" }}>
                     <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg, #0050d5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "16px", fontWeight: 800 }}>
-                      {pastAdv.num}
+                      {num}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: "15px", color: "#002f76" }}>{pastAdv.label}</div>
+                      <div style={{ fontWeight: 800, fontSize: "15px", color: "#002f76" }}>Adventure {num}</div>
                       <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                        {new Date(pastAdv.start).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} — {new Date(pastAdv.end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        {" · "}{pastPayments.length} payment{pastPayments.length !== 1 ? "s" : ""} from {grouped.size} {grouped.size !== 1 ? "families" : "family"}
+                        {range ? `${fmtDate(range.start)} — ${fmtDate(range.end)} · ` : ""}
+                        {items.length} payment{items.length !== 1 ? "s" : ""} from {families} {families !== 1 ? "families" : "family"}
                       </div>
                     </div>
                   </div>
@@ -2596,40 +2900,32 @@ function AdminPaymentsPageInner() {
                     ))}
                   </div>
 
-                  {pastPayments.length === 0 ? (
-                    <div style={{ padding: "40px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>No payments found for this adventure.</div>
-                  ) : (
-                    pastPayments
-                      .sort((a, b) => new Date(b.payment.submittedAt || 0).getTime() - new Date(a.payment.submittedAt || 0).getTime())
-                      .map(({ uid, acc, payment, type }, idx) => {
-                        const status = getStatus(payment);
-                        const statusColors = { verified: "#15803d", rejected: "#b91c1c", pending: "#b45309" };
-                        return (
-                          <div
-                            key={payment.id + idx}
-                            className="pay-row"
-                            onClick={() => openDetail({ uid, acc, payment, type, seq: 1, seqTotal: 1 })}
-                            style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 0.8fr 1fr", padding: "12px 24px", borderBottom: "1px solid #f1f5f9", alignItems: "center", background: "white", cursor: "pointer" }}
-                          >
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{acc.childName || acc.fullName || acc.email}</div>
-                              <div style={{ fontSize: "11px", color: "#94a3b8" }}>{acc.fullName || "—"}</div>
-                            </div>
-                            <div>
-                              <span style={tagStyle(
-                                type === "session" ? "#ecfeff" : payment.isRenewal ? "#f5f3ff" : "#eff6ff",
-                                type === "session" ? "#0e7490" : payment.isRenewal ? "#7c3aed" : "#0050d5"
-                              )}>
-                                {type === "session" ? "SESSION" : payment.isRenewal ? "RENEWAL" : "REGISTRATION"}
-                              </span>
-                            </div>
-                            <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{fmtCurrency(payment.amountPaid || 0)}</div>
-                            <div style={{ fontWeight: 700, fontSize: "12px", color: statusColors[status], textTransform: "uppercase" }}>{status}</div>
-                            <div style={{ fontSize: "12px", color: "#64748b" }}>{fmtDate(payment.submittedAt)}</div>
-                          </div>
-                        );
-                      })
-                  )}
+                  {items.map(({ uid, acc, payment, type, seq, seqTotal }, idx) => {
+                    const status = getStatus(payment);
+                    const statusColors = { verified: "#15803d", rejected: "#b91c1c", pending: "#b45309" };
+                    const tag = kindTag(type, payment);
+                    return (
+                      <div
+                        key={payment.id + idx}
+                        className="pay-row"
+                        onClick={() => openDetail({ uid, acc, payment, type, seq, seqTotal })}
+                        style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 0.8fr 1fr", padding: "12px 24px", borderBottom: "1px solid #f1f5f9", alignItems: "center", background: "white", cursor: "pointer" }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{acc.childName || acc.fullName || acc.email}</div>
+                          <div style={{ fontSize: "11px", color: "#94a3b8" }}>{acc.fullName || "—"}</div>
+                        </div>
+                        <div>
+                          <span style={tagStyle(tag.bg, tag.color)}>
+                            {type === "session" ? "SESSION" : isBalanceRow(payment) ? "BALANCE" : "REGISTRATION"}
+                          </span>
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{fmtCurrency(payment.amountPaid || 0)}</div>
+                        <div style={{ fontWeight: 700, fontSize: "12px", color: statusColors[status], textTransform: "uppercase" }}>{status}</div>
+                        <div style={{ fontSize: "12px", color: "#64748b" }}>{fmtDateTime(payment.submittedAt).split(",").slice(0, 2).join(",")}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })
