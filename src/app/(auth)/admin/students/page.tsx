@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { m } from "framer-motion";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/lib/auth-context";
 
 interface Student {
   id: string;
@@ -50,6 +51,31 @@ function getAge(dob?: string) {
   return age < 0 ? 0 : age;
 }
 
+function normalizeIdentity(value?: string) {
+  return (value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function getStudentGroupKey(student: Student) {
+  const childName = normalizeIdentity(`${student.childInfo?.firstName || ""} ${student.childInfo?.lastName || ""}`);
+  const dateOfBirth = normalizeIdentity(student.childInfo?.dateOfBirth);
+  const familyIdentity = normalizeIdentity(student.parentInfo?.email) || normalizeIdentity(student.parentInfo?.phone);
+
+  // Only combine records when there is enough information to avoid merging
+  // different children who happen to share a name.
+  if (!childName || !dateOfBirth || !familyIdentity) return `registration:${student.id}`;
+  return `${familyIdentity}|${childName}|${dateOfBirth}`;
+}
+
+function getEnrollmentTime(student: Student) {
+  const time = new Date(student.enrolledAt).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#002f76,#0050d5)",
   "linear-gradient(135deg,#7c3aed,#a78bfa)",
@@ -60,38 +86,95 @@ const AVATAR_COLORS = [
 ];
 
 export default function AdminStudentsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.uid;
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [programFilter, setProgramFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch("/api/students")
-      .then(r => r.json())
-      .then(d => { if (d.success) setStudents(d.data); })
-      .catch(() => { })
-      .finally(() => setLoading(false));
-  }, []);
+    if (authLoading) return;
+
+    if (!userId) {
+      setLoadError("Your sign-in session could not be verified. Sign out and sign in again.");
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setLoadError("");
+
+    fetch("/api/students", { cache: "no-store" })
+      .then(async response => {
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Your sign-in session could not be verified. Sign out and sign in again.");
+          }
+          throw new Error(`Could not load students (HTTP ${response.status}).`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        if (data.success) setStudents(data.data);
+        else throw new Error(data.error || "Could not load students.");
+      })
+      .catch(error => {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : "Could not load students.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [authLoading, userId]);
 
   const filtered = useMemo(() => {
-    return students.filter(s => {
-      const matchProgram = programFilter === "all" || s.program === programFilter;
+    const groups = new Map<string, Student[]>();
+    for (const student of students) {
+      const key = getStudentGroupKey(student);
+      const enrollments = groups.get(key) || [];
+      enrollments.push(student);
+      groups.set(key, enrollments);
+    }
+
+    return Array.from(groups, ([key, enrollments]) => ({
+      key,
+      enrollments: enrollments.sort((a, b) => getEnrollmentTime(b) - getEnrollmentTime(a)),
+    })).filter(group => {
+      const matchProgram = programFilter === "all" || group.enrollments.some(s => s.program === programFilter);
       const q = search.toLowerCase();
-      const matchSearch = !q ||
+      const matchSearch = !q || group.enrollments.some(s =>
         `${s.childInfo.firstName} ${s.childInfo.lastName}`.toLowerCase().includes(q) ||
         s.parentInfo.name.toLowerCase().includes(q) ||
         s.programName.toLowerCase().includes(q) ||
-        (s.childInfo.nickname || "").toLowerCase().includes(q);
+        (s.childInfo.nickname || "").toLowerCase().includes(q)
+      );
       return matchProgram && matchSearch;
     });
   }, [students, programFilter, search]);
 
-  const stats = useMemo(() => ({
-    total: students.length,
-    active: students.filter(s => s.status === "active").length,
-    programs: new Set(students.map(s => s.program)).size,
-    today: students.filter(s => new Date(s.enrolledAt).toDateString() === new Date().toDateString()).length,
-  }), [students]);
+  const stats = useMemo(() => {
+    const groups = new Map<string, Student[]>();
+    for (const student of students) {
+      const key = getStudentGroupKey(student);
+      const enrollments = groups.get(key) || [];
+      enrollments.push(student);
+      groups.set(key, enrollments);
+    }
+    const explorers = Array.from(groups.values());
+    return {
+      total: explorers.length,
+      active: explorers.filter(enrollments => enrollments.some(s => s.status === "active")).length,
+      programs: new Set(students.map(s => s.program)).size,
+      today: explorers.filter(enrollments => enrollments.some(s => new Date(s.enrolledAt).toDateString() === new Date().toDateString())).length,
+    };
+  }, [students]);
+
+  const filteredEnrollmentCount = filtered.reduce((count, group) => count + group.enrollments.length, 0);
 
   return (
     <AppShell title="Students">
@@ -146,7 +229,7 @@ export default function AdminStudentsPage() {
           })}
         </div>
         <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "#94a3b8", flexShrink: 0 }}>
-          {loading ? "Loading…" : `${filtered.length} of ${students.length} students`}
+          {loading ? "Loading…" : `${filtered.length} explorers · ${filteredEnrollmentCount} enrollment records`}
         </div>
       </div>
 
@@ -155,6 +238,12 @@ export default function AdminStudentsPage() {
         <div style={{ background: "white", borderRadius: "20px", padding: "80px 24px", textAlign: "center", color: "#94a3b8", fontSize: "15px", fontWeight: "600", border: "1px solid #e2e8f0" }}>
           <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
           <div>Loading students…</div>
+        </div>
+      ) : loadError ? (
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "20px", padding: "32px 24px", textAlign: "center", color: "#9a3412" }}>
+          <div style={{ fontSize: "28px", marginBottom: "8px" }}>🔒</div>
+          <div style={{ fontWeight: "800", fontSize: "16px", marginBottom: "6px" }}>Students could not be loaded</div>
+          <div style={{ fontSize: "13px" }}>{loadError}</div>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ background: "white", borderRadius: "20px", padding: "80px 24px", textAlign: "center", border: "2px dashed #e2e8f0" }}>
@@ -171,13 +260,22 @@ export default function AdminStudentsPage() {
             ))}
           </div>
 
-          {filtered.map((student, idx) => {
-            const meta = PROGRAM_META[student.program];
+          {filtered.map((group, idx) => {
+            const student = group.enrollments[0];
+            const programGroups = Array.from(
+              group.enrollments.reduce((programs, enrollment) => {
+                const existing = programs.get(enrollment.program);
+                if (existing) existing.count += 1;
+                else programs.set(enrollment.program, { enrollment, count: 1 });
+                return programs;
+              }, new Map<string, { enrollment: Student; count: number }>()),
+              ([program, value]) => ({ program, ...value })
+            );
             const avatarGrad = AVATAR_COLORS[idx % AVATAR_COLORS.length];
             const age = getAge(student.childInfo.dateOfBirth);
 
             return (
-              <Link key={student.id} href={`/admin/students/${student.id}`} style={{ textDecoration: "none", display: "block" }}>
+              <Link key={group.key} href={`/admin/students/${student.id}`} style={{ textDecoration: "none", display: "block" }}>
                 <m.div
                   className="stu-row"
                   initial={{ opacity: 0, y: 6 }}
@@ -197,15 +295,29 @@ export default function AdminStudentsPage() {
                       <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
                         {[student.childInfo.nickname ? `"${student.childInfo.nickname}"` : null, age !== null ? `${age} yrs` : null, student.childInfo.gender].filter(Boolean).join(" · ")}
                       </div>
+                      {group.enrollments.length > 1 && (
+                        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "3px", fontWeight: "600" }}>
+                          {group.enrollments.length} enrollment records
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Program col */}
-                  <div>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", background: meta?.bg || "#f8faff", color: meta?.color || "#64748b", borderRadius: "20px", fontSize: "11px", fontWeight: "700" }}>
-                      {meta?.emoji} {meta?.label || student.programName}
-                    </span>
-                    <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>{student.classTime}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {programGroups.map(({ program, enrollment, count }) => {
+                      const meta = PROGRAM_META[program];
+                      return (
+                        <div key={program}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", background: meta?.bg || "#f8faff", color: meta?.color || "#64748b", borderRadius: "20px", fontSize: "11px", fontWeight: "700" }}>
+                            {meta?.emoji} {meta?.label || enrollment.programName}
+                          </span>
+                          <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "4px" }}>
+                            {enrollment.classTime}{count > 1 ? ` · ${count} registrations` : ""}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Parent col */}

@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { requireInternalAuth } from "@/lib/auth-guard";
+import { requireAdmin } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/students — Admin only
 export async function GET(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
 
   try {
     const { db } = await connectToDatabase();
@@ -52,8 +52,8 @@ export async function GET(request: Request) {
 
 // GET /api/students/[id] — handled separately; this also supports fetching a single student by registrationId
 export async function DELETE(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
 
   try {
     const url = new URL(request.url);
