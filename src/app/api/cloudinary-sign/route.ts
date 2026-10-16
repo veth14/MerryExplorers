@@ -11,7 +11,7 @@ cloudinary.config({
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

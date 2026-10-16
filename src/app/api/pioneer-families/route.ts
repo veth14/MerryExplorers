@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,9 @@ export async function GET() {
 
 // POST - add/update a pioneer family OR set pioneer prices
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if ("response" in auth) return auth.response;
+
   try {
     const body = await req.json();
     const { db } = await connectToDatabase();
@@ -93,6 +97,9 @@ export async function POST(req: NextRequest) {
 
 // DELETE - remove a pioneer family by id
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if ("response" in auth) return auth.response;
+
   try {
     const id = req.nextUrl.searchParams.get("id");
     if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });

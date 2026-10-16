@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { deleteB2File } from "@/lib/b2";
+import { requireAdmin } from "@/lib/auth-guard";
 
 /**
  * POST /api/parents/study-materials
@@ -16,6 +17,9 @@ import { deleteB2File } from "@/lib/b2";
  * on demand via GET /api/files/download-url.
  */
 export async function POST(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const body = await request.json();
     const { uid, title, url, key, type, contentType, size } = body;
@@ -56,12 +60,15 @@ export async function POST(request: Request) {
 
     const account = await db.collection("accounts").findOne({ _id: uid as any });
     return NextResponse.json({ success: true, studyMaterials: account?.studyMaterials || [] });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to add material" }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { uid, materialId } = await request.json();
     if (!uid || !materialId) {

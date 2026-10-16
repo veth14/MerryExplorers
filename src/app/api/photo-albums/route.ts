@@ -55,7 +55,7 @@ function getTrailblazerExpiry(now = new Date()): Date {
 
 // GET /api/photo-albums — Admin only, list all albums
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
 
 // POST /api/photo-albums — Admin only, create album + upload photos
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
 
 // PATCH /api/photo-albums — Admin only, edit date / note / photos
 export async function PATCH(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -307,7 +307,7 @@ export async function PATCH(request: Request) {
 
 // DELETE /api/photo-albums?id=... — Admin only
 export async function DELETE(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

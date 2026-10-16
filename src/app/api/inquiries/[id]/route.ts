@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import nodemailer from "nodemailer";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { id } = await params;
     const data = await request.json();
@@ -20,7 +24,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { id } = await params;
     const { db } = await connectToDatabase();
@@ -35,6 +42,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
 /** POST — Admin sends a reply email to the client */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { id } = await params;
     const { replyMessage } = await request.json();
@@ -175,6 +185,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
 /** PUT — Admin manually logs a client follow-up message they received outside the system */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { id } = await params;
     const { clientMessage } = await request.json();
@@ -201,7 +214,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     );
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to log client reply" }, { status: 500 });
   }
 }

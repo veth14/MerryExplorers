@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { getAuthenticatedUser } from "@/lib/auth-guard";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -7,6 +8,12 @@ export async function GET(request: Request) {
 
   if (!uid) {
     return NextResponse.json({ error: "UID required" }, { status: 400 });
+  }
+
+  const auth = await getAuthenticatedUser(request);
+  if (auth instanceof NextResponse) return auth;
+  if (auth.uid !== uid) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {

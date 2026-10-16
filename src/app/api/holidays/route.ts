@@ -19,7 +19,7 @@ interface NagerHoliday {
 
 // GET /api/holidays?year=YYYY — list seeded holidays for a year
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
 // POST /api/holidays/seed?year=YYYY — fetch from Nager.Date and upsert into suspended_days
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

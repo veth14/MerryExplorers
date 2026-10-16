@@ -167,7 +167,7 @@ function buildEmailHtml({
 
 // POST /api/photo-albums/send-email — Admin only
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

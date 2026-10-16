@@ -12,7 +12,7 @@ export const maxDuration = 60; // Allow more time for upload
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

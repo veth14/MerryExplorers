@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { uid } = await request.json();
     if (!uid) return NextResponse.json({ error: "uid required" }, { status: 400 });
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to end session" }, { status: 500 });
   }
 }

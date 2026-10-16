@@ -23,6 +23,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Attach a current Firebase ID token to same-origin API calls made from a
+  // signed-in portal. Route handlers verify this token server-side.
+  useEffect(() => {
+    const nativeFetch = window.fetch.bind(window);
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(
+        typeof input === "string" || input instanceof URL ? input.toString() : input.url,
+        window.location.origin
+      );
+
+      if (url.origin !== window.location.origin || !url.pathname.startsWith("/api/")) {
+        return nativeFetch(input, init);
+      }
+
+      await auth.authStateReady();
+      const currentUser = auth.currentUser;
+      if (!currentUser) return nativeFetch(input, init);
+
+      const headers = new Headers(
+        init?.headers ?? (input instanceof Request ? input.headers : undefined)
+      );
+      headers.set("Authorization", `Bearer ${await currentUser.getIdToken()}`);
+
+      return nativeFetch(input, { ...init, headers });
+    };
+
+    return () => {
+      window.fetch = nativeFetch;
+    };
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
       setUser(currUser);
@@ -35,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const profile = await res.json();
             setUserProfile(profile);
           }
-        } catch (e) {
+        } catch {
           console.error("Failed to load user profile");
         }
       } else {

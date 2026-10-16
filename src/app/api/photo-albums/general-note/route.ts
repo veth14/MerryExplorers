@@ -1,6 +1,7 @@
 // Save as: app/api/photo-albums/general-note/route.ts
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireAdmin } from "@/lib/auth-guard";
 
 const COLLECTION = "settings";
 const LEGACY_ID = "photoAlbumGeneralNote"; // the single note saved by the first version
@@ -42,9 +43,11 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+    const auth = await requireAdmin(req);
+    if ("response" in auth) return auth.response;
+
     try {
         const { scope, note, actorUid, actorName } = await req.json();
-        // TODO (recommended): verify the caller is an admin, same as your other routes.
         if (!SCOPES.includes(scope)) {
             return NextResponse.json({ success: false, error: "Invalid program" }, { status: 400 });
         }

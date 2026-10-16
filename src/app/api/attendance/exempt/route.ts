@@ -6,7 +6,7 @@ import { computeTimeInStatus } from "@/lib/attendance-rules";
 // POST /api/attendance/exempt
 // Toggles the exemption status for a specific teacher on a specific date.
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

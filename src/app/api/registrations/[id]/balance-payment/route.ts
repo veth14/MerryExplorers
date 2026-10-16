@@ -42,7 +42,7 @@ function statusMessage(status: string): string {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const deny = requireInternalAuth(request);
+    const deny = await requireInternalAuth(request);
     if (deny) return deny;
 
     const { id } = await params;

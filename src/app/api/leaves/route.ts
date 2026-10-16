@@ -4,7 +4,7 @@ import { requireInternalAuth } from "@/lib/auth-guard";
 
 // GET /api/leaves - get all leave requests
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
 // POST /api/leaves - submit a leave request (called from teacher-card)
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const data = await request.json();

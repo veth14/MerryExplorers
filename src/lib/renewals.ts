@@ -1,5 +1,6 @@
 import type { Db } from "mongodb";
 import { PROGRAM_SLOTS } from "@/data/landing";
+import { requireAdmin } from "@/lib/auth-guard";
 
 // ---------------------------------------------------------------------------
 // Shared config: ONE place for values both GET and PATCH depend on
@@ -14,11 +15,11 @@ export const RENEWAL_STATUSES = ["reserved", "confirmed", "for_release", "releas
 export type RenewalStatus = (typeof RENEWAL_STATUSES)[number];
 
 // ---------------------------------------------------------------------------
-// Auth: single placeholder used by every renewals route.
-// TODO: replace with your real admin check. Must FAIL CLOSED in production.
+// Auth shared by the legacy renewal endpoints.
 // ---------------------------------------------------------------------------
-export async function isAdmin(_request: Request): Promise<boolean> {
-    return true;
+export async function isAdmin(request: Request): Promise<boolean> {
+    const auth = await requireAdmin(request);
+    return !("response" in auth);
 }
 
 // ---------------------------------------------------------------------------

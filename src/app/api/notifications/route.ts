@@ -4,7 +4,7 @@ import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
  * Marks specific notification IDs (or ALL if ids omitted) as read for that user.
  */
 export async function PATCH(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const body = await request.json();

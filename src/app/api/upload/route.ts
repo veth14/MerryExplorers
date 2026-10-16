@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireRoles } from "@/lib/auth-guard";
 
 const BUCKET = process.env.B2_BUCKET_NAME || "merry-explorers-files";
 
@@ -38,6 +39,9 @@ function getS3Client(): S3Client {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireRoles(request, ["parent", "admin", "developer", "executive assistant"]);
+  if ("response" in auth) return auth.response;
+
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -46,6 +50,11 @@ export async function POST(request: Request) {
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    const isAdmin = ["admin", "developer", "executive assistant"].includes(auth.user.role ?? "");
+    if (!isAdmin && folder !== `submissions/${auth.user.uid}`) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Build a deterministic, filesystem-safe key
@@ -72,6 +81,9 @@ export async function POST(request: Request) {
 
     // Persist only the key + metadata in MongoDB, never a public URL.
     if (uid) {
+      if (!isAdmin && uid !== auth.user.uid) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       const { db } = await connectToDatabase();
       const newMaterial = {
         id: crypto.randomUUID(),

@@ -6,7 +6,7 @@ import { requireInternalAuth } from "@/lib/auth-guard";
 // Returns audit log entries, sorted newest first.
 // Optional: ?limit=50&category=announcement
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
 // POST /api/audit-log  — internal helper used by other API routes to write entries
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const data = await request.json();

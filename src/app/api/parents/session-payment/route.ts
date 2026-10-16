@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { sendPaymentSubmittedEmail, sendPaymentVerifiedEmail } from "@/lib/virtual-session-emails";
+import { requireAdmin, requireParent, requireRoles } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ export async function POST(request: Request) {
     if (!uid || !paymentMethod || !receiptBase64) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const auth = await requireParent(request, uid);
+    if ("response" in auth) return auth.response;
 
     // Parents can pay any amount, but it has to be a real positive number.
     const amount = Math.round(Number(amountPaid) * 100) / 100;
@@ -70,6 +74,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "uid is required" }, { status: 400 });
     }
 
+    const auth = await requireRoles(request, ["parent", "admin", "developer", "executive assistant"]);
+    if ("response" in auth) return auth.response;
+    const isAdmin = ["admin", "developer", "executive assistant"].includes(auth.user.role ?? "");
+    if (!isAdmin && auth.user.uid !== uid) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { db } = await connectToDatabase();
     const account = await db.collection("accounts").findOne({ _id: uid as any });
 
@@ -85,6 +96,9 @@ export async function GET(request: Request) {
 
 // PATCH — Admin verifies or rejects a session payment
 export async function PATCH(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const data = await request.json();
     const { uid, paymentId, action, adminNote } = data;

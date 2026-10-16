@@ -3,6 +3,7 @@ import type { GetObjectCommandInput } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireRoles } from "@/lib/auth-guard";
 
 const BUCKET = process.env.B2_BUCKET_NAME || "merry-explorers-files";
 const EXPIRES_IN = 300; // 5 minutes
@@ -40,15 +41,22 @@ function getS3Client(): S3Client {
  * so the browser saves the file directly without opening a new tab.
  */
 export async function GET(request: Request) {
+  const auth = await requireRoles(request, ["parent", "admin", "developer", "executive assistant"]);
+  if ("response" in auth) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const uid           = searchParams.get("uid");
     const materialId    = searchParams.get("materialId");
     const submissionKey = searchParams.get("submissionKey");
     const asDownload    = searchParams.get("download") === "1";
+    const isAdmin = ["admin", "developer", "executive assistant"].includes(auth.user.role ?? "");
 
     // ── Shortcut: admin requesting a submission file directly by its B2 key ──
     if (submissionKey) {
+      if (!isAdmin || !submissionKey.startsWith("submissions/") || submissionKey.includes("..")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       const s3 = getS3Client();
       const cmd: GetObjectCommandInput = { Bucket: BUCKET, Key: submissionKey };
       if (asDownload) {
@@ -63,6 +71,10 @@ export async function GET(request: Request) {
         { error: "uid and materialId are required" },
         { status: 400 }
       );
+    }
+
+    if (!isAdmin && auth.user.uid !== uid) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { db } = await connectToDatabase();

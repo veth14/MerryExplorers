@@ -177,7 +177,7 @@ function buildEmailHtml(p: {
 // Only call this AFTER the payment was saved. For balance payments pass the numbers the
 // balance-payment route returned (balanceAfter etc.), not numbers computed in the browser.
 export async function POST(request: Request) {
-    const deny = requireInternalAuth(request);
+    const deny = await requireInternalAuth(request);
     if (deny) return deny;
 
     try {

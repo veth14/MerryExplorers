@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { computeAdventureBadge } from "@/lib/adventure-badge";
+import { requireAdmin } from "@/lib/auth-guard";
 
 const SETTINGS_KEY = "renewal_settings_v2";
 
@@ -205,6 +206,9 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if ("response" in auth) return auth.response;
+
   try {
     const body = await req.json();
     const incoming: ProgramRenewalEntry[] = body.programs ?? [];

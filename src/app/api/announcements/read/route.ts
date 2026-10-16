@@ -8,7 +8,7 @@ import { ObjectId } from "mongodb";
  * Returns the subset of the given announcement IDs that this teacher has already read.
  */
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
  * Marks a single announcement as read for this teacher (upsert — safe to call multiple times).
  */
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

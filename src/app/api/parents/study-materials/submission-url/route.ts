@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { requireRoles } from "@/lib/auth-guard";
 
 // Backblaze B2 speaks the S3 API. Use the SAME env var names as your /api/upload route.
 // Endpoint looks like: https://s3.us-west-004.backblazeb2.com  (region = us-west-004)
@@ -18,7 +19,12 @@ const BUCKET = process.env.B2_BUCKET!;
 export async function POST(req: Request) {
     const { uid, key } = await req.json();
 
-    // TODO: verify the logged-in user actually is `uid` (same auth check your other parent routes use)
+    const auth = await requireRoles(req, ["parent", "admin", "developer", "executive assistant"]);
+    if ("response" in auth) return auth.response;
+    const isAdmin = ["admin", "developer", "executive assistant"].includes(auth.user.role ?? "");
+    if (!isAdmin && auth.user.uid !== uid) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Only allow files inside this parent's own submissions folder
     if (typeof uid !== "string" || typeof key !== "string" || !key.startsWith(`submissions/${uid}/`) || key.includes("..")) {

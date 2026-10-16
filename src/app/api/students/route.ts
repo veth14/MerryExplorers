@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // GET /api/students — Admin only
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
 // GET /api/students/[id] — handled separately; this also supports fetching a single student by registrationId
 export async function DELETE(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

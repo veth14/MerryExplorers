@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireAdmin } from "@/lib/auth-guard";
 
 /**
  * GET /api/seed-payroll
@@ -7,7 +8,10 @@ import { connectToDatabase } from "@/lib/mongodb";
  * Only updates documents where the payroll fields are missing (0 or undefined).
  * Safe to run multiple times.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { db } = await connectToDatabase();
 

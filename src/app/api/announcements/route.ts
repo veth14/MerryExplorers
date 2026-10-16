@@ -9,7 +9,7 @@ import { ObjectId } from "mongodb";
 //   ?all=true   — all records (admin manage view)
 //   ?admin=true — all records + readCount + totalTeachers (admin stats view)
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
 
 // POST /api/announcements (Admin only)
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const data = await request.json();
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 
 // PUT /api/announcements (Admin only)
 export async function PUT(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const data = await request.json();
@@ -174,7 +174,7 @@ export async function PUT(request: Request) {
 
 // DELETE /api/announcements (Admin only)
 export async function DELETE(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);

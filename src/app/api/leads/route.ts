@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 // GET /api/leads — Admin only, lists all leads (newest first)
 export async function GET(request: Request) {
-    const deny = requireInternalAuth(request);
+    const deny = await requireInternalAuth(request);
     if (deny) return deny;
 
     try {
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
 
 // PATCH /api/leads — Admin only, update lead status or notes
 export async function PATCH(request: Request) {
-    const deny = requireInternalAuth(request);
+    const deny = await requireInternalAuth(request);
     if (deny) return deny;
 
     try {
@@ -241,7 +241,7 @@ export async function PATCH(request: Request) {
 
 // DELETE /api/leads — Admin only, delete a lead permanently
 export async function DELETE(request: Request) {
-    const deny = requireInternalAuth(request);
+    const deny = await requireInternalAuth(request);
     if (deny) return deny;
 
     try {

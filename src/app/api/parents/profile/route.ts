@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireParent } from "@/lib/auth-guard";
 
 export async function PATCH(request: Request) {
   try {
@@ -9,6 +10,9 @@ export async function PATCH(request: Request) {
     if (!uid) {
       return NextResponse.json({ error: "Missing uid" }, { status: 400 });
     }
+
+    const auth = await requireParent(request, uid);
+    if ("response" in auth) return auth.response;
 
     const { db } = await connectToDatabase();
 

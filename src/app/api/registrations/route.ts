@@ -15,7 +15,7 @@ cloudinary.config({
 
 // GET /api/registrations — Admin only, lists all registrations
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

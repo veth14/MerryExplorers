@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { sendSessionLinkEmail } from "@/lib/virtual-session-emails";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export async function PATCH(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const { uid, virtualSessionLink, virtualSessionTime, sendEmail } = await request.json();
     if (!uid) return NextResponse.json({ error: "uid required" }, { status: 400 });
@@ -36,7 +40,7 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to update link" }, { status: 500 });
   }
 }

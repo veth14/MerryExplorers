@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireParent } from "@/lib/auth-guard";
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +9,12 @@ export async function POST(request: Request) {
 
     if (!uid || !materialId || !key) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const auth = await requireParent(request, uid);
+    if ("response" in auth) return auth.response;
+    if (!key.startsWith(`submissions/${auth.user.uid}/`) || key.includes("..")) {
+      return NextResponse.json({ error: "Invalid submission key" }, { status: 400 });
     }
 
     const { db } = await connectToDatabase();

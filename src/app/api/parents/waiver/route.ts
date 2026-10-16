@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { v2 as cloudinary } from "cloudinary";
+import { requireParent } from "@/lib/auth-guard";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -18,6 +19,9 @@ export async function POST(request: Request) {
     if (!uid || !signature) {
       return NextResponse.json({ error: "uid and signature are required" }, { status: 400 });
     }
+
+    const auth = await requireParent(request, uid);
+    if ("response" in auth) return auth.response;
 
     let signatureUrl = signature;
     if (signature.startsWith("data:image")) {

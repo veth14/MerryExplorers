@@ -20,7 +20,7 @@ import { computeContributions } from "@/lib/contributions";
  */
 
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

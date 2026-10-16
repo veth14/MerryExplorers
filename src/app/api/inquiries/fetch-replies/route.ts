@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * Returns: { success, newReplies: number, checked: number }
  */
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

@@ -1,34 +1,120 @@
 import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
+
+export type AppRole =
+  | "admin"
+  | "developer"
+  | "executive assistant"
+  | "teacher"
+  | "lead teacher"
+  | "assistant teacher"
+  | "parent";
+
+export type AuthenticatedUser = {
+  uid: string;
+  email: string | null;
+  role: AppRole | null;
+};
+
+function unauthorized(message = "Unauthorized") {
+  return NextResponse.json({ error: message }, { status: 401 });
+}
+
+function forbidden() {
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+}
 
 /**
- * Verifies that the request carries the correct internal API secret.
- * The portal frontend must send: Authorization: Bearer <INTERNAL_API_SECRET>
- *
- * Returns null on success, or a 401 NextResponse on failure.
- *
- * Usage:
- *   const deny = requireInternalAuth(request);
- *   if (deny) return deny;
+ * Verifies a Firebase ID token supplied by an authenticated browser client.
+ * Browser-controlled cookies are deliberately not accepted as credentials.
  */
-export function requireInternalAuth(request: Request): NextResponse | null {
-  const secret = process.env.INTERNAL_API_SECRET;
+export async function getAuthenticatedUser(
+  request: Request
+): Promise<AuthenticatedUser | NextResponse> {
+  const authorization = request.headers.get("authorization");
+  const idToken = authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
 
-  // If no secret is configured (e.g. in dev without .env.local), skip the guard
-  if (!secret) {
-    console.warn("[auth-guard] INTERNAL_API_SECRET is not set — skipping auth check");
-    return null;
+  if (!idToken) return unauthorized();
+
+  try {
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (!apiKey) {
+      console.error("[auth-guard] Firebase API key is not configured");
+      return unauthorized("Authentication is not configured");
+    }
+
+    // Firebase validates the token's signature and expiry before returning the
+    // account. The web API key identifies the Firebase project; it cannot turn
+    // an arbitrary string into a valid ID token.
+    const verification = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+        cache: "no-store",
+      }
+    );
+
+    if (!verification.ok) return unauthorized();
+
+    const payload = await verification.json() as {
+      users?: Array<{ localId?: string; email?: string }>;
+    };
+    const firebaseUser = payload.users?.[0];
+    if (!firebaseUser?.localId) return unauthorized();
+
+    const { db } = await connectToDatabase();
+    const account = await db.collection("accounts").findOne(
+      { _id: firebaseUser.localId as never },
+      { projection: { role: 1 } }
+    );
+
+    const role = typeof account?.role === "string"
+      ? account.role.toLowerCase() as AppRole
+      : null;
+
+    return { uid: firebaseUser.localId, email: firebaseUser.email ?? null, role };
+  } catch (error) {
+    console.error("[auth-guard] Firebase token verification failed", error);
+    return unauthorized();
   }
+}
 
-  const authHeader = request.headers.get("authorization");
-  if (authHeader && authHeader === `Bearer ${secret}`) {
-    return null;
-  }
+/**
+ * Shared guard for routes that only need an authenticated Firebase user.
+ * It intentionally rejects the old `session=active` cookie and no longer
+ * accepts an INTERNAL_API_SECRET fallback.
+ */
+export async function requireInternalAuth(request: Request): Promise<NextResponse | null> {
+  const result = await getAuthenticatedUser(request);
+  return result instanceof NextResponse ? result : null;
+}
 
-  // Allow frontend clients that have a session cookie
-  const cookieHeader = request.headers.get("cookie");
-  if (cookieHeader && cookieHeader.includes("session=")) {
-    return null;
-  }
+export async function requireRoles(
+  request: Request,
+  allowedRoles: AppRole[]
+): Promise<{ user: AuthenticatedUser } | { response: NextResponse }> {
+  const result = await getAuthenticatedUser(request);
+  if (result instanceof NextResponse) return { response: result };
+  if (!result.role || !allowedRoles.includes(result.role)) return { response: forbidden() };
+  return { user: result };
+}
 
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function requireAdmin(
+  request: Request
+): Promise<{ user: AuthenticatedUser } | { response: NextResponse }> {
+  return requireRoles(request, ["admin", "developer", "executive assistant"]);
+}
+
+export async function requireParent(
+  request: Request,
+  expectedUid?: string
+): Promise<{ user: AuthenticatedUser } | { response: NextResponse }> {
+  const result = await requireRoles(request, ["parent"]);
+  if ("response" in result) return result;
+  if (expectedUid && result.user.uid !== expectedUid) return { response: forbidden() };
+  return result;
 }

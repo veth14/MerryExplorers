@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { requireAdmin, requireParent } from "@/lib/auth-guard";
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,9 @@ export async function POST(request: Request) {
     if (!uid || !paymentMethod || !receiptBase64) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const auth = await requireParent(request, uid);
+    if ("response" in auth) return auth.response;
 
     const { db } = await connectToDatabase();
 
@@ -41,6 +45,9 @@ export async function POST(request: Request) {
 // ─── PATCH — Admin verifies or rejects a downpayment ─────────────────────────
 
 export async function PATCH(request: Request) {
+  const auth = await requireAdmin(request);
+  if ("response" in auth) return auth.response;
+
   try {
     const data = await request.json();
     const { uid, action, adminNote } = data; // action: "verify" | "reject"

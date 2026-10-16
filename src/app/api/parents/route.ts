@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { requireInternalAuth } from "@/lib/auth-guard";
+import { requireInternalAuth, requireRoles } from "@/lib/auth-guard";
 import * as nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
@@ -124,7 +124,7 @@ async function sendWelcomeEmail(
 // ─── POST /api/parents — Create parent Firebase + MongoDB account ─────────────
 
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -261,6 +261,13 @@ export async function GET(request: Request) {
 
     if (!uid) {
       return NextResponse.json({ error: "uid is required" }, { status: 400 });
+    }
+
+    const auth = await requireRoles(request, ["parent", "admin", "developer", "executive assistant"]);
+    if ("response" in auth) return auth.response;
+    const isAdmin = ["admin", "developer", "executive assistant"].includes(auth.user.role ?? "");
+    if (!isAdmin && auth.user.uid !== uid) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { db } = await connectToDatabase();

@@ -35,7 +35,7 @@ export async function GET() {
 
 // POST /api/gallery (Admin only)
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
 // PATCH /api/gallery (Admin only)
 export async function PATCH(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {
@@ -153,7 +153,7 @@ export async function PATCH(request: Request) {
 
 // DELETE /api/gallery (Admin only)
 export async function DELETE(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
 
   try {

@@ -10,7 +10,7 @@ import { computeTimeInStatus } from "@/lib/attendance-rules";
 //   ?uid=UID          — all records for a teacher (timekeeping)
 //   ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD  — date range (multi-date export)
 export async function GET(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
@@ -96,7 +96,7 @@ export async function GET(request: Request) {
 
 // POST /api/attendance (Clock in)
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const data = await request.json();
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
 
 // PUT /api/attendance (Clock out, start break, end break)
 export async function PUT(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const data = await request.json();

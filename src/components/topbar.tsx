@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { notifications as initialNotifications, notificationMeta, AppNotification, NotificationType } from "@/data/notifications";
+import { notificationMeta, AppNotification } from "@/data/notifications";
 import { useAuth } from "@/lib/auth-context";
 
 type TopbarProps = {
@@ -11,17 +11,33 @@ type TopbarProps = {
 };
 
 export function Topbar({ title, description, onMenuClick }: TopbarProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const uid = user?.uid;
   const [notifOpen, setNotifOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Firebase restores the persisted session asynchronously. Avoid issuing an
+    // unauthenticated request during that initial loading window.
+    if (loading) return;
+
+    // Notifications are only available to signed-in users.
+    if (!uid) {
+      setItems([]);
+      return;
+    }
+
+    const authenticatedUid = uid;
+
     async function fetchNotifs() {
       try {
-        const uid = user?.uid;
-        const url = uid ? `/api/notifications?userId=${uid}` : "/api/notifications";
+        const url = `/api/notifications?userId=${encodeURIComponent(authenticatedUid)}`;
         const res = await fetch(url);
+        if (!res.ok) {
+          setItems([]);
+          return;
+        }
         const json = await res.json();
         if (json.success) setItems(json.data);
       } catch (err) {
@@ -29,7 +45,7 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
       }
     }
     fetchNotifs();
-  }, [user?.uid]);
+  }, [loading, uid]);
 
   const unreadCount = items.filter((n) => !n.read).length;
 

@@ -4,7 +4,7 @@ import { requireInternalAuth } from "@/lib/auth-guard";
 
 // POST /api/attendance/suspend — Mark a date as suspended or holiday
 export async function POST(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { dateStr, reason, type } = await request.json();
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
 // DELETE /api/attendance/suspend — Undo a suspension or holiday
 export async function DELETE(request: Request) {
-  const deny = requireInternalAuth(request);
+  const deny = await requireInternalAuth(request);
   if (deny) return deny;
   try {
     const { searchParams } = new URL(request.url);
