@@ -305,7 +305,7 @@ export default function RegisterPage() {
     if (!email || !firstName) { setDuplicateRegId(null); setDuplicateChildName(""); return; }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`);
+        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}&program=${encodeURIComponent(selectedProgram || "curious-explorer")}`);
         const d = await res.json();
         if (d.exists && d.registrationId) {
           setDuplicateRegId(d.registrationId);
@@ -317,7 +317,7 @@ export default function RegisterPage() {
       } catch { /* ignore */ }
     }, 900);
     return () => clearTimeout(timer);
-  }, [parentInfo?.email, childInfo?.firstName]);
+  }, [parentInfo?.email, childInfo?.firstName, selectedProgram]);
 
   // Program renewal settings for dynamic Adventure cycle #, dates & registration open/close status
   type ProgramSetting = {

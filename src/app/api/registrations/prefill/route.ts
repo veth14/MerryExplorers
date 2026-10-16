@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 
 export const dynamic = "force-dynamic";
 
@@ -90,25 +91,24 @@ export async function GET(request: Request) {
       ? await db.collection("student_registrations").findOne({ $or: regOr })
       : null;
 
-    // Check if an active Adventure 2 registration already exists for this child / family
-    const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
-    const activeAdv2Reg = regOr.length > 0
+    // Check if an active registration already exists for the current adventure cycle.
+    const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const settings = settingsDoc?.programs || [];
+    const currentProgram = studentDoc?.program || prevReg?.program || "curious-explorer";
+    const programSetting = getProgramAdventureSetting(currentProgram, settings);
+    const adventureNumber = programSetting ? getCurrentAdventureNumber(currentProgram, settings) : 2;
+    const adventureStartDate = programSetting ? getCurrentAdventureStartDate(currentProgram, settings) : null;
+    const cycleQuery: Record<string, unknown>[] = getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
+    const activeCurrentCycleReg = regOr.length > 0
       ? await db.collection("student_registrations").findOne({
           $or: regOr,
           status: { $in: ["pending", "approved", "reserved"] },
-          $and: [
-            {
-              $or: [
-                { period: "adventure-2" },
-                { submittedAt: { $gte: ADVENTURE_2_START } },
-              ],
-            },
-          ],
+          $and: [{ $or: cycleQuery }],
         })
       : null;
 
     // Also check if familyDoc has an existing registrationId
-    let existingRegistrationId = activeAdv2Reg?._id?.toString() || null;
+    let existingRegistrationId = activeCurrentCycleReg?._id?.toString() || null;
     if (!existingRegistrationId && familyDoc?.registrationId) {
       existingRegistrationId = familyDoc.registrationId;
     }
@@ -190,7 +190,7 @@ export async function GET(request: Request) {
       emergencyContact,
       alreadyRegistered: Boolean(existingRegistrationId),
       existingRegistrationId,
-      existingProgram: activeAdv2Reg?.program || null,
+      existingProgram: activeCurrentCycleReg?.program || null,
     };
 
     return NextResponse.json({ success: true, data: prefillData });

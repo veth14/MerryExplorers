@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { PROGRAM_SLOTS } from "@/data/landing";
+import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +12,8 @@ const TESTING_EMAILS = ["iangelovalmores@gmail.com", "ian.valmores@gmail.com"];
 export async function GET() {
   try {
     const { db } = await connectToDatabase();
-
-    // Only count registrations from Adventure 2 onward
-    const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
+    const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const settings = settingsDoc?.programs || [];
     const now = new Date();
 
     const result: Record<string, Record<string, { maxSlots: number; taken: number; available: number }>> = {};
@@ -26,21 +26,29 @@ export async function GET() {
           ? cls.name.replace("Session", "Class")
           : cls.name.replace("Class", "Session");
 
+        const adventureSetting = getProgramAdventureSetting(programId, settings);
+        const adventureNumber = adventureSetting ? getCurrentAdventureNumber(programId, settings) : null;
+        const adventureStartDate = adventureSetting ? getCurrentAdventureStartDate(programId, settings) : null;
+        const cycleQuery = adventureNumber === null
+          ? []
+          : getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
         const taken = await db.collection("student_registrations").countDocuments({
           program: programId,
           classTime: { $in: [cls.name, altName] },
           status: { $in: ["pending", "approved", "reserved"] },
-          submittedAt: { $gte: ADVENTURE_2_START },
           // Exclude testing accounts
           "parentInfo.email": { $nin: TESTING_EMAILS },
           // Exclude "reserved" slots whose hold window has already lapsed.
           // The UI marks them "⏰ Expired Slot" via isRegExpired() but the DB
           // status field may still read "reserved" until admin explicitly releases.
-          $or: [
+          $and: [
+            ...(cycleQuery.length ? [{ $or: cycleQuery }] : []),
+            { $or: [
             { status: { $in: ["pending", "approved"] } }, // non-reserved always counts
             { reservedUntil: { $exists: false } },         // no expiry set → count
             { reservedUntil: null },                       // explicit null → count
             { reservedUntil: { $gte: now } },              // deadline still in future → count
+            ] },
           ],
         });
 

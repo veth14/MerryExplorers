@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb"; // NEW
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
+import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
 
@@ -99,6 +100,22 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
 
+    const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const adventureSettings = (renewalSettingsDoc?.programs || []) as Array<{
+      programKey: string;
+      currentAdventure?: number;
+      adventureStartDate?: string | null;
+      nextAdventureStart?: string | null;
+    }>;
+    const adventureSetting = getProgramAdventureSetting(program, adventureSettings);
+    const adventureNumber = adventureSetting ? getCurrentAdventureNumber(program, adventureSettings) : null;
+    const adventureStartDate = adventureSetting
+      ? getCurrentAdventureStartDate(program, adventureSettings)
+      : null;
+    const cycleQuery: Record<string, unknown>[] = adventureNumber === null
+      ? []
+      : getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
+
     // Check slot availability
     const programConfig: Record<string, { classes: Record<string, number> }> = {
       "curious-explorer": {
@@ -131,9 +148,6 @@ export async function POST(request: Request) {
       },
     };
 
-    // Adventure 2 start — only count registrations from this cycle onward
-    const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
-
     const maxSlots = programConfig[program]?.classes[classTime];
     if (maxSlots !== undefined) {
       const altClassTime = classTime.includes("Session")
@@ -144,13 +158,15 @@ export async function POST(request: Request) {
         program,
         classTime: { $in: [classTime, altClassTime] },
         status: { $in: ["pending", "approved", "reserved"] },
-        submittedAt: { $gte: ADVENTURE_2_START },
         "parentInfo.email": { $nin: ["vianangelo.14@gmail.com", "valmores.ianangelo00@gmail.com"] },
-        $or: [
+        $and: [
+          ...(cycleQuery.length ? [{ $or: cycleQuery }] : []),
+          { $or: [
           { status: { $in: ["pending", "approved"] } },
           { reservedUntil: { $exists: false } },
           { reservedUntil: null },
           { reservedUntil: { $gte: now } },
+          ] },
         ],
       });
       if (takenSlots >= maxSlots) {
@@ -167,13 +183,13 @@ export async function POST(request: Request) {
       const existing = await db.collection("student_registrations").findOne({
         "parentInfo.email": { $regex: new RegExp(`^${emailForDupe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
         "childInfo.firstName": { $regex: new RegExp(`^${childFirstForDupe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-        period: "adventure-2",
+        ...(cycleQuery.length ? { $or: cycleQuery } : {}),
         status: { $in: ["pending", "approved", "reserved"] },
       });
       if (existing) {
         const existingId = existing._id.toString();
         return NextResponse.json({
-          error: `${childFirstForDupe} already has an active registration for Adventure 2. If you submitted the renewal form, please check your email for a payment reminder link, or visit: /register/payment/${existingId}`,
+          error: `${childFirstForDupe} already has an active registration for Adventure ${adventureNumber ?? 2}. If you submitted the renewal form, please check your email for a payment reminder link, or visit: /register/payment/${existingId}`,
           duplicateRegistrationId: existingId,
         }, { status: 409 });
       }
@@ -250,7 +266,7 @@ export async function POST(request: Request) {
           ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)"
           : "",
       submittedAt: new Date(),
-      period: "adventure-2",
+      ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}`, adventureStartDate } : {}),
       approvedAt: isScholar ? new Date() : null,
       approvedBy: isScholar ? "system (scholar code: A1JesusLovesMe2026)" : null,
       confirmationEmailSent: false,
@@ -319,7 +335,6 @@ export async function POST(request: Request) {
     if (parentInfo?.email) {
       try {
         // Fetch program configuration & adventure start date
-        const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
         const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
 
         const programKeyMap: Record<string, string> = {
@@ -339,10 +354,7 @@ export async function POST(request: Request) {
         ) || storedPrograms[0];
 
         const isAdvProg = !["ballet", "virtual-session"].includes(program);
-        const periodNumMatch = (newRegistration.period || "").match(/adventure\s*[-_]?\s*(\d+)/i);
-        const advNum = periodNumMatch
-          ? parseInt(periodNumMatch[1], 10)
-          : (matchedProg?.nextAdventureStart ? ((matchedProg.currentAdventure ?? 1) + 1) : 2);
+        const advNum = adventureNumber ?? 2;
         const advLabel = isAdvProg ? `Adventure ${advNum}` : readableProgramName;
         const advStartDateStr = (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
           ? new Date(matchedProg.nextAdventureStart || matchedProg.adventureStartDate!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })

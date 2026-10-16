@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
+import { getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting, getRegistrationAdventureNumber } from "@/lib/adventure-cycle";
 import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +95,22 @@ export async function POST(
       return NextResponse.json({ error: "Already approved" }, { status: 409 });
     }
 
+    const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const adventureSettings = settingsDoc?.programs || [];
+    const adventureSetting = getProgramAdventureSetting(registration.program, adventureSettings);
+    const adventureNumber = adventureSetting
+      ? getRegistrationAdventureNumber({
+          adventureNumber: registration.adventureNumber,
+          period: registration.period,
+          submittedAt: registration.submittedAt,
+        }, registration.program, adventureSettings)
+      : null;
+    const adventureStartDate = registration.adventureStartDate || (
+      adventureSetting && adventureNumber === getCurrentAdventureNumber(registration.program, adventureSettings)
+        ? getCurrentAdventureStartDate(registration.program, adventureSettings)
+        : null
+    );
+
     // Update status
     await db.collection("student_registrations").updateOne(
       { _id: new ObjectId(id) },
@@ -116,6 +133,8 @@ export async function POST(
       emergencyContact: emergencyContact || {},
       program,
       classTime,
+      adventureNumber,
+      adventureStartDate,
       programName: PROGRAM_NAMES[program] || program,
       schedule: PROGRAM_SCHEDULES[program] || "",
       uniformOrdered: uniformOrdered || false,

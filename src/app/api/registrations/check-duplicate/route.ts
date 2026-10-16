@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 
 export const dynamic = "force-dynamic";
-
-const ADVENTURE_2_START = new Date("2026-10-12T00:00:00+08:00");
 
 // GET /api/registrations/check-duplicate?email=...&firstName=...
 export async function GET(request: Request) {
@@ -12,33 +11,35 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const email = (searchParams.get("email") || "").toLowerCase().trim();
     const firstName = (searchParams.get("firstName") || "").trim();
+    const program = searchParams.get("program") || "curious-explorer";
 
     if (!email || !firstName) {
       return NextResponse.json({ exists: false });
     }
 
     const { db } = await connectToDatabase();
+    const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const settings = settingsDoc?.programs || [];
+    const programSetting = getProgramAdventureSetting(program, settings);
+    const adventureNumber = programSetting ? getCurrentAdventureNumber(program, settings) : 2;
+    const adventureStartDate = programSetting ? getCurrentAdventureStartDate(program, settings) : null;
+    const cycleQuery: Record<string, unknown>[] = getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
 
     // Escape regex special chars
     const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const firstWord = firstName.split(/\s+/)[0];
 
-    // 1. Check student_registrations for Adventure 2
+    // 1. Check student_registrations for the current adventure cycle
     const regQuery: any = {
       "parentInfo.email": { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
-      $or: [
-        { "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstName)}$`, "i") } },
-        { "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstWord)}`, "i") } },
+      $and: [
+        { $or: [
+          { "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstName)}$`, "i") } },
+          { "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstWord)}`, "i") } },
+        ] },
+        { $or: cycleQuery },
       ],
       status: { $in: ["pending", "approved", "reserved"] },
-      $and: [
-        {
-          $or: [
-            { period: "adventure-2" },
-            { submittedAt: { $gte: ADVENTURE_2_START } },
-          ],
-        },
-      ],
     };
 
     const existingReg = await db.collection("student_registrations").findOne(regQuery);

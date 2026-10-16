@@ -13,6 +13,12 @@ interface Student {
   programName: string;
   classTime: string;
   schedule: string;
+  adventureNumber?: number | null;
+  adventureStartDate?: string | null;
+  activeAdventureNumber?: number | null;
+  upcomingAdventureNumber?: number | null;
+  previousAdventureNumber?: number | null;
+  upcomingAdventureStartDate?: string | null;
   childInfo: { firstName: string; lastName: string; nickname?: string; gender?: string; dateOfBirth?: string };
   parentInfo: { name: string; email: string; phone: string; relationship?: string };
   enrolledAt: string;
@@ -23,13 +29,14 @@ const PROGRAM_META: Record<string, { color: string; bg: string; label: string; e
   "curious-explorer": { color: "#b45309", bg: "#fffbeb", label: "Curious Explorer", emoji: "🔎" },
   "creative-explorer": { color: "#1d4ed8", bg: "#eff6ff", label: "Creative Explorer", emoji: "🎨" },
   "everyday-explorer": { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Explorer", emoji: "🌈" },
+  "everyday-curious": { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Explorer", emoji: "🌈" },
   "brave-explorer": { color: "#047857", bg: "#f0fdf4", label: "Brave Explorer", emoji: "💡" },
 };
 
 const FILTERS = [
   { id: "all", label: "All Programs" },
   { id: "curious-explorer", label: "Curious Explorer" },
-  { id: "everyday-explorer", label: "Everyday Explorer" },
+  { id: "everyday-curious", label: "Everyday Explorer" },
   { id: "creative-explorer", label: "Creative Explorer" },
   { id: "brave-explorer", label: "Brave Explorer" },
 ];
@@ -71,9 +78,35 @@ function getStudentGroupKey(student: Student) {
   return `${familyIdentity}|${childName}|${dateOfBirth}`;
 }
 
-function getEnrollmentTime(student: Student) {
+function getRegistrationTime(student: Student) {
   const time = new Date(student.enrolledAt).getTime();
   return Number.isFinite(time) ? time : 0;
+}
+
+function getAdventureKey(program: string) {
+  return program === "everyday-explorer" ? "everyday-curious" : program;
+}
+
+function formatRegistrationDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function AdventureCell({ student, fallback, startDate }: { student?: Student; fallback: string; startDate?: string | null }) {
+  if (!student) {
+    return <div style={{ fontSize: "12px", color: "#94a3b8" }}>{fallback}</div>;
+  }
+
+  const meta = PROGRAM_META[getAdventureKey(student.program)];
+  return (
+    <div>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", background: meta?.bg || "#f8faff", color: meta?.color || "#64748b", borderRadius: "20px", fontSize: "11px", fontWeight: "700" }}>
+        {student.adventureNumber ? `Adventure ${student.adventureNumber} · ` : ""}{meta?.emoji} {meta?.label || student.programName}
+      </span>
+      <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px" }}>{student.classTime || "Class time not set"}</div>
+      {startDate && <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>Starts {formatRegistrationDate(startDate)}</div>}
+      <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px" }}>Registered {formatRegistrationDate(student.enrolledAt)}</div>
+    </div>
+  );
 }
 
 const AVATAR_COLORS = [
@@ -136,18 +169,18 @@ export default function AdminStudentsPage() {
     const groups = new Map<string, Student[]>();
     for (const student of students) {
       const key = getStudentGroupKey(student);
-      const enrollments = groups.get(key) || [];
-      enrollments.push(student);
-      groups.set(key, enrollments);
+      const registrations = groups.get(key) || [];
+      registrations.push(student);
+      groups.set(key, registrations);
     }
 
-    return Array.from(groups, ([key, enrollments]) => ({
+    return Array.from(groups, ([key, registrations]) => ({
       key,
-      enrollments: enrollments.sort((a, b) => getEnrollmentTime(b) - getEnrollmentTime(a)),
+      registrations: registrations.sort((a, b) => getRegistrationTime(b) - getRegistrationTime(a)),
     })).filter(group => {
-      const matchProgram = programFilter === "all" || group.enrollments.some(s => s.program === programFilter);
+      const matchProgram = programFilter === "all" || group.registrations.some(s => getAdventureKey(s.program) === programFilter);
       const q = search.toLowerCase();
-      const matchSearch = !q || group.enrollments.some(s =>
+      const matchSearch = !q || group.registrations.some(s =>
         `${s.childInfo.firstName} ${s.childInfo.lastName}`.toLowerCase().includes(q) ||
         s.parentInfo.name.toLowerCase().includes(q) ||
         s.programName.toLowerCase().includes(q) ||
@@ -161,20 +194,20 @@ export default function AdminStudentsPage() {
     const groups = new Map<string, Student[]>();
     for (const student of students) {
       const key = getStudentGroupKey(student);
-      const enrollments = groups.get(key) || [];
-      enrollments.push(student);
-      groups.set(key, enrollments);
+      const registrations = groups.get(key) || [];
+      registrations.push(student);
+      groups.set(key, registrations);
     }
     const explorers = Array.from(groups.values());
     return {
       total: explorers.length,
-      active: explorers.filter(enrollments => enrollments.some(s => s.status === "active")).length,
-      programs: new Set(students.map(s => s.program)).size,
-      today: explorers.filter(enrollments => enrollments.some(s => new Date(s.enrolledAt).toDateString() === new Date().toDateString())).length,
+      active: explorers.filter(registrations => registrations.some(s => s.status === "active")).length,
+      programs: new Set(students.map(s => getAdventureKey(s.program))).size,
+      today: explorers.filter(registrations => registrations.some(s => new Date(s.enrolledAt).toDateString() === new Date().toDateString())).length,
     };
   }, [students]);
 
-  const filteredEnrollmentCount = filtered.reduce((count, group) => count + group.enrollments.length, 0);
+  const filteredRegistrationCount = filtered.reduce((count, group) => count + group.registrations.length, 0);
 
   return (
     <AppShell title="Students">
@@ -229,7 +262,7 @@ export default function AdminStudentsPage() {
           })}
         </div>
         <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "#94a3b8", flexShrink: 0 }}>
-          {loading ? "Loading…" : `${filtered.length} explorers · ${filteredEnrollmentCount} enrollment records`}
+          {loading ? "Loading…" : `${filtered.length} explorers · ${filteredRegistrationCount} registration records`}
         </div>
       </div>
 
@@ -254,23 +287,40 @@ export default function AdminStudentsPage() {
       ) : (
         <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,47,118,0.06)", overflow: "hidden" }}>
           {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 1fr 56px", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
-            {["Explorer", "Program", "Parent / Guardian", "Registered", ""].map((h, i) => (
+          <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1.2fr 1.2fr 1.2fr 1.4fr 1fr 40px", padding: "12px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
+            {["Explorer", "Current Adventure", "Upcoming Adventure", "Previous Adventure", "Parent / Guardian", "Latest Registration", ""].map((h, i) => (
               <div key={i} style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px" }}>{h}</div>
             ))}
           </div>
 
           {filtered.map((group, idx) => {
-            const student = group.enrollments[0];
-            const programGroups = Array.from(
-              group.enrollments.reduce((programs, enrollment) => {
-                const existing = programs.get(enrollment.program);
-                if (existing) existing.count += 1;
-                else programs.set(enrollment.program, { enrollment, count: 1 });
-                return programs;
-              }, new Map<string, { enrollment: Student; count: number }>()),
-              ([program, value]) => ({ program, ...value })
+            const student = group.registrations[0];
+            const adventureHistory = Array.from(
+              new Map(group.registrations.map(registration => [
+                registration.adventureNumber ? `adventure-${registration.adventureNumber}` : getAdventureKey(registration.program),
+                registration,
+              ])).values()
+            ).sort((a, b) =>
+              (b.adventureNumber || 0) - (a.adventureNumber || 0) || getRegistrationTime(b) - getRegistrationTime(a)
             );
+            const adventuresByNumber = new Map(
+              group.registrations
+                .filter(registration => registration.adventureNumber)
+                .map(registration => [registration.adventureNumber!, registration])
+            );
+            const currentAdventure = student.activeAdventureNumber
+              ? adventuresByNumber.get(student.activeAdventureNumber)
+              : student.upcomingAdventureNumber
+                ? undefined
+                : adventureHistory[0];
+            const upcomingAdventure = student.upcomingAdventureNumber
+              ? adventuresByNumber.get(student.upcomingAdventureNumber)
+              : undefined;
+            const previousAdventure = student.activeAdventureNumber !== null && student.activeAdventureNumber !== undefined
+              ? student.previousAdventureNumber
+                ? adventuresByNumber.get(student.previousAdventureNumber)
+                : undefined
+              : adventureHistory.find(registration => registration !== currentAdventure && registration !== upcomingAdventure);
             const avatarGrad = AVATAR_COLORS[idx % AVATAR_COLORS.length];
             const age = getAge(student.childInfo.dateOfBirth);
 
@@ -281,7 +331,7 @@ export default function AdminStudentsPage() {
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.025 }}
-                  style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 1fr 56px", padding: "15px 24px", borderBottom: idx < filtered.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white", cursor: "pointer" }}
+                  style={{ display: "grid", gridTemplateColumns: "1.55fr 1.2fr 1.2fr 1.2fr 1.4fr 1fr 40px", padding: "15px 24px", borderBottom: idx < filtered.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white", cursor: "pointer" }}
                 >
                   {/* Explorer col */}
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -295,30 +345,22 @@ export default function AdminStudentsPage() {
                       <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
                         {[student.childInfo.nickname ? `"${student.childInfo.nickname}"` : null, age !== null ? `${age} yrs` : null, student.childInfo.gender].filter(Boolean).join(" · ")}
                       </div>
-                      {group.enrollments.length > 1 && (
+                      {group.registrations.length > 1 && (
                         <div style={{ fontSize: "10px", color: "#64748b", marginTop: "3px", fontWeight: "600" }}>
-                          {group.enrollments.length} enrollment records
+                          {group.registrations.length} registration records
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Program col */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {programGroups.map(({ program, enrollment, count }) => {
-                      const meta = PROGRAM_META[program];
-                      return (
-                        <div key={program}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", background: meta?.bg || "#f8faff", color: meta?.color || "#64748b", borderRadius: "20px", fontSize: "11px", fontWeight: "700" }}>
-                            {meta?.emoji} {meta?.label || enrollment.programName}
-                          </span>
-                          <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "4px" }}>
-                            {enrollment.classTime}{count > 1 ? ` · ${count} registrations` : ""}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* Current adventure */}
+                  <AdventureCell student={currentAdventure} fallback="No current adventure registration" startDate={currentAdventure?.adventureStartDate} />
+
+                  {/* Upcoming adventure */}
+                  <AdventureCell student={upcomingAdventure} fallback="No upcoming adventure registration" startDate={student.upcomingAdventureStartDate || upcomingAdventure?.adventureStartDate} />
+
+                  {/* Previous adventure */}
+                  <AdventureCell student={previousAdventure} fallback="No previous adventure on record" />
 
                   {/* Parent col */}
                   <div>
@@ -326,9 +368,9 @@ export default function AdminStudentsPage() {
                     <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "1px" }}>{student.parentInfo.phone || student.parentInfo.email}</div>
                   </div>
 
-                  {/* Enrolled col */}
+                  {/* Latest registration date */}
                   <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "500" }}>
-                    {new Date(student.enrolledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    {formatRegistrationDate(student.enrolledAt)}
                   </div>
 
                   {/* Arrow */}
