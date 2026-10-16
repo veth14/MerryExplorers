@@ -295,8 +295,8 @@ export const PROGRAM_SLOTS = {
     icon: "🩰",
     prerequisite: null,
     classes: [
-      { name: "Baby Ballet (Morning)", time: "9:00 AM – 10:00 AM", maxSlots: 7 },
-      { name: "Baby Ballet (Afternoon)", time: "12:30 PM – 1:30 PM", maxSlots: 7 },
+      { name: "Baby Ballet (Morning)", time: "9:00 AM – 10:00 AM", maxSlots: 6 },
+      { name: "Baby Ballet (Afternoon)", time: "12:30 PM – 1:30 PM", maxSlots: 6 },
       { name: "Basic Ballet", time: "1:45 PM – 2:45 PM", maxSlots: 8 },
     ],
     notes: [
