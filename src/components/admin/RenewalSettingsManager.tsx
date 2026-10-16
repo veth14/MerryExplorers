@@ -23,15 +23,6 @@ export const PROGRAM_CONFIG_META: Record<string, { emoji: string; color: string;
     short: "Creative Explorer",
     badge: "bg-sky-100 text-sky-900 border-sky-300",
   },
-  "Discovery Club: Everyday Curious": {
-    emoji: "🌈",
-    color: "#16a34a",
-    bg: "#f0fdf4",
-    border: "#bbf7d0",
-    gradient: "from-emerald-500/10 to-teal-500/10",
-    short: "Everyday Explorer",
-    badge: "bg-emerald-100 text-emerald-900 border-emerald-300",
-  },
   "Discovery Club: Everyday Explorer": {
     emoji: "🌈",
     color: "#16a34a",
@@ -103,7 +94,6 @@ export type RenewalSettingsData = {
 const ADVENTURE_PROGRAMS = new Set([
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
-  "Discovery Club: Everyday Curious",
   "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
@@ -115,7 +105,6 @@ const MASTER_PROGRAM = "Discovery Club: Curious Explorer";
 export const DEFAULT_PROGRAMS: string[] = [
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
-  "Discovery Club: Everyday Curious",
   "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
   "Saturday Playdate",
@@ -410,8 +399,8 @@ export function RenewalSettingsManager() {
               {liveBadge.status === "upcoming"
                 ? `⏳ Scheduled — flips to "Adventure ${liveBadge.adventureNumber} · Now Ongoing 🎉" once ${fmtDate(liveBadge.targetDate)} arrives`
                 : liveBadge.status === "ongoing"
-                ? `✅ Active ongoing adventure cycle`
-                : `✏️ Custom override enabled`}
+                  ? `✅ Active ongoing adventure cycle`
+                  : `✏️ Custom override enabled`}
             </p>
           </div>
         </div>
@@ -560,13 +549,12 @@ export function RenewalSettingsManager() {
             return (
               <div
                 key={prog.programKey}
-                className={`rounded-3xl bg-white border-2 transition-all overflow-hidden flex flex-col justify-between ${
-                  isClosed
-                    ? "border-amber-300 shadow-sm"
-                    : isFuture
+                className={`rounded-3xl bg-white border-2 transition-all overflow-hidden flex flex-col justify-between ${isClosed
+                  ? "border-amber-300 shadow-sm"
+                  : isFuture
                     ? "border-blue-300 shadow-sm hover:shadow-md"
                     : "border-slate-200/80 shadow-sm hover:shadow-md"
-                }`}
+                  }`}
               >
                 {/* Card Header Strip */}
                 <div className={`p-5 pb-4 border-b border-slate-100 bg-gradient-to-r ${meta.gradient}`}>
@@ -589,19 +577,18 @@ export function RenewalSettingsManager() {
                             </span>
                           )}
                           <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              isClosed
-                                ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                : isFuture
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isClosed
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
+                              : isFuture
                                 ? "bg-blue-100 text-blue-900 border border-blue-300"
                                 : "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                            }`}
+                              }`}
                           >
                             {isClosed
                               ? "🔒 Registration Closed"
                               : isFuture
-                              ? `📅 Opens ${fmtDate(prog.newFamilyRegistrationOpenDate)}`
-                              : "🟢 Registration Open"}
+                                ? `📅 Opens ${fmtDate(prog.newFamilyRegistrationOpenDate)}`
+                                : "🟢 Registration Open"}
                           </span>
                         </div>
                         <h3 className="font-headline text-[17px] font-black text-[#002f76]">
@@ -623,13 +610,12 @@ export function RenewalSettingsManager() {
                               : { newFamilyRegistrationOpenDate: null }),
                           });
                         }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer shadow-xs ${
-                          isClosed
-                            ? "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
-                            : isFuture
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer shadow-xs ${isClosed
+                          ? "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
+                          : isFuture
                             ? "bg-blue-100 text-blue-900 border border-blue-300 hover:bg-blue-200"
                             : "bg-emerald-600 text-white hover:bg-emerald-700"
-                        }`}
+                          }`}
                       >
                         <span>{isClosed ? "🔒 Closed" : isFuture ? "📅 Scheduled" : "🟢 Open"}</span>
                       </button>
@@ -645,81 +631,81 @@ export function RenewalSettingsManager() {
 
                   {/* ── ADVENTURE PROGRAMS: Cycle Stepper + 2 date fields ── */}
                   {isAdventureProg && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Current Adventure Number */}
-                    <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1 text-center">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                        Current Cycle
-                      </label>
-                      <div className="flex items-center justify-center gap-1.5 pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() =>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Current Adventure Number */}
+                      <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1 text-center">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Current Cycle
+                        </label>
+                        <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateProgram(prog.programKey, {
+                                currentAdventure: Math.max(1, currentAdv - 1),
+                              })
+                            }
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100"
+                          >
+                            −
+                          </button>
+                          <span className="text-[16px] font-black text-[#002f76] px-1">
+                            Adv {currentAdv}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateProgram(prog.programKey, {
+                                currentAdventure: currentAdv + 1,
+                              })
+                            }
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Current Adventure Start Date */}
+                      <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Adv {currentAdv} Started
+                        </label>
+                        <input
+                          type="date"
+                          value={prog.adventureStartDate ? prog.adventureStartDate.slice(0, 10) : ""}
+                          onChange={(e) =>
                             updateProgram(prog.programKey, {
-                              currentAdventure: Math.max(1, currentAdv - 1),
+                              adventureStartDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
                             })
                           }
-                          className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100"
-                        >
-                          −
-                        </button>
-                        <span className="text-[16px] font-black text-[#002f76] px-1">
-                          Adv {currentAdv}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
+                          className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
+                        />
+                        <p className="text-[9.5px] text-slate-400 font-semibold truncate">
+                          {currentStartDateDisplay}
+                        </p>
+                      </div>
+
+                      {/* Next Adventure Start Date */}
+                      <div className={`rounded-2xl border-2 p-3 space-y-1 ${prog.nextAdventureStart ? "border-slate-100 bg-slate-50/60" : "border-dashed border-amber-200 bg-amber-50/40"}`}>
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Adv {nextAdv} Starts
+                        </label>
+                        <input
+                          type="date"
+                          value={prog.nextAdventureStart ? prog.nextAdventureStart.slice(0, 10) : ""}
+                          onChange={(e) =>
                             updateProgram(prog.programKey, {
-                              currentAdventure: currentAdv + 1,
+                              nextAdventureStart: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
                             })
                           }
-                          className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100"
-                        >
-                          +
-                        </button>
+                          className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
+                        />
+                        <p className={`text-[9.5px] font-semibold truncate ${prog.nextAdventureStart ? "text-slate-400" : "text-amber-500"}`}>
+                          {prog.nextAdventureStart ? nextStartDateDisplay : "⚠ Not set yet — please update"}
+                        </p>
                       </div>
                     </div>
-
-                    {/* Current Adventure Start Date */}
-                    <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                        Adv {currentAdv} Started
-                      </label>
-                      <input
-                        type="date"
-                        value={prog.adventureStartDate ? prog.adventureStartDate.slice(0, 10) : ""}
-                        onChange={(e) =>
-                          updateProgram(prog.programKey, {
-                            adventureStartDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
-                          })
-                        }
-                        className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
-                      />
-                      <p className="text-[9.5px] text-slate-400 font-semibold truncate">
-                        {currentStartDateDisplay}
-                      </p>
-                    </div>
-
-                    {/* Next Adventure Start Date */}
-                    <div className={`rounded-2xl border-2 p-3 space-y-1 ${prog.nextAdventureStart ? "border-slate-100 bg-slate-50/60" : "border-dashed border-amber-200 bg-amber-50/40"}` }>
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                        Adv {nextAdv} Starts
-                      </label>
-                      <input
-                        type="date"
-                        value={prog.nextAdventureStart ? prog.nextAdventureStart.slice(0, 10) : ""}
-                        onChange={(e) =>
-                          updateProgram(prog.programKey, {
-                            nextAdventureStart: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
-                          })
-                        }
-                        className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
-                      />
-                      <p className={`text-[9.5px] font-semibold truncate ${prog.nextAdventureStart ? "text-slate-400" : "text-amber-500"}`}>
-                        {prog.nextAdventureStart ? nextStartDateDisplay : "⚠ Not set yet — please update"}
-                      </p>
-                    </div>
-                  </div>
                   )}
 
                   {/* Curious Explorer Master Sync Helper */}
@@ -741,42 +727,42 @@ export function RenewalSettingsManager() {
 
                   {/* ── Ballet / Virtual Tutorial: simplified Start Date + Next Batch ── */}
                   {!isAdventureProg && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                        Start Date
-                      </label>
-                      <input
-                        type="date"
-                        value={prog.adventureStartDate ? prog.adventureStartDate.slice(0, 10) : ""}
-                        onChange={(e) =>
-                          updateProgram(prog.programKey, {
-                            adventureStartDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
-                          })
-                        }
-                        className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
-                      />
-                      <p className="text-[9.5px] text-slate-400 font-semibold truncate">{currentStartDateDisplay}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          value={prog.adventureStartDate ? prog.adventureStartDate.slice(0, 10) : ""}
+                          onChange={(e) =>
+                            updateProgram(prog.programKey, {
+                              adventureStartDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
+                            })
+                          }
+                          className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
+                        />
+                        <p className="text-[9.5px] text-slate-400 font-semibold truncate">{currentStartDateDisplay}</p>
+                      </div>
+                      <div className={`rounded-2xl border-2 p-3 space-y-1 ${prog.nextAdventureStart ? "border-slate-100 bg-slate-50/60" : "border-dashed border-slate-200"}`}>
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Next Batch / End Date
+                        </label>
+                        <input
+                          type="date"
+                          value={prog.nextAdventureStart ? prog.nextAdventureStart.slice(0, 10) : ""}
+                          onChange={(e) =>
+                            updateProgram(prog.programKey, {
+                              nextAdventureStart: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
+                            })
+                          }
+                          className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
+                        />
+                        <p className="text-[9.5px] text-slate-400 font-semibold truncate">
+                          {prog.nextAdventureStart ? nextStartDateDisplay : "Optional"}
+                        </p>
+                      </div>
                     </div>
-                    <div className={`rounded-2xl border-2 p-3 space-y-1 ${prog.nextAdventureStart ? "border-slate-100 bg-slate-50/60" : "border-dashed border-slate-200"}`}>
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                        Next Batch / End Date
-                      </label>
-                      <input
-                        type="date"
-                        value={prog.nextAdventureStart ? prog.nextAdventureStart.slice(0, 10) : ""}
-                        onChange={(e) =>
-                          updateProgram(prog.programKey, {
-                            nextAdventureStart: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
-                          })
-                        }
-                        className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
-                      />
-                      <p className="text-[9.5px] text-slate-400 font-semibold truncate">
-                        {prog.nextAdventureStart ? nextStartDateDisplay : "Optional"}
-                      </p>
-                    </div>
-                  </div>
                   )}
 
                   {/* Row 2: Public Registration Status & Auto-Close */}
@@ -797,11 +783,10 @@ export function RenewalSettingsManager() {
                                 : { newFamilyRegistrationOpenDate: null }),
                             });
                           }}
-                          className={`px-3 py-1 rounded-xl text-[11px] font-extrabold cursor-pointer transition-colors ${
-                            isClosed
-                              ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                              : "bg-amber-500 text-white hover:bg-amber-600"
-                          }`}
+                          className={`px-3 py-1 rounded-xl text-[11px] font-extrabold cursor-pointer transition-colors ${isClosed
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                            : "bg-amber-500 text-white hover:bg-amber-600"
+                            }`}
                         >
                           {isClosed ? "Reopen Registration" : isAdventureProg ? `Close Adventure ${currentAdv}` : `Close Registration`}
                         </button>
@@ -810,24 +795,24 @@ export function RenewalSettingsManager() {
 
                     {/* Auto-close rule — only for adventure programs */}
                     {isAdventureProg && (
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[11.5px]">
-                      <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={prog.registrationAutoCloseDays === 7}
-                          onChange={(e) =>
-                            updateProgram(prog.programKey, {
-                              registrationAutoCloseDays: e.target.checked ? 7 : null,
-                            })
-                          }
-                          className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <span>Auto-close registration 1 week (7 days) after Adventure {currentAdv} starts</span>
-                      </label>
-                      <span className="text-[10.5px] font-bold text-slate-400">
-                        {prog.registrationAutoCloseDays ? "7 days" : "Manual only"}
-                      </span>
-                    </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[11.5px]">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={prog.registrationAutoCloseDays === 7}
+                            onChange={(e) =>
+                              updateProgram(prog.programKey, {
+                                registrationAutoCloseDays: e.target.checked ? 7 : null,
+                              })
+                            }
+                            className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>Auto-close registration 1 week (7 days) after Adventure {currentAdv} starts</span>
+                        </label>
+                        <span className="text-[10.5px] font-bold text-slate-400">
+                          {prog.registrationAutoCloseDays ? "7 days" : "Manual only"}
+                        </span>
+                      </div>
                     )}
 
                     {/* New Family Registration Open Date */}
@@ -836,9 +821,8 @@ export function RenewalSettingsManager() {
                       const openDateFmt = prog.newFamilyRegistrationOpenDate ? fmtDate(prog.newFamilyRegistrationOpenDate) : null;
                       const isFuture = openDateStr ? openDateStr > new Date().toISOString().slice(0, 10) : false;
                       return (
-                        <div className={`rounded-xl border p-3 space-y-2 ${
-                          isFuture ? "border-blue-200 bg-blue-50/60" : "border-slate-200 bg-white"
-                        }`}>
+                        <div className={`rounded-xl border p-3 space-y-2 ${isFuture ? "border-blue-200 bg-blue-50/60" : "border-slate-200 bg-white"
+                          }`}>
                           <div className="flex items-center justify-between gap-2">
                             <label className="text-[10.5px] font-black uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
                               <span>📅</span> New Family Registration Opens On
@@ -941,14 +925,12 @@ export function RenewalSettingsManager() {
                         <button
                           type="button"
                           onClick={() => updateProgram(prog.programKey, { renewalOpen: prog.renewalOpen === false ? true : false })}
-                          className={`relative h-5 w-10 rounded-full transition-colors cursor-pointer ${
-                            prog.renewalOpen !== false ? "bg-emerald-500" : "bg-slate-300"
-                          }`}
+                          className={`relative h-5 w-10 rounded-full transition-colors cursor-pointer ${prog.renewalOpen !== false ? "bg-emerald-500" : "bg-slate-300"
+                            }`}
                         >
                           <span
-                            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-xs transition-transform ${
-                              prog.renewalOpen !== false ? "translate-x-5" : ""
-                            }`}
+                            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-xs transition-transform ${prog.renewalOpen !== false ? "translate-x-5" : ""
+                              }`}
                           />
                         </button>
                       </div>
@@ -969,14 +951,12 @@ export function RenewalSettingsManager() {
                           <button
                             type="button"
                             onClick={() => updateProgram(prog.programKey, { virtualLinkOpen: !prog.virtualLinkOpen })}
-                            className={`relative h-4 w-8 rounded-full transition-colors cursor-pointer ${
-                              prog.virtualLinkOpen ? "bg-emerald-500" : "bg-slate-300"
-                            }`}
+                            className={`relative h-4 w-8 rounded-full transition-colors cursor-pointer ${prog.virtualLinkOpen ? "bg-emerald-500" : "bg-slate-300"
+                              }`}
                           >
                             <span
-                              className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow-xs transition-transform ${
-                                prog.virtualLinkOpen ? "translate-x-4" : ""
-                              }`}
+                              className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow-xs transition-transform ${prog.virtualLinkOpen ? "translate-x-4" : ""
+                                }`}
                             />
                           </button>
                         </div>
