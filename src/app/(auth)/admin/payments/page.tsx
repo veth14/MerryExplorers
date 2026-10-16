@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import {
   calcRegistrationTerms,
   getStudentSessionInfo,
+  getProgramAdventureStart,
   firstInterestDate,
   isRegistrationVerified,
   fmtIsoDate,
@@ -835,9 +836,13 @@ function AdminPaymentsPageInner() {
   }, [allRegistrations, regCtx]);
   const advOf = (r: any): number => regAdvMap.get(String(r?.id)) ?? regAdventureNum(r, regCtx);
 
-  // NEW: first day of the Adventure a registration belongs to (classes can't be counted before it)
+  // First day of the Adventure a registration belongs to, from THAT PROGRAM's own dates
+  // (Programs & Registration Control). Falls back to the master program's dates.
   const advStartOf = (r: any): string | undefined => {
     const n = advOf(r);
+    const own = getProgramAdventureStart(renewalSettings, r.program, n, today);
+    if (own) return own;
+
     if (n === tl.curNum) return tl.curStart;
     if (n === tl.curNum + 1) return ADVENTURES.next.start;
     return ADVENTURES.past.find((p) => p.num === n)?.start;
@@ -1225,7 +1230,7 @@ function AdminPaymentsPageInner() {
     });
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registrations, allAccounts, tl, regAdvMap]); // CHANGED: also recalculates when the Adventure dates load
+  }, [registrations, allAccounts, tl, regAdvMap, renewalSettings, today]); // CHANGED: also recalculates when each program's own dates load // CHANGED: also recalculates when the Adventure dates load
 
   // Interest in the Encode Payment form is calculated as of the DATE THE PARENT PAID, not today.
   // Noon is used so the date can't slip a day because of timezones.

@@ -28,6 +28,15 @@ export const PROGRAM_SCHEDULE: Record<string, string> = {
 // Old name kept so any file that still imports it keeps working.
 export const PROGRAM_SCHEDULE_FALLBACK = PROGRAM_SCHEDULE;
 
+// NEW: registration `program` slug -> `programKey` used in /api/renewal-settings.
+// Each program has its OWN "Adv N Started" / "Adv N Starts" dates on the Programs page.
+export const PROGRAM_KEY_BY_SLUG: Record<string, string> = {
+    "curious-explorer": "Discovery Club: Curious Explorer",
+    "creative-explorer": "Discovery Club: Creative Explorer",
+    "everyday-explorer": "Discovery Club: Everyday Explorer",
+    "brave-explorer": "Trailblazer: Brave Explorer",
+};
+
 export const VERIFIED_REG_STATUSES = ["approved", "early-bird", "active", "scholar"];
 export const isRegistrationVerified = (status?: string) => VERIFIED_REG_STATUSES.includes(status || "");
 
@@ -40,11 +49,11 @@ export function fmtIsoDate(iso: string) {
     return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// How many Mondays have passed since the due date (the due day itself doesn't count).
+// How many Mondays have passed from the due date onward.
+// A due date that falls on a Monday counts as the first interest Monday.
 // `now` is the "as of" moment: today by default, or the date the parent actually paid.
 export function countMondaysAfter(dueIso: string, now = new Date()) {
     const d = new Date(dueIso + "T00:00:00");
-    d.setDate(d.getDate() + 1);
     let count = 0;
     while (d <= now) {
         if (d.getDay() === 1) count++;
@@ -82,10 +91,9 @@ export function getRegistrationItems(reg: any): FeeItem[] {
     return items;
 }
 
-// First Monday strictly after the due date: the day the first 4% is charged ("YYYY-MM-DD")
+// First Monday on or after the due date: the day the first 4% is charged ("YYYY-MM-DD")
 export function firstInterestDate(dueIso: string): string {
     const d = new Date(dueIso + "T00:00:00");
-    d.setDate(d.getDate() + 1);
     while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -98,26 +106,60 @@ export function getRegistrationTotal(reg: any, fallback?: number): number | unde
     return items.reduce((sum, i) => sum + i.amount, 0);
 }
 
-// CHANGED: new optional 3rd parameter `adventureStart`.
+// NEW: the start date of Adventure `advNum` for ONE program, read from that program's own
+// entry in /api/renewal-settings (the same data as the Programs & Registration Control page).
+//   settings   = the `programs` array returned by /api/renewal-settings
+//   programSlug = reg.program (e.g. "brave-explorer")
+//   advNum     = which Adventure the registration belongs to
+//   todayIso   = "YYYY-MM-DD" (Manila date is best)
+// Returns undefined when the program has no saved date, so the caller can fall back.
+export function getProgramAdventureStart(
+    settings: any[] | undefined | null,
+    programSlug: string | undefined,
+    advNum: number,
+    todayIso: string
+): string | undefined {
+    if (!settings || !programSlug) return undefined;
+    const key = PROGRAM_KEY_BY_SLUG[programSlug];
+    const entry = key ? settings.find((p) => p?.programKey === key) : undefined;
+    if (!entry) return undefined;
+
+    const day = (v: any) => (v ? String(v).slice(0, 10) : null);
+    let cur = Math.floor(Number(entry.currentAdventure)) || 1;
+    let curStart = day(entry.adventureStartDate);
+    let nextStart = day(entry.nextAdventureStart);
+
+    // The settings route rolls the cycle when the next start date arrives, but only when it is called.
+    // Do the same roll here so the switch still happens on a page that stays open.
+    if (nextStart && todayIso >= nextStart) {
+        cur += 1;
+        curStart = nextStart;
+        nextStart = null;
+    }
+
+    if (advNum === cur && curStart) return curStart;
+    if (advNum === cur + 1 && nextStart) return nextStart;
+    return undefined;
+}
+
 // Enrolled date + schedule for a student. `account` is the parent account / profile.
 // `adventureStart` ("YYYY-MM-DD") = first day of the Adventure this registration belongs to.
-// Sessions are never counted before it, so a family that pays early is not charged for
-// sessions that have not happened yet.
-// The schedule comes from the PROGRAM first (PROGRAM_SCHEDULE above). Only programs that
-// are not in that list fall back to whatever is saved on the student / account.
+//
+// CHANGED: the approval date (reg.approvedAt) is no longer used when an adventureStart is given.
+// Approval is just the day an admin clicked Verify, so it must not push the 6th-session due date later.
+//   - explicit studentInfo.enrolledAt later than the Adventure start -> a real late joiner, kept as is
+//   - no enrolledAt, or one before the Adventure start               -> the Adventure start date
+// Without an adventureStart (older callers) the old behavior is kept: enrolledAt, else approvedAt.
 export function getStudentSessionInfo(reg: any, account?: any, adventureStart?: string) {
     const info = account?.studentInfo;
-    let enrolledAt: string | undefined = info?.enrolledAt || reg?.approvedAt;
+    let enrolledAt: string | undefined = info?.enrolledAt || (adventureStart ? undefined : reg?.approvedAt);
     const schedule: string =
         PROGRAM_SCHEDULE[reg?.program] || info?.schedule || account?.schedule || (PROGRAM_SLOTS as any)?.[reg?.program]?.schedule || "";
     const classTime: string = info?.classTime || account?.classTime || reg?.classTime || "";
 
     if (adventureStart) {
         const base = enrolledAt ? String(enrolledAt).slice(0, 10) : null;
-        const d = new Date();
-        const todayIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        if (base && base < adventureStart) enrolledAt = adventureStart;           // approved before classes started
-        else if (!base && adventureStart > todayIso) enrolledAt = adventureStart; // still pending, Adventure not started yet
+        if (!base || base < adventureStart) enrolledAt = adventureStart;
     }
     return { enrolledAt, schedule, classTime };
 }
