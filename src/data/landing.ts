@@ -286,7 +286,7 @@ export const PROGRAM_SLOTS = {
     ageRange: "Ages 3 – 12",
     schedule: "Every Saturday, starts Oct 31",
     sessions: 5,
-    totalSlots: 22,
+    totalSlots: 20,
     rate: 2750,
     downpayment: 1650,
     balance: 1100,
