@@ -250,7 +250,7 @@ export async function POST(
                         <div style="background-color: #fffbea; border: 2px dashed #ffd84d; border-radius: 16px; padding: 22px 24px; margin: 0 0 20px 0;">
                           <p style="margin: 0 0 14px 0; color: #92400e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">💰 Payment Summary</p>
                           <table width="100%" cellpadding="0" cellspacing="0">
-                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Total Rate</td><td style="padding: 5px 0; color: #78350f; font-size: 14px; font-weight: 700; text-align: right;">₱${totalRate.toLocaleString()}</td></tr>
+                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Total Rate${registration.isPioneer ? " · Pioneer Family Rate" : ""}</td><td style="padding: 5px 0; color: #78350f; font-size: 14px; font-weight: 700; text-align: right;">₱${totalRate.toLocaleString()}</td></tr>
                             <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Amount Paid</td><td style="padding: 5px 0; color: #16a34a; font-size: 14px; font-weight: 700; text-align: right;">₱${amountPaid.toLocaleString()} ✓</td></tr>
                             <tr>
                               <td style="padding: 10px 0 4px 0; color: #92400e; font-size: 13px; font-weight: 700; border-top: 1px solid #fde68a;">Remaining Balance</td>

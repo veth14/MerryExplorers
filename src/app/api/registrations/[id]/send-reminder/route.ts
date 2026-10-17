@@ -67,7 +67,7 @@ export async function POST(
             <p>Hi <strong>${parentName}</strong>,</p>
             <p>This is a friendly reminder about <strong>${childName}</strong>&apos;s registration for <strong>${programName}</strong>.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbea;border:1px dashed #ffd84d;border-radius:12px;padding:16px">
-              <tr><td style="padding:5px 0">Total rate</td><td style="text-align:right;font-weight:700">₱${total.toLocaleString()}</td></tr>
+              <tr><td style="padding:5px 0">Total rate${registration.isPioneer ? " · Pioneer Family Rate" : ""}</td><td style="text-align:right;font-weight:700">₱${total.toLocaleString()}</td></tr>
               <tr><td style="padding:5px 0">Verified amount paid</td><td style="text-align:right;color:#15803d;font-weight:700">₱${amountPaid.toLocaleString()}</td></tr>
               <tr><td style="padding:9px 0 0;border-top:1px solid #fde68a;font-weight:800">Remaining balance</td><td style="padding:9px 0 0;border-top:1px solid #fde68a;text-align:right;color:#b45309;font-weight:800">₱${balance.toLocaleString()}</td></tr>
             </table>
