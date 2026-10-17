@@ -3,6 +3,9 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
+import { allocateBalancePayment } from "@/lib/balance-payment";
+import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
+import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +54,112 @@ export async function POST(
 
     if (!registration) {
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+    }
+
+    if (data.balancePayment === true) {
+      if (!["approved", "active"].includes(registration.status)) {
+        return NextResponse.json({ error: "This registration is not ready for a balance payment. Please contact Merry Explorers for help." }, { status: 409 });
+      }
+      const amount = Math.round(Number(amountPaid) * 100) / 100;
+      const reference = String(referenceNumber || "").trim();
+      if (!["gcash", "bpi", "mari-bank"].includes(String(paymentMethod))) {
+        return NextResponse.json({ error: "Please choose a supported payment method." }, { status: 400 });
+      }
+      if (!Number.isFinite(amount) || amount <= 0 || !reference) {
+        return NextResponse.json({ error: "Enter a valid amount and payment reference number." }, { status: 400 });
+      }
+      if (typeof receiptBase64 !== "string" || !/^data:image\//.test(receiptBase64)) {
+        return NextResponse.json({ error: "Please upload a payment receipt image." }, { status: 400 });
+      }
+      if (receiptBase64.length > 2_500_000) {
+        return NextResponse.json({ error: "The receipt image is too large. Please use a smaller image." }, { status: 413 });
+      }
+
+      const existingRefs = [registration.referenceNumber, ...(registration.balancePayments || []).map((p: any) => p.referenceNumber)]
+        .filter(Boolean).map((value: string) => value.replace(/\s+/g, "").toLowerCase());
+      if (existingRefs.includes(reference.replace(/\s+/g, "").toLowerCase())) {
+        return NextResponse.json({ error: "This reference number has already been submitted for this registration." }, { status: 409 });
+      }
+      if ((registration.balancePayments || []).some((payment: any) => payment?.verified !== true && payment?.rejected !== true)) {
+        return NextResponse.json({ error: "A balance payment is already waiting for verification. Please wait for it to be reviewed before submitting another." }, { status: 409 });
+      }
+
+      const parentEmail = String(registration.parentInfo?.email || "").trim().toLowerCase();
+      const pioneerFamily = parentEmail ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail)) : null;
+      const isPioneer = Boolean(registration.isPioneer || pioneerFamily);
+      const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+      const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[registration.program]) || FALLBACK_PIONEER_RATES[registration.program];
+      const pricingRegistration = {
+        ...registration,
+        isPioneer,
+        ...(isPioneer && pioneerRate ? { customRate: pioneerRate } : {}),
+      };
+      const escapedEmail = parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const parentAccount = parentEmail
+        ? await db.collection("accounts").findOne({ email: { $regex: `^${escapedEmail}$`, $options: "i" } })
+        : null;
+      const renewalSettings = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+      const adventureStart = getRegistrationAdventureStart(renewalSettings?.programs || [], registration, getManilaTodayIso());
+      const student = getStudentSessionInfo(registration, parentAccount, adventureStart);
+      const paidVerified = isRegistrationVerified(registration.status) ? Number(registration.amountPaid || registration.amountDue || 0) : 0;
+      const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
+        + (registration.uniformOrdered ? 650 : 0);
+      const terms = calcRegistrationTerms(pricingRegistration, student, paidVerified, fallbackTotal);
+      if (data.expectedTotalPayable != null && terms.totalPayable != null && Math.abs(Number(data.expectedTotalPayable) - terms.totalPayable) > 0.01) {
+        return NextResponse.json({ error: "The balance changed while you were preparing this payment. Refresh this page to see the latest amount." }, { status: 409 });
+      }
+      const allocation = allocateBalancePayment(terms, amount, false);
+      if (!allocation.ok) return NextResponse.json({ error: allocation.error || "This payment amount cannot be applied to the current balance." }, { status: 400 });
+
+      let receiptUrl = "";
+      let receiptPublicId = "";
+      try {
+        const uploaded = await cloudinary.uploader.upload(receiptBase64, { folder: "merry_explorers_receipts", resource_type: "image" });
+        receiptUrl = uploaded.secure_url;
+        receiptPublicId = uploaded.public_id;
+      } catch (uploadError: any) {
+        console.error("[payment balance upload] Receipt upload failed:", uploadError);
+        return NextResponse.json({ error: "Failed to upload your receipt. Please try again." }, { status: 502 });
+      }
+
+      const now = new Date();
+      const entry = {
+        id: new ObjectId().toString(),
+        amountPaid: amount,
+        paymentMethod,
+        referenceNumber: reference,
+        receiptUrl,
+        receiptPublicId,
+        paidOn: now,
+        submittedAt: now,
+        verified: false,
+        rejected: false,
+        balanceBefore: allocation.balanceBefore,
+        interestAtTime: allocation.interest,
+        totalPayableAtTime: allocation.totalPayable,
+        adminNote: "",
+      };
+      const saved = await db.collection("student_registrations").updateOne(
+        {
+          _id: new ObjectId(id),
+          status: { $in: ["approved", "active"] },
+          balancePayments: { $not: { $elemMatch: { verified: { $ne: true }, rejected: { $ne: true } } } },
+        },
+        { $push: { balancePayments: entry } as any }
+      );
+      if (!saved.matchedCount) {
+        await cloudinary.uploader.destroy(receiptPublicId).catch(() => {});
+        return NextResponse.json({ error: "A payment was submitted or this registration changed. Refresh the page and try again." }, { status: 409 });
+      }
+      await db.collection("notifications").insertOne({
+        title: "Balance Payment Receipt Submitted",
+        message: `${registration.childInfo?.firstName || "A student"} submitted a balance payment receipt for ${registration.program}.`,
+        type: "info",
+        read: false,
+        time: now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
+        createdAt: now,
+      });
+      return NextResponse.json({ success: true, balancePaymentSubmitted: true });
     }
 
     if (registration.status !== "reserved") {

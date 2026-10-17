@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
+import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import Tesseract from "tesseract.js";
@@ -164,7 +165,7 @@ export default function RegisterPage() {
   // Pioneer pricing state
   const [isPioneer, setIsPioneer] = useState<boolean>(false);
   const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
-  const [pioneerFamiliesList, setPioneerFamiliesList] = useState<Array<{ email: string; parentName?: string; childName?: string }>>([]);
+  const [pioneerFamiliesList, setPioneerFamiliesList] = useState<Array<{ email: string; email2?: string; parentName?: string; childName?: string }>>([]);
 
   // Duplicate registration detection
   const [duplicateRegId, setDuplicateRegId] = useState<string | null>(null);
@@ -265,7 +266,7 @@ export default function RegisterPage() {
     // Instant match against preloaded list
     if (pioneerFamiliesList.length > 0) {
       const matched = pioneerFamiliesList.some(
-        (f) => (f.email || "").toLowerCase().trim() === email
+        (f) => [f.email, f.email2].some((address) => (address || "").toLowerCase().trim() === email)
       );
       setIsPioneer(matched);
       if (matched) {
@@ -302,11 +303,18 @@ export default function RegisterPage() {
   useEffect(() => {
     const email = (parentInfo?.email || "").toLowerCase().trim();
     const firstName = (childInfo?.firstName || "").trim();
+    const lastName = (childInfo?.lastName || "").trim();
     if (!email || !firstName) { setDuplicateRegId(null); setDuplicateChildName(""); return; }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}&program=${encodeURIComponent(selectedProgram || "curious-explorer")}`);
+        const parentName = (parentInfo?.name || "").trim();
+        const parentPhone = (parentInfo?.phone || "").trim();
+        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&parentName=${encodeURIComponent(parentName)}&parentPhone=${encodeURIComponent(parentPhone)}&program=${encodeURIComponent(selectedProgram || "curious-explorer")}`);
         const d = await res.json();
+        if (d.isReturningFamily) {
+          setIsNewFamily(false);
+          setWelcomeKitOrdered(false);
+        }
         if (d.exists && d.registrationId) {
           setDuplicateRegId(d.registrationId);
           setDuplicateChildName(firstName);
@@ -317,7 +325,7 @@ export default function RegisterPage() {
       } catch { /* ignore */ }
     }, 900);
     return () => clearTimeout(timer);
-  }, [parentInfo?.email, childInfo?.firstName, selectedProgram]);
+  }, [parentInfo?.email, parentInfo?.name, parentInfo?.phone, childInfo?.firstName, childInfo?.lastName, selectedProgram]);
 
   // Program renewal settings for dynamic Adventure cycle #, dates & registration open/close status
   type ProgramSetting = {
@@ -489,7 +497,7 @@ export default function RegisterPage() {
     };
 
     // Do not count renewal families in leads
-    if (!isNewFamily || promoCode.trim().toUpperCase() === "A1RENEWAL2026") {
+    if (!isNewFamily) {
       return;
     }
 
@@ -1303,36 +1311,17 @@ export default function RegisterPage() {
                         <span className="text-[13px] font-black text-white uppercase tracking-wider">THIS CODE HAS BEEN ACCEPTED</span>
                       </div>
                       {/* Note body */}
-                      {promoCode.trim().replace(/^[“"']+|[”"':]+$/g, "") === "A1JesusLovesMe2026" || promoCode.trim().startsWith("A1JesusLovesMe2026") ? (
-                        <div className="p-4 space-y-2 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
-                          <p className="font-extrabold text-[13.5px] text-emerald-950 flex items-center gap-1.5">
-                            <span>🎓</span> Full Scholarship Code Applied!
-                          </p>
-                          <p>
-                            This special code grants <strong>100% sponsored tuition</strong> for your child.
-                          </p>
-                          <div className="mt-1 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-2 text-emerald-950 font-bold text-[12px] leading-snug">
-                            ✨ <strong>No payment needed.</strong> Your slot will be automatically guaranteed and confirmed upon submission.
-                          </div>
+                      <div className="p-4 space-y-2 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
+                        <p className="font-extrabold text-[13.5px] text-emerald-950 flex items-center gap-1.5">
+                          <span>🎓</span> Full Scholarship Code Applied!
+                        </p>
+                        <p>
+                          This special code grants <strong>100% sponsored tuition</strong> for your child.
+                        </p>
+                        <div className="mt-1 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-2 text-emerald-950 font-bold text-[12px] leading-snug">
+                          ✨ <strong>No payment needed.</strong> Your slot will be automatically guaranteed and confirmed upon submission.
                         </div>
-                      ) : (
-                        <div className="p-4 space-y-2.5 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
-                          <p>
-                            The code allows parents to submit the registration form and reserve a slot for their little one
-                            without immediate payment until <strong>October 15</strong>.
-                          </p>
-                          <p>
-                            However, <strong>using the code does not guarantee a confirmed reservation</strong>; slots will only
-                            be confirmed upon submission of payment.
-                          </p>
-                          <p>
-                            All families who use the code will receive a <strong>payment reminder via email</strong> by October 15.
-                          </p>
-                          <div className="mt-1 rounded-xl bg-amber-100 border border-amber-300 px-3 py-2.5 text-amber-900 font-bold text-[12px] leading-snug">
-                            ⚠️ Any unpaid reservations by <strong>October 16 at 1:00 PM</strong> will be released. Families who miss the payment deadline must submit a new registration form to reserve a slot again.
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -1477,7 +1466,9 @@ export default function RegisterPage() {
 
                 {[
                   (() => {
-                    const pioneerRate = isPioneer && pioneerPrices[prog.id] ? pioneerPrices[prog.id] : null;
+                    const pioneerRate = isPioneer
+                      ? Number(pioneerPrices[prog.id]) || FALLBACK_PIONEER_RATES[prog.id] || null
+                      : null;
                     const effectiveRate = pioneerRate ?? prog.rate;
                     const effectiveDownpayment = pioneerRate ? Math.round(pioneerRate * 0.6) : prog.downpayment;
                     const effectiveBalance = effectiveRate - effectiveDownpayment;
@@ -1538,13 +1529,10 @@ export default function RegisterPage() {
                     </table>
                   </div>
                 ))}
-
                 {promoAccepted ? (
-                  <div className="mb-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] px-5 py-4 text-[13px] text-[#0b2a82] shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-1">
-                    <p className="font-black text-[14px]">🎟️ Promo Reservation Applied:</p>
-                    <p className="text-[12.5px] font-medium text-[#3d5a99] leading-relaxed">
-                      Your slot is held today without upfront payment. To confirm your slot, a 60% non-refundable downpayment is required by <strong>October 15</strong>. All unpaid slots will be released on <strong>October 16, 1:00 PM</strong>.
-                    </p>
+                  <div className="mb-5 rounded-[22px] bg-emerald-50 border-2 border-emerald-300 px-5 py-4 text-[13px] text-emerald-900">
+                    <p className="font-black text-[14px]">🎓 Scholarship applied</p>
+                    <p className="text-[12.5px] font-medium leading-relaxed">No payment is required for this registration.</p>
                   </div>
                 ) : (
                   <div className="mb-5 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] px-5 py-4 text-[13px] text-[#0b2a82] space-y-1">

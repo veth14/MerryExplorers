@@ -1460,7 +1460,6 @@ export default function ParentDashboardPage() {
                       const programs: Record<string, number> = {
                         "Discovery Club: Curious Explorer": 8,
                         "Discovery Club: Creative Explorer": 12,
-                        "Discovery Club: Everyday Curious": 14,
                         "Discovery Club: Everyday Explorer": 14,
                         "Trailblazer: Brave Explorer": 18,
                       };

@@ -64,7 +64,7 @@ export async function GET(request: Request) {
 
     // Load pioneer families to link isPioneer flag dynamically
     const pioneerDocs = await db.collection("pioneer_families").find({}).toArray();
-    const pioneerEmails = new Set(pioneerDocs.map((p) => (p.email || "").toLowerCase().trim()).filter(Boolean));
+    const pioneerEmails = new Set(pioneerDocs.flatMap((p) => [p.email, p.email2].map((email) => (email || "").toLowerCase().trim()).filter(Boolean)));
     const pioneerChildFirsts = new Set(
       pioneerDocs
         .map((p) => (p.childName || "").toLowerCase().trim().split(/\s+/)[0])

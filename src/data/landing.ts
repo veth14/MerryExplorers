@@ -199,7 +199,7 @@ export const BALLET = {
   recital: {
     title: "2026 Ballet Recital on November 28",
     kitPrice: "₱1,500",
-    kitDetails: "Recital kit preorder starts on October 3. Inclusive of 2 guest passes, 1 mini bouquet, and 1 set of costume.",
+    kitDetails: "Includes 2 guest passes, 1 mini bouquet, and 1 set of costume.",
     note: "Recital kit is required to participate in the group themed performance.",
   },
 } as const;

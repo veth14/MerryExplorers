@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { isReturningFamilyRecord } from "@/lib/returning-family";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const email = (searchParams.get("email") || "").toLowerCase().trim();
     const firstName = (searchParams.get("firstName") || "").trim();
+    const lastName = (searchParams.get("lastName") || "").trim();
+    const parentName = (searchParams.get("parentName") || "").trim();
+    const parentPhone = (searchParams.get("parentPhone") || "").trim();
     const program = searchParams.get("program") || "curious-explorer";
 
     if (!email || !firstName) {
@@ -28,6 +32,10 @@ export async function GET(request: Request) {
     // Escape regex special chars
     const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const firstWord = firstName.split(/\s+/)[0];
+    const isReturning = await isReturningFamilyRecord(db, {
+      childInfo: { firstName, lastName },
+      parentInfo: { name: parentName, phone: parentPhone },
+    });
 
     // 1. Check student_registrations for the current adventure cycle
     const regQuery: any = {
@@ -51,6 +59,7 @@ export async function GET(request: Request) {
         childName: existingReg.childInfo?.firstName || firstName,
         program: existingReg.program,
         status: existingReg.status,
+        isReturningFamily: Boolean(isReturning || existingReg.isNewFamily === false || existingReg.isPioneer),
       });
     }
 
@@ -67,10 +76,11 @@ export async function GET(request: Request) {
         registrationId: familyMatch.registrationId,
         childName: familyMatch.childName || firstName,
         status: familyMatch.renewalStatus,
+        isReturningFamily: true,
       });
     }
 
-    return NextResponse.json({ exists: false });
+    return NextResponse.json({ exists: false, isReturningFamily: isReturning });
   } catch (error: any) {
     console.error("[check-duplicate GET]", error);
     return NextResponse.json({ exists: false, error: error.message }, { status: 500 });

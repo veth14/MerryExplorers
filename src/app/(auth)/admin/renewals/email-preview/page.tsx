@@ -4,7 +4,6 @@ import { useState } from "react";
 
 const TABS = [
     { key: "registration_preview", label: "📝 Registration Confirmation (All Programs)" },
-    { key: "promo_code", label: "📨 Promo Code Email" },
     { key: "payment_reminder", label: "⏰ Renewal Payment Reminder" },
     { key: "slot_released", label: "🔴 Slot Released Email" },
 ];
@@ -384,11 +383,6 @@ function RegistrationAllProgramsPreview() {
                         </div>
                     )}
 
-                    <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, marginTop: 20, fontSize: 12.5, color: "#475569" }}>
-                        <p style={{ margin: "0 0 4px", fontWeight: "bold" }}>⏰ Deadline Reminder:</p>
-                        <p style={{ margin: 0 }}>Unpaid reservations will be held until <strong>October 16, 2026 at 1:00 PM</strong>, after which unpaid slots will be released to the waitlist.</p>
-                    </div>
-
                     <p style={{ fontSize: 13, color: "#64748b", marginTop: 24 }}>
                         Need help? Feel free to approach Teacher Angel onsite, or reply directly to this email.
                     </p>
@@ -398,57 +392,6 @@ function RegistrationAllProgramsPreview() {
                         The Merry Explorers Team 💛
                     </p>
                 </div>
-            </div>
-        </div>
-    );
-}
-
-function PromoCodePreview() {
-    return (
-        <div style={{ fontFamily: "Arial, sans-serif", maxWidth: 600, margin: "0 auto", color: "#1e293b", lineHeight: 1.6, border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden", backgroundColor: "white" }}>
-            <div style={{ backgroundColor: "#002f76", padding: 24, textAlign: "center", color: "white" }}>
-                <h1 style={{ margin: 0, fontSize: 20, fontWeight: "bold" }}>Merry Explorers Playgroup Learning Center</h1>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#ffb800", fontWeight: "bold" }}>Priority Renewal Access</p>
-            </div>
-            <div style={{ padding: 28 }}>
-                <p>Dear <strong>Parent / Guardian</strong>,</p>
-                <p>We are excited to welcome back <strong>Child Name</strong> for our upcoming adventure!</p>
-                <p>As a valued returning family, you have priority access to reserve your slot before general registration:</p>
-
-                <div style={{ backgroundColor: "#f8fafc", border: "2px dashed #0033a0", borderRadius: 12, padding: 18, textAlign: "center", margin: "24px 0" }}>
-                    <p style={{ margin: 0, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#64748b", fontWeight: "bold" }}>Your Priority Reservation Code</p>
-                    <p style={{ margin: "6px 0 0", fontSize: 26, fontFamily: "monospace", fontWeight: 900, color: "#002f76", letterSpacing: 2 }}>A1RENEWAL2026</p>
-                </div>
-
-                <p style={{ textAlign: "center", margin: "24px 0" }}>
-                    <a href="#" style={{ backgroundColor: "#0033a0", color: "white", padding: "14px 28px", textDecoration: "none", borderRadius: 12, fontWeight: "bold", display: "inline-block" }}>
-                        Complete Registration Form →
-                    </a>
-                </p>
-
-                <div style={{ backgroundColor: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: 16, marginTop: 24, fontSize: 13, color: "#92400e" }}>
-                    <p style={{ margin: "0 0 8px", fontWeight: "bold" }}>⚠️ Key Reminders Regarding Your Reservation:</p>
-                    <ul style={{ margin: "0 0 12px", paddingLeft: 20 }}>
-                        <li>This code is <strong>not a discount voucher</strong>. It reserves your child&apos;s slot without upfront payment today.</li>
-                        <li><strong>Code validity:</strong> Valid only until <strong>October 15, 2026</strong>.</li>
-                        <li><strong>Slot release policy:</strong> All unpaid slots as of <strong>October 16, 2026 at 1:00 PM</strong> will be released.</li>
-                        <li><strong>Confirmation:</strong> Your slot is officially confirmed upon receipt of the 60% non-refundable downpayment.</li>
-                    </ul>
-                    <div style={{ borderTop: "1px dashed #fcd34d", paddingTop: 10, marginTop: 10 }}>
-                        <p style={{ margin: "0 0 4px", fontWeight: "bold", color: "#b45309" }}>⚠️ NOTE &amp; DISCLAIMER:</p>
-                        <p style={{ margin: "0 0 6px" }}>Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.</p>
-                        <p style={{ margin: 0, fontStyle: "italic", color: "#78350f" }}>
-                            &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
-                        </p>
-                    </div>
-                </div>
-
-                <p style={{ fontSize: 13, color: "#64748b", marginTop: 24 }}>
-                    If you have any questions about schedules or need help accessing the form, feel free to approach Teacher Angel onsite, or reply directly to this email.
-                </p>
-                <p style={{ marginTop: 24, fontSize: 14, color: "#002f76", fontWeight: "bold" }}>
-                    Warm regards,<br />The Merry Explorers Team 💛
-                </p>
             </div>
         </div>
     );
@@ -481,11 +424,6 @@ function PaymentReminderPreview() {
                     </p>
                 </div>
 
-                <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, marginTop: 20, fontSize: 13, color: "#475569" }}>
-                    <p style={{ margin: "0 0 4px", fontWeight: "bold" }}>⏰ Deadline Reminder:</p>
-                    <p style={{ margin: 0 }}>Unpaid reservations will be held until <strong>October 16, 2026 at 1:00 PM</strong>, after which unpaid slots will be released to the waitlist.</p>
-                </div>
-
                 <p style={{ fontSize: 13, color: "#64748b", marginTop: 24 }}>
                     Need help? Feel free to approach Teacher Angel onsite, or reply directly to this email.
                 </p>
@@ -511,7 +449,7 @@ function SlotReleasedPreview() {
                 <div style={{ backgroundColor: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 14, padding: 20, textAlign: "center", margin: "24px 0" }}>
                     <p style={{ margin: 0, fontSize: 16, color: "#991b1b", fontWeight: 800 }}>Notice of Released Slot</p>
                     <p style={{ margin: "8px 0 0", fontSize: 13, color: "#b91c1c", lineHeight: 1.5 }}>
-                        As of <strong>October 16, 2026 at 1:00 PM</strong>, our priority reservation payment deadline has officially closed. Because payment was not received or confirmed before the cutoff, your reserved slot has now been <strong>released</strong> to waitlisted families.
+                        Your reserved slot has been <strong>released</strong> to waitlisted families.
                     </p>
                 </div>
 
@@ -580,7 +518,6 @@ export default function EmailPreviewPage() {
 
             <div style={{ padding: "32px", maxWidth: 740, margin: "0 auto" }}>
                 {activeTab === "registration_preview" && <RegistrationAllProgramsPreview />}
-                {activeTab === "promo_code" && <PromoCodePreview />}
                 {activeTab === "payment_reminder" && <PaymentReminderPreview />}
                 {activeTab === "slot_released" && <SlotReleasedPreview />}
             </div>

@@ -11,6 +11,10 @@ import { getNthSessionDate } from "@/lib/sessions";
 export const RESERVATION_RATE = 0.6;
 export const WEEKLY_INTEREST_RATE = 0.04;
 export const BALANCE_DUE_SESSION = 6;
+export const FALLBACK_PIONEER_RATES: Record<string, number> = {
+    "creative-explorer": 4820,
+    "curious-explorer": 4295,
+};
 
 // Class days per program. The PROGRAM decides the schedule, so it is the same for every student.
 //  - Curious Explorer ........ Monday, Wednesday
@@ -76,7 +80,11 @@ export function getRegistrationItems(reg: any): FeeItem[] {
     const prog = reg ? PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS] : undefined;
     if (!reg || !prog) return [];
     const isPioneer = Boolean(reg.isPioneer);
-    const progRate = reg.customRate || (isPioneer && reg.program === "creative-explorer" ? 4820 : (isPioneer && reg.program === "curious-explorer" ? 4295 : prog.rate));
+    const customRate = Number(reg.customRate) || 0;
+    const pioneerFallback = FALLBACK_PIONEER_RATES[reg.program];
+    const progRate = isPioneer
+        ? (customRate && customRate !== prog.rate ? customRate : pioneerFallback || customRate || prog.rate)
+        : customRate || prog.rate;
     const items: FeeItem[] = [{ key: "program", label: isPioneer ? "Program fee (Pioneer)" : "Program fee", amount: progRate }];
 
     const welcome = !isPioneer && (on(reg.welcomeKit) || on(reg.isNewFamily) || on(reg.newFamily) || on(reg.welcomeKitOrdered));
@@ -139,6 +147,92 @@ export function getProgramAdventureStart(
 
     if (advNum === cur && curStart) return curStart;
     if (advNum === cur + 1 && nextStart) return nextStart;
+    return undefined;
+}
+
+export function getManilaTodayIso() {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+}
+
+/**
+ * Resolve the Adventure start date for a registration using the same settings
+ * timeline as Payment Tracking. Older registrations can have a stale
+ * adventureStartDate copied at signup, so callers should prefer this result.
+ */
+export function getRegistrationAdventureStart(
+    settings: any[] | undefined | null,
+    registration: any,
+    todayIso: string
+): string | undefined {
+    const day = (value: any) => value ? String(value).slice(0, 10) : null;
+    const addDays = (iso: string, count: number) => {
+        const date = new Date(`${iso}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + count);
+        return date.toISOString().slice(0, 10);
+    };
+    const addMonths = (iso: string, count: number) => {
+        const date = new Date(`${iso}T00:00:00Z`);
+        date.setUTCMonth(date.getUTCMonth() + count);
+        return date.toISOString().slice(0, 10);
+    };
+
+    const masterKey = PROGRAM_KEY_BY_SLUG["curious-explorer"];
+    const master = settings?.find((entry) => entry?.programKey === masterKey && (day(entry?.nextAdventureStart) || day(entry?.adventureStartDate)))
+        ?? settings?.find((entry) => day(entry?.nextAdventureStart) || day(entry?.adventureStartDate));
+    let currentNumber = Math.floor(Number(master?.currentAdventure)) || 1;
+    let currentStart = day(master?.adventureStartDate);
+    let nextStart = day(master?.nextAdventureStart);
+    if (!master) {
+        currentStart = "2026-06-01";
+        nextStart = "2026-11-01";
+    }
+    if (nextStart && todayIso >= nextStart) {
+        currentNumber += 1;
+        currentStart = nextStart;
+        nextStart = null;
+    }
+    if (!currentStart && nextStart) currentStart = addMonths(nextStart, -5);
+    if (!currentStart) currentStart = "2026-06-01";
+
+    const currentOpen = addDays(currentStart, -14);
+    const nextOpen = nextStart ? addDays(nextStart, -14) : null;
+    const dateInManila = (value: any): string | null => {
+        if (!value) return null;
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
+        }).format(date);
+    };
+    const registrationDays = [dateInManila(registration?.createdAt), dateInManila(registration?.submittedAt)]
+        .filter(Boolean)
+        .sort() as string[];
+    const registeredDay = registrationDays[0];
+    let adventureNumber = Math.floor(Number(registration?.adventure));
+    if (!Number.isFinite(adventureNumber) || adventureNumber < 2) {
+        adventureNumber = registeredDay
+            ? nextOpen && registeredDay >= nextOpen
+                ? currentNumber + 1
+                : currentNumber > 1 && registeredDay < currentOpen
+                    ? currentNumber - 1
+                    : currentNumber
+            : currentNumber;
+        if (registration?.isPromoRegistration || registration?.parentInfo?.isRenewal || registration?.renewalPeriod) {
+            if (registeredDay && registeredDay < currentStart && registeredDay >= addMonths(currentStart, -5)) {
+                adventureNumber = Math.max(adventureNumber, currentNumber);
+            } else if (nextStart && registeredDay && registeredDay >= currentStart && registeredDay < nextStart) {
+                adventureNumber = Math.max(adventureNumber, currentNumber + 1);
+            }
+        }
+    }
+
+    const ownStart = getProgramAdventureStart(settings, registration?.program, adventureNumber, todayIso);
+    if (ownStart) return ownStart;
+    if (adventureNumber === currentNumber) return currentStart;
+    if (adventureNumber === currentNumber + 1) return nextStart ?? addMonths(currentStart, 5);
+    if (adventureNumber < currentNumber) return addMonths(currentStart, -5);
     return undefined;
 }
 

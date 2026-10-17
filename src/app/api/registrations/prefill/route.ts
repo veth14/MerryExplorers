@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
 
@@ -160,8 +161,7 @@ export async function GET(request: Request) {
 
     const pioneerOr: any[] = [];
     if (finalEmail) {
-      pioneerOr.push({ email: finalEmail });
-      pioneerOr.push({ email: { $regex: new RegExp(`^${finalEmail.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") } });
+      pioneerOr.push(...pioneerEmailQuery(finalEmail).$or);
     }
     if (finalChildFirst) {
       pioneerOr.push({ childName: { $regex: new RegExp(`^${finalChildFirst.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`, "i") } });
@@ -179,7 +179,6 @@ export async function GET(request: Request) {
     const prefillData = {
       isPrefilled: true,
       familyId: familyDoc?._id?.toString() || null,
-      promoCode: "A1RENEWAL2026",
       isNewFamily: false,
       isPioneer,
       pioneerPrices,

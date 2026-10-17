@@ -66,12 +66,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Add or update a pioneer family
-    const { parentName, childName, email, id } = body;
+    const { parentName, childName, email, email2, id } = body;
     if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
+    const primaryEmail = String(email).trim().toLowerCase();
+    const secondaryEmail = String(email2 || "").trim().toLowerCase();
+    if (secondaryEmail && secondaryEmail === primaryEmail) return NextResponse.json({ error: "Enter two different email addresses" }, { status: 400 });
     const doc = {
       parentName: (parentName || "").trim(),
       childName: (childName || "").trim(),
-      email: email.trim().toLowerCase(),
+      email: primaryEmail,
+      email2: secondaryEmail || "",
       updatedAt: new Date().toISOString(),
     };
 

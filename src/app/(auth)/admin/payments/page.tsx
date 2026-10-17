@@ -279,7 +279,9 @@ const normRef = (r: string | undefined | null) => (r || "").trim().toLowerCase()
 // in a `balancePayments` array. amountPaid is the running total of both, so the first payment on its
 // own is the total minus the balance payments.
 const balancePaymentsOf = (r: any): any[] => (Array.isArray(r?.balancePayments) ? r.balancePayments : []);
-const sumBalancePayments = (r: any) => balancePaymentsOf(r).reduce((s, b) => s + (Number(b.amountPaid) || 0), 0);
+const sumBalancePayments = (r: any) => balancePaymentsOf(r)
+  .filter((b) => b.verified !== false && b.rejected !== true)
+  .reduce((s, b) => s + (Number(b.amountPaid) || 0), 0);
 const firstPaymentAmount = (r: any) => Math.max(0, (r.amountPaid || r.amountDue || 0) - sumBalancePayments(r));
 const isBalanceRow = (p: { id: string }) => p.id.startsWith("bal-");
 
@@ -454,14 +456,12 @@ function regDay(r: any): string | null {
 
 // Must match the same criteria as the Renewals API (api/renewals/route.ts):
 // - isPromoRegistration: true  (renewal promo flow)
-// - promoCode: "A1RENEWAL2026" (specific renewal code, NOT any promo code)
 // - parentInfo.isRenewal: true (explicit renewal flag from /renew page)
 // - renewalPeriod is set       (tagged by admin or system)
 // NOTE: isNewFamily === false is NOT used — it's too broad. A returning family's
 // original Adventure 1 registration also has isNewFamily:false.
 const isRenewalReg = (r: any): boolean =>
   Boolean(r.isPromoRegistration) ||
-  r.promoCode === "A1RENEWAL2026" ||
   Boolean(r.parentInfo?.isRenewal) ||
   Boolean(r.renewalPeriod);
 
@@ -642,6 +642,7 @@ function AdminPaymentsPageInner() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [rejectTarget, setRejectTarget] = useState<{ uid: string; paymentId: string | null; type: PaymentKind } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [reminderPreview, setReminderPreview] = useState<{ uid: string; to: string; subject: string; html: string } | null>(null);
 
   // the page is "loading" until the main data AND the Renewals records are in, so rows never jump between tabs
   const loading = mainLoading || renewalsFeed === "loading";
@@ -1130,7 +1131,10 @@ function AdminPaymentsPageInner() {
     let body: any = {};
     let method = "PATCH";
 
-    if (type === "registration") {
+    if (type === "registration" && paymentId?.startsWith("bal-")) {
+      url = `/api/registrations/${uid}/balance-payment/review`;
+      body = { paymentId: paymentId.slice(4), action, adminNote };
+    } else if (type === "registration") {
       url = `/api/registrations/${uid}/${action === "verify" ? "approve" : "reject"}`;
       method = "POST";
       body = { adminNote };
@@ -1158,17 +1162,71 @@ function AdminPaymentsPageInner() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(emailAction === "reminder" ? {} : { emailAction: "resendConfirmation" }),
+          body: JSON.stringify(emailAction === "reminder" ? { action: "preview" } : { emailAction: "resendConfirmation" }),
         }
       );
+      const data = await res.json().catch(() => ({}));
+      if (emailAction === "reminder") {
+        if (!res.ok || !data.preview) {
+          showToast(data.error || "The reminder preview could not be loaded.", "error");
+          return;
+        }
+        setReminderPreview({ uid, ...data.preview });
+        return;
+      }
+      if (!res.ok || !data.emailSent) {
+        showToast(data.error || "The email could not be sent.", "error");
+        return;
+      }
+      showToast("Corrected confirmation email sent.");
+    } catch {
+      showToast("Network error sending the email.", "error");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function confirmSendReminder() {
+    if (!reminderPreview) return;
+    const { uid } = reminderPreview;
+    setActioning(`${uid}-email-reminder-send`);
+    try {
+      const res = await fetch(`/api/registrations/${uid}/send-reminder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send" }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.emailSent) {
         showToast(data.error || "The email could not be sent.", "error");
         return;
       }
-      showToast(emailAction === "reminder" ? "Payment reminder sent." : "Corrected confirmation email sent.");
+      setReminderPreview(null);
+      showToast("Payment reminder sent.");
     } catch {
       showToast("Network error sending the email.", "error");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function updateRegistrationFamilyType(uid: string, isNewFamily: boolean) {
+    const key = `${uid}-family-type`;
+    setActioning(key);
+    try {
+      const { ok, error } = await postJson(`/api/registrations/${uid}`, "PATCH", { isNewFamily });
+      if (!ok) {
+        showToast(error || "Could not update the family type.", "error");
+        return;
+      }
+      setAllRegistrations((current) => current.map((registration) =>
+        String(registration.id) === String(uid)
+          ? { ...registration, isNewFamily, familyTypeOverride: isNewFamily }
+          : registration
+      ));
+      showToast(isNewFamily ? "Marked as a new family." : "Marked as a returning family.");
+    } catch {
+      showToast("Network error updating the family type.", "error");
     } finally {
       setActioning(null);
     }
@@ -1870,7 +1928,9 @@ function AdminPaymentsPageInner() {
         const advTotals: Record<string, number> = {}; // key = Adventure number, or "other" when none could be assigned
 
         const pendingHelp =
-          type === "registration"
+          type === "registration" && isBalanceRow(payment)
+            ? "Verifying applies this receipt to the registration's remaining balance. Check the receipt amount and reference no. against the payment provider first."
+            : type === "registration"
             ? "Verifying APPROVES the registration, registers the student and emails the parent. Check the receipt amount and reference no. against GCash/BPI first."
             : type === "session"
               ? "Verifying counts this payment toward the family's balance. Check the receipt amount and reference no. first."
@@ -1938,14 +1998,14 @@ function AdminPaymentsPageInner() {
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button
                         disabled={!!actioning}
-                        onClick={() => { handleAction(detail.uid, type === "session" ? payment.id : null, "verify", type); }}
+                        onClick={() => { handleAction(detail.uid, type === "session" || (type === "registration" && isBalanceRow(payment)) ? payment.id : null, "verify", type); }}
                         style={{ padding: "8px 16px", borderRadius: "10px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                       >
                         ✓ Verify
                       </button>
                       <button
                         disabled={!!actioning}
-                        onClick={() => { const d = detail; setDetail(null); handleAction(d.uid, d.type === "session" ? d.payment.id : null, "reject", d.type); }}
+                        onClick={() => { const d = detail; setDetail(null); handleAction(d.uid, d.type === "session" || (d.type === "registration" && isBalanceRow(d.payment)) ? d.payment.id : null, "reject", d.type); }}
                         style={{ padding: "8px 16px", borderRadius: "10px", background: "#ef4444", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                       >
                         ✕ Reject
@@ -2222,7 +2282,7 @@ function AdminPaymentsPageInner() {
                       <div style={row}><span style={muted}>Parent</span><span>{selectedReg.parentInfo?.name || "—"}</span></div>
                       <div style={row}><span style={muted}>Email</span><span style={{ wordBreak: "break-all", textAlign: "right" }}>{selectedReg.parentInfo?.email || "—"}</span></div>
                       <div style={row}><span style={muted}>Child</span><span>{`${selectedReg.childInfo?.firstName ?? ""} ${selectedReg.childInfo?.lastName ?? ""}`.trim() || "—"}</span></div>
-                      <div style={row}><span style={muted}>Program</span><span>{selectedReg.program || "—"}</span></div>
+                      <div style={row}><span style={muted}>Program</span><span>{selectedReg.program === "everyday-curious" ? "Everyday Explorer" : selectedReg.program || "—"}</span></div>
                       <div style={row}><span style={muted}>Adventure</span><span>{`Adventure ${advOf(selectedReg)}`}</span></div>
                       <div style={row}><span style={muted}>Status</span><span style={{ textTransform: "uppercase" }}>{selectedReg.status || "—"}</span></div>
                       <div style={row}>
@@ -2531,6 +2591,52 @@ function AdminPaymentsPageInner() {
           </div>
         );
       })()}
+
+      {reminderPreview && (
+        <div
+          onClick={() => !actioning && setReminderPreview(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 62, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "760px", maxHeight: "92vh", display: "flex", flexDirection: "column", background: "white", borderRadius: "20px", boxShadow: "0 20px 40px rgba(0,0,0,0.25)", overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", padding: "18px 22px", borderBottom: "1px solid #e2e8f0" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: "18px", color: "#002f76" }}>Payment reminder preview</div>
+                <div style={{ marginTop: "5px", fontSize: "12px", color: "#64748b", overflowWrap: "anywhere" }}>To: {reminderPreview.to}</div>
+                <div style={{ marginTop: "4px", fontSize: "12px", color: "#334155" }}>Subject: <strong>{reminderPreview.subject}</strong></div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReminderPreview(null)}
+                disabled={!!actioning}
+                aria-label="Close reminder preview"
+                style={{ border: 0, background: "transparent", color: "#64748b", fontSize: "22px", lineHeight: 1, cursor: actioning ? "wait" : "pointer" }}
+              >×</button>
+            </div>
+            <div style={{ padding: "14px 18px", overflowY: "auto", background: "#f1f5f9" }}>
+              <iframe
+                title="Payment reminder email preview"
+                srcDoc={reminderPreview.html}
+                sandbox=""
+                style={{ display: "block", width: "100%", height: "560px", border: "1px solid #dbe3ef", borderRadius: "12px", background: "white" }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 22px", borderTop: "1px solid #e2e8f0" }}>
+              <button
+                type="button"
+                onClick={() => setReminderPreview(null)}
+                disabled={!!actioning}
+                style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "white", color: "#475569", fontSize: "13px", fontWeight: 700, cursor: actioning ? "wait" : "pointer" }}
+              >Cancel</button>
+              <button
+                type="button"
+                onClick={() => void confirmSendReminder()}
+                disabled={!!actioning}
+                style={{ padding: "10px 18px", borderRadius: "10px", border: 0, background: "#0033a0", color: "white", fontSize: "13px", fontWeight: 800, cursor: actioning ? "wait" : "pointer" }}
+              >{actioning === `${reminderPreview.uid}-email-reminder-send` ? "Sending…" : "Send this email"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reject reason modal (replaces window.prompt) */}
       {rejectTarget && (
@@ -2857,7 +2963,7 @@ function AdminPaymentsPageInner() {
                               (pendingItems.length > 1 ? `Verifies the oldest of ${pendingItems.length} pending payments. Open Details to review each one. ` : "") +
                               (g.pendingItem.type === "registration" ? "Approves the registration, registers the student and emails the parent." : "Mark this payment as verified.")
                             }
-                            onClick={(e) => { e.stopPropagation(); const pi = g.pendingItem!; handleAction(pi.uid, pi.type === "session" ? pi.payment.id : null, "verify", pi.type); }}
+                            onClick={(e) => { e.stopPropagation(); const pi = g.pendingItem!; handleAction(pi.uid, pi.type === "session" || (pi.type === "registration" && isBalanceRow(pi.payment)) ? pi.payment.id : null, "verify", pi.type); }}
                             disabled={!!actioning}
                             style={{ padding: "6px 12px", borderRadius: "8px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                           >
@@ -2865,7 +2971,7 @@ function AdminPaymentsPageInner() {
                           </button>
                           <button
                             title="Reject this payment"
-                            onClick={(e) => { e.stopPropagation(); const pi = g.pendingItem!; handleAction(pi.uid, pi.type === "session" ? pi.payment.id : null, "reject", pi.type); }}
+                            onClick={(e) => { e.stopPropagation(); const pi = g.pendingItem!; handleAction(pi.uid, pi.type === "session" || (pi.type === "registration" && isBalanceRow(pi.payment)) ? pi.payment.id : null, "reject", pi.type); }}
                             disabled={!!actioning}
                             style={{ padding: "6px 12px", borderRadius: "8px", background: "#ef4444", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                           >
@@ -2881,7 +2987,7 @@ function AdminPaymentsPageInner() {
                               disabled={!!actioning}
                               style={{ padding: "6px 10px", borderRadius: "8px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 700, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
                             >
-                              {actioning === `${uid}-email-reminder` ? "Sending…" : "📧 Reminder"}
+                              {actioning === `${uid}-email-reminder` ? "Preparing preview…" : "📧 Reminder"}
                             </button>
                           )}
                           {isRegistrationVerified(registration.status) && (
@@ -2948,7 +3054,9 @@ function AdminPaymentsPageInner() {
                   : RENEWAL_BADGE[state];
                 const accent = state === "pending" ? "#f59e0b" : state === "rejected" ? "#ef4444" : noReceipt ? "#cbd5e1" : "transparent";
                 const avatarGrad = AVATAR_COLORS[colorIndex((acc.email || r.id).toLowerCase())];
-                const returning = renewalIds.has(String(r.id)) || isRenewalReg(r) || r.isNewFamily === false;
+                const returning = typeof r.familyTypeOverride === "boolean"
+                  ? !r.familyTypeOverride
+                  : renewalIds.has(String(r.id)) || isRenewalReg(r) || r.isNewFamily === false;
                 const summary = regSummary.get(r.id);
                 const waiting = state === "pending" ? daysSince(r.submittedAt) : 0;
                 const registeredDays = noReceipt ? daysSince(r.createdAt || r.submittedAt) : 0;
@@ -2991,6 +3099,15 @@ function AdminPaymentsPageInner() {
                           {isTestAccount(acc) && <span style={tagStyle("#fef3c7", "#92400e")}>🧪 TESTING ACCOUNT</span>}
                           <span style={advTagStyle(advNumbers.next, tl.curNum)}>ADVENTURE {advNumbers.next} REGISTRATION</span>
                           <span style={returning ? tagStyle("#f5f3ff", "#7c3aed") : tagStyle("#ecfeff", "#0e7490")}>{returning ? "RETURNING FAMILY" : "NEW FAMILY"}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void updateRegistrationFamilyType(r.id, returning); }}
+                            disabled={!!actioning}
+                            title={`Change to ${returning ? "new family" : "returning family"}`}
+                            style={{ padding: "2px 6px", borderRadius: "6px", background: "#fff", color: "#475569", fontSize: "10px", fontWeight: 700, border: "1px solid #cbd5e1", cursor: actioning ? "wait" : "pointer" }}
+                          >
+                            {actioning === `${r.id}-family-type` ? "Saving…" : returning ? "Mark new" : "Mark returning"}
+                          </button>
                           {r.classTime && <span style={tagStyle("#f1f5f9", "#475569")}>{r.classTime}</span>}
                         </div>
                       </div>
@@ -3091,7 +3208,7 @@ function AdminPaymentsPageInner() {
                               disabled={!!actioning}
                               style={{ padding: "6px 10px", borderRadius: "8px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 700, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
                             >
-                              {actioning === `${r.id}-email-reminder` ? "Sending…" : "📧 Reminder"}
+                              {actioning === `${r.id}-email-reminder` ? "Preparing preview…" : "📧 Reminder"}
                             </button>
                           )}
                         </>
@@ -3132,7 +3249,7 @@ function AdminPaymentsPageInner() {
                                   disabled={!!actioning}
                                   style={{ padding: "6px 10px", borderRadius: "8px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 700, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
                                 >
-                                  {actioning === `${r.id}-email-reminder` ? "Sending…" : "📧 Reminder"}
+                                  {actioning === `${r.id}-email-reminder` ? "Preparing preview…" : "📧 Reminder"}
                                 </button>
                               )}
                               <button

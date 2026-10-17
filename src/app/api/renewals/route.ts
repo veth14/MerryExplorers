@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import {
-  RENEWAL_PROMO_CODE,
-  RESERVATION_DEADLINE_ISO,
   MIN_STUDENTS_PER_SESSION,
   DOWNPAYMENT_RATE,
   type RenewalStatus,
@@ -78,7 +76,6 @@ export async function GET(request: Request) {
     const regQuery: Record<string, any> = {
       $or: [
         { isPromoRegistration: true },
-        { promoCode: RENEWAL_PROMO_CODE },
         { "parentInfo.isRenewal": true },
         { renewalPeriod: period },
       ],
@@ -117,11 +114,11 @@ export async function GET(request: Request) {
       const amountPaid = initialPaid + balancePaid;
       const remainingBalance = Math.max(0, totalTuition - amountPaid);
 
-      const isPromo = Boolean(r.isPromoRegistration || r.promoCode === RENEWAL_PROMO_CODE);
+      const isPromo = Boolean(r.isPromoRegistration);
       const reservationType = isPromo ? "Promo code reservation" : "Direct payment (no code)";
-
-      const reservedUntil = safeDate(r.reservedUntil, RESERVATION_DEADLINE_ISO);
-      const isPastDeadline = now > reservedUntil;
+      const reservedUntil = r.reservedUntil
+        ? safeDate(r.reservedUntil, (r.submittedAt || now).toISOString())
+        : null;
 
       const isVerified =
         r.status === "approved" ||
@@ -143,8 +140,6 @@ export async function GET(request: Request) {
         renewalStatus = "for_release";
       } else if (confirmable) {
         renewalStatus = "confirmed";
-      } else if (isPromo && isPastDeadline && !r.manualHold) {
-        renewalStatus = "for_release";
       } else {
         renewalStatus = "reserved";
       }
@@ -171,9 +166,9 @@ export async function GET(request: Request) {
         submittedAt,
         reservationType,
         isPromo,
-        promoCode: r.promoCode || (isPromo ? RENEWAL_PROMO_CODE : null),
+        promoCode: r.promoCode || null,
         reservedOn: r.submittedAt || r.createdAt,
-        reservedUntil: reservedUntil.toISOString(),
+        reservedUntil: reservedUntil?.toISOString() || null,
         renewalStatus,
         paymentStatus,
         totalTuition,
@@ -255,6 +250,7 @@ export async function GET(request: Request) {
     const DAY_MS = 24 * 60 * 60 * 1000;
     const countExpiringSoon = allRecords.filter((r) => {
       if (r.renewalStatus !== "reserved") return false;
+      if (!r.reservedUntil) return false;
       const expiryMs = new Date(r.reservedUntil).getTime();
       return expiryMs > nowMs && expiryMs - nowMs <= DAY_MS;
     }).length;
@@ -324,7 +320,6 @@ export async function GET(request: Request) {
           renewalRate,
           conversionRate,
           countExpiringSoon,
-          deadlineIso: RESERVATION_DEADLINE_ISO,
           minStudentsPerSession: MIN_STUDENTS_PER_SESSION,
           downpaymentRate: DOWNPAYMENT_RATE,
           totalCollected,

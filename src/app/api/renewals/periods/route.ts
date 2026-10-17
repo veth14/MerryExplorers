@@ -17,25 +17,6 @@ export async function GET(request: Request) {
       .sort({ createdAt: -1 })
       .toArray();
 
-    // Default seed if no periods exist
-    if (periods.length === 0) {
-      const defaultPeriod = {
-        name: "Adventure 1 Renewal",
-        slug: "adventure-1-renewal",
-        targetProgram: "Adventure 2",
-        previousProgram: "Adventure 1",
-        promoCode: "A1RENEWAL2026",
-        deadline: new Date("2026-10-16T13:00:00+08:00"),
-        createdAt: new Date(),
-        isDefault: true,
-      };
-      const res = await db.collection("renewal_periods").insertOne(defaultPeriod);
-      return NextResponse.json({
-        success: true,
-        data: [{ ...defaultPeriod, _id: res.insertedId.toString() }],
-      });
-    }
-
     return NextResponse.json({
       success: true,
       data: periods.map((p) => ({
@@ -56,7 +37,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, targetProgram, previousProgram, promoCode, deadline } = body;
+    const { name, targetProgram, previousProgram } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Period name is required" }, { status: 400 });
@@ -70,8 +51,6 @@ export async function POST(request: Request) {
       slug,
       targetProgram: targetProgram || "",
       previousProgram: previousProgram || "",
-      promoCode: promoCode || "A1RENEWAL2026",
-      deadline: deadline ? new Date(deadline) : new Date("2026-10-16T13:00:00+08:00"),
       createdAt: new Date(),
       isDefault: false,
     };

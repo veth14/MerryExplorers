@@ -3,7 +3,10 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 import { getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting, getRegistrationAdventureNumber } from "@/lib/adventure-cycle";
-import { getRegistrationTotal, isRegistrationVerified } from "@/lib/payment-terms";
+import { FALLBACK_PIONEER_RATES, getRegistrationTotal, isRegistrationVerified } from "@/lib/payment-terms";
+import { PROGRAM_SLOTS } from "@/data/landing";
+import { pioneerEmailQuery } from "@/lib/pioneer-families";
+import { isReturningFamilyRecord } from "@/lib/returning-family";
 import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +23,6 @@ const PROGRAM_SCHEDULES: Record<string, string> = {
   "everyday-curious": "Monday – Friday",
   "creative-explorer": "Tuesday, Thursday & Friday",
   "brave-explorer": "Monday – Friday",
-};
-
-const PROGRAM_RATES: Record<string, { rate: number; downpayment: number; balance: number; sessions: number }> = {
-  "curious-explorer": { rate: 4395, downpayment: 2637, balance: 1758, sessions: 8 },
-  "everyday-curious": { rate: 7518, downpayment: 4511, balance: 3007, sessions: 14 },
-  "creative-explorer": { rate: 4985, downpayment: 2991, balance: 1994, sessions: 12 },
-  "brave-explorer": { rate: 6900, downpayment: 4140, balance: 2760, sessions: 18 },
 };
 
 // Actual clock times for each program's class slots
@@ -91,6 +87,18 @@ export async function POST(
 
     if (!registration) {
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+    }
+
+    const inferredReturningFamily = Boolean(
+      registration.isPioneer || registration.parentInfo?.isRenewal || await isReturningFamilyRecord(db, registration, id)
+    );
+    if (inferredReturningFamily) {
+      registration.isNewFamily = false;
+      registration.welcomeKitOrdered = false;
+      await db.collection("student_registrations").updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { isNewFamily: false, welcomeKitOrdered: false } }
+      );
     }
 
     if (registration.status === "approved" && !resendConfirmation) {
@@ -175,16 +183,32 @@ export async function POST(
         auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
       });
 
-      const prog = PROGRAM_RATES[program];
+      const prog = (PROGRAM_SLOTS as Record<string, any>)[program];
       const programName = PROGRAM_NAMES[program] || program;
       const schedule = PROGRAM_SCHEDULES[program] || "";
       const classTimeDisplay = formatClassTime(program, classTime);
+      const parentEmail = (parentInfo?.email || "").toLowerCase().trim();
+      const parentEmailRegex = new RegExp(`^${parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+      const pioneerFamily = parentEmail
+        ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail))
+        : null;
+      const isPioneerRegistration = Boolean(registration.isPioneer || pioneerFamily);
+      const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+      const currentPioneerRate = Number(pioneerSettings?.pioneerPrices?.[program]) || FALLBACK_PIONEER_RATES[program];
+      const pricingRegistration = {
+        ...registration,
+        isPioneer: isPioneerRegistration,
+        ...(isPioneerRegistration && currentPioneerRate ? { customRate: currentPioneerRate } : {}),
+      };
       // Use the registration pricing rules so pioneer/custom rates match the
       // amount collected during registration. Preserve the legacy uniform fee.
       const totalRate =
-        (getRegistrationTotal({ ...registration, uniformOrdered: false }, prog?.rate || 0) || 0) +
+        (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, prog?.rate || 0) || 0) +
         (uniformOrdered ? 650 : 0);
-      const amountPaid = registration.amountPaid || 0;
+      const balancePaid = Array.isArray(registration.balancePayments)
+        ? registration.balancePayments.reduce((sum: number, payment: any) => sum + (Number(payment.amountPaid) || 0), 0)
+        : 0;
+      const amountPaid = (Number(registration.amountPaid) || 0) + balancePaid;
       const remainingBalance = Math.max(0, totalRate - amountPaid);
       const isFullyPaid = remainingBalance <= 0;
 
@@ -250,7 +274,7 @@ export async function POST(
                         <div style="background-color: #fffbea; border: 2px dashed #ffd84d; border-radius: 16px; padding: 22px 24px; margin: 0 0 20px 0;">
                           <p style="margin: 0 0 14px 0; color: #92400e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">💰 Payment Summary</p>
                           <table width="100%" cellpadding="0" cellspacing="0">
-                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Total Rate${registration.isPioneer ? " · Pioneer Family Rate" : ""}</td><td style="padding: 5px 0; color: #78350f; font-size: 14px; font-weight: 700; text-align: right;">₱${totalRate.toLocaleString()}</td></tr>
+                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Total Rate${isPioneerRegistration ? " · Pioneer Family Rate" : ""}</td><td style="padding: 5px 0; color: #78350f; font-size: 14px; font-weight: 700; text-align: right;">₱${totalRate.toLocaleString()}</td></tr>
                             <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Amount Paid</td><td style="padding: 5px 0; color: #16a34a; font-size: 14px; font-weight: 700; text-align: right;">₱${amountPaid.toLocaleString()} ✓</td></tr>
                             <tr>
                               <td style="padding: 10px 0 4px 0; color: #92400e; font-size: 13px; font-weight: 700; border-top: 1px solid #fde68a;">Remaining Balance</td>

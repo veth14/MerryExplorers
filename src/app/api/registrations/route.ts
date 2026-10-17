@@ -3,8 +3,11 @@ import { ObjectId } from "mongodb"; // NEW
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { BALLET, PROGRAM_SLOTS } from "@/data/landing";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
+import { isReturningFamilyRecord } from "@/lib/returning-family";
+import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +34,57 @@ export async function GET(request: Request) {
       .sort({ submittedAt: -1 })
       .toArray();
 
-    const formatted = registrations.map((r) => ({
-      ...r,
-      id: r._id.toString(),
-      _id: undefined,
-    }));
+    const knownStudents = await db.collection("students").find({}, { projection: { childInfo: 1, parentInfo: 1, registrationId: 1 } }).toArray();
+    const existingRenewalFamilies = await db.collection("renewal_families").find({
+      renewalStatus: { $in: ["submitted", "reserved", "confirmed", "paid"] },
+    }).toArray();
+    const familyIdentityKeys = (parentInfo: any, childInfo: any) => {
+      const parentName = String(parentInfo?.name || "").trim().toLowerCase().replace(/\s+/g, " ");
+      const phone = String(parentInfo?.phone || "").replace(/\D/g, "");
+      const childName = `${childInfo?.firstName || ""} ${childInfo?.lastName || ""}`.trim().toLowerCase().replace(/\s+/g, " ");
+      return [parentName ? `name:${parentName}` : "", phone ? `phone:${phone}` : "", childName ? `child:${childName}` : ""].filter(Boolean);
+    };
+    const returningStudentRegistrations = new Map<string, Set<string>>();
+    for (const student of knownStudents) {
+      for (const key of familyIdentityKeys(student.parentInfo, student.childInfo)) {
+        const registrationIds = returningStudentRegistrations.get(key) || new Set<string>();
+        if (student.registrationId) registrationIds.add(String(student.registrationId));
+        returningStudentRegistrations.set(key, registrationIds);
+      }
+    }
+
+    const formatted = registrations.map((r) => {
+      const identityKeys = familyIdentityKeys(r.parentInfo, r.childInfo);
+      const hasDifferentStudentRegistration = identityKeys.some((key) => {
+        const linkedStudentRegistrations = returningStudentRegistrations.get(key);
+        return Boolean(linkedStudentRegistrations?.size && !linkedStudentRegistrations.has(r._id.toString()));
+      });
+      const parentName = String(r.parentInfo?.name || "").trim().toLowerCase();
+      const parentPhone = String(r.parentInfo?.phone || "").replace(/\D/g, "");
+      const submittedAt = new Date(r.submittedAt || 0).getTime();
+      const hasPriorFamilyRegistration = registrations.some((previous) => {
+        if (previous._id.toString() === r._id.toString() || !["approved", "active", "early-bird", "scholar"].includes(previous.status)) return false;
+        if (new Date(previous.submittedAt || 0).getTime() >= submittedAt) return false;
+        const previousParentName = String(previous.parentInfo?.name || "").trim().toLowerCase();
+        const previousPhone = String(previous.parentInfo?.phone || "").replace(/\D/g, "");
+        const sameParent = (parentName && parentName === previousParentName) || (parentPhone && parentPhone === previousPhone);
+        return Boolean(sameParent);
+      });
+      const hasRenewalFamilyMatch = existingRenewalFamilies.some((family) => {
+        const familyParentName = String(family.parentName || "").trim().toLowerCase();
+        const familyPhone = String(family.phone || "").replace(/\D/g, "");
+        const sameParent = (parentName && parentName === familyParentName) || (parentPhone && parentPhone === familyPhone);
+        return Boolean(sameParent);
+      });
+      const inferredReturningFamily = r.isNewFamily === false || Boolean(r.isPioneer || r.parentInfo?.isRenewal) || hasDifferentStudentRegistration || hasPriorFamilyRegistration || hasRenewalFamilyMatch;
+      const isNewFamily = typeof r.familyTypeOverride === "boolean" ? r.familyTypeOverride : !inferredReturningFamily;
+      return {
+        ...r,
+        isNewFamily,
+        id: r._id.toString(),
+        _id: undefined,
+      };
+    });
 
     return NextResponse.json({ success: true, data: formatted });
   } catch (error: any) {
@@ -67,8 +116,8 @@ export async function POST(request: Request) {
       creditBalance,
       referenceNumber,
       leadId, // NEW — sent by the register page after the Details step
+      isRenewal,
       promoCode,
-      isPromoRegistration,
     } = data;
 
     // Validate required fields
@@ -203,25 +252,16 @@ export async function POST(request: Request) {
       rawPromoCode === "A1JesusLovesMe2026" ||
       rawPromoCode === "A1JesusLovesMe2026:”" ||
       rawPromoCode === 'A1JesusLovesMe2026:"';
-    const isPromo = isScholar || Boolean(isPromoRegistration && cleanPromoCode.toUpperCase() === "A1RENEWAL2026");
-    // All unpaid slots as of October 16, 1:00 PM will be released for promo reservations; standard reservations get 1 hour; scholars are permanent
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")
-      : isPromo
-        ? new Date("2026-10-16T13:00:00+08:00")
-        : new Date(Date.now() + 60 * 60 * 1000);
+      : new Date(Date.now() + 60 * 60 * 1000);
 
     // Auto-detect pioneer status if not explicitly passed
     let isPioneer = Boolean(data.isPioneer);
     let customRate = data.customRate ? Number(data.customRate) : undefined;
     const parentEmailClean = (parentInfo?.email || "").toLowerCase().trim();
     if (!isPioneer && parentEmailClean) {
-      const pioneerCheck = await db.collection("pioneer_families").findOne({
-        $or: [
-          { email: parentEmailClean },
-          { email: { $regex: new RegExp(`^${parentEmailClean.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") } },
-        ],
-      });
+      const pioneerCheck = await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmailClean));
       if (pioneerCheck) {
         isPioneer = true;
         if (!customRate) {
@@ -235,12 +275,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Existing students remain returning families when a parent registers with a new email.
+    const existingStudent = await isReturningFamilyRecord(db, { childInfo, parentInfo });
+    const isReturningFamily = Boolean(isPioneer || isRenewal || data.isNewFamily === false || existingStudent);
+
     const newRegistration = {
       status: isScholar ? "approved" : "reserved",
       reservedUntil,
       program,
       classTime,
-      parentInfo,
+      parentInfo: isRenewal ? { ...parentInfo, isRenewal: true } : parentInfo,
       childInfo,
       emergencyContact: emergencyContact || {},
       paymentMethod: isScholar ? "Scholarship (A1JesusLovesMe2026)" : (paymentMethod || ""),
@@ -256,23 +300,21 @@ export async function POST(request: Request) {
       photoConsent,
       uniformOrdered: uniformOrdered || false,
       lanyardOrdered: lanyardOrdered || false,
-      welcomeKitOrdered: isPioneer ? false : (welcomeKitOrdered || false),
-      isNewFamily: isPioneer ? false : (typeof data.isNewFamily === "boolean" ? data.isNewFamily : true),
+      welcomeKitOrdered: isReturningFamily ? false : (welcomeKitOrdered || false),
+      isNewFamily: !isReturningFamily,
       isPioneer,
       customRate: isScholar ? 0 : (customRate || null),
       notes: isScholar
         ? "Scholar Registration (Promo code: A1JesusLovesMe2026 — 100% tuition sponsored, no payment needed)"
-        : isPromo
-          ? "Reserved via promo code A1RENEWAL2026 (Unpaid slot holds until Oct 16, 1:00 PM)"
-          : "",
+        : "",
       submittedAt: new Date(),
       ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}`, adventureStartDate } : {}),
       approvedAt: isScholar ? new Date() : null,
       approvedBy: isScholar ? "system (scholar code: A1JesusLovesMe2026)" : null,
       confirmationEmailSent: false,
       leadId: leadId || null,
-      promoCode: isScholar ? "A1JesusLovesMe2026" : (isPromo ? promoCode : null),
-      isPromoRegistration: isPromo,
+      promoCode: isScholar ? "A1JesusLovesMe2026" : null,
+      isPromoRegistration: isScholar,
       isScholar,
     };
 
@@ -313,7 +355,7 @@ export async function POST(request: Request) {
             { _id: familyMatch._id },
             {
               $set: {
-                renewalStatus: isPromo ? "reserved" : (amountPaid > 0 ? "confirmed" : "reserved"),
+                renewalStatus: amountPaid > 0 ? "confirmed" : "reserved",
                 registrationId: result.insertedId.toString(),
                 updatedAt: new Date(),
               },
@@ -380,6 +422,9 @@ export async function POST(request: Request) {
 
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://merry-explorers.vercel.app";
         const paymentUrl = `${baseUrl}/register/payment/${result.insertedId.toString()}`;
+        const reservationDeadlineText = !isScholar && reservedUntil > new Date()
+          ? reservedUntil.toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" })
+          : null;
         const parentName = parentInfo.name || "Parent / Guardian";
         const childName = childInfo?.firstName || "Explorer";
 
@@ -471,17 +516,17 @@ export async function POST(request: Request) {
                 </div>
                 ` : program === "ballet" ? `
                 <div style="background-color: #fdf2f8; border: 1.5px solid #fbcfe8; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #831843;">
-                  <p style="margin: 0 0 6px; font-weight: bold; font-size: 14px;">🩰 2026 BALLET RECITAL ON NOVEMBER 28</p>
-                  <p style="margin: 0 0 8px; font-weight: 600;">Recital kit is optional, but required if joining the recital.</p>
+                  <p style="margin: 0 0 6px; font-weight: bold; font-size: 14px;">🩰 ${BALLET.recital.title.toUpperCase()}</p>
+                  <p style="margin: 0 0 8px; font-weight: 600;">${BALLET.recital.note}</p>
                   <div style="background-color: white; border: 1px solid #fbcfe8; border-radius: 10px; padding: 12px; margin: 10px 0;">
-                    <p style="margin: 0 0 4px; font-weight: bold; color: #be185d;">Recital Kit · ₱1,500</p>
-                    <p style="margin: 0 0 6px; font-size: 12.5px; color: #475569;">Recital kit preorder starts on October 3. Inclusive of:</p>
-                    <p style="margin: 0; font-size: 12.5px; color: #1e293b;">🎫 <strong>2 Guest Passes</strong> &nbsp;·&nbsp; 💐 <strong>1 Mini Bouquet</strong> &nbsp;·&nbsp; 👗 <strong>1 Set of Costume</strong></p>
+                    <p style="margin: 0 0 4px; font-weight: bold; color: #be185d;">Recital Kit · ${BALLET.recital.kitPrice}</p>
+                    <p style="margin: 0 0 6px; font-size: 12.5px; color: #475569;">${BALLET.recital.kitDetails}</p>
+                    <p style="margin: 0; font-size: 12.5px; color: #1e293b;">${BALLET.recital.kitDetails.replace(/^Includes\s*/i, "")}</p>
                   </div>
                   <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 12.5px; color: #475569;">
-                    <li>5 sessions total (₱2,750): 60% downpayment (₱1,650) to confirm a slot, 40% balance (₱1,100).</li>
-                    <li><strong>12 completed sessions</strong> are required to join the recital.</li>
-                    <li>The next recital will be in <strong>Q1 of 2027</strong>.</li>
+                    <li>${BALLET.rate.downpaymentNote}</li>
+                    <li>${(PROGRAM_SLOTS as any).ballet.notes[3]}</li>
+                    <li>${(PROGRAM_SLOTS as any).ballet.notes[4]}</li>
                   </ul>
                 </div>
                 ` : program === "virtual-session" ? `
@@ -496,10 +541,10 @@ export async function POST(request: Request) {
                 </div>
                 `}
 
-                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
+                ${reservationDeadlineText ? `<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
                   <p style="margin: 0 0 4px; font-weight: bold;">⏰ Deadline Reminder:</p>
-                  <p style="margin: 0;">Unpaid reservations will be held until <strong>October 16, 2026 at 1:00 PM</strong>, after which unpaid slots will be released to the waitlist.</p>
-                </div>
+                  <p style="margin: 0;">Your reservation is held until <strong>${reservationDeadlineText}</strong>.</p>
+                </div>` : ""}
 
                 <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
                   Need help? Feel free to approach Teacher Angel onsite, or reply directly to this email.

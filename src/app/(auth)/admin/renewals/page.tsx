@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import * as XLSX from "xlsx";
 import { RenewalSettingsManager } from "@/components/admin/RenewalSettingsManager";
+import { PROGRAM_SLOTS } from "@/data/landing";
+import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 
 type Family = {
   _id: string;
@@ -48,7 +50,7 @@ type RenewalRecord = {
   isPromo: boolean;
   promoCode?: string | null;
   reservedOn: string;
-  reservedUntil: string;
+  reservedUntil: string | null;
   renewalStatus: "reserved" | "confirmed" | "for_release" | "released";
   paymentStatus: "unpaid" | "downpayment_received" | "fully_paid";
   totalTuition: number;
@@ -80,7 +82,6 @@ type Stats = {
   renewalRate: number;
   conversionRate: number;
   countExpiringSoon: number;
-  deadlineIso: string;
   minStudentsPerSession?: number;
   downpaymentRate?: number;
   totalCollected: number;
@@ -95,8 +96,6 @@ type SlotInfo = {
   totalMax: number;
   sessions: Record<string, { max: number; taken: number; belowMin: boolean }>;
 };
-
-const FALLBACK_DEADLINE_ISO = "2026-10-16T13:00:00+08:00";
 
 export default function RenewalsPage() {
   const router = useRouter();
@@ -152,7 +151,7 @@ export default function RenewalsPage() {
 
   // Email Sending Modal state
   const [emailModalFamily, setEmailModalFamily] = useState<Family | null>(null);
-  const [emailType, setEmailType] = useState<"promo_code" | "payment_reminder" | "slot_released" | "custom">("promo_code");
+  const [emailType, setEmailType] = useState<"payment_reminder" | "slot_released" | "custom">("payment_reminder");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailCustomMessage, setEmailCustomMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -193,28 +192,7 @@ export default function RenewalsPage() {
   }, [selectedPeriod]);
 
   const [mounted, setMounted] = useState(false);
-  const [deadlineText, setDeadlineText] = useState("");
-
-  // Deadline comes from the API (single source of truth), with a fallback until it loads
-  const deadlineIso = stats?.deadlineIso || FALLBACK_DEADLINE_ISO;
   const minStudents = stats?.minStudentsPerSession ?? 3;
-  const deadlinePassed = new Date(deadlineIso).getTime() < Date.now();
-
-  useEffect(() => {
-    setMounted(true);
-    const computeDeadline = () => {
-      const target = new Date(deadlineIso).getTime();
-      const diff = target - Date.now();
-      if (diff <= 0) return "Deadline has passed (Oct 16, 1:00 PM)";
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      return `${days}d ${hours}h ${mins}m remaining until Oct 16, 1:00 PM`;
-    };
-    setDeadlineText(computeDeadline());
-    const timer = setInterval(() => setDeadlineText(computeDeadline()), 60000);
-    return () => clearInterval(timer);
-  }, [deadlineIso]);
 
   // Filtered Renewals
   const filteredRenewals = useMemo(() => {
@@ -670,7 +648,7 @@ export default function RenewalsPage() {
       "Payment Method": r.paymentMethod,
       "Reference Number": r.referenceNumber,
       "Submitted At": new Date(r.submittedAt).toLocaleString(),
-      "Reserved Until": new Date(r.reservedUntil).toLocaleString(),
+      "Reserved Until": r.reservedUntil ? new Date(r.reservedUntil).toLocaleString() : "—",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -759,7 +737,7 @@ export default function RenewalsPage() {
     }
   };
 
-  // Remind All Unpaid Families (October 16, 1:00 PM Deadline Reminder)
+  // Remind all families with an unpaid reservation.
   const [remindingAll, setRemindingAll] = useState(false);
   const handleRemindAllUnpaid = async () => {
     const unpaidList = renewalRecords.filter(
@@ -776,8 +754,8 @@ export default function RenewalsPage() {
     setFeedbackDialog({
       open: true,
       type: "confirm",
-      title: "Send Oct 16 1:00 PM Payment Reminder?",
-      message: `Send the payment deadline reminder (with payment link and Adventure 1 balance disclaimer) to ${unpaidList.length} family/families who have not yet paid the downpayment?`,
+      title: "Send Payment Reminder?",
+      message: `Send a payment reminder with the correct payment or renewal link to ${unpaidList.length} family/families who have not yet paid the downpayment?`,
       confirmLabel: `Send Reminders (${unpaidList.length})`,
       cancelLabel: "Cancel",
       onConfirm: async () => {
@@ -794,19 +772,9 @@ export default function RenewalsPage() {
     });
   };
 
-  // Notify Released Slots.
-  // Only for records that are ACTUALLY for_release / released, and only AFTER the deadline.
-  // (The old version also included "reserved", i.e. slots still being held.)
+  // Notify families whose slots have actually been marked for release.
   const [releasingAll, setReleasingAll] = useState(false);
   const handleNotifyReleasedSlots = async () => {
-    if (!deadlinePassed) {
-      showModalNotice(
-        "Too Early",
-        "Release notices can only be sent after the deadline (Oct 16, 1:00 PM). Until then, these slots are still being held.",
-        "error"
-      );
-      return;
-    }
 
     // Skip families already sent a release notice (ASSUMPTION: lastEmailSent contains "release").
     // Confirm against what /api/renewals/send-email actually stores.
@@ -929,24 +897,6 @@ export default function RenewalsPage() {
             >
               <span>+</span> Start New Period
             </button>
-          </div>
-        </div>
-
-        {/* ── DEADLINE & COUNTDOWN BANNER ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-amber-500/10 border border-amber-300 px-6 py-4 text-amber-900">
-          <div className="flex items-center gap-2.5">
-            <span className="text-xl">⏳</span>
-            <div>
-              <p className="text-[13.5px] font-bold">
-                Promo Code Expiry &amp; Slot Release: <span className="underline">October 16, 2026 at 1:00 PM</span>
-              </p>
-              <p className="text-[12px] text-amber-800">
-                A slot is confirmed only upon receipt of 60% downpayment. Unpaid reservations are flagged for admin release after this deadline.
-              </p>
-            </div>
-          </div>
-          <div className="rounded-xl bg-amber-500 text-white px-3.5 py-1.5 text-[12px] font-bold self-start sm:self-auto shrink-0 shadow-sm">
-            {mounted ? deadlineText : "Calculating remaining time..."}
           </div>
         </div>
 
@@ -1245,7 +1195,7 @@ export default function RenewalsPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <p className="text-[11.5px] text-slate-700 font-medium">
-                            {new Date(r.reservedUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                            {r.reservedUntil ? new Date(r.reservedUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
                           </p>
                           <p className="text-[10.5px] text-slate-400">
                             Sub: {new Date(r.submittedAt).toLocaleDateString()}
@@ -1568,8 +1518,8 @@ export default function RenewalsPage() {
                         key={f._id}
                         onClick={() => {
                           setEmailModalFamily(f);
-                          setEmailType("promo_code");
-                          setEmailSubject(`Priority Renewal & Slot Reservation Code for ${f.childName} 🌈`);
+                          setEmailType("payment_reminder");
+                          setEmailSubject(`Payment Reminder & Renewal Link for ${f.childName} 🌈`);
                           setEmailCustomMessage("");
                         }}
                         className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
@@ -1682,8 +1632,8 @@ export default function RenewalsPage() {
                             <button
                               onClick={() => {
                                 setEmailModalFamily(f);
-                                setEmailType("promo_code");
-                                setEmailSubject(`Priority Renewal & Slot Reservation Code for ${f.childName} 🌈`);
+                                setEmailType("payment_reminder");
+                                setEmailSubject(`Payment Reminder & Renewal Link for ${f.childName} 🌈`);
                                 setEmailCustomMessage("");
                               }}
                               className="rounded-lg bg-blue-50 text-[#0033A0] hover:bg-[#0033A0] hover:text-white px-2.5 py-1 text-[11.5px] font-bold transition-all shadow-sm"
@@ -2046,19 +1996,6 @@ export default function RenewalsPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setEmailType("promo_code");
-                    setEmailSubject(`Priority Renewal & Slot Reservation Code for ${emailModalFamily.childName} 🌈`);
-                  }}
-                  className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "promo_code"
-                    ? "bg-white text-[#0033A0] shadow-sm"
-                    : "text-slate-600 hover:text-[#002f76]"
-                    }`}
-                >
-                  🎟️ Priority Code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
                     setEmailType("payment_reminder");
                     setEmailSubject(`Payment Reminder & Slot Confirmation for ${emailModalFamily.childName} 🌈`);
                   }}
@@ -2073,7 +2010,7 @@ export default function RenewalsPage() {
                   type="button"
                   onClick={() => {
                     setEmailType("slot_released");
-                    setEmailSubject(`Notice of Released Slot: Priority Reservation Expired for ${emailModalFamily.childName} ⏳`);
+                    setEmailSubject(`Notice of Released Slot for ${emailModalFamily.childName} ⏳`);
                   }}
                   className={`flex-1 py-2 text-[12px] font-bold rounded-xl transition-all ${emailType === "slot_released"
                     ? "bg-white text-[#0033A0] shadow-sm"
@@ -2098,41 +2035,30 @@ export default function RenewalsPage() {
               </div>
 
               {/* Email Content Preview */}
-              {emailType === "promo_code" ? (
-                <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
-                  <div className="border-b border-slate-200 pb-2">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
-                    <p className="font-bold text-[#002f76] mt-0.5">
-                      Priority Renewal &amp; Slot Reservation Code for {emailModalFamily.childName} 🌈
-                    </p>
-                  </div>
-                  <div className="space-y-2 text-slate-600 text-[12px] leading-relaxed">
-                    <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
-                    <p>
-                      We are delighted to welcome back <strong>{emailModalFamily.childName}</strong> for our upcoming adventure with Merry Explorers!
-                    </p>
-                    <div className="rounded-xl bg-white border border-dashed border-[#0033A0] p-3 text-center my-2">
-                      <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">Your Priority Reservation Code</p>
-                      <p className="text-xl font-mono font-black text-[#002f76] mt-0.5 tracking-wider">A1RENEWAL2026</p>
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1 text-slate-600 text-[11.5px]">
-                      <li><strong>Not a discount voucher:</strong> Allows reserving without upfront payment today.</li>
-                      <li><strong>Valid until:</strong> October 15, 2026.</li>
-                      <li><strong>Release deadline:</strong> Unpaid slots released October 16, 1:00 PM.</li>
-                      <li><strong>Confirmation:</strong> Confirmed upon receipt of 60% downpayment.</li>
-                      <li>Need help? Ask Teacher Angel onsite.</li>
-                    </ul>
-                  </div>
-                </div>
-              ) : emailType === "payment_reminder" ? (
+              {emailType === "payment_reminder" ? (
                 (() => {
                   const modalMatchingRecord = emailModalFamily
                     ? familyRecordMap.get(emailModalFamily._id) || null
                     : null;
                   const displayProgram = modalMatchingRecord?.program || emailModalFamily.renewingTo || emailModalFamily.previousProgram || "Curious Explorer";
-                  const isTrailblazer = displayProgram.toLowerCase().includes("trailblazer") || displayProgram.toLowerCase().includes("brave");
-                  const displayTuition = modalMatchingRecord?.totalTuition || (isTrailblazer ? 6900 : 4395);
-                  const displayDownpayment = modalMatchingRecord?.expectedDownpayment || (isTrailblazer ? 4140 : 2637);
+                  const normalizedProgram = displayProgram.toLowerCase();
+                  const displayProgramSlug = normalizedProgram.includes("creative")
+                    ? "creative-explorer"
+                    : normalizedProgram.includes("everyday")
+                      ? "everyday-curious"
+                      : normalizedProgram.includes("brave") || normalizedProgram.includes("trailblazer")
+                        ? "brave-explorer"
+                        : normalizedProgram.includes("ballet")
+                          ? "ballet"
+                          : normalizedProgram.includes("virtual")
+                            ? "virtual-session"
+                            : normalizedProgram.includes("saturday")
+                              ? "saturday-playdate"
+                              : "curious-explorer";
+                  const programDefinition = (PROGRAM_SLOTS as Record<string, any>)[displayProgramSlug];
+                  const pioneerFallback = emailModalFamily.isPioneer ? FALLBACK_PIONEER_RATES[displayProgramSlug] : undefined;
+                  const displayTuition = modalMatchingRecord?.totalTuition || pioneerFallback || programDefinition?.rate || 0;
+                  const displayDownpayment = modalMatchingRecord?.expectedDownpayment || Math.round(displayTuition * 0.6);
 
                   return (
                     <div className="space-y-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-4 text-[12.5px] text-slate-700">
@@ -2169,7 +2095,7 @@ export default function RenewalsPage() {
                           </div>
                           <div className="flex justify-between border-b border-slate-100 pb-1">
                             <span className="text-slate-500 font-semibold">Total Tuition:</span>
-                            <span className="font-bold text-slate-800">₱{displayTuition.toLocaleString()}</span>
+                            <span className="font-bold text-slate-800">₱{displayTuition.toLocaleString()}{emailModalFamily.isPioneer && pioneerFallback ? " · Pioneer Family Rate" : ""}</span>
                           </div>
                           <div className="flex justify-between border-b border-slate-100 pb-1">
                             <span className="text-slate-500 font-semibold">60% Downpayment Due:</span>
@@ -2201,15 +2127,15 @@ export default function RenewalsPage() {
                   <div className="border-b border-slate-200 pb-2">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Subject</p>
                     <p className="font-bold text-rose-700 mt-0.5">
-                      Notice of Released Slot: Priority Reservation Expired for {emailModalFamily.childName} ⏳
+                      Notice of Released Slot for {emailModalFamily.childName} ⏳
                     </p>
                   </div>
                   <div className="space-y-2.5 text-slate-600 text-[12px] leading-relaxed">
                     <p>Dear <strong>{emailModalFamily.parentName}</strong>,</p>
                     <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-red-900 text-[11.5px]">
-                      <p className="font-bold">⚠️ SLOT RELEASED (OCTOBER 16, 1:00 PM CUTOFF):</p>
+                      <p className="font-bold">⚠️ SLOT RELEASED (RELEASED SLOT):</p>
                       <p className="mt-0.5">
-                        Priority reservation has expired due to unconfirmed payment. The reserved slot has been released.
+                        The reserved slot has been released. Please contact us if you have already made a payment or need help renewing.
                       </p>
                     </div>
                     <p>

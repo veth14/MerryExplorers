@@ -8,6 +8,7 @@ interface PioneerFamily {
   parentName: string;
   childName: string;
   email: string;
+  email2?: string;
   createdAt?: string;
 }
 
@@ -54,6 +55,7 @@ export default function PioneerFamiliesPage() {
   const [fParent, setFParent] = useState("");
   const [fChild, setFChild] = useState("");
   const [fEmail, setFEmail] = useState("");
+  const [fEmail2, setFEmail2] = useState("");
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
 
   function showToast(msg: string, type: "success" | "error" = "success") {
@@ -91,13 +93,13 @@ export default function PioneerFamiliesPage() {
   const filteredPioneers = useMemo(() => {
     const q = search.toLowerCase();
     return q
-      ? pioneers.filter(f => [f.parentName, f.childName, f.email].some(v => v?.toLowerCase().includes(q)))
+      ? pioneers.filter(f => [f.parentName, f.childName, f.email, f.email2].some(v => v?.toLowerCase().includes(q)))
       : pioneers;
   }, [pioneers, search]);
 
   const filteredRenewal = useMemo(() => {
     const q = renewalSearch.toLowerCase();
-    const alreadyEmails = new Set(pioneers.map(p => p.email.toLowerCase()));
+    const alreadyEmails = new Set(pioneers.flatMap(p => [p.email, p.email2].map(email => (email || "").toLowerCase())));
     const base = renewalFamilies.filter(f => !alreadyEmails.has((f.parentEmail || "").toLowerCase()));
     return q
       ? base.filter(f => [f.parentName, f.childName, f.parentEmail].some(v => v?.toLowerCase().includes(q)))
@@ -105,10 +107,10 @@ export default function PioneerFamiliesPage() {
   }, [renewalFamilies, pioneers, renewalSearch]);
 
   function openAdd() {
-    setModalMode("add"); setEditId(null); setFParent(""); setFChild(""); setFEmail("");
+    setModalMode("add"); setEditId(null); setFParent(""); setFChild(""); setFEmail(""); setFEmail2("");
   }
   function openEdit(f: PioneerFamily) {
-    setModalMode("edit"); setEditId(f.id); setFParent(f.parentName); setFChild(f.childName); setFEmail(f.email);
+    setModalMode("edit"); setEditId(f.id); setFParent(f.parentName); setFChild(f.childName); setFEmail(f.email); setFEmail2(f.email2 || "");
   }
   function openPick() {
     setModalMode("pick"); setPickedIds(new Set()); setRenewalSearch("");
@@ -123,7 +125,7 @@ export default function PioneerFamiliesPage() {
     if (!fEmail.trim()) { showToast("Email is required", "error"); return; }
     setSaving(true);
     try {
-      const body: any = { parentName: fParent, childName: fChild, email: fEmail };
+      const body: any = { parentName: fParent, childName: fChild, email: fEmail, email2: fEmail2 };
       if (editId) body.id = editId;
       const res = await fetch("/api/pioneer-families", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
@@ -312,7 +314,7 @@ export default function PioneerFamiliesPage() {
               >
                 <p className="font-semibold text-[13px] text-[#002f76]">{f.parentName || "—"}</p>
                 <p className="text-[13px] text-slate-700">{f.childName || "—"}</p>
-                <p className="text-[12px] text-slate-500 truncate">{f.email}</p>
+                <p className="text-[12px] text-slate-500 truncate">{[f.email, f.email2].filter(Boolean).join(" · ")}</p>
                 <p className="text-[12px] text-slate-400">{fmtDate(f.createdAt)}</p>
                 <div className="flex gap-2">
                   <button
@@ -346,10 +348,12 @@ export default function PioneerFamiliesPage() {
                   { label: "Parent Name", value: fParent, set: setFParent, placeholder: "e.g. Maria Santos" },
                   { label: "Child Name", value: fChild, set: setFChild, placeholder: "e.g. Isabella Santos" },
                   { label: "Email Address *", value: fEmail, set: setFEmail, placeholder: "parent@email.com" },
+                  { label: "Second Email Address (optional)", value: fEmail2, set: setFEmail2, placeholder: "second-parent@email.com" },
                 ].map(({ label, value, set, placeholder }) => (
                   <div key={label}>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{label}</label>
                     <input
+                      type={label.toLowerCase().includes("email") ? "email" : "text"}
                       value={value}
                       onChange={e => set(e.target.value)}
                       placeholder={placeholder}

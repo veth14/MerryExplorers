@@ -155,6 +155,7 @@ export async function GET() {
       return existing
         ? {
             ...existing,
+            programKey: key,
             currentAdventure: existing.currentAdventure ?? 2,
             adventureStartDate: existing.adventureStartDate ?? null,
             registrationOpen: existing.registrationOpen !== false,

@@ -15,14 +15,25 @@ type ProgramId = keyof typeof PROGRAM_SLOTS;
 type RegData = {
   status: string;
   program: ProgramId;
+  classTime?: string;
   reservedUntil: string;
   paymentDeadline?: string;
   isPromoRegistration?: boolean;
   promoCode?: string;
   isScholar?: boolean;
   isPioneer?: boolean;
+  isNewFamily?: boolean;
   customRate?: number;
   amountDue?: number;
+  balanceInfo?: {
+    total: number | null;
+    paid: number;
+    balance: number;
+    interest: number;
+    weeksOfInterest: number;
+    totalPayable: number | null;
+    dueDate?: string | null;
+  } | null;
 };
 
 // ─── Design Tokens (aligned with Parent Portal / TrailblazerDashboard) ───────
@@ -101,18 +112,6 @@ export default function PaymentPage() {
   const [ocrDone, setOcrDone] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
 
-  // Oct 16, 1:00 PM deadline gate — only applies to promo code (renewal) reservations
-  // Regular 1-hour registrations are already handled by the countdown timer expiry
-  const SLOT_RELEASE_DEADLINE = new Date("2026-10-16T13:00:00+08:00");
-  const isSlotReleased =
-    mounted &&
-    !loading &&
-    !!regData &&
-    regData.status === "reserved" &&
-    regData.isPromoRegistration === true &&
-    Date.now() >= SLOT_RELEASE_DEADLINE.getTime() &&
-    !success;
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -133,11 +132,16 @@ export default function PaymentPage() {
             if (typeof data.data.lanyardOrdered === "boolean") setLanyardOrdered(data.data.lanyardOrdered);
             if (typeof data.data.welcomeKitOrdered === "boolean") setWelcomeKitOrdered(data.data.isPioneer ? false : data.data.welcomeKitOrdered);
             const isScholar = data.data.isScholar || data.data.promoCode === "A1JesusLovesMe2026" || data.data.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || data.data.status === "scholar";
-            if (data.data.status !== "reserved" && data.data.status !== "early-bird" && !isScholar) {
+            const balanceCanBePaid = ["approved", "active"].includes(data.data.status) && Number(data.data.balanceInfo?.balance) > 0;
+            if (balanceCanBePaid && Number(data.data.balanceInfo?.totalPayable) > 0) {
+              setAmountPaid(String(data.data.balanceInfo.totalPayable));
+            } else if (data.data.status !== "reserved" && data.data.status !== "early-bird" && !isScholar) {
               setError(
                 data.data.status === "expired"
                   ? "Your slot reservation has expired."
-                  : "Payment has already been submitted for this registration."
+                  : ["approved", "active"].includes(data.data.status)
+                    ? "There is no remaining balance to pay for this registration."
+                    : "A payment is already submitted and waiting for verification."
               );
             }
           } else {
@@ -189,6 +193,7 @@ export default function PaymentPage() {
     regData?.program === "virtual-session";
 
   const isPioneer = Boolean(regData?.isPioneer);
+  const isBalanceMode = Boolean(regData && ["approved", "active"].includes(regData.status) && Number(regData.balanceInfo?.balance) > 0);
 
   const addonCost = isBallet
     ? (recitalKitOrdered ? 1500 : 0)
@@ -205,9 +210,11 @@ export default function PaymentPage() {
     ? Math.round(effectiveRate * 0.6)
     : (prog ? prog.downpayment : 0);
 
-  const amountDue = prog
-    ? (paymentType === "full" ? effectiveRate : effectiveDownpayment) + addonCost
-    : 0;
+  const amountDue = isBalanceMode
+    ? Number(regData?.balanceInfo?.totalPayable) || Number(regData?.balanceInfo?.balance) || 0
+    : prog
+      ? (paymentType === "full" ? effectiveRate : effectiveDownpayment) + addonCost
+      : 0;
 
   const parsedAmountPaid = parseFloat(amountPaid.replace(/,/g, "")) || 0;
   const creditBalance = parsedAmountPaid > 0 && parsedAmountPaid > amountDue ? +(parsedAmountPaid - amountDue).toFixed(2) : 0;
@@ -250,7 +257,12 @@ export default function PaymentPage() {
     []
   );
 
-  const canProceed = paymentMethod !== "" && receiptBase64 !== "" && amountPaid !== "" && amountShort === 0;
+  const partialWouldLeaveInterest = Boolean(
+    isBalanceMode && regData?.balanceInfo && parsedAmountPaid >= regData.balanceInfo.balance && parsedAmountPaid < Number(regData.balanceInfo.totalPayable || 0) - 0.01
+  );
+  const canProceed = paymentMethod !== "" && receiptBase64 !== "" && amountPaid !== "" && (
+    isBalanceMode ? parsedAmountPaid > 0 && !partialWouldLeaveInterest : amountShort === 0
+  );
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -262,6 +274,9 @@ export default function PaymentPage() {
         body: JSON.stringify({
           paymentMethod,
           receiptBase64,
+          balancePayment: isBalanceMode,
+          expectedTotalPayable: isBalanceMode ? regData?.balanceInfo?.totalPayable : undefined,
+          paidOn: isBalanceMode ? new Date().toISOString() : undefined,
           uniformOrdered,
           lanyardOrdered,
           welcomeKitOrdered: isPioneer ? false : welcomeKitOrdered,
@@ -305,13 +320,15 @@ export default function PaymentPage() {
         {/* Hero title */}
         <div className="text-center flex flex-col items-center gap-2 -mb-2">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
-            <span>💳</span> REGISTRATION PAYMENT
+            <span>💳</span> {isBalanceMode ? "BALANCE PAYMENT" : "REGISTRATION PAYMENT"}
           </div>
           <h1 className="vp-title text-[32px] sm:text-[42px]">
-            Finalize Your Slot
+            {isBalanceMode ? "Pay Remaining Balance" : "Finalize Your Slot"}
           </h1>
           <p className="vp-sub text-[15px] max-w-md">
-            Submit your receipt below to confirm registration for <strong>2026 Adventure 2</strong>.
+            {isBalanceMode
+              ? <>Submit your receipt below for the remaining balance on <strong>{prog?.name}</strong>.</>
+              : <>Submit your receipt below to confirm registration for <strong>2026 Adventure 2</strong>.</>}
           </p>
         </div>
 
@@ -330,12 +347,13 @@ export default function PaymentPage() {
             </div>
             <h2 className="vp-h2 text-[28px] mb-2">Payment Submitted!</h2>
             <p className="vp-sub max-w-md mx-auto text-[15px] mb-8 leading-relaxed">
-              Your receipt has been successfully recorded! Our administrative team will verify your payment shortly. An email confirmation has been sent to your email.
+              {isBalanceMode
+                ? "Your balance payment receipt has been submitted. Our administrative team will verify it and update your remaining balance."
+                : "Your receipt has been successfully recorded! Our administrative team will verify your payment shortly. An email confirmation has been sent to your email."}
             </p>
             <div className="flex justify-center gap-3">
-              <Link href="/parent/dashboard" className="vp-btn">
-                Go to Parent Dashboard 🚀
-              </Link>
+              {!isBalanceMode && <Link href="/parent/dashboard" className="vp-btn">Go to Parent Dashboard 🚀</Link>}
+              {isBalanceMode && <Link href="/" className="vp-btn">Back to Merry Explorers</Link>}
             </div>
           </div>
         ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
@@ -382,25 +400,6 @@ export default function PaymentPage() {
               </Link>
             </div>
           </div>
-        ) : isSlotReleased ? (
-          <div className="vp-card text-center py-12">
-            <div className="vp-tape" />
-            <div className="w-20 h-20 rounded-full bg-red-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
-              🔓
-            </div>
-            <h2 className="vp-h2 text-[24px] text-red-600 mb-2">Your Slot Has Been Released</h2>
-            <p className="vp-sub max-w-md mx-auto text-[14px] mb-4 leading-relaxed">
-              As of <strong>October 16, 2026 at 1:00 PM</strong>, the priority reservation deadline has passed and your reserved slot has been released to waitlisted families.
-            </p>
-            <p className="vp-sub max-w-md mx-auto text-[13px] mb-8 leading-relaxed text-[#3d5a99]">
-              If you would still like to register, please submit a <strong>new registration form</strong> through our standard registration portal, subject to slot availability.
-            </p>
-            <div className="flex justify-center gap-3 flex-wrap">
-              <Link href="/register" className="vp-btn">Submit New Registration →</Link>
-              <Link href="/" className="vp-btn ghost small">Back to Home</Link>
-            </div>
-            <p className="mt-6 text-[12px] text-[#64748b]">Questions? Contact Teacher Angel onsite or reply to the email you received.</p>
-          </div>
         ) : showErrorScreen || !prog ? (
           <div className="vp-card text-center py-12">
             <div className="vp-tape" />
@@ -416,6 +415,27 @@ export default function PaymentPage() {
         ) : (
           <div className="vp-card">
             <div className="vp-tape" />
+
+            {isBalanceMode ? (
+              <div className="mb-6 rounded-[22px] bg-gradient-to-r from-[#0b2a82] to-[#1f7ae0] p-6 text-white border-3 border-[#0b2a82] shadow-[0_6px_0_#0b2a82]">
+                <div className="flex justify-between items-end gap-3 mb-4">
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/80">Balance Payment</p>
+                    <p className="mt-1 text-[32px] font-black leading-none">₱{amountDue.toLocaleString()}</p>
+                    <p className="mt-1 text-[11px] text-white/75">Total due now, including any current interest</p>
+                  </div>
+                  {isPioneer && <span className="rounded-full bg-emerald-300 text-emerald-950 px-2.5 py-1 text-[10px] font-black uppercase">⭐ Pioneer Family</span>}
+                </div>
+                <div className="space-y-1.5 bg-white/15 rounded-xl p-3.5 text-[13px] border border-white/20">
+                  <div className="flex justify-between"><span className="text-white/80">Total Rate</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.total || 0).toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-white/80">Verified Amount Paid</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.paid || 0).toLocaleString()}</span></div>
+                  <div className="flex justify-between border-t border-white/30 pt-2"><span className="text-white/80">Remaining Balance</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.balance || 0).toLocaleString()}</span></div>
+                  {Number(regData?.balanceInfo?.interest) > 0 && <div className="flex justify-between"><span className="text-white/80">Overdue Interest ({regData?.balanceInfo?.weeksOfInterest} week{regData?.balanceInfo?.weeksOfInterest === 1 ? "" : "s"})</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.interest || 0).toLocaleString()}</span></div>}
+                  {regData?.balanceInfo?.dueDate && <div className="border-t border-white/30 pt-2 text-[11px] text-white/75">Balance due date: {new Date(`${regData.balanceInfo.dueDate}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}. Overdue balances accrue 4% weekly interest.</div>}
+                </div>
+              </div>
+            ) : (
+              <>
 
             {/* Countdown Banner */}
             {timeLeft && (
@@ -567,6 +587,8 @@ export default function PaymentPage() {
                 </div>
               </div>
             </div>
+              </>
+            )}
 
             {/* Payment Method Selector */}
             <div className="mb-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
@@ -689,8 +711,14 @@ export default function PaymentPage() {
                       onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ""))}
                       placeholder={`e.g. ${amountDue}`}
                     />
-                    {amountShort > 0 && (
+                    {!isBalanceMode && amountShort > 0 && (
                       <p className="text-red-600 text-[12px] mt-1 font-black">⚠️ Amount entered is short by ₱{amountShort.toLocaleString()}</p>
+                    )}
+                    {isBalanceMode && partialWouldLeaveInterest && (
+                      <p className="text-red-600 text-[12px] mt-1 font-black">⚠️ Enter an amount below the remaining balance for a partial payment, or pay the full total due including interest.</p>
+                    )}
+                    {isBalanceMode && parsedAmountPaid > 0 && parsedAmountPaid < Number(regData?.balanceInfo?.balance || 0) && (
+                      <p className="text-blue-800 text-[12px] mt-1 font-bold">Partial payments are accepted and will be applied after verification.</p>
                     )}
                     {creditBalance > 0 && (
                       <p className="text-emerald-700 text-[12px] mt-1 font-bold">✨ Overpayment of ₱{creditBalance.toLocaleString()} will be credited to balance.</p>

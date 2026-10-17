@@ -928,7 +928,6 @@ function DownpaymentPanel({ data, onRefresh, renewalSettings }: { data: ParentAc
 const PROGRAM_META: Record<string, { emoji: string; color: string; bg: string; border: string; short: string }> = {
   "Discovery Club: Curious Explorer": { emoji: "🔍", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", short: "Curious Explorer" },
   "Discovery Club: Creative Explorer": { emoji: "🎨", color: "#0e7490", bg: "#ecfeff", border: "#a5f3fc", short: "Creative Explorer" },
-  "Discovery Club: Everyday Curious": { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Explorer" },
   "Discovery Club: Everyday Explorer": { emoji: "🌱", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0", short: "Everyday Explorer" },
   "Trailblazer: Brave Explorer": { emoji: "🏕️", color: "#b45309", bg: "#fffbeb", border: "#fde68a", short: "Brave Explorer" },
 };

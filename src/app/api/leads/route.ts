@@ -40,7 +40,6 @@ export async function GET(request: Request) {
         // Exclude leads that belong to renewal families
         const filteredLeads = leads.filter((l) => {
             if (l.source === "renewal" || l.isRenewal) return false;
-            if (l.promoCode && l.promoCode.toUpperCase() === "A1RENEWAL2026") return false;
 
             const pEmail = (l.parentInfo?.email || "").toLowerCase().trim();
             if (pEmail && renewalEmails.has(pEmail)) return false;
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
         if (
             source === "renewal" ||
             body.isRenewal ||
-            (promoCode && promoCode.toUpperCase() === "A1RENEWAL2026")
+            source === "renewal"
         ) {
             return NextResponse.json({
                 success: true,

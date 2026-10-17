@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
+import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import SignatureCanvas from "react-signature-canvas";
@@ -124,12 +125,6 @@ export default function RenewPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // Promo code state
-  const [promoCode, setPromoCode] = useState("");
-  const [promoAccepted, setPromoAccepted] = useState(false);
-  const [promoError, setPromoError] = useState("");
-  const [validatingPromo, setValidatingPromo] = useState(false);
-
   // Pioneer pricing state
   const [isPioneer, setIsPioneer] = useState(false);
   const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
@@ -227,11 +222,12 @@ export default function RenewPage() {
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
 
   // Effective pricing: Pioneer families receive their set pioneer prices
-  const effectiveRate = prog
-    ? (isPioneer && pioneerPrices[prog.id] ? pioneerPrices[prog.id] : prog.rate)
+  const configuredPioneerRate = prog && isPioneer
+    ? Number(pioneerPrices[prog.id]) || FALLBACK_PIONEER_RATES[prog.id]
     : 0;
+  const effectiveRate = prog ? configuredPioneerRate || prog.rate : 0;
   const effectiveDownpayment = prog
-    ? (isPioneer && pioneerPrices[prog.id] ? Math.round(effectiveRate * 0.6) : prog.downpayment)
+    ? (configuredPioneerRate ? Math.round(effectiveRate * 0.6) : prog.downpayment)
     : 0;
   const effectiveBalance = effectiveRate - effectiveDownpayment;
 
@@ -245,40 +241,8 @@ export default function RenewPage() {
   const canProceedStep1 =
     selectedProgram !== "" &&
     selectedClass !== "" &&
-    (!requiresUniformDay || uniformDayAcknowledged) &&
-    promoAccepted;
+    (!requiresUniformDay || uniformDayAcknowledged);
   const canProceedStep2 = photoConsent !== "" && (selectedProgram === "brave-explorer" || (waiverRead && signatureBase64 !== ""));
-
-  async function applyPromoCode() {
-    const trimmed = promoCode.trim();
-    if (!trimmed) {
-      setPromoError("Please enter your promo code.");
-      return;
-    }
-    setValidatingPromo(true);
-    setPromoError("");
-    try {
-      const res = await fetch("/api/promos/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: trimmed }),
-      });
-      const data = await res.json();
-      if (data.valid) {
-        setPromoAccepted(true);
-        if (data.promoCode) setPromoCode(data.promoCode);
-        setPromoError("");
-      } else {
-        setPromoAccepted(false);
-        setPromoError(data.error || "This code is not valid.");
-      }
-    } catch {
-      setPromoAccepted(false);
-      setPromoError("This code is not valid.");
-    } finally {
-      setValidatingPromo(false);
-    }
-  }
 
   async function handleSubmit() {
     if (!childInfo || !parentInfo) return;
@@ -296,9 +260,7 @@ export default function RenewPage() {
           emergencyContact,
           photoConsent,
           signatureBase64,
-          // Send promo code as-is (case-sensitive) — A1JesusLovesMe2026 is case-sensitive on the server
-          promoCode: promoAccepted ? promoCode.trim() : undefined,
-          isPromoRegistration: promoAccepted,
+          isRenewal: true,
           isNewFamily: false,
           isPioneer,
           customRate: effectiveRate,
@@ -828,91 +790,6 @@ export default function RenewPage() {
                   </div>
                 )}
 
-                {/* Promo Code Section */}
-                <div className="mt-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🎟️</span>
-                    <h3 className="vp-h3 text-[15px] text-[#0b2a82] mb-0">Enter Your Priority Renewal Code</h3>
-                  </div>
-                  <p className="text-[12px] font-medium text-[#3d5a99] leading-relaxed">
-                    Enter the priority renewal code you received via email and click <strong>Apply Code</strong> to proceed.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <input
-                      type="text"
-                      value={promoCode}
-                      onChange={(e) => { setPromoCode(e.target.value); setPromoError(""); setPromoAccepted(false); }}
-                      placeholder="Enter your promo code"
-                      disabled={promoAccepted}
-                      className={`flex-1 rounded-xl border-2 bg-white px-4 py-2.5 text-[14px] font-mono font-black text-[#0b2a82] tracking-wider focus:border-[#0b2a82] focus:outline-none transition-all ${promoAccepted ? "border-emerald-400 bg-emerald-50 cursor-not-allowed opacity-70" : "border-[#b6dcf5]"}`}
-                    />
-                    {!promoAccepted ? (
-                      <button
-                        type="button"
-                        disabled={validatingPromo || !promoCode.trim()}
-                        onClick={applyPromoCode}
-                        className="vp-btn small"
-                      >
-                        {validatingPromo ? "Checking..." : "Apply Code"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => { setPromoAccepted(false); setPromoCode(""); setPromoError(""); }}
-                        className="rounded-xl border-2 border-[#b6dcf5] bg-white px-4 py-2.5 text-[12px] font-extrabold text-[#3d5a99] hover:border-red-300 hover:text-red-500 transition-all shrink-0"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  {promoAccepted && (
-                    <div className="rounded-[18px] border-3 border-emerald-400 bg-emerald-50 shadow-[0_4px_0_rgba(16,185,129,0.20)] overflow-hidden">
-                      <div className="bg-emerald-500 px-4 py-2.5 flex items-center gap-2">
-                        <span className="text-lg">✅</span>
-                        <span className="text-[13px] font-black text-white uppercase tracking-wider">THIS CODE HAS BEEN ACCEPTED</span>
-                      </div>
-                      {/* Note body */}
-                      {promoCode.trim().replace(/^[“"']+|[”"':]+$/g, "") === "A1JesusLovesMe2026" || promoCode.trim().startsWith("A1JesusLovesMe2026") ? (
-                        <div className="p-4 space-y-2 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
-                          <p className="font-extrabold text-[13.5px] text-emerald-950 flex items-center gap-1.5">
-                            <span>🎓</span> Full Scholarship Code Applied!
-                          </p>
-                          <p>
-                            This special code grants <strong>100% sponsored tuition</strong> for your child.
-                          </p>
-                          <div className="mt-1 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-2 text-emerald-950 font-bold text-[12px] leading-snug">
-                            ✨ <strong>No payment needed.</strong> Your slot will be automatically guaranteed and confirmed upon submission.
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-4 space-y-2.5 text-[12.5px] text-emerald-900 leading-relaxed font-medium">
-                          <p>
-                            The code allows parents to submit the registration form and reserve a slot for their little one
-                            without immediate payment until <strong>October 15</strong>.
-                          </p>
-                          <p>
-                            However, <strong>using the code does not guarantee a confirmed reservation</strong>; slots will only
-                            be confirmed upon submission of payment.
-                          </p>
-                          <p>
-                            All families who use the code will receive a <strong>payment reminder via email</strong> by October 15.
-                          </p>
-                          <div className="mt-1 rounded-xl bg-amber-100 border border-amber-300 px-3 py-2.5 text-amber-900 font-bold text-[12px] leading-snug">
-                            ⚠️ Any unpaid reservations by <strong>October 16 at 1:00 PM</strong> will be released. Families who miss the payment deadline must submit a new registration form to reserve a slot again.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {promoError && (
-                    <div className="rounded-xl bg-red-100 border-2 border-red-300 p-2.5 text-[12px] font-extrabold text-red-900">
-                      ⚠️ {promoError}
-                    </div>
-                  )}
-                </div>
-
                 {/* Uniform Day Acknowledgment (only for weekday explorer programs with Wed/Fri uniform) */}
                 {requiresUniformDay && (
                   <div className="mt-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] p-5 shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-2">
@@ -1107,14 +984,6 @@ export default function RenewPage() {
                     </table>
                   </div>
                 )}
-
-                {/* Priority Reservation Notice */}
-                <div className="mb-5 rounded-[22px] bg-[#fff6cf] border-3 border-[#0b2a82] px-5 py-4 text-[13px] text-[#0b2a82] shadow-[0_4px_0_rgba(11,42,130,0.18)] space-y-1">
-                  <p className="font-black text-[14px]">🎟️ Priority Reservation Applied:</p>
-                  <p className="text-[12.5px] font-medium text-[#3d5a99] leading-relaxed">
-                    Your slot is held today. To confirm your slot, a 60% non-refundable downpayment of <strong>₱{amountDue.toLocaleString()}</strong> is required by <strong>October 15</strong>. All unpaid slots as of <strong>October 16, 1:00 PM</strong> will be released.
-                  </p>
-                </div>
 
                 {/* Duplicate registration warning — shown when email+child already has an active registration */}
                 {duplicateRegId ? (

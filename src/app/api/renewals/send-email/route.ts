@@ -3,6 +3,9 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import nodemailer from "nodemailer";
+import { PROGRAM_SLOTS } from "@/data/landing";
+import { FALLBACK_PIONEER_RATES } from "@/lib/renewals";
+import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +18,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       familyId,
-      emailType, // "promo_code" | "payment_reminder" | "announcement"
+      emailType, // "payment_reminder" | "slot_released" | "custom"
       customSubject,
       customMessage,
     } = body;
@@ -33,6 +36,10 @@ export async function POST(request: Request) {
 
     if (!family.parentEmail) {
       return NextResponse.json({ error: "Family does not have a valid email address" }, { status: 400 });
+    }
+
+    if (emailType === "promo_code") {
+      return NextResponse.json({ error: "Priority-code campaign emails have been retired. Send a payment reminder with the family's renewal link instead." }, { status: 410 });
     }
 
     // 1. Fetch linked student registration if already submitted
@@ -67,65 +74,41 @@ export async function POST(request: Request) {
     const PROGRAM_META: Record<string, {
       slug: string;
       displayName: string;
-      rate: number;
-      downpayment: number;
-      balance: number;
       isAdv: boolean;
     }> = {
       "curious-explorer": {
         slug: "curious-explorer",
         displayName: "Discovery Club: Curious Explorer",
-        rate: 4395,
-        downpayment: 2637,
-        balance: 1758,
         isAdv: true,
       },
       "creative-explorer": {
         slug: "creative-explorer",
         displayName: "Discovery Club: Creative Explorer",
-        rate: 4985,
-        downpayment: 2991,
-        balance: 1994,
         isAdv: true,
       },
       "everyday-curious": {
         slug: "everyday-curious",
         displayName: "Discovery Club: Everyday Explorer",
-        rate: 7518,
-        downpayment: 4511,
-        balance: 3007,
         isAdv: true,
       },
       "brave-explorer": {
         slug: "brave-explorer",
         displayName: "Trailblazer: Brave Explorer",
-        rate: 6900,
-        downpayment: 4140,
-        balance: 2760,
         isAdv: true,
       },
       "ballet": {
         slug: "ballet",
         displayName: "Ballet",
-        rate: 2750,
-        downpayment: 1650,
-        balance: 1100,
         isAdv: false,
       },
       "saturday-playdate": {
         slug: "saturday-playdate",
         displayName: "Saturday Playdate",
-        rate: 2190,
-        downpayment: 1314,
-        balance: 876,
         isAdv: true,
       },
       "virtual-session": {
         slug: "virtual-session",
         displayName: "Virtual Tutorial",
-        rate: 450,
-        downpayment: 450,
-        balance: 0,
         isAdv: false,
       },
     };
@@ -156,6 +139,7 @@ export async function POST(request: Request) {
     const targetProgramRaw = studentReg?.program || family.renewingTo || family.previousProgram || "Curious Explorer";
     const targetProgramSlug = resolveProgramSlug(targetProgramRaw);
     const meta = PROGRAM_META[targetProgramSlug] || PROGRAM_META["curious-explorer"];
+    const programDefinition = (PROGRAM_SLOTS as Record<string, any>)[targetProgramSlug] || PROGRAM_SLOTS["curious-explorer"];
 
     const matchedProgramEntry = storedPrograms.find((p) =>
       resolveProgramSlug(p.programKey) === targetProgramSlug
@@ -189,25 +173,22 @@ export async function POST(request: Request) {
     // 4. Pioneer verification & Financials
     const pioneerSettingsDoc = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
     const cleanEmail = (family.parentEmail || "").toLowerCase().trim();
-    const pioneerFamily = await db.collection("pioneer_families").findOne({
-      $or: [
-        { email: cleanEmail },
-        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }
-      ]
-    });
+    const pioneerFamily = cleanEmail
+      ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(cleanEmail))
+      : null;
     const isPioneer = Boolean(pioneerFamily || studentReg?.isPioneer);
 
     const pioneerPrices: Record<string, number> = pioneerSettingsDoc?.pioneerPrices || {};
-    const specificPioneerPrice: number | undefined = pioneerPrices[targetProgramSlug];
-    const hasPioneerDiscount = isPioneer && typeof specificPioneerPrice === "number" && specificPioneerPrice > 0;
+    const specificPioneerPrice = Number(pioneerPrices[targetProgramSlug]) || FALLBACK_PIONEER_RATES[targetProgramSlug] || 0;
+    const hasPioneerDiscount = isPioneer && (specificPioneerPrice > 0 || Number(studentReg?.customRate) > 0);
 
     const totalTuition: number = hasPioneerDiscount
-      ? specificPioneerPrice!
-      : (Number(studentReg?.customRate) || meta.rate);
+      ? (specificPioneerPrice || Number(studentReg?.customRate) || programDefinition.rate)
+      : (Number(studentReg?.customRate) || programDefinition.rate);
 
     const expectedDownpayment: number = hasPioneerDiscount
-      ? Math.round(specificPioneerPrice! * 0.6)
-      : (Number(studentReg?.amountDue) || meta.downpayment);
+      ? Math.round(totalTuition * 0.6)
+      : (Number(studentReg?.amountDue) || Math.round(totalTuition * 0.6) || programDefinition.downpayment);
 
     const initialPaid = Number(studentReg?.amountPaid) || 0;
     const balancePaid = Array.isArray(studentReg?.balancePayments)
@@ -217,107 +198,22 @@ export async function POST(request: Request) {
     const remainingToConfirm = Math.max(0, expectedDownpayment - totalPaid);
 
     // Default configuration
-    const promoCode = "A1RENEWAL2026";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merry-explorers.vercel.app";
     const registerUrl = `${baseUrl}/renew?ref=${family._id.toString()}`;
     const parentName = family.parentName || "Parent / Guardian";
     const childName = family.childName || "Explorer";
+    const reservationDeadlineValue = studentReg?.reservedUntil || family.reservedUntil;
+    const reservationDeadline = reservationDeadlineValue ? new Date(reservationDeadlineValue) : null;
+    const validDeadline = reservationDeadline && !Number.isNaN(reservationDeadline.getTime()) ? reservationDeadline : null;
+    const deadlineText = validDeadline
+      ? validDeadline.toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" })
+      : null;
+    const futureDeadlineText = validDeadline && validDeadline > new Date() ? deadlineText : null;
 
     let subject = customSubject;
     let htmlContent = "";
 
-    if (emailType === "promo_code") {
-      subject = subject || `Priority Renewal: ${programDisplayName} (${adventureLabel}) for ${childName} 🌈`;
-      htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
-          <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
-            <h1 style="margin: 0; font-size: 20px; font-weight: bold;">Merry Explorers Playgroup Learning Center</h1>
-            <p style="margin: 4px 0 0; font-size: 13px; color: #ffb800; font-weight: bold;">Priority Renewal Access · ${adventureLabel}</p>
-          </div>
-          <div style="padding: 28px;">
-            <p>Dear <strong>${parentName}</strong>,</p>
-            <p>We are thrilled to welcome back <strong>${childName}</strong> for <strong>${adventureLabel}</strong>!</p>
-            
-            <!-- Specific Renewal Program & Schedule Details Box -->
-            <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-              <p style="margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">📋 Program & Schedule Information</p>
-              <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #1e293b;">
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b; width: 150px;"><strong>Explorer:</strong></td>
-                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${childName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Program:</strong></td>
-                  <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${programDisplayName}</td>
-                </tr>
-                ${isAdvProg ? `
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Adventure Cycle:</strong></td>
-                  <td style="padding: 4px 0; font-weight: bold; color: #059669;">${adventureLabel}</td>
-                </tr>
-                ` : ""}
-                ${formattedStartDate ? `
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>${isAdvProg ? "Adventure Starts:" : "Program Starts:"}</strong></td>
-                  <td style="padding: 4px 0; font-weight: 800; color: #ffb800;">🚀 ${formattedStartDate}</td>
-                </tr>
-                ` : ""}
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Tuition Fee:</strong></td>
-                  <td style="padding: 4px 0; font-weight: bold; color: #1e293b;">
-                    ₱${totalTuition.toLocaleString()}
-                    ${hasPioneerDiscount ? `<span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800; margin-left: 6px;">PIONEER FAMILY</span>` : ""}
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>60% Downpayment:</strong></td>
-                  <td style="padding: 4px 0; font-weight: 900; color: #059669;">⭐ ₱${expectedDownpayment.toLocaleString()}</td>
-                </tr>
-              </table>
-            </div>
-
-            <p>As a valued returning family, you have priority access to reserve your slot before general registration opens:</p>
-            
-            <div style="background-color: #f8fafc; border: 2px dashed #0033a0; border-radius: 12px; padding: 18px; text-align: center; margin: 24px 0;">
-              <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: bold;">Your Priority Reservation Code</p>
-              <p style="margin: 6px 0 0; font-size: 26px; font-family: monospace; font-weight: 900; color: #002f76; letter-spacing: 2px;">${promoCode}</p>
-            </div>
-
-            <p style="text-align: center; margin: 24px 0;">
-              <a href="${registerUrl}" style="background-color: #0033a0; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">
-                Complete Renewal Registration Form →
-              </a>
-            </p>
-
-            <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-top: 24px; font-size: 13px; color: #92400e;">
-              <p style="margin: 0 0 8px; font-weight: bold;">⚠️ Key Reminders Regarding Your Reservation:</p>
-              <ul style="margin: 0 0 12px; padding-left: 20px;">
-                <li>This code is <strong>not a discount voucher</strong>. It holds your child's slot without upfront payment today.</li>
-                <li><strong>Code validity:</strong> Valid only until <strong>October 15, 2026</strong>.</li>
-                <li><strong>Slot release policy:</strong> All unpaid slots as of <strong>October 16, 2026 at 1:00 PM</strong> will be released.</li>
-                <li><strong>Confirmation:</strong> Your slot is officially confirmed upon receipt of the 60% non-refundable downpayment.</li>
-              </ul>
-              <div style="border-top: 1px dashed #fcd34d; padding-top: 10px; margin-top: 10px;">
-                <p style="margin: 0 0 4px; font-weight: bold; color: #b45309;">⚠️ NOTE &amp; DISCLAIMER:</p>
-                <p style="margin: 0 0 6px;">Please ensure to settle your <strong>Adventure 1 Balance</strong> before you can proceed to the registration.</p>
-                <p style="margin: 0; font-style: italic; color: #78350f;">
-                  "In the event that a family has unsettled balance, your downpayment for ${adventureLabel} will be credited as your balance payment for the previous cycle."
-                </p>
-              </div>
-            </div>
-
-            <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
-              If you have any questions about schedules or need help accessing the form, feel free to approach Teacher Angel onsite, or reply directly to this email.
-            </p>
-            
-            <p style="margin-top: 24px; font-size: 14px; color: #002f76; font-weight: bold;">
-              Warm regards,<br />
-              The Merry Explorers Team 💛
-            </p>
-          </div>
-        </div>
-      `;
-    } else if (emailType === "payment_reminder") {
+    if (emailType === "payment_reminder") {
       const regId = studentReg?._id?.toString() || family.registrationId || "";
       const paymentUrl = regId ? `${baseUrl}/register/payment/${regId}` : `${baseUrl}/renew?ref=${family._id.toString()}`;
       subject = subject || `Payment Reminder & Slot Confirmation: ${programDisplayName} (${adventureLabel}) for ${childName} 🌈`;
@@ -401,10 +297,10 @@ export async function POST(request: Request) {
               </p>
             </div>
 
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
+            ${futureDeadlineText ? `<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 12.5px; color: #475569;">
               <p style="margin: 0 0 4px; font-weight: bold;">⏰ Deadline Reminder:</p>
-              <p style="margin: 0;">Unpaid reservations will be held until <strong>October 16, 2026 at 1:00 PM</strong>, after which unpaid slots will be released to the waitlist.</p>
-            </div>
+              <p style="margin: 0;">Your reservation is held until <strong>${futureDeadlineText}</strong>.</p>
+            </div>` : ""}
 
             <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
               Need help? Feel free to approach Teacher Angel onsite, or reply directly to this email.
@@ -419,7 +315,7 @@ export async function POST(request: Request) {
       `;
     } else if (emailType === "slot_released") {
       const newRegUrl = `${baseUrl}/register`;
-      subject = subject || `Notice of Released Slot: Priority Reservation Expired for ${childName} ⏳`;
+      subject = subject || `Notice of Released Slot for ${childName} ⏳`;
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
           <div style="background-color: #002f76; padding: 24px; text-align: center; color: white;">
@@ -433,7 +329,7 @@ export async function POST(request: Request) {
             <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
               <p style="margin: 0; font-size: 16px; color: #991b1b; font-weight: 800;">Notice of Released Slot</p>
               <p style="margin: 8px 0 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
-                As of <strong>October 16, 2026 at 1:00 PM</strong>, our priority reservation payment deadline has officially closed. Because payment was not received or confirmed before the cutoff, your reserved slot has now been <strong>released</strong> to waitlisted families.
+                ${deadlineText ? `The payment deadline of <strong>${deadlineText}</strong> has passed.` : "The payment deadline has passed."} Because payment was not received or confirmed before the cutoff, your reserved slot has now been <strong>released</strong> to waitlisted families.
               </p>
             </div>
 
@@ -520,9 +416,7 @@ export async function POST(request: Request) {
       { _id: new ObjectId(familyId) },
       {
         $set: {
-          lastEmailSent: emailType === "promo_code"
-            ? "Promo Code Email Sent"
-            : emailType === "payment_reminder"
+          lastEmailSent: emailType === "payment_reminder"
               ? "Payment Reminder Sent"
               : emailType === "slot_released"
                 ? "Slot Released Notice Sent"
