@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 import { getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting, getRegistrationAdventureNumber } from "@/lib/adventure-cycle";
+import { getRegistrationTotal, isRegistrationVerified } from "@/lib/payment-terms";
 import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,7 @@ export async function POST(
   try {
     const body = await request.json();
     const { actorUid, actorName, actorRole } = body;
+    const resendConfirmation = body.emailAction === "resendConfirmation";
 
     const { db } = await connectToDatabase();
 
@@ -91,8 +93,11 @@ export async function POST(
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
     }
 
-    if (registration.status === "approved") {
+    if (registration.status === "approved" && !resendConfirmation) {
       return NextResponse.json({ error: "Already approved" }, { status: 409 });
+    }
+    if (resendConfirmation && !isRegistrationVerified(registration.status)) {
+      return NextResponse.json({ error: "Only approved registrations can receive a confirmation email." }, { status: 409 });
     }
 
     const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
@@ -111,53 +116,55 @@ export async function POST(
         : null
     );
 
-    // Update status
-    await db.collection("student_registrations").updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          status: "approved",
-          approvedAt: new Date(),
-          approvedBy: actorName || actorUid || "Admin",
-          confirmationEmailSent: false,
-        },
-      }
-    );
-
-    // Create student profile in students collection
     const { childInfo, parentInfo, emergencyContact, program, classTime, uniformOrdered, lanyardOrdered } = registration;
-    await db.collection("students").insertOne({
-      registrationId: id,
-      childInfo,
-      parentInfo,
-      emergencyContact: emergencyContact || {},
-      program,
-      classTime,
-      adventureNumber,
-      adventureStartDate,
-      programName: PROGRAM_NAMES[program] || program,
-      schedule: PROGRAM_SCHEDULES[program] || "",
-      uniformOrdered: uniformOrdered || false,
-      lanyardOrdered: lanyardOrdered || false,
-      photoConsent: registration.photoConsent,
-      waiverSignature: registration.signatureUrl,
-      waiverSignedAt: registration.submittedAt,
-      enrolledAt: new Date(),
-      status: "active",
-    });
+    if (!resendConfirmation) {
+      // Update status
+      await db.collection("student_registrations").updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: "approved",
+            approvedAt: new Date(),
+            approvedBy: actorName || actorUid || "Admin",
+            confirmationEmailSent: false,
+          },
+        }
+      );
 
-    // Audit log
-    if (actorUid) {
-      await db.collection("audit_log").insertOne({
-        actorUid,
-        actorName: actorName || "Unknown",
-        actorRole: actorRole || "Unknown",
-        action: "APPROVE",
-        category: "registration",
-        targetId: id,
-        details: `Approved registration for ${childInfo?.firstName} ${childInfo?.lastName}`,
-        createdAt: new Date(),
+      // Create student profile in students collection
+      await db.collection("students").insertOne({
+        registrationId: id,
+        childInfo,
+        parentInfo,
+        emergencyContact: emergencyContact || {},
+        program,
+        classTime,
+        adventureNumber,
+        adventureStartDate,
+        programName: PROGRAM_NAMES[program] || program,
+        schedule: PROGRAM_SCHEDULES[program] || "",
+        uniformOrdered: uniformOrdered || false,
+        lanyardOrdered: lanyardOrdered || false,
+        photoConsent: registration.photoConsent,
+        waiverSignature: registration.signatureUrl,
+        waiverSignedAt: registration.submittedAt,
+        enrolledAt: new Date(),
+        status: "active",
       });
+
+      // Audit log
+      if (actorUid) {
+        await db.collection("audit_log").insertOne({
+          actorUid,
+          actorName: actorName || "Unknown",
+          actorRole: actorRole || "Unknown",
+          action: "APPROVE",
+          category: "registration",
+          targetId: id,
+          details: `Approved registration for ${childInfo?.firstName} ${childInfo?.lastName}`,
+          createdAt: new Date(),
+        });
+      }
     }
 
     // Send confirmation email to parent
@@ -172,9 +179,13 @@ export async function POST(
       const programName = PROGRAM_NAMES[program] || program;
       const schedule = PROGRAM_SCHEDULES[program] || "";
       const classTimeDisplay = formatClassTime(program, classTime);
-      const totalRate = (prog?.rate || 0) + (uniformOrdered ? 650 : 0);
+      // Use the registration pricing rules so pioneer/custom rates match the
+      // amount collected during registration. Preserve the legacy uniform fee.
+      const totalRate =
+        (getRegistrationTotal({ ...registration, uniformOrdered: false }, prog?.rate || 0) || 0) +
+        (uniformOrdered ? 650 : 0);
       const amountPaid = registration.amountPaid || 0;
-      const remainingBalance = totalRate - amountPaid;
+      const remainingBalance = Math.max(0, totalRate - amountPaid);
       const isFullyPaid = remainingBalance <= 0;
 
       await transporter.sendMail({
@@ -292,7 +303,7 @@ export async function POST(
       console.warn("[approve] Failed to send confirmation email:", emailErr);
     }
 
-    return NextResponse.json({ success: true, emailSent });
+      return NextResponse.json({ success: true, emailSent });
   } catch (error: any) {
     console.error("[approve POST]", error);
     return NextResponse.json({ error: error.message || "Failed to approve" }, { status: 500 });

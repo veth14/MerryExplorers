@@ -1147,6 +1147,33 @@ function AdminPaymentsPageInner() {
     finally { setActioning(null); }
   }
 
+  async function sendRegistrationEmail(uid: string, emailAction: "reminder" | "confirmation") {
+    const key = `${uid}-email-${emailAction}`;
+    setActioning(key);
+    try {
+      const res = await fetch(
+        emailAction === "reminder"
+          ? `/api/registrations/${uid}/send-reminder`
+          : `/api/registrations/${uid}/approve`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(emailAction === "reminder" ? {} : { emailAction: "resendConfirmation" }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.emailSent) {
+        showToast(data.error || "The email could not be sent.", "error");
+        return;
+      }
+      showToast(emailAction === "reminder" ? "Payment reminder sent." : "Corrected confirmation email sent.");
+    } catch {
+      showToast("Network error sending the email.", "error");
+    } finally {
+      setActioning(null);
+    }
+  }
+
   // ── Manual payment encoding ──
   const setF = (patch: Partial<typeof EMPTY_FORM>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -2697,6 +2724,7 @@ function AdminPaymentsPageInner() {
                   pending: { bg: "#fffbeb", color: "#b45309", label: "PENDING" },
                 }[g.status];
                 const summary = type === "registration" ? regSummary.get(uid) : undefined;
+                const registration = type === "registration" ? registrations.find((r) => r.id === uid) : undefined;
                 const isDup = items.some((i) => dupRefs.has(normRef(i.payment.referenceNumber)));
                 const isTest = items.some((i) => /test/i.test(i.payment.referenceNumber || ""));
                 const pendingItems = items.filter((i) => getStatus(i.payment) === "pending");
@@ -2843,6 +2871,28 @@ function AdminPaymentsPageInner() {
                           >
                             ✕
                           </button>
+                        </>
+                      )}
+                      {registration?.parentInfo?.email && !g.pendingItem && registration.status !== "rejected" && (
+                        <>
+                          {summary?.balance != null && summary.balance > 0 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(uid, "reminder"); }}
+                              disabled={!!actioning}
+                              style={{ padding: "6px 10px", borderRadius: "8px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 700, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
+                            >
+                              {actioning === `${uid}-email-reminder` ? "Sending…" : "📧 Reminder"}
+                            </button>
+                          )}
+                          {isRegistrationVerified(registration.status) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(uid, "confirmation"); }}
+                              disabled={!!actioning}
+                              style={{ padding: "6px 10px", borderRadius: "8px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 700, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
+                            >
+                              {actioning === `${uid}-email-confirmation` ? "Sending…" : "↻ Resend email"}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -3026,14 +3076,25 @@ function AdminPaymentsPageInner() {
                     {/* Actions */}
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
                       {noReceipt ? (
-                        <button
-                          className="record-btn"
-                          onClick={(e) => { e.stopPropagation(); openManualFor(r); }}
-                          title="Record this family's payment (upload the receipt and enter the amount)"
-                          style={{ padding: "6px 12px", borderRadius: "8px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer", transition: "all 0.15s" }}
-                        >
-                          ＋ Record payment
-                        </button>
+                        <>
+                          <button
+                            className="record-btn"
+                            onClick={(e) => { e.stopPropagation(); openManualFor(r); }}
+                            title="Record this family's payment (upload the receipt and enter the amount)"
+                            style={{ padding: "6px 12px", borderRadius: "8px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer", transition: "all 0.15s" }}
+                          >
+                            ＋ Record payment
+                          </button>
+                          {r.parentInfo?.email && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(r.id, "reminder"); }}
+                              disabled={!!actioning}
+                              style={{ padding: "6px 10px", borderRadius: "8px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 700, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
+                            >
+                              {actioning === `${r.id}-email-reminder` ? "Sending…" : "📧 Reminder"}
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <button
@@ -3060,6 +3121,26 @@ function AdminPaymentsPageInner() {
                                 style={{ padding: "6px 12px", borderRadius: "8px", background: "#ef4444", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                               >
                                 ✕
+                              </button>
+                            </>
+                          )}
+                          {r.parentInfo?.email && state === "renewed" && isRegistrationVerified(r.status) && (
+                            <>
+                              {summary?.balance != null && summary.balance > 0 && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(r.id, "reminder"); }}
+                                  disabled={!!actioning}
+                                  style={{ padding: "6px 10px", borderRadius: "8px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 700, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
+                                >
+                                  {actioning === `${r.id}-email-reminder` ? "Sending…" : "📧 Reminder"}
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(r.id, "confirmation"); }}
+                                disabled={!!actioning}
+                                style={{ padding: "6px 10px", borderRadius: "8px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 700, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
+                              >
+                                {actioning === `${r.id}-email-confirmation` ? "Sending…" : "↻ Resend email"}
                               </button>
                             </>
                           )}
