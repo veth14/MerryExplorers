@@ -3,6 +3,8 @@ export type AdventureProgramSetting = {
   currentAdventure?: number;
   adventureStartDate?: string | null;
   nextAdventureStart?: string | null;
+  registrationOpen?: boolean;
+  closedClasses?: string[];
 };
 
 export type AdventureCycleTimeline = {

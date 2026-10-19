@@ -83,12 +83,19 @@ export type ProgramRenewalEntry = {
   newFamilyRegistrationOpenDate?: string | null; // optional: date when /register opens for new families
   virtualLink?: string;
   virtualLinkOpen?: boolean;
+  closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
 };
 
 export type RenewalSettingsData = {
   programs: ProgramRenewalEntry[];
   updatedAt: string | null;
 };
+
+export const BALLET_CLASSES = [
+  { name: "Baby Ballet (Morning)", time: "9:00 AM – 10:00 AM", ageRange: "Ages 2.5 to 4.11", maxSlots: 6 },
+  { name: "Baby Ballet (Afternoon)", time: "12:30 PM – 1:30 PM", ageRange: "Ages 2.5 to 4.11", maxSlots: 6 },
+  { name: "Basic Ballet", time: "1:45 PM – 2:45 PM", ageRange: "Ages 5+", maxSlots: 8 },
+] as const;
 
 // Programs that use Adventure cycles (show current/next adventure dates + cycle stepper)
 const ADVENTURE_PROGRAMS = new Set([
@@ -761,6 +768,83 @@ export function RenewalSettingsManager() {
                         <p className="text-[9.5px] text-slate-400 font-semibold truncate">
                           {prog.nextAdventureStart ? nextStartDateDisplay : "Optional"}
                         </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Ballet Specific: Class Time / Session Availability Control ── */}
+                  {prog.programKey === "Ballet" && (
+                    <div className="rounded-2xl border-2 border-pink-200/90 bg-pink-50/40 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[12px] font-black uppercase tracking-wider text-pink-900 flex items-center gap-1.5">
+                            <span>🩰</span> Ballet Class Time Controls
+                          </span>
+                          <p className="text-[11px] font-medium text-pink-800/80 mt-0.5">
+                            Open or close individual session times for public registration.
+                          </p>
+                        </div>
+                        {Array.isArray(prog.closedClasses) && prog.closedClasses.length > 0 ? (
+                          <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                            {prog.closedClasses.length} {prog.closedClasses.length === 1 ? "Session Closed" : "Sessions Closed"}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            All 3 Sessions Open
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        {BALLET_CLASSES.map((cls) => {
+                          const isSessionClosed = Array.isArray(prog.closedClasses) && prog.closedClasses.includes(cls.name);
+                          return (
+                            <div
+                              key={cls.name}
+                              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border-2 transition-all ${
+                                isSessionClosed
+                                  ? "bg-white border-rose-300 shadow-2xs"
+                                  : "bg-white border-pink-200/80 hover:border-pink-300 shadow-2xs"
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[13px] font-black text-slate-800">{cls.name}</p>
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider ${
+                                      isSessionClosed
+                                        ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                        : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                    }`}
+                                  >
+                                    {isSessionClosed ? "🔒 Closed" : "🟢 Open"}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                  {cls.time} · {cls.ageRange} · Max {cls.maxSlots} students
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentClosed = Array.isArray(prog.closedClasses) ? [...prog.closedClasses] : [];
+                                  const updatedClosed = isSessionClosed
+                                    ? currentClosed.filter((name) => name !== cls.name)
+                                    : [...currentClosed, cls.name];
+                                  updateProgram(prog.programKey, { closedClasses: updatedClosed });
+                                }}
+                                className={`shrink-0 px-3.5 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer shadow-xs ${
+                                  isSessionClosed
+                                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                    : "bg-rose-500 text-white hover:bg-rose-600"
+                                }`}
+                              >
+                                {isSessionClosed ? "✓ Reopen Session" : "🔒 Close Session"}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

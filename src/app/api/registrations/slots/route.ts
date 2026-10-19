@@ -14,7 +14,7 @@ export async function GET() {
     const settings = settingsDoc?.programs || [];
     const now = new Date();
 
-    const result: Record<string, Record<string, { maxSlots: number; taken: number; available: number }>> = {};
+    const result: Record<string, Record<string, { maxSlots: number; taken: number; available: number; closed?: boolean }>> = {};
 
     for (const [programId, config] of Object.entries(PROGRAM_SLOTS)) {
       result[programId] = {};
@@ -31,10 +31,12 @@ export async function GET() {
           activeRegistrationSlotQuery({ program: programId, classTime: cls.name, cycleQuery, now })
         );
 
+        const isClassClosed = Array.isArray((adventureSetting as any)?.closedClasses) && (adventureSetting as any).closedClasses.includes(cls.name);
         result[programId][cls.name] = {
           maxSlots: cls.maxSlots,
           taken,
-          available: Math.max(0, cls.maxSlots - taken),
+          available: isClassClosed ? 0 : Math.max(0, cls.maxSlots - taken),
+          closed: isClassClosed,
         };
       }
     }

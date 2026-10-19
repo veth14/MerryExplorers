@@ -7,6 +7,7 @@ type SlotAvailability = {
   maxSlots: number;
   taken: number;
   available: number;
+  closed?: boolean;
 };
 
 type SlotOverview = Record<string, Record<string, SlotAvailability>>;
@@ -103,7 +104,14 @@ export function ClassCapacityTracker() {
                         return (
                           <div key={session.name} className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 text-xs ${belowMin ? "border-orange-200 bg-orange-50/70 text-orange-950" : "border-emerald-200/60 bg-emerald-50/40 text-slate-700"}`}>
                             <div>
-                              <p className="font-bold">{session.name}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold">{session.name}</p>
+                                {session.availability?.closed && (
+                                  <span className="rounded-md border border-rose-300 bg-rose-100 px-1.5 py-0.5 text-[9.5px] font-black uppercase text-rose-800">
+                                    🔒 Closed
+                                  </span>
+                                )}
+                              </div>
                               <p className="mt-0.5 text-[10px] text-slate-500">Max: {max} students</p>
                             </div>
                             <div className="shrink-0 text-right">

@@ -355,6 +355,7 @@ export default function RegisterPage() {
     registrationAutoCloseDays: number | null;
     customClosedMessage?: string;
     newFamilyRegistrationOpenDate?: string | null;
+    closedClasses?: string[];
   };
 
   const [renewalSettings, setRenewalSettings] = useState<Record<string, ProgramSetting>>({});
@@ -388,7 +389,7 @@ export default function RegisterPage() {
         if (Array.isArray(d.programs)) {
           const map: Record<string, ProgramSetting> = {};
           d.programs.forEach((p: any) => {
-            map[p.programKey] = {
+            const entry: ProgramSetting = {
               currentAdventure: p.currentAdventure ?? 2,
               registrationAdventure: getTargetRegistrationAdventureNumber(p.programKey, d.programs),
               adventureStartDate: p.adventureStartDate ?? null,
@@ -397,7 +398,10 @@ export default function RegisterPage() {
               registrationAutoCloseDays: p.registrationAutoCloseDays ?? 7,
               customClosedMessage: p.customClosedMessage || "",
               newFamilyRegistrationOpenDate: p.newFamilyRegistrationOpenDate ?? null,
+              closedClasses: Array.isArray(p.closedClasses) ? p.closedClasses : [],
             };
+            map[p.programKey] = entry;
+            if (p.programKey === "Ballet") map["ballet"] = entry;
           });
           setRenewalSettings(map);
         }
@@ -1290,18 +1294,22 @@ export default function RegisterPage() {
                                   const displayName = cls.name;
 
                                   const slotInfo = programSlots[cls.name];
-                                  const isFull = slotInfo ? slotInfo.available === 0 : false;
+                                  const isClosedByAdmin = Boolean(
+                                    progSettings?.closedClasses?.includes(cls.name) || (slotInfo as any)?.closed
+                                  );
+                                  const isFull = slotInfo ? slotInfo.available === 0 && !isClosedByAdmin : false;
+                                  const isDisabled = isFull || isClosedByAdmin;
                                   const isClassSelected = selectedClass === cls.name;
                                   return (
                                     <button
                                       key={`${cls.name}-${cls.time}`}
                                       type="button"
-                                      disabled={isFull}
+                                      disabled={isDisabled}
                                       aria-pressed={isClassSelected}
-                                      onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
+                                      onClick={(e) => { e.stopPropagation(); if (!isDisabled) setSelectedClass(cls.name); }}
                                       className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${
-                                        isFull
-                                        ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50"
+                                        isDisabled
+                                        ? "opacity-50 cursor-not-allowed border-slate-200 bg-slate-50"
                                         : isClassSelected
                                           ? "border-[#0b2a82] bg-[#fff6cf] shadow-[0_3px_0_#0b2a82] ring-2 ring-[#ffd23f]"
                                           : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"
@@ -1313,7 +1321,13 @@ export default function RegisterPage() {
                                       </div>
                                       <div className="flex shrink-0 flex-col items-end gap-1.5">
                                         {isClassSelected && <span className="rounded-full bg-[#0b2a82] px-2.5 py-1 text-[10px] font-black tracking-wide text-white">✓ SELECTED</span>}
-                                        {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                        {isClosedByAdmin ? (
+                                          <span className="rounded-full bg-rose-100 border border-rose-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-800">
+                                            🔒 Closed
+                                          </span>
+                                        ) : (
+                                          slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />
+                                        )}
                                       </div>
                                     </button>
                                   );

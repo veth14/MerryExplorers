@@ -211,20 +211,23 @@ export default function RenewPage() {
   }, [parentInfo?.email]);
 
   // Program renewal settings for dynamic Adventure cycle # & dates
-  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean }>>({});
+  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean; closedClasses?: string[] }>>({});
 
   useEffect(() => {
     fetch("/api/renewal-settings")
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.programs)) {
-          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean }> = {};
+          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean; closedClasses?: string[] }> = {};
           d.programs.forEach((p: any) => {
-            map[p.programKey] = {
+            const settingItem = {
               currentAdventure: p.currentAdventure ?? 2,
               nextAdventureStart: p.nextAdventureStart ?? null,
               renewalOpen: p.renewalOpen !== false,
+              closedClasses: Array.isArray(p.closedClasses) ? p.closedClasses : [],
             };
+            map[p.programKey] = settingItem;
+            if (p.programKey === "Ballet") map["ballet"] = settingItem;
           });
           setRenewalSettings(map);
         }
@@ -760,17 +763,23 @@ export default function RenewPage() {
                                   const displayName = cls.name;
 
                                   const slotInfo = programSlotData[cls.name];
-                                  const isFull = slotInfo ? slotInfo.available === 0 : false;
+                                  const isClosedByAdmin = Boolean(
+                                    renewalSettings[p.name]?.closedClasses?.includes(cls.name) ||
+                                    renewalSettings[p.id]?.closedClasses?.includes(cls.name) ||
+                                    (slotInfo as any)?.closed
+                                  );
+                                  const isFull = slotInfo ? slotInfo.available === 0 && !isClosedByAdmin : false;
+                                  const isDisabled = isFull || isClosedByAdmin;
                                   const isClassSelected = selectedClass === cls.name;
                                   return (
                                     <button
                                       key={`${cls.name}-${cls.time}`}
                                       type="button"
-                                      disabled={isFull}
-                                      onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
+                                      disabled={isDisabled}
+                                      onClick={(e) => { e.stopPropagation(); if (!isDisabled) setSelectedClass(cls.name); }}
                                       className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${
-                                        isFull
-                                        ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50"
+                                        isDisabled
+                                        ? "opacity-50 cursor-not-allowed border-slate-200 bg-slate-50"
                                         : isClassSelected
                                           ? "border-[#0b2a82] bg-white shadow-[0_3px_0_#0b2a82]"
                                           : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"
@@ -780,7 +789,15 @@ export default function RenewPage() {
                                         <p className="text-[13px] font-black text-[#0b2a82]">{displayName}</p>
                                         <p className="text-[11px] font-semibold text-[#3d5a99]">{cls.time}</p>
                                       </div>
-                                      {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                        {isClosedByAdmin ? (
+                                          <span className="rounded-full bg-rose-100 border border-rose-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-800">
+                                            🔒 Closed
+                                          </span>
+                                        ) : (
+                                          slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />
+                                        )}
+                                      </div>
                                     </button>
                                   );
                                 })}

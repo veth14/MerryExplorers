@@ -41,6 +41,7 @@ export type ProgramRenewalEntry = {
   virtualLink?: string;
   virtualLinkOpen?: boolean;
   newFamilyRegistrationOpenDate?: string | null; // optional: date when /register opens for new families
+  closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -139,6 +140,7 @@ function defaultPrograms(): ProgramRenewalEntry[] {
     virtualLink: "",
     virtualLinkOpen: false,
     newFamilyRegistrationOpenDate: null,
+    closedClasses: [],
   }));
 }
 
@@ -163,6 +165,7 @@ export async function GET() {
             customClosedMessage: existing.customClosedMessage ?? "",
             renewalOpen: existing.renewalOpen !== false,
             newFamilyRegistrationOpenDate: existing.newFamilyRegistrationOpenDate ?? null,
+            closedClasses: Array.isArray(existing.closedClasses) ? existing.closedClasses : [],
           }
         : {
             programKey: key,
@@ -177,6 +180,7 @@ export async function GET() {
             virtualLink: "",
             virtualLinkOpen: false,
             newFamilyRegistrationOpenDate: null,
+            closedClasses: [],
           };
     });
 
@@ -232,6 +236,7 @@ export async function PUT(req: NextRequest) {
         virtualLink: p?.virtualLink ?? "",
         virtualLinkOpen: p?.virtualLinkOpen ?? false,
         newFamilyRegistrationOpenDate: p?.newFamilyRegistrationOpenDate ?? null,
+        closedClasses: Array.isArray(p?.closedClasses) ? p.closedClasses : [],
       };
     });
 

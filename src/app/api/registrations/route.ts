@@ -203,7 +203,22 @@ export async function POST(request: Request) {
           "Morning Session": 10, "Morning Class": 10,
         },
       },
+      "ballet": {
+        classes: {
+          "Baby Ballet (Morning)": 6,
+          "Baby Ballet (Afternoon)": 6,
+          "Basic Ballet": 8,
+        },
+      },
     };
+
+    // Check if the specific class or program is closed by admin
+    if (adventureSetting?.registrationOpen === false) {
+      return NextResponse.json({ error: `Registration for this program is currently closed.` }, { status: 409 });
+    }
+    if (Array.isArray((adventureSetting as any)?.closedClasses) && (adventureSetting as any).closedClasses.includes(classTime)) {
+      return NextResponse.json({ error: `Sorry, registration for ${classTime} is currently closed.` }, { status: 409 });
+    }
 
     const maxSlots = programConfig[program]?.classes[classTime];
     if (maxSlots !== undefined) {
