@@ -1104,7 +1104,7 @@ export default function RegisterPage() {
                       const programSlots = slots[p.id] || {};
                       const isSelected = selectedProgram === p.id;
 
-                      const isAdvProgram = !["ballet", "virtual-session"].includes(p.id) && !["Ballet", "Virtual Tutorial"].includes(p.name);
+                      const isAdvProgram = !["ballet", "virtual-session", "saturday-playdate"].includes(p.id) && !["Ballet", "Virtual Tutorial", "Saturday Playdate"].includes(p.name);
                       const advNumber = progSettings?.registrationAdventure ?? progSettings?.currentAdventure ?? 2;
                       const nextAdvNumber = advNumber + 1;
                       const startDateStr = progSettings?.nextAdventureStart

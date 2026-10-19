@@ -103,7 +103,6 @@ const ADVENTURE_PROGRAMS = new Set([
   "Discovery Club: Creative Explorer",
   "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
-  "Saturday Playdate",
 ]);
 
 // Source of truth for adventure cycle auto-increment

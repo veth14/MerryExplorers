@@ -678,7 +678,7 @@ export default function RenewPage() {
                       const startDateStr = progSettings?.nextAdventureStart
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : null;
-
+                      const isAdventureProg = !["ballet", "virtual-session", "saturday-playdate"].includes(p.id as string) && !["Ballet", "Virtual Tutorial", "Saturday Playdate"].includes(p.name);
                       const isUnavailable = progSettings ? progSettings.renewalOpen === false : p.id === "saturday-playdate";
                       const pEffectiveRate = isPioneer && pioneerPrices[p.id] ? pioneerPrices[p.id] : p.rate;
                       const isPioneerDiscounted = isPioneer && Boolean(pioneerPrices[p.id]);
@@ -710,12 +710,14 @@ export default function RenewPage() {
                                   </span>
                                 ) : (
                                   <>
-                                    <span className="rounded-full bg-[#0b2a82]/10 border border-[#0b2a82]/20 px-2 py-0.5 text-[10.5px] font-black uppercase text-[#0b2a82]">
-                                      Adventure {advNumber}
-                                    </span>
+                                    {isAdventureProg && (
+                                      <span className="rounded-full bg-[#0b2a82]/10 border border-[#0b2a82]/20 px-2 py-0.5 text-[10.5px] font-black uppercase text-[#0b2a82]">
+                                        Adventure {advNumber}
+                                      </span>
+                                    )}
                                     {startDateStr && (
                                       <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                                        Starts {startDateStr}
+                                        {isAdventureProg ? `Starts ${startDateStr}` : `Next Batch: ${startDateStr}`}
                                       </span>
                                     )}
                                   </>

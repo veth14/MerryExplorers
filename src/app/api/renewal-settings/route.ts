@@ -23,7 +23,6 @@ const ADVENTURE_PROGRAMS: readonly ProgramKey[] = [
   "Discovery Club: Creative Explorer",
   "Discovery Club: Everyday Explorer",
   "Trailblazer: Brave Explorer",
-  "Saturday Playdate",
 ];
 
 const CURIOUS_EXPLORER_KEY: ProgramKey = "Discovery Club: Curious Explorer";
