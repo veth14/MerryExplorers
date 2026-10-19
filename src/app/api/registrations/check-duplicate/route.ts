@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumber, getRegistrationAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const email = (searchParams.get("email") || "").toLowerCase().trim();
     const firstName = (searchParams.get("firstName") || "").trim();
     const lastName = (searchParams.get("lastName") || "").trim();
+    const dateOfBirth = (searchParams.get("dateOfBirth") || "").trim();
     const parentName = (searchParams.get("parentName") || "").trim();
     const parentPhone = (searchParams.get("parentPhone") || "").trim();
     const program = searchParams.get("program") || "curious-explorer";
@@ -25,8 +26,8 @@ export async function GET(request: Request) {
     const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const settings = settingsDoc?.programs || [];
     const programSetting = getProgramAdventureSetting(program, settings);
-    const adventureNumber = programSetting ? getCurrentAdventureNumber(program, settings) : 2;
-    const adventureStartDate = programSetting ? getCurrentAdventureStartDate(program, settings) : null;
+    const adventureNumber = programSetting ? getTargetRegistrationAdventureNumber(program, settings) : 2;
+    const adventureStartDate = programSetting ? getRegistrationAdventureStartDate(program, settings) : null;
     const cycleQuery: Record<string, unknown>[] = getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
 
     // Escape regex special chars
@@ -38,19 +39,26 @@ export async function GET(request: Request) {
     });
 
     // 1. Check student_registrations for the current adventure cycle
-    const regQuery: any = {
-      "parentInfo.email": { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
+    const childNameMatch: any = {
+      "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstName)}$`, "i") },
+      ...(lastName ? { "childInfo.lastName": { $regex: new RegExp(`^${escapeRegex(lastName)}$`, "i") } } : {}),
+    };
+    const childIdentityMatch: any = lastName
+      ? {
+          ...childNameMatch,
+          ...(dateOfBirth ? { "childInfo.dateOfBirth": dateOfBirth } : {}),
+        }
+      : {
+        "parentInfo.email": { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
+        "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstName)}$`, "i") },
+      };
+    const existingReg = await db.collection("student_registrations").findOne({
       $and: [
-        { $or: [
-          { "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstName)}$`, "i") } },
-          { "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(firstWord)}`, "i") } },
-        ] },
+        childIdentityMatch,
         { $or: cycleQuery },
       ],
-      status: { $in: ["pending", "approved", "reserved"] },
-    };
-
-    const existingReg = await db.collection("student_registrations").findOne(regQuery);
+      status: { $in: ["pending", "approved", "reserved", "expired"] },
+    }, { sort: { submittedAt: -1 } });
 
     if (existingReg) {
       return NextResponse.json({
@@ -59,6 +67,10 @@ export async function GET(request: Request) {
         childName: existingReg.childInfo?.firstName || firstName,
         program: existingReg.program,
         status: existingReg.status,
+        submittedAt: existingReg.submittedAt || null,
+        reservedUntil: existingReg.reservedUntil || null,
+        promoCode: existingReg.promoCode || null,
+        reservationExpired: existingReg.status === "expired" || Boolean(existingReg.reservedUntil && new Date(existingReg.reservedUntil).getTime() <= Date.now()),
         isReturningFamily: Boolean(isReturning || existingReg.isNewFamily === false || existingReg.isPioneer),
       });
     }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
+import { getTargetRegistrationAdventureNumber } from "@/lib/adventure-cycle";
 import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import Tesseract from "tesseract.js";
@@ -170,6 +171,9 @@ export default function RegisterPage() {
   // Duplicate registration detection
   const [duplicateRegId, setDuplicateRegId] = useState<string | null>(null);
   const [duplicateChildName, setDuplicateChildName] = useState<string>("");
+  const [duplicateRegSubmittedAt, setDuplicateRegSubmittedAt] = useState<string | null>(null);
+  const [duplicateRegExpired, setDuplicateRegExpired] = useState(false);
+  const [duplicateRegPromoCode, setDuplicateRegPromoCode] = useState<string | null>(null);
 
   // Uniform day acknowledgment
   const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState<boolean>(draft?.uniformDayAcknowledged ?? false);
@@ -304,12 +308,20 @@ export default function RegisterPage() {
     const email = (parentInfo?.email || "").toLowerCase().trim();
     const firstName = (childInfo?.firstName || "").trim();
     const lastName = (childInfo?.lastName || "").trim();
-    if (!email || !firstName) { setDuplicateRegId(null); setDuplicateChildName(""); return; }
+    if (!email || !firstName) {
+      setDuplicateRegId(null);
+      setDuplicateChildName("");
+      setDuplicateRegSubmittedAt(null);
+      setDuplicateRegExpired(false);
+      setDuplicateRegPromoCode(null);
+      return;
+    }
     const timer = setTimeout(async () => {
       try {
         const parentName = (parentInfo?.name || "").trim();
         const parentPhone = (parentInfo?.phone || "").trim();
-        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&parentName=${encodeURIComponent(parentName)}&parentPhone=${encodeURIComponent(parentPhone)}&program=${encodeURIComponent(selectedProgram || "curious-explorer")}`);
+        const dateOfBirth = (childInfo?.dateOfBirth || "").trim();
+        const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&dateOfBirth=${encodeURIComponent(dateOfBirth)}&parentName=${encodeURIComponent(parentName)}&parentPhone=${encodeURIComponent(parentPhone)}&program=${encodeURIComponent(selectedProgram || "curious-explorer")}`);
         const d = await res.json();
         if (d.isReturningFamily) {
           setIsNewFamily(false);
@@ -318,18 +330,25 @@ export default function RegisterPage() {
         if (d.exists && d.registrationId) {
           setDuplicateRegId(d.registrationId);
           setDuplicateChildName(firstName);
+          setDuplicateRegSubmittedAt(d.submittedAt ? String(d.submittedAt) : null);
+          setDuplicateRegExpired(Boolean(d.reservationExpired));
+          setDuplicateRegPromoCode(d.promoCode ? String(d.promoCode) : null);
         } else {
           setDuplicateRegId(null);
           setDuplicateChildName("");
+          setDuplicateRegSubmittedAt(null);
+          setDuplicateRegExpired(false);
+          setDuplicateRegPromoCode(null);
         }
       } catch { /* ignore */ }
     }, 900);
     return () => clearTimeout(timer);
-  }, [parentInfo?.email, parentInfo?.name, parentInfo?.phone, childInfo?.firstName, childInfo?.lastName, selectedProgram]);
+  }, [parentInfo?.email, parentInfo?.name, parentInfo?.phone, childInfo?.firstName, childInfo?.lastName, childInfo?.dateOfBirth, selectedProgram]);
 
   // Program renewal settings for dynamic Adventure cycle #, dates & registration open/close status
   type ProgramSetting = {
     currentAdventure: number;
+    registrationAdventure: number;
     adventureStartDate: string | null;
     nextAdventureStart: string | null;
     registrationOpen: boolean;
@@ -371,6 +390,7 @@ export default function RegisterPage() {
           d.programs.forEach((p: any) => {
             map[p.programKey] = {
               currentAdventure: p.currentAdventure ?? 2,
+              registrationAdventure: getTargetRegistrationAdventureNumber(p.programKey, d.programs),
               adventureStartDate: p.adventureStartDate ?? null,
               nextAdventureStart: p.nextAdventureStart ?? null,
               registrationOpen: p.registrationOpen !== false,
@@ -387,10 +407,31 @@ export default function RegisterPage() {
 
   // Live slot counts
   useEffect(() => {
-    fetch("/api/registrations/slots")
-      .then((r) => r.json())
-      .then((d) => { if (d.success) setSlots(d.data); })
-      .catch(() => { });
+    let active = true;
+    const loadSlots = async () => {
+      try {
+        const response = await fetch("/api/registrations/slots", { cache: "no-store" });
+        const data = await response.json();
+        if (active && data.success) setSlots(data.data);
+      } catch {
+        // Keep the most recent availability if a refresh briefly fails.
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void loadSlots();
+    };
+
+    void loadSlots();
+    window.addEventListener("focus", loadSlots);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    const interval = window.setInterval(loadSlots, 60_000);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", loadSlots);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.clearInterval(interval);
+    };
   }, []);
 
   // Save to localStorage draft
@@ -627,6 +668,9 @@ export default function RegisterPage() {
         // Duplicate detected by server — redirect to existing payment page
         setDuplicateRegId(data.duplicateRegistrationId);
         setDuplicateChildName(childInfo?.firstName || "");
+        setDuplicateRegSubmittedAt(data.duplicateRegistrationSubmittedAt ? String(data.duplicateRegistrationSubmittedAt) : null);
+        setDuplicateRegExpired(Boolean(data.duplicateRegistrationExpired));
+        setDuplicateRegPromoCode(data.duplicateRegistrationPromoCode ? String(data.duplicateRegistrationPromoCode) : null);
         setStep(3); // Stay on review step to show the warning
       } else {
         setError(data.error || "Submission failed. Please try again.");
@@ -963,11 +1007,18 @@ export default function RegisterPage() {
                       <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
                     </div>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      It looks like <strong>{duplicateChildName || childInfo.firstName || "your child"}</strong> already has an active registration for <strong>Adventure 2</strong> (e.g. submitted via the renewal form or general registration).
+                      A registration for <strong>{duplicateChildName || childInfo.firstName || "your child"}</strong> was found for <strong>Adventure 2</strong> (possibly submitted via the renewal form or general registration).
                     </p>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
                       You do not need to register again! You can proceed directly to your payment page to upload proof of payment and confirm your slot.
                     </p>
+                    {duplicateRegSubmittedAt && (
+                      <p className="text-[12px] font-semibold text-amber-900">
+                        Most recent matching registration: {new Date(duplicateRegSubmittedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}.
+                        {duplicateRegExpired && " Its reservation has expired; renew it on the payment page for 1 hour if a slot is available."}
+                        {duplicateRegPromoCode?.toUpperCase() === "A1RENEWAL2026" && " A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time)."}
+                      </p>
+                    )}
                     <a
                       href={`/register/payment/${duplicateRegId}`}
                       className="block w-full text-center rounded-[14px] bg-amber-500 text-white py-3 font-black text-[14px] shadow-[0_4px_0_rgba(180,83,9,0.40)] hover:bg-amber-600 transition-all font-sans"
@@ -998,7 +1049,17 @@ export default function RegisterPage() {
                   </span>
                 </div>
                 <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure 2 Program</h2>
-                <p className="vp-sub mb-6">Select the program and class time that works best for your explorer.</p>
+                <p className="vp-sub mb-4">Follow both steps to choose your child&apos;s class. You must choose a session time before continuing.</p>
+                <div className="mb-6 grid gap-2 sm:grid-cols-2" aria-label="Program selection steps">
+                  <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${selectedProgram ? "border-emerald-400 bg-emerald-50" : "border-[#0b2a82] bg-[#fff6cf]"}`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#0b2a82] bg-white text-sm font-black text-[#0b2a82]">{selectedProgram ? "✓" : "1"}</span>
+                    <span className="text-[13px] font-extrabold text-[#0b2a82]">Choose a program</span>
+                  </div>
+                  <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${selectedClass ? "border-emerald-400 bg-emerald-50" : selectedProgram ? "border-[#0b2a82] bg-[#fff6cf]" : "border-[#b6dcf5] bg-white"}`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#0b2a82] bg-white text-sm font-black text-[#0b2a82]">{selectedClass ? "✓" : "2"}</span>
+                    <span className="text-[13px] font-extrabold text-[#0b2a82]">Choose a session time</span>
+                  </div>
+                </div>
 
                 {/* Filter Tabs */}
                 <div className="mb-6 flex flex-wrap justify-center gap-2.5">
@@ -1040,7 +1101,7 @@ export default function RegisterPage() {
                       const isSelected = selectedProgram === p.id;
 
                       const isAdvProgram = !["ballet", "virtual-session"].includes(p.id) && !["Ballet", "Virtual Tutorial"].includes(p.name);
-                      const advNumber = progSettings?.currentAdventure ?? 2;
+                      const advNumber = progSettings?.registrationAdventure ?? progSettings?.currentAdventure ?? 2;
                       const nextAdvNumber = advNumber + 1;
                       const startDateStr = progSettings?.nextAdventureStart
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -1169,7 +1230,13 @@ export default function RegisterPage() {
                       return (
                         <div
                           key={p.id}
-                          onClick={() => { setSelectedProgram(p.id as ProgramId); setSelectedClass(""); }}
+                          onClick={() => {
+                            setSelectedProgram(p.id as ProgramId);
+                            setSelectedClass("");
+                            window.setTimeout(() => {
+                              document.getElementById(`session-times-${p.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }, 80);
+                          }}
                           className={`cursor-pointer rounded-[22px] border-3 p-5 transition-all ${isSelected
                             ? "bg-[#fff6cf] border-[#0b2a82] shadow-[0_6px_0_#0b2a82]"
                             : "bg-white border-[#b6dcf5] hover:border-[#0b2a82] shadow-sm"
@@ -1208,13 +1275,16 @@ export default function RegisterPage() {
                           </div>
 
                           {isSelected && (
-                            <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
+                            <div id={`session-times-${p.id}`} className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20 scroll-mt-28">
                               {p.prerequisite && (
                                 <div className="mb-3 rounded-xl bg-amber-100 border border-amber-300 p-2.5 text-[12px] font-bold text-amber-900">
                                   ⚠️ Pre-requisite: {p.prerequisite}
                                 </div>
                               )}
-                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Session Time</p>
+                              <div className="mb-3 rounded-xl border-2 border-[#0b2a82] bg-[#fff6cf] px-3.5 py-3">
+                                <p className="text-[13px] font-black text-[#0b2a82]">Step 2: Choose one available session time</p>
+                                <p className="mt-1 text-[12px] font-semibold leading-snug text-[#3d5a99]">Tap a time below. Your choice will show a checkmark and the word SELECTED.</p>
+                              </div>
                               <div className="grid gap-2.5 sm:grid-cols-2">
                                 {p.classes.map((cls) => {
                                   const displayName = cls.name;
@@ -1227,12 +1297,13 @@ export default function RegisterPage() {
                                       key={`${cls.name}-${cls.time}`}
                                       type="button"
                                       disabled={isFull}
+                                      aria-pressed={isClassSelected}
                                       onClick={(e) => { e.stopPropagation(); if (!isFull) setSelectedClass(cls.name); }}
                                       className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${
                                         isFull
                                         ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50"
                                         : isClassSelected
-                                          ? "border-[#0b2a82] bg-white shadow-[0_3px_0_#0b2a82]"
+                                          ? "border-[#0b2a82] bg-[#fff6cf] shadow-[0_3px_0_#0b2a82] ring-2 ring-[#ffd23f]"
                                           : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"
                                         }`}
                                     >
@@ -1240,11 +1311,23 @@ export default function RegisterPage() {
                                         <p className="text-[13px] font-black text-[#0b2a82]">{displayName}</p>
                                         <p className="text-[11px] font-semibold text-[#3d5a99]">{cls.time}</p>
                                       </div>
-                                      {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                        {isClassSelected && <span className="rounded-full bg-[#0b2a82] px-2.5 py-1 text-[10px] font-black tracking-wide text-white">✓ SELECTED</span>}
+                                        {slotInfo && <SlotPill available={slotInfo.available} max={cls.maxSlots} />}
+                                      </div>
                                     </button>
                                   );
                                 })}
                               </div>
+                              {selectedClass ? (
+                                <p className="mt-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 px-3.5 py-2.5 text-[12px] font-extrabold text-emerald-900" role="status">
+                                  ✓ Session selected: {p.classes.find((cls) => cls.name === selectedClass)?.name} ({p.classes.find((cls) => cls.name === selectedClass)?.time})
+                                </p>
+                              ) : (
+                                <p className="mt-3 rounded-xl border-2 border-amber-400 bg-amber-50 px-3.5 py-2.5 text-[12px] font-extrabold text-amber-900" role="status">
+                                  No session time selected yet. Choose one above to continue.
+                                </p>
+                              )}
 
                               {"notes" in p && Array.isArray((p as any).notes) && (
                                 <div className="mt-4 rounded-2xl bg-pink-50 border-2 border-pink-200 p-4 text-[12.5px] text-pink-950 space-y-1.5 shadow-sm">
@@ -1359,7 +1442,7 @@ export default function RegisterPage() {
                     onClick={handleProgramContinue}
                     className="vp-btn"
                   >
-                    Continue to Consents →
+                    {selectedProgram && !selectedClass ? "Choose a Session Time ↑" : "Continue to Consents →"}
                   </button>
                 </div>
               </m.div>
@@ -1551,11 +1634,18 @@ export default function RegisterPage() {
                       <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
                     </div>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      It looks like <strong>{duplicateChildName || "your child"}</strong> already has an active registration for <strong>Adventure 2</strong> — possibly submitted via the renewal form.
+                      A registration for <strong>{duplicateChildName || "your child"}</strong> was found for <strong>Adventure 2</strong> — possibly submitted via the renewal form.
                     </p>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
                       You <strong>do not need to register again</strong>. Click below to go directly to your existing registration&apos;s payment page to upload your proof of payment and confirm your slot.
                     </p>
+                    {duplicateRegSubmittedAt && (
+                      <p className="text-[12px] font-semibold text-amber-900">
+                        Most recent matching registration: {new Date(duplicateRegSubmittedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}.
+                        {duplicateRegExpired && " Its reservation has expired; renew it on the payment page for 1 hour if a slot is available."}
+                        {duplicateRegPromoCode?.toUpperCase() === "A1RENEWAL2026" && " A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time)."}
+                      </p>
+                    )}
                     <a
                       href={`/register/payment/${duplicateRegId}`}
                       className="block w-full text-center rounded-[14px] bg-amber-500 text-white py-3 font-black text-[14px] shadow-[0_4px_0_rgba(180,83,9,0.40)] hover:bg-amber-600 transition-all"

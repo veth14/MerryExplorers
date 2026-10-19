@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumber, getRegistrationAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
@@ -97,15 +97,15 @@ export async function GET(request: Request) {
     const settings = settingsDoc?.programs || [];
     const currentProgram = studentDoc?.program || prevReg?.program || "curious-explorer";
     const programSetting = getProgramAdventureSetting(currentProgram, settings);
-    const adventureNumber = programSetting ? getCurrentAdventureNumber(currentProgram, settings) : 2;
-    const adventureStartDate = programSetting ? getCurrentAdventureStartDate(currentProgram, settings) : null;
+    const adventureNumber = programSetting ? getTargetRegistrationAdventureNumber(currentProgram, settings) : 2;
+    const adventureStartDate = programSetting ? getRegistrationAdventureStartDate(currentProgram, settings) : null;
     const cycleQuery: Record<string, unknown>[] = getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
     const activeCurrentCycleReg = regOr.length > 0
       ? await db.collection("student_registrations").findOne({
           $or: regOr,
-          status: { $in: ["pending", "approved", "reserved"] },
+          status: { $in: ["pending", "approved", "reserved", "expired"] },
           $and: [{ $or: cycleQuery }],
-        })
+        }, { sort: { submittedAt: -1 } })
       : null;
 
     // Also check if familyDoc has an existing registrationId
@@ -113,6 +113,11 @@ export async function GET(request: Request) {
     if (!existingRegistrationId && familyDoc?.registrationId) {
       existingRegistrationId = familyDoc.registrationId;
     }
+    const linkedRegistration = activeCurrentCycleReg || (
+      existingRegistrationId && ObjectId.isValid(existingRegistrationId)
+        ? await db.collection("student_registrations").findOne({ _id: new ObjectId(existingRegistrationId) })
+        : null
+    );
 
     // ── Nothing found ─────────────────────────────────────────────────────────
     if (!familyDoc && !studentDoc && !accountDoc && !prevReg) {
@@ -190,6 +195,10 @@ export async function GET(request: Request) {
       alreadyRegistered: Boolean(existingRegistrationId),
       existingRegistrationId,
       existingProgram: activeCurrentCycleReg?.program || null,
+      existingRegistrationSubmittedAt: linkedRegistration?.submittedAt || null,
+      existingRegistrationStatus: linkedRegistration?.status || null,
+      existingReservationExpiresAt: linkedRegistration?.reservedUntil || null,
+      existingPromoCode: linkedRegistration?.promoCode || null,
     };
 
     return NextResponse.json({ success: true, data: prefillData });

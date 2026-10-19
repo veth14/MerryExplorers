@@ -168,6 +168,9 @@ export async function POST(
       }
       return NextResponse.json({ error: "Payment already submitted for this registration." }, { status: 400 });
     }
+    if (registration.reservedUntil && new Date(registration.reservedUntil).getTime() <= Date.now()) {
+      return NextResponse.json({ error: "Your slot reservation has expired. Renew it to continue." }, { status: 410 });
+    }
 
     // Upload receipt to Cloudinary
     let receiptUrl = "";
@@ -185,8 +188,16 @@ export async function POST(
     }
 
     // Update the registration document
-    await db.collection("student_registrations").updateOne(
-      { _id: new ObjectId(id) },
+    const saved = await db.collection("student_registrations").updateOne(
+      {
+        _id: new ObjectId(id),
+        status: "reserved",
+        $or: [
+          { reservedUntil: { $exists: false } },
+          { reservedUntil: null },
+          { reservedUntil: { $gt: new Date() } },
+        ],
+      },
       {
         $set: {
           status: "pending", // Change to pending verification
@@ -207,6 +218,10 @@ export async function POST(
         }
       }
     );
+    if (!saved.matchedCount) {
+      await cloudinary.uploader.destroy(receiptPublicId).catch(() => {});
+      return NextResponse.json({ error: "Your slot reservation has expired. Renew it to continue." }, { status: 410 });
+    }
 
     // Sync payment details into renewal_families
     try {

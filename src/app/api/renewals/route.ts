@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { PROGRAM_SLOTS } from "@/data/landing";
+import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumber, getRegistrationAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { activeRegistrationSlotQuery, countUniqueActiveRegistrationSlots } from "@/lib/registration-slots";
 import {
   MIN_STUDENTS_PER_SESSION,
   DOWNPAYMENT_RATE,
@@ -59,6 +61,8 @@ export async function GET(request: Request) {
     const search = (searchParams.get("search") || "").toLowerCase().trim();
 
     const { db } = await connectToDatabase();
+    const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
+    const adventureSettings = renewalSettingsDoc?.programs || [];
 
     // 1. Families (excluding test accounts)
     const allFamilies = await db.collection("renewal_families").find({}).toArray();
@@ -255,7 +259,7 @@ export async function GET(request: Request) {
       return expiryMs > nowMs && expiryMs - nowMs <= DAY_MS;
     }).length;
 
-    // 5. Slot overview, driven by the SAME computed records (reserved + confirmed hold a slot)
+    // 5. Slot overview uses the same active-cycle capacity query as public registration.
     const slotOverview: Record<
       string,
       { totalMax: number; sessions: Record<string, { max: number; taken: number; belowMin: boolean }> }
@@ -264,25 +268,23 @@ export async function GET(request: Request) {
     for (const [progKey, progData] of Object.entries(PROGRAM_SLOTS)) {
       if (progKey === "virtual-session" || progKey.includes("virtual")) continue;
       slotOverview[progKey] = { totalMax: 0, sessions: {} };
+      const adventureSetting = getProgramAdventureSetting(progKey, adventureSettings);
+      const adventureNumber = adventureSetting ? getTargetRegistrationAdventureNumber(progKey, adventureSettings, now) : null;
+      const adventureStartDate = adventureSetting ? getRegistrationAdventureStartDate(progKey, adventureSettings, now) : null;
+      const cycleQuery = adventureNumber === null
+        ? []
+        : getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
       for (const cls of (progData as any).classes) {
         slotOverview[progKey].totalMax += cls.maxSlots;
-        slotOverview[progKey].sessions[cls.name] = { max: cls.maxSlots, taken: 0, belowMin: true };
-      }
-    }
-
-    for (const r of allRecords) {
-      if (r.renewalStatus !== "reserved" && r.renewalStatus !== "confirmed") continue;
-      const prog = slotOverview[r.program];
-      if (!prog) continue;
-      const ct: string = r.classTime || "";
-      const alt = ct.includes("Session") ? ct.replace("Session", "Class") : ct.replace("Class", "Session");
-      const sessionKey = prog.sessions[ct] ? ct : alt && prog.sessions[alt] ? alt : null;
-      if (sessionKey) prog.sessions[sessionKey].taken += 1;
-    }
-
-    for (const progKey of Object.keys(slotOverview)) {
-      for (const s of Object.values(slotOverview[progKey].sessions)) {
-        s.belowMin = s.taken < MIN_STUDENTS_PER_SESSION;
+        const taken = await countUniqueActiveRegistrationSlots(
+          db.collection("student_registrations"),
+          activeRegistrationSlotQuery({ program: progKey, classTime: cls.name, cycleQuery, now })
+        );
+        slotOverview[progKey].sessions[cls.name] = {
+          max: cls.maxSlots,
+          taken,
+          belowMin: taken < MIN_STUDENTS_PER_SESSION,
+        };
       }
     }
 

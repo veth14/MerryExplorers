@@ -66,6 +66,27 @@ function PortalScene() {
   );
 }
 
+function EarlyStateStyles() {
+  return (
+    <style jsx global>{`
+      .vp-root {
+        color: ${NAVY};
+        font-family: inherit;
+        background: radial-gradient(ellipse at 50% 0%, #b9e5fb 0%, #8fd3f7 55%, #74c3f1 100%);
+        background-attachment: fixed;
+      }
+      .vp-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+      .vp-sticker { filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff); }
+      .vp-sun { position: absolute; top: 12px; right: 24px; width: 130px; }
+      .vp-cloud { position: absolute; left: 0; width: 130px; overflow: visible; }
+      .vp-cloud.c1 { top: 16%; }
+      .vp-cloud.c2 { top: 46%; width: 104px; }
+      .vp-cloud.c3 { top: 72%; width: 140px; }
+      .vp-star { position: absolute; width: 26px; }
+    `}</style>
+  );
+}
+
 function SlotPill({ available, max }: { available: number; max: number }) {
   if (max >= 900) {
     return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">Available</span>;
@@ -292,6 +313,7 @@ export default function RenewPage() {
   if (loading) {
     return (
       <div className="vp-root min-h-screen flex items-center justify-center p-6">
+        <EarlyStateStyles />
         <PortalScene />
         <div className="relative z-10 text-center flex flex-col items-center">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-[#ffe066] to-[#ffb82e] border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-3xl mb-4 animate-bounce">
@@ -306,6 +328,7 @@ export default function RenewPage() {
   if (loadError) {
     return (
       <div className="vp-root min-h-screen flex items-center justify-center p-6">
+        <EarlyStateStyles />
         <PortalScene />
         <div className="relative z-10 max-w-md w-full bg-white rounded-[28px] border-4 border-[#0b2a82] p-8 shadow-[0_0_0_6px_#fff,0_12px_0_6px_rgba(11,42,130,0.18)] text-center space-y-4">
           <div className="text-5xl">🧭</div>
@@ -323,25 +346,41 @@ export default function RenewPage() {
   if (duplicateRegId || (prefillData?.alreadyRegistered && prefillData?.existingRegistrationId)) {
     const payId = duplicateRegId || prefillData?.existingRegistrationId;
     return (
-      <div className="vp-root min-h-screen flex items-center justify-center p-6">
+      <div className="vp-root min-h-screen relative overflow-x-hidden">
+        <EarlyStateStyles />
         <PortalScene />
-        <div className="relative z-10 max-w-md w-full bg-white rounded-[28px] border-4 border-[#0b2a82] p-8 shadow-[0_0_0_6px_#fff,0_12px_0_6px_rgba(11,42,130,0.18)] text-center space-y-4">
-          <div className="text-5xl">🎉</div>
-          <h2 className="font-extrabold text-[22px] text-[#0b2a82]">Already Registered for Adventure 2!</h2>
-          <p className="text-[14px] text-[#3d5a99] font-medium leading-relaxed">
-            Good news! A registration for <strong>{childName}</strong> is already active for <strong>Adventure 2</strong>.
-          </p>
-          <p className="text-[13px] text-[#3d5a99] font-medium leading-relaxed">
-            You don&apos;t need to submit the renewal form again. Click below to view your registration status or upload proof of payment.
-          </p>
-          <a
-            href={`/register/payment/${payId}`}
-            className="block w-full py-3.5 px-6 rounded-2xl bg-[#1f7ae0] text-white font-extrabold text-[15px] shadow-[0_4px_0_#0b2a82] hover:bg-[#1864b8] transition-all text-center"
-          >
-            Go to My Payment Page →
-          </a>
-          <p className="text-[12px] text-[#3d5a99]">Need help? Ask <strong>Teacher Angel</strong> onsite.</p>
-        </div>
+        <SiteHeader />
+        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-6 px-5 pb-8 pt-32">
+          <div className="relative w-full rounded-[28px] border-4 border-[#0b2a82] bg-white px-6 py-10 text-center shadow-[0_0_0_6px_#fff,0_12px_0_6px_rgba(11,42,130,0.18)] sm:px-10">
+            <div className="absolute -top-4 left-1/2 h-[26px] w-[92px] -translate-x-1/2 rotate-2 rounded border-2 border-[#0b2a82]/25 bg-[repeating-linear-gradient(45deg,#ffd23f_0_9px,#ffe066_9px_18px)]" />
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#0b2a82] bg-emerald-100 text-4xl shadow-[0_6px_0_#0b2a82]">🎉</div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-[#0b2a82] bg-[#fff6cf] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[#0b2a82]">
+              <span>🌟</span> 2026 Adventure 2
+            </div>
+            <h1 className="mx-auto mb-3 max-w-xl text-[26px] font-black leading-tight text-[#0b2a82] sm:text-[32px]">Already Registered!</h1>
+            <p className="mx-auto mb-4 max-w-lg text-[15px] font-medium leading-relaxed text-[#3d5a99]">
+              A registration for <strong className="text-[#0b2a82]">{childName}</strong> was found for <strong className="text-[#0b2a82]">Adventure 2</strong>.
+            </p>
+            {prefillData?.existingRegistrationSubmittedAt && (
+              <p className="mx-auto mb-4 max-w-xl rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-[13px] font-semibold leading-relaxed text-amber-900">
+                Most recent matching registration: {new Date(prefillData.existingRegistrationSubmittedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}.
+                {(prefillData.existingRegistrationStatus === "expired" || (prefillData.existingReservationExpiresAt && new Date(prefillData.existingReservationExpiresAt).getTime() <= Date.now())) && " Its reservation has expired; renew it on the payment page for 1 hour if a slot is available."}
+                {prefillData.existingPromoCode?.toUpperCase() === "A1RENEWAL2026" && " A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time)."}
+              </p>
+            )}
+            <p className="mx-auto mb-6 max-w-lg text-[14px] font-medium leading-relaxed text-[#3d5a99]">
+              You don&apos;t need to submit the renewal form again. Continue to the payment page to upload proof of payment or renew an expired reservation if a slot is still available.
+            </p>
+            <Link
+              href={`/register/payment/${payId}`}
+              className="mx-auto inline-flex min-h-[52px] w-full max-w-md items-center justify-center rounded-[18px] border-[3px] border-[#0b2a82] bg-gradient-to-b from-[#ffe066] via-[#ffd23f] to-[#ffb82e] px-6 py-3 text-[15px] font-extrabold text-[#0b2a82] shadow-[0_6px_0_#0b2a82] transition-transform hover:-translate-y-0.5"
+            >
+              Go to My Payment Page →
+            </Link>
+            <p className="mt-6 text-[13px] font-medium text-[#3d5a99]">Need help? Ask <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.</p>
+          </div>
+          <DreamBanner />
+        </main>
       </div>
     );
   }
@@ -993,10 +1032,17 @@ export default function RenewPage() {
                       <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
                     </div>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      It looks like <strong>{childName}</strong> already has an active registration for <strong>Adventure 2</strong>.
+                      A registration for <strong>{childName}</strong> was found for <strong>Adventure 2</strong>.
                     </p>
+                    {prefillData?.existingRegistrationSubmittedAt && (
+                      <p className="text-[12px] font-semibold text-amber-900">
+                        Most recent matching registration: {new Date(prefillData.existingRegistrationSubmittedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}.
+                        {(prefillData.existingRegistrationStatus === "expired" || (prefillData.existingReservationExpiresAt && new Date(prefillData.existingReservationExpiresAt).getTime() <= Date.now())) && " Its reservation has expired; renew it on the payment page for 1 hour if a slot is available."}
+                        {prefillData.existingPromoCode?.toUpperCase() === "A1RENEWAL2026" && " A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time)."}
+                      </p>
+                    )}
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      You do not need to register again. Click below to go directly to your payment page to upload your proof of payment.
+                      You do not need to register again. Go to the payment page to upload your proof of payment or renew an expired reservation if a slot is still available.
                     </p>
                     <a
                       href={`/register/payment/${duplicateRegId}`}

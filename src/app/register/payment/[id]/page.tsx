@@ -14,6 +14,7 @@ type ProgramId = keyof typeof PROGRAM_SLOTS;
 
 type RegData = {
   status: string;
+  parentEmail?: string;
   program: ProgramId;
   classTime?: string;
   reservedUntil: string;
@@ -111,6 +112,7 @@ export default function PaymentPage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrDone, setOcrDone] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
+  const [renewingReservation, setRenewingReservation] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -302,10 +304,34 @@ export default function PaymentPage() {
     }
   }
 
+  async function handleRenewReservation() {
+    setRenewingReservation(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/registrations/${id}/renew-reservation`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setError(data.error || "We couldn't renew this reservation. Please contact Teacher Angel.");
+        return;
+      }
+      setRegData((current) => current ? { ...current, status: "reserved", reservedUntil: data.reservedUntil } : current);
+      setTimeLeft("");
+      setError("");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setRenewingReservation(false);
+    }
+  }
+
   if (!mounted) return null;
 
   const isExpired = timeLeft === "0d 0h 0m 0s" || timeLeft === "00:00";
-  const showErrorScreen = !!error && (!regData || regData.status !== "reserved" || isExpired);
+  const reservationIsExpired = Boolean(regData && (
+    regData.status === "expired" ||
+    (regData.status === "reserved" && regData.reservedUntil && new Date(regData.reservedUntil).getTime() <= Date.now())
+  ));
+  const showErrorScreen = (!!error && (!regData || regData.status !== "reserved" || isExpired)) || reservationIsExpired;
 
   return (
     <div className="vp-root min-h-screen relative overflow-x-hidden">
@@ -407,10 +433,27 @@ export default function PaymentPage() {
               ⚠️
             </div>
             <h2 className="vp-h2 text-[24px] text-red-600 mb-2">
-              {error || "We couldn't find this registration."}
+              {reservationIsExpired ? "Your slot reservation has expired." : error || "We couldn't find this registration."}
             </h2>
-            <p className="vp-sub mb-6">If you believe this is an error, please contact Teacher Angel.</p>
-            <Link href="/" className="vp-btn ghost small">Back to Home</Link>
+            {reservationIsExpired ? (
+              <>
+                <p className="vp-sub mb-6">If your class still has an available slot, you can renew this reservation and get 1 hour to submit payment.</p>
+                {regData?.parentEmail && (
+                  <p className="mx-auto mb-4 max-w-md rounded-2xl border-2 border-[#b6dcf5] bg-[#f2faff] px-4 py-3 text-sm font-semibold text-[#0b2a82]">
+                    Email used for this registration: <strong className="break-all">{regData.parentEmail}</strong>
+                  </p>
+                )}
+                {error && <div className="vp-error mb-4">❌ {error}</div>}
+                <button onClick={handleRenewReservation} disabled={renewingReservation} className="vp-btn disabled:opacity-60">
+                  {renewingReservation ? "Checking availability…" : "Renew Reservation for 1 Hour"}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="vp-sub mb-6">If you believe this is an error, please contact Teacher Angel.</p>
+                <Link href="/" className="vp-btn ghost small">Back to Home</Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="vp-card">

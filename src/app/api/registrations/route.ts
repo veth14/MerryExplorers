@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb"; // NEW
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
-import { getAdventureCycleRegistrationQuery, getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
+import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumber, getRegistrationAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 import { BALLET, PROGRAM_SLOTS } from "@/data/landing";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
+import { activeRegistrationSlotQuery, countUniqueActiveRegistrationSlots } from "@/lib/registration-slots";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    const submittedPromoCode = String(promoCode || "").trim().replace(/^[“"']+|[”"':]+$/g, "");
+    if (submittedPromoCode.toUpperCase() === "A1RENEWAL2026" && Date.now() > new Date("2026-10-16T13:00:00+08:00").getTime()) {
+      return NextResponse.json({
+        error: "A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time). If you already registered, open your existing payment page to renew your reservation for 1 hour if a slot is available.",
+      }, { status: 410 });
+    }
+
     // Payment receipt upload has been moved to the second step of the flow.
     let receiptUrl = "";
     let receiptPublicId = "";
@@ -157,9 +165,9 @@ export async function POST(request: Request) {
       nextAdventureStart?: string | null;
     }>;
     const adventureSetting = getProgramAdventureSetting(program, adventureSettings);
-    const adventureNumber = adventureSetting ? getCurrentAdventureNumber(program, adventureSettings) : null;
+    const adventureNumber = adventureSetting ? getTargetRegistrationAdventureNumber(program, adventureSettings) : null;
     const adventureStartDate = adventureSetting
-      ? getCurrentAdventureStartDate(program, adventureSettings)
+      ? getRegistrationAdventureStartDate(program, adventureSettings)
       : null;
     const cycleQuery: Record<string, unknown>[] = adventureNumber === null
       ? []
@@ -199,47 +207,48 @@ export async function POST(request: Request) {
 
     const maxSlots = programConfig[program]?.classes[classTime];
     if (maxSlots !== undefined) {
-      const altClassTime = classTime.includes("Session")
-        ? classTime.replace("Session", "Class")
-        : classTime.replace("Class", "Session");
       const now = new Date();
-      const takenSlots = await db.collection("student_registrations").countDocuments({
-        program,
-        classTime: { $in: [classTime, altClassTime] },
-        status: { $in: ["pending", "approved", "reserved"] },
-        "parentInfo.email": { $nin: ["vianangelo.14@gmail.com", "valmores.ianangelo00@gmail.com"] },
-        $and: [
-          ...(cycleQuery.length ? [{ $or: cycleQuery }] : []),
-          { $or: [
-          { status: { $in: ["pending", "approved"] } },
-          { reservedUntil: { $exists: false } },
-          { reservedUntil: null },
-          { reservedUntil: { $gte: now } },
-          ] },
-        ],
-      });
+      const takenSlots = await countUniqueActiveRegistrationSlots(
+        db.collection("student_registrations"),
+        activeRegistrationSlotQuery({ program, classTime, cycleQuery, now })
+      );
       if (takenSlots >= maxSlots) {
         return NextResponse.json({ error: `Sorry, ${classTime} for this program is now full.` }, { status: 409 });
       }
     }
 
     // ── Duplicate registration guard ──────────────────────────────────────────
-    // Prevent the same child from being registered twice for the current period.
-    // Match on parent email + child first name (case-insensitive).
+    // Prevent the same child from being registered twice in this cycle, even
+    // when a second parent uses a different email address.
     const emailForDupe = (parentInfo?.email || "").toLowerCase().trim();
     const childFirstForDupe = (childInfo?.firstName || "").trim();
     if (emailForDupe && childFirstForDupe) {
+      const childLastForDupe = (childInfo?.lastName || "").trim();
+      const childDobForDupe = (childInfo?.dateOfBirth || "").trim();
+      const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const identityQuery = childLastForDupe
+        ? {
+          "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(childFirstForDupe)}$`, "i") },
+          "childInfo.lastName": { $regex: new RegExp(`^${escapeRegex(childLastForDupe)}$`, "i") },
+          ...(childDobForDupe ? { "childInfo.dateOfBirth": childDobForDupe } : {}),
+        }
+        : {
+          "parentInfo.email": { $regex: new RegExp(`^${escapeRegex(emailForDupe)}$`, "i") },
+          "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(childFirstForDupe)}$`, "i") },
+        };
       const existing = await db.collection("student_registrations").findOne({
-        "parentInfo.email": { $regex: new RegExp(`^${emailForDupe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-        "childInfo.firstName": { $regex: new RegExp(`^${childFirstForDupe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        ...identityQuery,
         ...(cycleQuery.length ? { $or: cycleQuery } : {}),
-        status: { $in: ["pending", "approved", "reserved"] },
-      });
+        status: { $in: ["pending", "approved", "reserved", "expired"] },
+      }, { sort: { submittedAt: -1 } });
       if (existing) {
         const existingId = existing._id.toString();
         return NextResponse.json({
-          error: `${childFirstForDupe} already has an active registration for Adventure ${adventureNumber ?? 2}. If you submitted the renewal form, please check your email for a payment reminder link, or visit: /register/payment/${existingId}`,
+          error: `A registration for ${childFirstForDupe} was already found for Adventure ${adventureNumber ?? 2}. Continue from its payment page: /register/payment/${existingId}`,
           duplicateRegistrationId: existingId,
+          duplicateRegistrationSubmittedAt: existing.submittedAt || null,
+          duplicateRegistrationExpired: existing.status === "expired" || Boolean(existing.reservedUntil && new Date(existing.reservedUntil).getTime() <= Date.now()),
+          duplicateRegistrationPromoCode: existing.promoCode || null,
         }, { status: 409 });
       }
     }
@@ -252,6 +261,7 @@ export async function POST(request: Request) {
       rawPromoCode === "A1JesusLovesMe2026" ||
       rawPromoCode === "A1JesusLovesMe2026:”" ||
       rawPromoCode === 'A1JesusLovesMe2026:"';
+    const isPriorityReservation = cleanPromoCode.toUpperCase() === "A1RENEWAL2026";
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")
       : new Date(Date.now() + 60 * 60 * 1000);
@@ -313,8 +323,8 @@ export async function POST(request: Request) {
       approvedBy: isScholar ? "system (scholar code: A1JesusLovesMe2026)" : null,
       confirmationEmailSent: false,
       leadId: leadId || null,
-      promoCode: isScholar ? "A1JesusLovesMe2026" : null,
-      isPromoRegistration: isScholar,
+      promoCode: isScholar ? "A1JesusLovesMe2026" : isPriorityReservation ? "A1RENEWAL2026" : null,
+      isPromoRegistration: isScholar || isPriorityReservation,
       isScholar,
     };
 

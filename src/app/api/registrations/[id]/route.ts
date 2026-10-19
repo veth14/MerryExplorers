@@ -71,11 +71,17 @@ export async function GET(
           dueDate: terms.dueDate,
         }
       : null;
+    const reservationIsExpired = registration.status === "expired" || (
+      registration.status === "reserved" &&
+      registration.reservedUntil &&
+      new Date(registration.reservedUntil).getTime() <= Date.now()
+    );
 
-    // Only return non-sensitive fields needed for the payment page
+    // Reveal the registration email only on an expired reservation so the two parents can identify the record.
     const publicData = {
       id: registration._id.toString(),
       status: registration.status,
+      ...(reservationIsExpired ? { parentEmail: String(registration.parentInfo?.email || "").trim() } : {}),
       program: registration.program,
       classTime: registration.classTime,
       reservedUntil: registration.reservedUntil,

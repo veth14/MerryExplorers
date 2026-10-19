@@ -8,6 +8,7 @@ import * as XLSX from "xlsx";
 import { RenewalSettingsManager } from "@/components/admin/RenewalSettingsManager";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
+import { auth } from "@/lib/firebase";
 
 type Family = {
   _id: string;
@@ -159,14 +160,26 @@ export default function RenewalsPage() {
   // File import ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Renewals APIs verify Firebase ID tokens. The shared fetch wrapper can run
+  // after child effects on first render, so attach the token explicitly here.
+  const adminFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    await auth.authStateReady();
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error("Your admin session has expired. Please sign in again.");
+
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${await currentUser.getIdToken()}`);
+    return fetch(input, { ...init, headers });
+  };
+
   // Fetch renewals & families
   const fetchData = async () => {
     try {
       setLoading(true);
       const [pRes, rRes, fRes] = await Promise.all([
-        fetch("/api/renewals/periods"),
-        fetch(`/api/renewals?period=${selectedPeriod}`),
-        fetch(`/api/renewals/families?period=${selectedPeriod}`),
+        adminFetch("/api/renewals/periods"),
+        adminFetch(`/api/renewals?period=${selectedPeriod}`),
+        adminFetch(`/api/renewals/families?period=${selectedPeriod}`),
       ]);
 
       const [pData, rData, fData] = await Promise.all([pRes.json(), rRes.json(), fRes.json()]);
@@ -387,7 +400,7 @@ export default function RenewalsPage() {
       `Are you sure you want to change this renewal status to "${newStatus}"?`,
       async () => {
         try {
-          const res = await fetch(`/api/renewals/${id}`, {
+          const res = await adminFetch(`/api/renewals/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "update_status", newStatus }),
@@ -413,7 +426,7 @@ export default function RenewalsPage() {
       "Are you sure you want to release this student's slot? This will mark the registration as released/expired and free up room in the class capacity.",
       async () => {
         try {
-          const res = await fetch(`/api/renewals/${id}`, {
+          const res = await adminFetch(`/api/renewals/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "release_slot" }),
@@ -443,7 +456,7 @@ export default function RenewalsPage() {
 
     try {
       if (editingFamily) {
-        const res = await fetch(`/api/renewals/families/${editingFamily._id}`, {
+        const res = await adminFetch(`/api/renewals/families/${editingFamily._id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -467,7 +480,7 @@ export default function RenewalsPage() {
           setFamilyFormError(d.error || "Failed to update family.");
         }
       } else {
-        const res = await fetch("/api/renewals/families", {
+        const res = await adminFetch("/api/renewals/families", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -514,7 +527,7 @@ export default function RenewalsPage() {
       `Are you sure you want to permanently delete the family record for ${name}?`,
       async () => {
         try {
-          await fetch(`/api/renewals/families/${id}`, { method: "DELETE" });
+          await adminFetch(`/api/renewals/families/${id}`, { method: "DELETE" });
           showModalNotice("Record Deleted", `The family record for ${name} has been removed.`, "success");
           fetchData();
         } catch {
@@ -598,7 +611,7 @@ export default function RenewalsPage() {
     if (importData.length === 0) return;
     setImporting(true);
     try {
-      const res = await fetch("/api/renewals/families", {
+      const res = await adminFetch("/api/renewals/families", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -664,7 +677,7 @@ export default function RenewalsPage() {
       return;
     }
     try {
-      const res = await fetch("/api/renewals/periods", {
+      const res = await adminFetch("/api/renewals/periods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -708,7 +721,7 @@ export default function RenewalsPage() {
         continue;
       }
       try {
-        const res = await fetch("/api/renewals/send-email", {
+        const res = await adminFetch("/api/renewals/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ familyId: item.familyId, emailType: type }),
@@ -822,7 +835,7 @@ export default function RenewalsPage() {
     if (!emailModalFamily) return;
     setSendingEmail(true);
     try {
-      const res = await fetch("/api/renewals/send-email", {
+      const res = await adminFetch("/api/renewals/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -986,8 +999,8 @@ export default function RenewalsPage() {
                 </div>
                 <p className="text-[12px] text-[#64748b]">
                   {showClassTracker
-                    ? "Click to collapse session breakdown"
-                    : "Click to expand live class capacity and see sessions needing students"}
+                    ? "Counts active registrations from both renewal and regular sign-ups in the current Adventure cycle."
+                    : "Click to see live class capacity across renewal and regular sign-ups"}
                 </p>
               </div>
             </div>

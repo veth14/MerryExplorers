@@ -44,7 +44,7 @@ export function getProgramAdventureSetting(
   program: string,
   settings: AdventureProgramSetting[]
 ) {
-  const programKey = PROGRAM_KEYS[program];
+  const programKey = PROGRAM_KEYS[program] || program;
   return settings.find((entry) => entry.programKey === programKey);
 }
 
@@ -53,7 +53,12 @@ export function getAdventureCycleRegistrationQuery(
   adventureStartDate: string | null
 ) {
   return [
-    { adventureNumber },
+    {
+      adventureNumber,
+      ...(adventureNumber === 2
+        ? { submittedAt: { $gte: new Date(`${LEGACY_ADVENTURE_2_START}T00:00:00+08:00`) } }
+        : {}),
+    },
     {
       period: `adventure-${adventureNumber}`,
       ...(adventureNumber === 2
@@ -101,6 +106,42 @@ export function getCurrentAdventureStartDate(
   return datePart(programSetting?.adventureStartDate) || (
     getCurrentAdventureNumber(program, settings, now) === 2 ? LEGACY_ADVENTURE_2_START : null
   );
+}
+
+/**
+ * The registration form can open for the upcoming adventure before its start
+ * date. In that window, new reservations belong to the upcoming cycle, even
+ * though the admin setting still identifies the in-session adventure as
+ * current.
+ */
+export function getTargetRegistrationAdventureNumber(
+  program: string,
+  settings: AdventureProgramSetting[],
+  now = new Date()
+) {
+  const currentNumber = getCurrentAdventureNumber(program, settings, now);
+  const programSetting = getProgramAdventureSetting(program, settings);
+  const master = settings.find((entry) => entry.programKey === "Discovery Club: Curious Explorer");
+  const upcomingStart = datePart(programSetting?.nextAdventureStart) || datePart(master?.nextAdventureStart);
+
+  return upcomingStart && manilaDate(now) < upcomingStart
+    ? currentNumber + 1
+    : currentNumber;
+}
+
+export function getRegistrationAdventureStartDate(
+  program: string,
+  settings: AdventureProgramSetting[],
+  now = new Date()
+) {
+  const currentNumber = getCurrentAdventureNumber(program, settings, now);
+  const registrationNumber = getTargetRegistrationAdventureNumber(program, settings, now);
+  if (registrationNumber > currentNumber) {
+    const programSetting = getProgramAdventureSetting(program, settings);
+    const master = settings.find((entry) => entry.programKey === "Discovery Club: Curious Explorer");
+    return datePart(programSetting?.nextAdventureStart) || datePart(master?.nextAdventureStart);
+  }
+  return getCurrentAdventureStartDate(program, settings, now);
 }
 
 export function getAdventureCycleTimeline(
