@@ -53,12 +53,17 @@ export async function POST(request: Request) {
       if (size) newMaterial.size = size;
     }
 
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid as any },
+      { $push: { studyMaterials: newMaterial } as any }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid as any },
       { $push: { studyMaterials: newMaterial } as any }
     );
 
-    const account = await db.collection("accounts").findOne({ _id: uid as any });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                    (await db.collection("accounts").findOne({ _id: uid as any }));
     return NextResponse.json({ success: true, studyMaterials: account?.studyMaterials || [] });
   } catch {
     return NextResponse.json({ error: "Failed to add material" }, { status: 500 });
@@ -78,7 +83,8 @@ export async function DELETE(request: Request) {
     const { db } = await connectToDatabase();
 
     // 1. Find the target material to check if it has an associated B2 file key
-    const account = await db.collection("accounts").findOne({ _id: uid as any });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                    (await db.collection("accounts").findOne({ _id: uid as any }));
     const targetMaterial = (account?.studyMaterials || []).find(
       (m: any) => m.id === materialId
     );
@@ -89,12 +95,17 @@ export async function DELETE(request: Request) {
     }
 
     // 3. Remove the material record completely from the MongoDB database
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid as any },
+      { $pull: { studyMaterials: { id: materialId } } as any }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid as any },
       { $pull: { studyMaterials: { id: materialId } } as any }
     );
 
-    const updatedAccount = await db.collection("accounts").findOne({ _id: uid as any });
+    const updatedAccount = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                           (await db.collection("accounts").findOne({ _id: uid as any }));
     return NextResponse.json({ success: true, studyMaterials: updatedAccount?.studyMaterials || [] });
   } catch (error: any) {
     console.error("[study-materials DELETE]", error);

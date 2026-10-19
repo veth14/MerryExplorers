@@ -16,7 +16,21 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // Update parent account with renewal status
+    // Update parent account with renewal status in parent_accounts and accounts
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid },
+      {
+        $set: {
+          renewalStatus: {
+            hasSubmitted: true,
+            returning,
+            notes: notes || "",
+            reason: reason || "",
+            submittedAt: new Date().toISOString(),
+          }
+        }
+      }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid },
       {

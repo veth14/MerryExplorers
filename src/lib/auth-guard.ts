@@ -67,10 +67,16 @@ export async function getAuthenticatedUser(
     if (!firebaseUser?.localId) return unauthorized();
 
     const { db } = await connectToDatabase();
-    const account = await db.collection("accounts").findOne(
+    let account = await db.collection("parent_accounts").findOne(
       { _id: firebaseUser.localId as never },
       { projection: { role: 1 } }
     );
+    if (!account) {
+      account = await db.collection("accounts").findOne(
+        { _id: firebaseUser.localId as never },
+        { projection: { role: 1 } }
+      );
+    }
 
     const role = typeof account?.role === "string"
       ? account.role.toLowerCase() as AppRole

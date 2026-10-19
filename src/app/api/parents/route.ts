@@ -155,8 +155,9 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // Check if email already exists in MongoDB accounts
-    const existing = await db.collection("accounts").findOne({ email: cleanEmail });
+    // Check if email already exists in MongoDB parent_accounts or legacy accounts
+    const existing = (await db.collection("parent_accounts").findOne({ email: cleanEmail })) ||
+                     (await db.collection("accounts").findOne({ email: cleanEmail }));
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
@@ -218,7 +219,7 @@ export async function POST(request: Request) {
       ...(promoDiscount ? { promoDiscount } : {}),
     };
 
-    await db.collection("accounts").insertOne(accountDoc);
+    await db.collection("parent_accounts").insertOne(accountDoc);
 
     // Send the welcome email with login credentials
     let emailSent = false;
@@ -271,7 +272,8 @@ export async function GET(request: Request) {
     }
 
     const { db } = await connectToDatabase();
-    const account = await db.collection("accounts").findOne({ _id: uid as any });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                    (await db.collection("accounts").findOne({ _id: uid as any }));
 
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });

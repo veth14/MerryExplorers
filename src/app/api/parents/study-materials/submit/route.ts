@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       submittedAt: new Date().toISOString(),
     };
 
-    const result = await db.collection("accounts").updateOne(
+    let result = await db.collection("parent_accounts").updateOne(
       { _id: uid as any, "studyMaterials.id": materialId },
       { 
         $set: {
@@ -35,6 +35,17 @@ export async function POST(request: Request) {
         }
       }
     );
+
+    if (result.matchedCount === 0) {
+      result = await db.collection("accounts").updateOne(
+        { _id: uid as any, "studyMaterials.id": materialId },
+        { 
+          $set: {
+            "studyMaterials.$.submission": submission
+          }
+        }
+      );
+    }
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Material or account not found" }, { status: 404 });

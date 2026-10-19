@@ -7,7 +7,16 @@ export async function GET(request: Request) {
   if (deny) return deny;
   try {
     const { db } = await connectToDatabase();
-    const accounts = await db.collection("accounts").find({}).toArray();
+    const [accounts, parentAccounts] = await Promise.all([
+      db.collection("accounts").find({}).toArray(),
+      db.collection("parent_accounts").find({}).toArray(),
+    ]);
+
+    const accountsMap = new Map<string, any>();
+    for (const acc of [...accounts, ...parentAccounts]) {
+      accountsMap.set(acc._id.toString(), acc);
+    }
+    const mergedAccounts = Array.from(accountsMap.values());
     
     // Get all currently active leaves to dynamically compute 'on-leave' status
     const today = new Date().toISOString().split("T")[0];
@@ -20,7 +29,7 @@ export async function GET(request: Request) {
     const teachersOnLeave = new Set(activeLeaves.map(l => l.teacherId));
     
     // Map _id back to id for frontend compatibility
-    const formattedAccounts = accounts.map(acc => {
+    const formattedAccounts = mergedAccounts.map(acc => {
       const id = acc._id.toString();
       const isOnLeave = teachersOnLeave.has(id);
       let status = acc.status;

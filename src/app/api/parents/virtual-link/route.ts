@@ -17,6 +17,10 @@ export async function PATCH(request: Request) {
     if (virtualSessionLink !== undefined) updateData.virtualSessionLink = virtualSessionLink;
     if (virtualSessionTime !== undefined) updateData.virtualSessionTime = virtualSessionTime;
 
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid },
+      { $set: updateData }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid },
       { $set: updateData }
@@ -24,7 +28,8 @@ export async function PATCH(request: Request) {
 
     // Optionally email the parent that their session is ready
     if (sendEmail) {
-      const account = await db.collection("accounts").findOne({ _id: uid });
+      const account = (await db.collection("parent_accounts").findOne({ _id: uid })) ||
+                      (await db.collection("accounts").findOne({ _id: uid }));
       if (account?.email) {
         try {
           await sendSessionLinkEmail(

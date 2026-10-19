@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     //
     // The filter only matches while a class link is set, so a double-click, a retry,
     // or a second admin ending the same session can't count it twice.
-    const result = await db.collection("accounts").updateOne(
+    let result = await db.collection("parent_accounts").updateOne(
       { _id: uid, virtualSessionLink: { $nin: [null, ""] } },
       {
         $set: {
@@ -30,6 +30,21 @@ export async function POST(request: Request) {
         },
       }
     );
+
+    if (result.matchedCount === 0) {
+      result = await db.collection("accounts").updateOne(
+        { _id: uid, virtualSessionLink: { $nin: [null, ""] } },
+        {
+          $set: {
+            virtualSessionLink: null,
+            virtualSessionTime: null,
+          },
+          $inc: {
+            virtualSessionsCompleted: 1,
+          },
+        }
+      );
+    }
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "No active session to end" }, { status: 409 });

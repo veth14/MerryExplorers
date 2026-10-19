@@ -66,8 +66,14 @@ export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
     
-    // 2. Fetch all active parents
-    const parents = await db.collection("accounts").find({ role: { $in: ["parent", "Parent"] }, status: "active" }).toArray();
+    // 2. Fetch all active parents from parent_accounts and legacy accounts
+    const parentAccounts = await db.collection("parent_accounts").find({ status: "active" }).toArray();
+    const legacyParents = await db.collection("accounts").find({ role: { $in: ["parent", "Parent"] }, status: "active" }).toArray();
+    const parentMap = new Map<string, any>();
+    for (const p of [...legacyParents, ...parentAccounts]) {
+      if (p.email) parentMap.set(p.email.toLowerCase(), p);
+    }
+    const parents = Array.from(parentMap.values());
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -146,6 +152,10 @@ export async function GET(request: Request) {
           });
 
           // Mark as reminded so we don't send multiple emails if the cron runs twice
+          await db.collection("parent_accounts").updateOne(
+            { _id: parent._id },
+            { $set: { lastRemindedDate: sessionDateStr } }
+          );
           await db.collection("accounts").updateOne(
             { _id: parent._id },
             { $set: { lastRemindedDate: sessionDateStr } }

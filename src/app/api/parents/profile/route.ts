@@ -17,7 +17,8 @@ export async function PATCH(request: Request) {
     const { db } = await connectToDatabase();
 
     // Find the parent account
-    const account = await db.collection("accounts").findOne({ _id: uid });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid })) ||
+                    (await db.collection("accounts").findOne({ _id: uid }));
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
@@ -61,6 +62,10 @@ export async function PATCH(request: Request) {
       accountUpdates.emergencyContact = emergencyContact;
     }
 
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid },
+      { $set: accountUpdates }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid },
       { $set: accountUpdates }

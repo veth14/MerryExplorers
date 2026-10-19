@@ -19,8 +19,11 @@ export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
     
-    // Look up the user in the "accounts" collection by their Firebase UID
-    const user = await db.collection("accounts").findOne({ _id: uid as any });
+    // Look up the user in "parent_accounts" first, then "accounts" by Firebase UID
+    let user = await db.collection("parent_accounts").findOne({ _id: uid as any });
+    if (!user) {
+      user = await db.collection("accounts").findOne({ _id: uid as any });
+    }
     
     if (user && user.role) {
       // Normalize to lowercase so "Admin", "ADMIN", "admin" all work consistently

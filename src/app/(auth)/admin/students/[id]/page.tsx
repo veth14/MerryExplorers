@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { StudentEditModal } from "@/components/admin/StudentEditModal";
 
 const PROGRAM_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
   "curious-explorer":  { color: "#b45309", bg: "#fffbeb", label: "Curious Explorer",  emoji: "🔎" },
   "creative-explorer": { color: "#1d4ed8", bg: "#eff6ff", label: "Creative Explorer", emoji: "🎨" },
   "everyday-curious":  { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Explorer", emoji: "🌈" },
-  "brave-explorer":    { color: "#047857", bg: "#f0fdf4", label: "Brave Explorer",    emoji: "💡" },
+  "everyday-explorer": { color: "#7c3aed", bg: "#f5f3ff", label: "Everyday Explorer", emoji: "🌈" },
+  "brave-explorer":    { color: "#047857", bg: "#f0fdf4", label: "Trailblazer (Brave)",    emoji: "💡" },
+  "saturday-playdate": { color: "#ea580c", bg: "#fff7ed", label: "Saturday Playdate", emoji: "🎈" },
+  "ballet":            { color: "#db2777", bg: "#fdf2f8", label: "Ballet",            emoji: "🩰" },
+  "virtual-session":   { color: "#0891b2", bg: "#ecfeff", label: "Virtual Tutorial",  emoji: "💻" },
 };
 
 const AVATAR_GRADIENTS = [
@@ -61,19 +66,24 @@ export default function AdminStudentProfilePage() {
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
-  useEffect(() => {
+  const fetchStudent = () => {
     fetch("/api/students")
       .then(r => r.json())
       .then(data => {
         if (data.success) {
-          const found = data.data.find((s: any) => s.id === id);
+          const found = data.data.find((s: any) => s.id === id || s.registrationId === id);
           if (found) setStudent(found);
           else setError("Student not found");
         } else setError(data.error);
       })
       .catch(() => setError("Network error"))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStudent();
   }, [id]);
 
   if (loading) {
@@ -101,36 +111,60 @@ export default function AdminStudentProfilePage() {
     );
   }
 
-  const meta = PROGRAM_META[student.program];
+  const meta = PROGRAM_META[student.program] || PROGRAM_META["curious-explorer"];
   const age = getAge(student.childInfo?.dateOfBirth);
   const avatarGrad = AVATAR_GRADIENTS[student.childInfo?.firstName?.charCodeAt(0) % AVATAR_GRADIENTS.length] || AVATAR_GRADIENTS[0];
-  const enrolledDate = new Date(student.enrolledAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const enrolledDate = student.enrolledAt ? new Date(student.enrolledAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—";
 
   return (
-    <AppShell title={`${student.childInfo.firstName} ${student.childInfo.lastName}`}>
-      {/* Back */}
-      <button onClick={() => router.push("/admin/students")} style={{ marginBottom: "20px", background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700", color: "#64748b", display: "flex", alignItems: "center", gap: "6px", padding: 0 }}>
-        ← Back to Students
-      </button>
+    <AppShell title={`${student.childInfo?.firstName || "Explorer"} ${student.childInfo?.lastName || ""}`}>
+      {/* Top action bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <button
+          onClick={() => router.push("/admin/students")}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700", color: "#64748b", display: "flex", alignItems: "center", gap: "6px", padding: 0 }}
+        >
+          ← Back to Students Directory
+        </button>
+
+        <button
+          onClick={() => setEditOpen(true)}
+          style={{
+            padding: "8px 18px",
+            borderRadius: "12px",
+            border: "none",
+            background: "linear-gradient(135deg,#0b2a82,#0050d5)",
+            color: "white",
+            fontSize: "13px",
+            fontWeight: "800",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,80,213,0.25)",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          ✏️ Edit Explorer Info
+        </button>
+      </div>
 
       {/* ── Hero Banner ── */}
       <div style={{ background: "linear-gradient(135deg,#001a4d 0%,#002f76 45%,#0050d5 100%)", borderRadius: "24px", padding: "32px 36px", marginBottom: "24px", position: "relative", overflow: "hidden", boxShadow: "0 8px 32px rgba(0,47,118,0.25)" }}>
-        {/* Decorative circles */}
         <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "180px", height: "180px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "-50px", right: "120px", width: "140px", height: "140px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
 
         <div style={{ display: "flex", alignItems: "center", gap: "24px", flexWrap: "wrap", position: "relative" }}>
           {/* Avatar */}
           <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: avatarGrad, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "28px", fontWeight: "900", flexShrink: 0, boxShadow: "0 4px 20px rgba(0,0,0,0.25)", border: "3px solid rgba(255,255,255,0.25)" }}>
-            {getInitials(student.childInfo.firstName, student.childInfo.lastName)}
+            {getInitials(student.childInfo?.firstName || "", student.childInfo?.lastName || "")}
           </div>
 
           {/* Name & badges */}
           <div style={{ flex: 1, minWidth: "200px" }}>
             <h1 style={{ color: "white", fontWeight: "900", fontSize: "24px", margin: "0 0 4px", letterSpacing: "-0.3px" }}>
-              {student.childInfo.firstName} {student.childInfo.lastName}
+              {student.childInfo?.firstName} {student.childInfo?.lastName}
             </h1>
-            {student.childInfo.nickname && (
+            {student.childInfo?.nickname && (
               <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "14px", margin: "0 0 10px" }}>"{student.childInfo.nickname}"</p>
             )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -139,18 +173,23 @@ export default function AdminStudentProfilePage() {
                   {meta.emoji} {meta.label}
                 </span>
               )}
+              {student.adventureNumber && (
+                <span style={{ padding: "4px 12px", background: "rgba(255,255,255,0.18)", color: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "700" }}>
+                  Adventure {student.adventureNumber}
+                </span>
+              )}
               {age !== null && (
                 <span style={{ padding: "4px 12px", background: "rgba(255,255,255,0.12)", color: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.2)" }}>
                   {age} yrs old
                 </span>
               )}
-              {student.childInfo.gender && (
+              {student.childInfo?.gender && (
                 <span style={{ padding: "4px 12px", background: "rgba(255,255,255,0.12)", color: "white", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.2)" }}>
                   {student.childInfo.gender}
                 </span>
               )}
               <span style={{ padding: "4px 12px", background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.2)" }}>
-                Registered {enrolledDate}
+                Status: {student.status || "active"}
               </span>
             </div>
           </div>
@@ -174,28 +213,28 @@ export default function AdminStudentProfilePage() {
       </div>
 
       {/* ── 2-column grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
         <Section title="Explorer Details" icon="🧒" accentColor="#0050d5" iconBg="linear-gradient(135deg,#dbeafe,#bfdbfe)">
-          <InfoRow label="Full Name" value={`${student.childInfo.firstName} ${student.childInfo.lastName}`} />
-          <InfoRow label="Nickname" value={student.childInfo.nickname} />
-          <InfoRow label="Date of Birth" value={student.childInfo.dateOfBirth ? (() => { const [y,m,d] = student.childInfo.dateOfBirth.split("-"); return new Date(+y, +m-1, +d).toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}); })() : null} />
-          <InfoRow label="Gender" value={student.childInfo.gender} />
+          <InfoRow label="Full Name" value={`${student.childInfo?.firstName} ${student.childInfo?.lastName}`} />
+          <InfoRow label="Nickname" value={student.childInfo?.nickname} />
+          <InfoRow label="Date of Birth" value={student.childInfo?.dateOfBirth} />
+          <InfoRow label="Gender" value={student.childInfo?.gender} />
           <InfoRow label="Age" value={age !== null ? `${age} years old` : null} />
-          <InfoRow label="Health Notes" value={student.childInfo.healthProfile || "None noted"} />
+          <InfoRow label="Health / Allergies" value={student.childInfo?.healthProfile || "None noted"} />
         </Section>
 
         <Section title="Parent / Guardian" icon="👨‍👩‍👧" accentColor="#7c3aed" iconBg="linear-gradient(135deg,#ede9fe,#ddd6fe)">
-          <InfoRow label="Name" value={student.parentInfo.name} />
-          <InfoRow label="Relationship" value={student.parentInfo.relationship} />
-          <InfoRow label="Email" value={student.parentInfo.email} />
-          <InfoRow label="Phone" value={student.parentInfo.phone} />
+          <InfoRow label="Name" value={student.parentInfo?.name} />
+          <InfoRow label="Relationship" value={student.parentInfo?.relationship || "Parent"} />
+          <InfoRow label="Email" value={student.parentInfo?.email} />
+          <InfoRow label="Phone" value={student.parentInfo?.phone} />
+          <InfoRow label="Address" value={student.parentInfo?.address} />
         </Section>
 
         <Section title="Favorites" icon="⭐" accentColor="#b45309" iconBg="linear-gradient(135deg,#fef3c7,#fde68a)">
-          <InfoRow label="Favorite Song" value={student.childInfo.favoriteSong} />
-          <InfoRow label="Favorite Color" value={student.childInfo.favoriteColor} />
-          <InfoRow label="Favorite Character" value={student.childInfo.favoriteCharacter} />
+          <InfoRow label="Favorite Color" value={student.childInfo?.favoriteColor} />
+          <InfoRow label="Favorite Song" value={student.childInfo?.favoriteSong} />
+          <InfoRow label="Favorite Character" value={student.childInfo?.favoriteCharacter} />
         </Section>
 
         <Section title="Emergency Contact" icon="🚨" accentColor="#be123c" iconBg="linear-gradient(135deg,#fee2e2,#fecaca)">
@@ -206,10 +245,9 @@ export default function AdminStudentProfilePage() {
 
         <Section title="Registration Details" icon="📋" accentColor="#047857" iconBg="linear-gradient(135deg,#d1fae5,#a7f3d0)">
           <InfoRow label="Program" value={student.programName} />
+          <InfoRow label="Adventure Cycle" value={student.adventureNumber ? `Adventure ${student.adventureNumber}` : "Standard session"} />
           <InfoRow label="Class Time" value={student.classTime} />
           <InfoRow label="Schedule" value={student.schedule} />
-          <InfoRow label="Uniform Kit" value={student.uniformOrdered ? "✅ Ordered" : "No"} />
-          <InfoRow label="Lanyard" value={student.lanyardOrdered ? "✅ Ordered" : "No"} />
           <InfoRow label="Registered On" value={enrolledDate} />
         </Section>
 
@@ -223,9 +261,17 @@ export default function AdminStudentProfilePage() {
             <span style={{ color: "#15803d", fontWeight: "800" }}>✅ Digitally Signed</span>
           } />
         </Section>
-
       </div>
+
+      {/* Edit Modal */}
+      <StudentEditModal
+        isOpen={editOpen}
+        student={student}
+        onClose={() => setEditOpen(false)}
+        onSaveSuccess={(updated) => {
+          setStudent(updated);
+        }}
+      />
     </AppShell>
   );
 }
-

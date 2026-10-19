@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    const result = await db.collection("accounts").updateOne(
+    let result = await db.collection("parent_accounts").updateOne(
       { _id: uid as any },
       {
         $set: {
@@ -43,6 +43,19 @@ export async function POST(request: Request) {
         },
       }
     );
+
+    if (result.matchedCount === 0) {
+      result = await db.collection("accounts").updateOne(
+        { _id: uid as any },
+        {
+          $set: {
+            waiverSignature: signatureUrl,
+            waiverSignedAt: new Date(),
+            photoConsent: photoConsent !== undefined ? photoConsent : true,
+          },
+        }
+      );
+    }
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });

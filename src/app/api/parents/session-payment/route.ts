@@ -25,7 +25,8 @@ export async function POST(request: Request) {
     }
 
     const { db } = await connectToDatabase();
-    const account = await db.collection("accounts").findOne({ _id: uid as any });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                    (await db.collection("accounts").findOne({ _id: uid as any }));
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
@@ -43,6 +44,10 @@ export async function POST(request: Request) {
     };
 
     // Submitting a payment no longer touches needsSessionPayment: families are not blocked.
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid as any },
+      { $push: { sessionPayments: payment } as any }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid as any },
       { $push: { sessionPayments: payment } as any }
@@ -82,7 +87,8 @@ export async function GET(request: Request) {
     }
 
     const { db } = await connectToDatabase();
-    const account = await db.collection("accounts").findOne({ _id: uid as any });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                    (await db.collection("accounts").findOne({ _id: uid as any }));
 
     return NextResponse.json({
       success: true,
@@ -112,7 +118,7 @@ export async function PATCH(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    const result = await db.collection("accounts").updateOne(
+    let result = await db.collection("parent_accounts").updateOne(
       { _id: uid as any, "sessionPayments.id": paymentId },
       {
         $set: {
@@ -125,12 +131,27 @@ export async function PATCH(request: Request) {
     );
 
     if (result.matchedCount === 0) {
+      result = await db.collection("accounts").updateOne(
+        { _id: uid as any, "sessionPayments.id": paymentId },
+        {
+          $set: {
+            "sessionPayments.$.verified": action === "verify",
+            "sessionPayments.$.rejected": action === "reject",
+            "sessionPayments.$.reviewedAt": new Date().toISOString(),
+            "sessionPayments.$.adminNote": adminNote || "",
+          },
+        }
+      );
+    }
+
+    if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
     // If verified, email the parent
     if (action === "verify") {
-      const account = await db.collection("accounts").findOne({ _id: uid as any });
+      const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
+                      (await db.collection("accounts").findOne({ _id: uid as any }));
       if (account?.email) {
         try {
           await sendPaymentVerifiedEmail(account.email, account.fullName || account.email);

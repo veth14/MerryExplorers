@@ -40,13 +40,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const { db } = await connectToDatabase();
 
-    // Try matching by string _id (Firebase UID stored as MongoDB _id)
-    let account = await db.collection("accounts").findOne({ _id: id as any });
+    // Try matching by string _id (Firebase UID stored as MongoDB _id) in parent_accounts or accounts
+    let account = (await db.collection("parent_accounts").findOne({ _id: id as any })) ||
+                  (await db.collection("accounts").findOne({ _id: id as any }));
 
     // Fallback: try ObjectId in case the document was created differently
     if (!account) {
       try {
-        account = await db.collection("accounts").findOne({ _id: new ObjectId(id) });
+        account = (await db.collection("parent_accounts").findOne({ _id: new ObjectId(id) })) ||
+                  (await db.collection("accounts").findOne({ _id: new ObjectId(id) }));
       } catch {
         // id is not a valid ObjectId, ignore
       }
@@ -110,10 +112,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const { db } = await connectToDatabase();
 
-    const result = await db.collection("accounts").updateOne(
+    let result = await db.collection("parent_accounts").updateOne(
       { _id: id as any },
       { $set: updateData }
     );
+
+    if (result.matchedCount === 0) {
+      result = await db.collection("accounts").updateOne(
+        { _id: id as any },
+        { $set: updateData }
+      );
+    }
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -135,7 +144,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { db } = await connectToDatabase();
 
     // Find the account first so we can clean up any B2 files it owns
-    const account = await db.collection("accounts").findOne({ _id: id as any });
+    const account = (await db.collection("parent_accounts").findOne({ _id: id as any })) ||
+                    (await db.collection("accounts").findOne({ _id: id as any }));
     if (account?.studyMaterials?.length) {
       for (const mat of account.studyMaterials) {
         if (mat.key) {
@@ -144,7 +154,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       }
     }
 
-    const result = await db.collection("accounts").deleteOne({ _id: id as any });
+    let result = await db.collection("parent_accounts").deleteOne({ _id: id as any });
+    if (result.deletedCount === 0) {
+      result = await db.collection("accounts").deleteOne({ _id: id as any });
+    }
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });

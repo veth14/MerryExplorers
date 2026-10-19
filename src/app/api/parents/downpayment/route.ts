@@ -17,6 +17,23 @@ export async function POST(request: Request) {
     const { db } = await connectToDatabase();
 
     // Save the downpayment submission on the parent's account
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid as any },
+      {
+        $set: {
+          "renewalStatus.downpayment": {
+            submitted: true,
+            paymentMethod,
+            receiptBase64,
+            referenceNumber: referenceNumber || "",
+            amountPaid: amountPaid || 0,
+            submittedAt: new Date().toISOString(),
+            verified: false,
+            rejected: false,
+          },
+        },
+      }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid as any },
       {
@@ -70,6 +87,10 @@ export async function PATCH(request: Request) {
       updateFields["renewalStatus.slotSecured"] = true;
     }
 
+    await db.collection("parent_accounts").updateOne(
+      { _id: uid as any },
+      { $set: updateFields }
+    );
     await db.collection("accounts").updateOne(
       { _id: uid as any },
       { $set: updateFields }
