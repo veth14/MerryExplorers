@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
-import { getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting, getRegistrationAdventureNumber } from "@/lib/adventure-cycle";
+import { getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting, getRegistrationAdventureNumber, getAdventureStartDateForNumber } from "@/lib/adventure-cycle";
 import { FALLBACK_PIONEER_RATES, getRegistrationTotal, isRegistrationVerified } from "@/lib/payment-terms";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
@@ -119,8 +119,8 @@ export async function POST(
         }, registration.program, adventureSettings)
       : null;
     const adventureStartDate = registration.adventureStartDate || (
-      adventureSetting && adventureNumber === getCurrentAdventureNumber(registration.program, adventureSettings)
-        ? getCurrentAdventureStartDate(registration.program, adventureSettings)
+      adventureSetting
+        ? getAdventureStartDateForNumber(registration.program, adventureNumber, adventureSettings)
         : null
     );
 
@@ -135,6 +135,8 @@ export async function POST(
             approvedAt: new Date(),
             approvedBy: actorName || actorUid || "Admin",
             confirmationEmailSent: false,
+            ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}` } : {}),
+            ...(adventureStartDate ? { adventureStartDate } : {}),
           },
         }
       );

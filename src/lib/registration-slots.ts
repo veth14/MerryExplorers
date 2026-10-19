@@ -2,7 +2,6 @@ const DEFAULT_TESTING_EMAILS = [
   "iangelovalmores@gmail.com",
   "ian.valmores@gmail.com",
   "vianangelo.14@gmail.com",
-  "valmores.ianangelo00@gmail.com",
 ];
 
 const TESTING_EMAILS = [...new Set([
@@ -44,13 +43,13 @@ export function activeRegistrationSlotQuery({
     ...(excludeId ? { _id: { $ne: excludeId } } : {}),
     program,
     classTime: { $in: getClassTimeAliases(classTime) },
-    status: { $in: ["pending", "approved", "reserved"] },
+    status: { $in: ["pending", "approved", "active", "reserved"] },
     "parentInfo.email": { $nin: TESTING_EMAILS },
     $and: [
       ...(cycleQuery.length ? [{ $or: cycleQuery }] : []),
       {
         $or: [
-          { status: "approved" },
+          { status: { $in: ["approved", "active"] } },
           { status: { $in: ["pending", "reserved"] }, reservedUntil: { $gte: now } },
           // Older imports stored reservation deadlines as ISO strings.
           { status: { $in: ["pending", "reserved"] }, reservedUntil: { $gte: now.toISOString() } },

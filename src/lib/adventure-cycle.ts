@@ -187,6 +187,22 @@ export function getAdventureCycleTimeline(
   };
 }
 
+export function getAdventureStartDateForNumber(
+  program: string,
+  adventureNumber: number | null,
+  settings: AdventureProgramSetting[],
+  now = new Date()
+) {
+  if (!adventureNumber) return null;
+  const currentNumber = getCurrentAdventureNumber(program, settings, now);
+  const programSetting = getProgramAdventureSetting(program, settings);
+  if (adventureNumber > currentNumber) {
+    const master = settings.find((entry) => entry.programKey === "Discovery Club: Curious Explorer");
+    return datePart(programSetting?.nextAdventureStart) || datePart(master?.nextAdventureStart);
+  }
+  return getCurrentAdventureStartDate(program, settings, now);
+}
+
 export function getRegistrationAdventureNumber(
   registration: { adventureNumber?: number; period?: string; submittedAt?: string | Date },
   program: string,
@@ -194,11 +210,17 @@ export function getRegistrationAdventureNumber(
   now = new Date()
 ) {
   const savedNumber = Number(registration.adventureNumber);
+  const submittedDate = datePart(registration.submittedAt);
+
+  // If a registration was submitted on or after Oct 12, 2026, it belongs to Adventure 2 (or upcoming target cycle),
+  // not Adventure 1, even if an earlier bug erroneously saved adventureNumber: 1 or period: 'adventure-1'.
+  if (savedNumber === 1 && submittedDate && submittedDate >= LEGACY_ADVENTURE_2_START) {
+    return getTargetRegistrationAdventureNumber(program, settings, registration.submittedAt ? new Date(registration.submittedAt) : now);
+  }
   if (Number.isInteger(savedNumber) && savedNumber > 0) return savedNumber;
 
   const currentNumber = getCurrentAdventureNumber(program, settings, now);
   const currentStart = getCurrentAdventureStartDate(program, settings, now);
-  const submittedDate = datePart(registration.submittedAt);
   const periodMatch = registration.period?.match(/adventure\s*[-_]?\s*(\d+)/i);
   if (periodMatch) {
     const periodNumber = Number(periodMatch[1]);
@@ -207,11 +229,17 @@ export function getRegistrationAdventureNumber(
     if (periodNumber === 2 && currentNumber === 2 && submittedDate && submittedDate < LEGACY_ADVENTURE_2_START) {
       return 1;
     }
+    if (periodNumber === 1 && submittedDate && submittedDate >= LEGACY_ADVENTURE_2_START) {
+      return getTargetRegistrationAdventureNumber(program, settings, registration.submittedAt ? new Date(registration.submittedAt) : now);
+    }
     return periodNumber;
   }
 
   if (currentStart && submittedDate && submittedDate < currentStart) {
     return Math.max(1, currentNumber - 1);
+  }
+  if (submittedDate && submittedDate >= LEGACY_ADVENTURE_2_START) {
+    return getTargetRegistrationAdventureNumber(program, settings, registration.submittedAt ? new Date(registration.submittedAt) : now);
   }
   return currentNumber;
 }

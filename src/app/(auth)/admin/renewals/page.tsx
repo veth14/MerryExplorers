@@ -93,11 +93,6 @@ type Stats = {
   countWithBalance: number;
 };
 
-type SlotInfo = {
-  totalMax: number;
-  sessions: Record<string, { max: number; taken: number; belowMin: boolean }>;
-};
-
 export default function RenewalsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"renewals" | "families" | "settings">("renewals");
@@ -109,7 +104,6 @@ export default function RenewalsPage() {
   // Renewals tab state
   const [renewalRecords, setRenewalRecords] = useState<RenewalRecord[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [slotOverview, setSlotOverview] = useState<Record<string, SlotInfo>>({});
   const [renewalSearch, setRenewalSearch] = useState("");
   const [renewalStatusFilter, setRenewalStatusFilter] = useState("all");
   const [renewalProgramFilter, setRenewalProgramFilter] = useState("all");
@@ -120,9 +114,6 @@ export default function RenewalsPage() {
   const [familySearch, setFamilySearch] = useState("");
   const [familyStatusFilter, setFamilyStatusFilter] = useState("all");
   const [familyProgramFilter, setFamilyProgramFilter] = useState("all");
-
-  // UI display toggles
-  const [showClassTracker, setShowClassTracker] = useState(false);
 
   // Modals
   const [addFamilyModal, setAddFamilyModal] = useState(false);
@@ -188,7 +179,6 @@ export default function RenewalsPage() {
       if (rData.success) {
         setRenewalRecords(rData.data.records);
         setStats(rData.data.stats);
-        setSlotOverview(rData.data.slotOverview);
       } else {
         console.error("Renewals API error:", rData.error || rRes.status);
       }
@@ -205,7 +195,6 @@ export default function RenewalsPage() {
   }, [selectedPeriod]);
 
   const [mounted, setMounted] = useState(false);
-  const minStudents = stats?.minStudentsPerSession ?? 3;
 
   // Filtered Renewals
   const filteredRenewals = useMemo(() => {
@@ -978,99 +967,6 @@ export default function RenewalsPage() {
           </div>
         )}
 
-        {/* ── PART E: SLOT OVERVIEW & MINIMUM CLASS SIZE MONITOR (Collapsible) ── */}
-        <div className="rounded-3xl bg-white border border-slate-100 shadow-sm overflow-hidden transition-all">
-          <div
-            onClick={() => setShowClassTracker(!showClassTracker)}
-            className="flex flex-wrap items-center justify-between p-5 cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 font-bold text-lg">
-                🏫
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-headline text-[15px] font-extrabold text-[#002f76]">
-                    Class Size &amp; Session Tracker
-                  </h2>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                    Min. {minStudents} students rule
-                  </span>
-                </div>
-                <p className="text-[12px] text-[#64748b]">
-                  {showClassTracker
-                    ? "Counts active registrations from both renewal and regular sign-ups in the current Adventure cycle."
-                    : "Click to see live class capacity across renewal and regular sign-ups"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 mt-2 sm:mt-0">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                <span className="flex items-center gap-1 text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-xl">
-                  ⚠️ Below Min (&lt;{minStudents})
-                </span>
-                <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-                  ✓ Proceeding ({minStudents}+)
-                </span>
-              </div>
-              <button
-                type="button"
-                className="ml-2 rounded-xl p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors text-sm font-bold"
-              >
-                {showClassTracker ? "▲ Hide" : "▼ Show"}
-              </button>
-            </div>
-          </div>
-
-          {showClassTracker && (
-            <div className="p-6 pt-2 border-t border-slate-100 bg-slate-50/30">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {Object.entries(slotOverview).map(([progKey, progData]) => (
-                  <div key={progKey} className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-3 shadow-xs">
-                    <p className="text-[13px] font-bold text-[#002f76] capitalize flex items-center justify-between">
-                      <span>{progKey.replace(/-/g, " ")}</span>
-                      <span className="text-[11px] font-normal text-slate-500">Cap: {progData.totalMax}</span>
-                    </p>
-                    <div className="space-y-2">
-                      {Object.entries(progData.sessions).map(([sessName, sessInfo]) => (
-                        <div
-                          key={sessName}
-                          className={`flex items-center justify-between p-2.5 rounded-xl border text-[12px] transition-all ${sessInfo.belowMin
-                            ? "bg-orange-50/70 border-orange-200 text-orange-950 font-medium"
-                            : "bg-emerald-50/40 border-emerald-200/60 text-slate-700"
-                            }`}
-                        >
-                          <div>
-                            <p className="font-bold text-[12px]">{sessName}</p>
-                            <p className="text-[10.5px] text-slate-500">
-                              Max: {sessInfo.max} students
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${sessInfo.belowMin
-                                ? "bg-orange-200 text-orange-800"
-                                : sessInfo.taken >= sessInfo.max
-                                  ? "bg-slate-200 text-slate-800"
-                                  : "bg-emerald-100 text-emerald-800"
-                                }`}
-                            >
-                              {sessInfo.taken} / {sessInfo.max}
-                            </span>
-                            {sessInfo.belowMin && (
-                              <p className="text-[10px] text-orange-700 font-bold mt-0.5">Needs {Math.max(0, minStudents - sessInfo.taken)} more</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* ── TABS NAVIGATION ── */}
         <div className="flex border-b border-slate-200">

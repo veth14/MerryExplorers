@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { m } from "framer-motion";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { ClassCapacityTracker } from "@/components/admin/ClassCapacityTracker";
 import { useAuth } from "@/lib/auth-context";
 
 interface Student {
@@ -220,6 +221,8 @@ export default function AdminStudentsPage() {
         .filter-pill:hover { transform: translateY(-1px); }
         @keyframes fadeSlide { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
       `}</style>
+
+      <ClassCapacityTracker />
 
       {/* ── Stats Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "24px" }}>
