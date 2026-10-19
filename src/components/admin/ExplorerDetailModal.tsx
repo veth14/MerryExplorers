@@ -56,6 +56,7 @@ interface ExplorerGroup {
   currentAdventure?: any;
   upcomingAdventure?: any;
   hasAccount?: boolean;
+  isPioneer?: boolean;
   status: string;
   latestRegistrationDate?: string;
   isNonAdv?: boolean;
@@ -84,6 +85,11 @@ export function ExplorerDetailModal({
   const student = group.latestStudent;
   const age = getAge(childInfo?.dateOfBirth);
   const hasAccount = !!(group.hasAccount || student?.hasAccount || group.registrations?.some((r: any) => r.hasAccount));
+  const isPioneer = Boolean(
+    group.isPioneer ||
+    student?.isPioneer ||
+    group.registrations?.some((r: any) => r.isPioneer)
+  );
 
   const charCode = (childInfo?.firstName || "A").charCodeAt(0);
   const avatarGrad = AVATAR_GRADIENTS[charCode % AVATAR_GRADIENTS.length];
@@ -279,6 +285,44 @@ export function ExplorerDetailModal({
                   >
                     ● {group.status}
                   </span>
+
+                  {/* Pioneer Status Badge */}
+                  {isPioneer ? (
+                    <span
+                      style={{
+                        background: "linear-gradient(135deg, #fef08a, #fde047)",
+                        color: "#713f12",
+                        border: "1px solid #eab308",
+                        padding: "2px 10px",
+                        borderRadius: "12px",
+                        fontSize: "11px",
+                        fontWeight: "900",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.18)",
+                      }}
+                    >
+                      ⭐ Pioneer Family
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        background: "rgba(255, 255, 255, 0.14)",
+                        color: "white",
+                        border: "1px solid rgba(255, 255, 255, 0.25)",
+                        padding: "2px 10px",
+                        borderRadius: "12px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      🌱 Standard Enrollment
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -508,6 +552,44 @@ export function ExplorerDetailModal({
                     <span style={{ fontWeight: "700", color: childInfo?.healthProfile && childInfo.healthProfile !== "None" ? "#b91c1c" : "#15803d", textAlign: "right", maxWidth: "60%" }}>
                       {childInfo?.healthProfile || "None"}
                     </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#94a3b8", fontWeight: "600" }}>Pioneer Status</span>
+                    {isPioneer ? (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "2px 8px",
+                          borderRadius: "8px",
+                          fontSize: "11px",
+                          fontWeight: "800",
+                          background: "#fef9c3",
+                          color: "#854d0e",
+                          border: "1px solid #fde047",
+                        }}
+                      >
+                        ⭐ Pioneer Family (Inaugural Cohort)
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "2px 8px",
+                          borderRadius: "8px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          background: "#f1f5f9",
+                          color: "#64748b",
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        Standard Enrollment
+                      </span>
+                    )}
                   </div>
                 </div>
 

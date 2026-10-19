@@ -45,10 +45,11 @@ export async function GET(request: Request) {
     const renewalSettings = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const adventureSettings = renewalSettings?.programs || [];
 
-    // 3. Fetch all accounts (parent_accounts + staff/legacy from accounts)
-    const [accounts, parentAccounts] = await Promise.all([
+    // 3. Fetch all accounts (parent_accounts + staff/legacy from accounts) and pioneer families
+    const [accounts, parentAccounts, pioneerDocs] = await Promise.all([
       db.collection("accounts").find({}).toArray(),
       db.collection("parent_accounts").find({}).toArray(),
+      db.collection("pioneer_families").find({}).toArray(),
     ]);
     const parentAccountMap = new Map<string, any>();
     for (const acc of [...accounts, ...parentAccounts]) {
@@ -56,6 +57,9 @@ export async function GET(request: Request) {
         parentAccountMap.set(acc.email.toLowerCase().trim(), acc);
       }
     }
+    const pioneerEmails = new Set(
+      pioneerDocs.flatMap((p: any) => [p.email, p.email2].map((e: string) => (e || "").toLowerCase().trim()).filter(Boolean))
+    );
 
     // 4. Format existing students from students collection
     const studentKeys = new Set<string>();
@@ -82,6 +86,13 @@ export async function GET(request: Request) {
       const childKey = `${normalizeIdentity(s.childInfo?.firstName)} ${normalizeIdentity(s.childInfo?.lastName)}|${normalizeIdentity(s.parentInfo?.email)}|adv${adventureNumber ?? 0}`;
       studentKeys.add(childKey);
 
+      const parentEmailClean = (s.parentInfo?.email || "").toLowerCase().trim();
+      const isPioneer = Boolean(
+        s.isPioneer ||
+        registration?.isPioneer ||
+        (parentEmailClean && pioneerEmails.has(parentEmailClean))
+      );
+
       return {
         ...s,
         adventureNumber,
@@ -92,6 +103,7 @@ export async function GET(request: Request) {
         upcomingAdventureStartDate: timeline?.upcomingAdventureStartDate ?? null,
         id: s._id.toString(),
         _id: undefined,
+        isPioneer,
         hasAccount: !!parentAcc,
         accountRole: parentAcc?.role || null,
         photoConsent: parentAcc?.photoConsent !== undefined ? parentAcc.photoConsent : s.photoConsent,
@@ -124,6 +136,12 @@ export async function GET(request: Request) {
           ? getAdventureCycleTimeline(r.program, adventureSettings)
           : null;
 
+        const regEmailClean = (r.parentInfo?.email || "").toLowerCase().trim();
+        const isPioneer = Boolean(
+          r.isPioneer ||
+          (regEmailClean && pioneerEmails.has(regEmailClean))
+        );
+
         formattedStudents.push({
           id: r._id.toString(),
           registrationId: r._id.toString(),
@@ -148,6 +166,7 @@ export async function GET(request: Request) {
           emergencyContact: r.emergencyContact || { name: "", relationship: "", phone: "" },
           enrolledAt: r.submittedAt || new Date().toISOString(),
           status: r.status || "registered",
+          isPioneer,
           hasAccount: !!parentAcc,
           accountRole: parentAcc?.role || null,
           photoConsent: parentAcc?.photoConsent !== undefined ? parentAcc.photoConsent : r.photoConsent,
@@ -195,6 +214,7 @@ export async function GET(request: Request) {
           phone: s.parentInfo?.phone || parentAcc?.phone || "",
           relationship: s.parentInfo?.relationship || parentAcc?.relationship || "Parent",
           address: s.parentInfo?.address || parentAcc?.address || "",
+          isPioneer: pioneerEmails.has(email) || !!s.isPioneer,
           hasAccount: !!parentAcc,
           accountId: parentAcc?._id?.toString() || null,
           accountRole: parentAcc?.role || null,

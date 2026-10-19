@@ -61,6 +61,7 @@ interface Student {
   signatureUrl?: string | null;
   photoConsent?: boolean | string | null;
   hasAccount?: boolean;
+  isPioneer?: boolean;
   notes?: string;
   source?: string;
 }
@@ -520,6 +521,7 @@ export default function AdminStudentsPage() {
         hasUpcomingRegistration: !!adv2,
         isNonAdv,
         hasAccount: sorted.some((r) => r.hasAccount === true),
+        isPioneer: sorted.some((r) => r.isPioneer === true),
         status: activeStatus,
         latestRegistrationDate: latest.enrolledAt,
       };
@@ -1002,8 +1004,28 @@ export default function AdminStudentsPage() {
                         {getInitials(group.childName)}
                       </div>
                       <div>
-                        <div style={{ fontWeight: "800", fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>
-                          {group.childName}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: "800", fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>
+                            {group.childName}
+                          </span>
+                          {group.isPioneer && (
+                            <span
+                              style={{
+                                background: "#fef9c3",
+                                color: "#854d0e",
+                                border: "1px solid #fde047",
+                                borderRadius: "6px",
+                                padding: "1px 6px",
+                                fontSize: "10px",
+                                fontWeight: "800",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "2px",
+                              }}
+                            >
+                              ⭐ Pioneer
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "3px" }}>
                           {[
