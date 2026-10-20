@@ -7,6 +7,7 @@ import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 import { getTargetRegistrationAdventureNumber } from "@/lib/adventure-cycle";
+import { isPlausiblePersonName } from "@/lib/person-name-validation";
 import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import Tesseract from "tesseract.js";
@@ -126,6 +127,12 @@ export default function RegisterPage() {
   // Lead capture
   const [leadId, setLeadId] = useState<string>(draft?.leadId ?? "");
   const [savingLead, setSavingLead] = useState(false);
+  const leadIdRef = useRef<string>(draft?.leadId ?? "");
+  const leadSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    if (leadId) leadIdRef.current = leadId;
+  }, [leadId]);
 
   // Form state
   const [selectedProgram, setSelectedProgram] = useState<ProgramId | "">(draft?.selectedProgram ?? "");
@@ -521,7 +528,18 @@ export default function RegisterPage() {
     ...(!emergencyContact.relationship ? ["Emergency Contact Relationship"] : []),
   ];
 
-  const canProceedStep1 = missingStep1.length === 0 && dataPrivacyConsent && !duplicateRegId;
+  const invalidNameFields = [
+    ...(childInfo.firstName?.trim() && !isPlausiblePersonName(childInfo.firstName) ? ["Child's First Name"] : []),
+    ...(childInfo.lastName?.trim() && !isPlausiblePersonName(childInfo.lastName) ? ["Child's Last Name"] : []),
+    ...(parentInfo.name?.trim() && !isPlausiblePersonName(parentInfo.name, true) ? ["Parent/Guardian Full Name"] : []),
+    ...(emergencyContact.name?.trim() && !isPlausiblePersonName(emergencyContact.name, true) ? ["Emergency Contact Full Name"] : []),
+  ];
+
+  const hasValidLeadNames =
+    isPlausiblePersonName(parentInfo.name, true) &&
+    isPlausiblePersonName(childInfo.firstName) &&
+    isPlausiblePersonName(childInfo.lastName);
+  const canProceedStep1 = missingStep1.length === 0 && invalidNameFields.length === 0 && dataPrivacyConsent && !duplicateRegId;
 
   // Track lead progress across each step of registration
   const syncLeadProgress = useCallback(async (
@@ -546,40 +564,42 @@ export default function RegisterPage() {
       return;
     }
 
-    const hasIdentifier =
-      Boolean(parentInfo.name) ||
-      Boolean(parentInfo.email) ||
-      Boolean(parentInfo.phone) ||
-      Boolean(childInfo.firstName);
+    if (!hasValidLeadNames || (!parentInfo.email && !parentInfo.phone)) return;
 
-    if (!hasIdentifier) return;
-
-    try {
-      const res = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId,
-          source: "register",
-          step: targetStep,
-          stepName: overrides?.stepName || stepNames[targetStep] || `Step ${targetStep}`,
-          childInfo,
-          parentInfo,
-          emergencyContact,
-          selectedProgram: overrides?.program !== undefined ? overrides.program : selectedProgram,
-          selectedClass: overrides?.classTime !== undefined ? overrides.classTime : selectedClass,
-          promoCode,
-          photoConsent: overrides?.photoConsentVal !== undefined ? overrides.photoConsentVal : photoConsent,
-          hasSignature: overrides?.hasSig !== undefined ? overrides.hasSig : Boolean(signatureBase64),
-        }),
-      });
-      const data = await res.json();
-      if (data.success && data.data?.id) {
-        setLeadId(data.data.id);
+    const saveLead = async () => {
+      try {
+        const res = await fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: leadIdRef.current || leadId,
+            source: "register",
+            step: targetStep,
+            stepName: overrides?.stepName || stepNames[targetStep] || `Step ${targetStep}`,
+            childInfo,
+            parentInfo,
+            emergencyContact,
+            selectedProgram: overrides?.program !== undefined ? overrides.program : selectedProgram,
+            selectedClass: overrides?.classTime !== undefined ? overrides.classTime : selectedClass,
+            promoCode,
+            photoConsent: overrides?.photoConsentVal !== undefined ? overrides.photoConsentVal : photoConsent,
+            hasSignature: overrides?.hasSig !== undefined ? overrides.hasSig : Boolean(signatureBase64),
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.data?.id) {
+          leadIdRef.current = data.data.id;
+          setLeadId(data.data.id);
+        }
+      } catch {
+        // Don't block parent user experience
       }
-    } catch {
-      // Don't block parent user experience
-    }
+    };
+
+    // Serialize autosaves and step changes so every save after the first uses its lead ID.
+    const queuedSave = leadSaveQueueRef.current.then(saveLead, saveLead);
+    leadSaveQueueRef.current = queuedSave.then(() => undefined, () => undefined);
+    await queuedSave;
   }, [
     leadId,
     isNewFamily,
@@ -591,6 +611,7 @@ export default function RegisterPage() {
     promoCode,
     photoConsent,
     signatureBase64,
+    hasValidLeadNames,
   ]);
 
   // Debounced lead capture while filling out details (saves as soon as contact info is entered)
@@ -598,12 +619,12 @@ export default function RegisterPage() {
   useEffect(() => {
     if (step !== 0) return;
     if (!dataPrivacyConsent) return; // ← DPA gate: do not capture anything without consent
-    if (!parentInfo.name || (!parentInfo.email && !parentInfo.phone)) return;
+    if (!hasValidLeadNames || (!parentInfo.email && !parentInfo.phone)) return;
     const timer = setTimeout(() => {
       syncLeadProgress(0, { stepName: "Step 0: Entering Details" });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [step, dataPrivacyConsent, parentInfo.name, parentInfo.email, parentInfo.phone, childInfo.firstName, syncLeadProgress]);
+  }, [step, dataPrivacyConsent, parentInfo.name, parentInfo.email, parentInfo.phone, childInfo.firstName, childInfo.lastName, hasValidLeadNames, syncLeadProgress]);
 
   async function handleDetailsContinue() {
     setSavingLead(true);
@@ -642,6 +663,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     setError("");
     try {
+      await leadSaveQueueRef.current;
       const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -653,7 +675,7 @@ export default function RegisterPage() {
           emergencyContact,
           photoConsent,
           signatureBase64,
-          leadId,
+          leadId: leadIdRef.current || leadId,
           // Send promo code as-is (case-sensitive) — A1JesusLovesMe2026 is case-sensitive on the server
           promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
@@ -998,6 +1020,18 @@ export default function RegisterPage() {
                         <span key={field} className="px-2.5 py-1 rounded-lg bg-amber-200/70 text-amber-950 font-bold">
                           {field}
                         </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {invalidNameFields.length > 0 && (
+                  <div className="mb-5 rounded-2xl border-2 border-red-300 bg-red-50 p-4 text-[12px] font-bold text-red-900">
+                    <p className="mb-1 text-[13px] font-black">Please use real names.</p>
+                    <p className="mb-2">Names must use letters and may include spaces, apostrophes, or hyphens. Placeholder words and numbers are not accepted.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {invalidNameFields.map((field) => (
+                        <span key={field} className="rounded-lg bg-red-100 px-2.5 py-1 font-bold text-red-950">{field}</span>
                       ))}
                     </div>
                   </div>

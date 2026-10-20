@@ -2,14 +2,15 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/lib/mongodb";
-import { requireInternalAuth } from "@/lib/auth-guard";
+import { requireAdmin } from "@/lib/auth-guard";
+import { isPlausiblePersonName } from "@/lib/person-name-validation";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/leads — Admin only, lists all leads (newest first)
 export async function GET(request: Request) {
-    const deny = await requireInternalAuth(request);
-    if (deny) return deny;
+    const auth = await requireAdmin(request);
+    if ("response" in auth) return auth.response;
 
     try {
         const { db } = await connectToDatabase();
@@ -116,6 +117,18 @@ export async function POST(request: Request) {
             );
         }
 
+        if (
+            !isPlausiblePersonName(parentInfo?.name, true) ||
+            !isPlausiblePersonName(childInfo?.firstName) ||
+            !isPlausiblePersonName(childInfo?.lastName) ||
+            (emergencyContact?.name && !isPlausiblePersonName(emergencyContact.name, true))
+        ) {
+            return NextResponse.json(
+                { success: false, error: "Enter real names for the child and parent or guardian before saving registration progress." },
+                { status: 400 }
+            );
+        }
+
         const { db } = await connectToDatabase();
 
         // Check if parent or child is in renewal_families
@@ -210,8 +223,8 @@ export async function POST(request: Request) {
 
 // PATCH /api/leads — Admin only, update lead status or notes
 export async function PATCH(request: Request) {
-    const deny = await requireInternalAuth(request);
-    if (deny) return deny;
+    const auth = await requireAdmin(request);
+    if ("response" in auth) return auth.response;
 
     try {
         const body = await request.json();
@@ -240,8 +253,8 @@ export async function PATCH(request: Request) {
 
 // DELETE /api/leads — Admin only, delete a lead permanently
 export async function DELETE(request: Request) {
-    const deny = await requireInternalAuth(request);
-    if (deny) return deny;
+    const auth = await requireAdmin(request);
+    if ("response" in auth) return auth.response;
 
     try {
         const url = new URL(request.url);

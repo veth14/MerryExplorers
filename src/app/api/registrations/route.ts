@@ -9,6 +9,7 @@ import nodemailer from "nodemailer";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 import { activeRegistrationSlotQuery, countUniqueActiveRegistrationSlots } from "@/lib/registration-slots";
+import { isPlausiblePersonName } from "@/lib/person-name-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,16 @@ export async function POST(request: Request) {
     // Validate required fields
     if (!program || !classTime || !parentInfo?.email || !parentInfo?.name || !childInfo?.firstName || (program !== "brave-explorer" && !signatureBase64)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (!isPlausiblePersonName(parentInfo.name, true)) {
+      return NextResponse.json({ error: "Please enter the parent or guardian’s real full name." }, { status: 400 });
+    }
+    if (!isPlausiblePersonName(childInfo.firstName) || !isPlausiblePersonName(childInfo.lastName)) {
+      return NextResponse.json({ error: "Please enter the child’s real first and last name." }, { status: 400 });
+    }
+    if (emergencyContact?.name && !isPlausiblePersonName(emergencyContact.name, true)) {
+      return NextResponse.json({ error: "Please enter the emergency contact’s real full name." }, { status: 400 });
     }
 
     const submittedPromoCode = String(promoCode || "").trim().replace(/^[“"']+|[”"':]+$/g, "");

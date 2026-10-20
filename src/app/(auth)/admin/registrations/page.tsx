@@ -144,6 +144,14 @@ interface Lead {
   lastActiveAt?: string;
   notes?: string;
   registrationId?: string;
+  followUpEmails?: Array<{
+    to: string;
+    subject: string;
+    step: number;
+    stepLabel: string;
+    sentAt: string;
+    sentBy?: string;
+  }>;
 }
 
 const LEAD_STEP_LABELS: Record<number, { label: string; badge: string; color: string; bg: string }> = {
@@ -623,10 +631,22 @@ function LeadDetailModal({
   onDelete: (id: string) => Promise<void>;
   isProcessing: boolean;
 }) {
+  const { user } = useAuth();
   const [currentStatus, setCurrentStatus] = useState(lead.status || "in-progress");
   const [notes, setNotes] = useState(lead.notes || "");
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [emailPreview, setEmailPreview] = useState<{
+    to: string;
+    subject: string;
+    html: string;
+    step: number;
+    stepLabel: string;
+    version: string;
+  } | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSentMessage, setEmailSentMessage] = useState("");
 
   const accent = lead.selectedProgram && PROGRAM_ACCENTS[lead.selectedProgram]
     ? PROGRAM_ACCENTS[lead.selectedProgram]
@@ -655,6 +675,60 @@ function LeadDetailModal({
     await onUpdate(lead.id, currentStatus, notes);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
+  }
+
+  async function handlePreviewFollowUp() {
+    if (!user) {
+      setEmailError("Your session has expired. Please sign in again.");
+      return;
+    }
+    setEmailBusy(true);
+    setEmailError("");
+    setEmailSentMessage("");
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/leads/${lead.id}/follow-up`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setEmailError(data.error || "Could not prepare the email preview.");
+        return;
+      }
+      setEmailPreview(data.preview);
+    } catch {
+      setEmailError("Could not load the email preview. Please try again.");
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function handleSendFollowUp() {
+    if (!user || !emailPreview) return;
+    setEmailBusy(true);
+    setEmailError("");
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/leads/${lead.id}/follow-up`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ expectedVersion: emailPreview.version }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        if (response.status === 409) setEmailPreview(null);
+        setEmailError(data.error || "The follow-up email could not be sent.");
+        return;
+      }
+      setEmailSentMessage(`Follow-up email sent to ${data.to}.`);
+    } catch {
+      setEmailError("The follow-up email could not be sent. Please try again.");
+    } finally {
+      setEmailBusy(false);
+    }
   }
 
   return (
@@ -797,6 +871,72 @@ function LeadDetailModal({
                     );
                   })}
                 </div>
+              </div>
+            </SectionCard>
+
+            {/* Follow-up email: review the exact message before sending */}
+            <SectionCard emoji="✉️" title="Follow-Up Email">
+              <div className="py-3 space-y-3">
+                <p className="text-[12px] leading-relaxed text-slate-600">
+                  Prepare a message tailored to this lead&apos;s current step: <strong>{stepMeta.label}</strong>. The email is sent only after you review it and choose Send.
+                </p>
+                {!emailPreview ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePreviewFollowUp}
+                      disabled={emailBusy || !parentEmail}
+                      className="rounded-xl bg-[#0033A0] px-4 py-2.5 text-[12px] font-bold text-white shadow-md shadow-[#0033A0]/20 hover:bg-[#002f76] disabled:opacity-50 transition-all"
+                    >
+                      {emailBusy ? "Preparing preview…" : "Preview Follow-Up Email"}
+                    </button>
+                    {!parentEmail && <p className="text-[11px] font-semibold text-amber-700">This lead has no email address saved.</p>}
+                  </>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <div className="space-y-1 border-b border-slate-200 bg-slate-50 px-3.5 py-3 text-[12px]">
+                      <p><span className="font-extrabold text-slate-500">To:</span> <span className="font-semibold text-slate-800">{emailPreview.to}</span></p>
+                      <p><span className="font-extrabold text-slate-500">Subject:</span> <span className="font-semibold text-slate-800">{emailPreview.subject}</span></p>
+                      <p><span className="font-extrabold text-slate-500">Based on:</span> <span className="font-semibold text-slate-800">{emailPreview.stepLabel}</span></p>
+                    </div>
+                    <iframe
+                      title="Follow-up email preview"
+                      srcDoc={emailPreview.html}
+                      sandbox=""
+                      className="h-[390px] w-full bg-[#eef5ff]"
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-3 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setEmailPreview(null)}
+                        disabled={emailBusy}
+                        className="rounded-xl border border-slate-200 px-3.5 py-2 text-[12px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSendFollowUp}
+                        disabled={emailBusy || Boolean(emailSentMessage)}
+                        className="rounded-xl bg-emerald-600 px-4 py-2 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {emailBusy ? "Sending…" : emailSentMessage ? "Email Sent" : "Send Follow-Up Email"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {emailError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-[12px] font-bold text-red-700">{emailError}</p>}
+                {emailSentMessage && <p role="status" className="rounded-xl bg-emerald-50 px-3 py-2 text-[12px] font-bold text-emerald-700">✅ {emailSentMessage}</p>}
+                {lead.followUpEmails && lead.followUpEmails.length > 0 && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Previously sent</p>
+                    {lead.followUpEmails.slice(-3).reverse().map((item, index) => (
+                      <p key={`${item.sentAt}-${index}`} className="text-[11px] text-slate-500">
+                        {item.stepLabel || `Step ${item.step}`} · {item.sentAt ? new Date(item.sentAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "Sent"}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             </SectionCard>
 
@@ -970,7 +1110,7 @@ function LeadDetailModal({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AdminRegistrationsPage() {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -985,9 +1125,14 @@ export default function AdminRegistrationsPage() {
   const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     fetchRegistrations();
     fetchLeads();
-  }, []);
+  }, [authLoading, user?.uid]);
 
   useEffect(() => {
     if (!toast) return;
@@ -997,7 +1142,11 @@ export default function AdminRegistrationsPage() {
 
   async function fetchRegistrations() {
     try {
-      const res = await fetch("/api/registrations");
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/registrations", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       const data = await res.json();
       if (data.success) setRegistrations(data.data);
     } catch { /* ignore */ }
@@ -1006,7 +1155,11 @@ export default function AdminRegistrationsPage() {
 
   async function fetchLeads() {
     try {
-      const res = await fetch("/api/leads");
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/leads", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       const data = await res.json();
       if (data.success) setLeads(data.data);
     } catch { /* ignore */ }
@@ -1015,9 +1168,11 @@ export default function AdminRegistrationsPage() {
   async function handleUpdateLead(id: string, status: string, notes: string) {
     setIsProcessing(true);
     try {
+      if (!user) throw new Error("Your session has expired. Please sign in again.");
+      const idToken = await user.getIdToken();
       const res = await fetch("/api/leads", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ id, status, notes }),
       });
       const data = await res.json();
@@ -1045,7 +1200,12 @@ export default function AdminRegistrationsPage() {
     setDeleteConfirmLeadId(null);
     setIsProcessing(true);
     try {
-      const res = await fetch(`/api/leads?id=${id}`, { method: "DELETE" });
+      if (!user) throw new Error("Your session has expired. Please sign in again.");
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/leads?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       const data = await res.json();
       if (data.success) {
         setToast("🗑️ Lead deleted successfully");
