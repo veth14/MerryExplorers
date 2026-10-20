@@ -7,13 +7,16 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 
-type Status = "pending" | "approved" | "rejected" | "early-bird" | "expired" | "reserved";
+type Status = "pending" | "approved" | "active" | "rejected" | "early-bird" | "expired" | "reserved";
 
 interface Registration {
   id: string;
   status: Status;
   program: string;
   classTime: string;
+  adventureNumber?: number | null;
+  period?: string;
+  adventureStartDate?: string | null;
   parentInfo: { name: string; email: string; phone: string; relationship: string };
   childInfo: { firstName: string; lastName: string; nickname?: string; dateOfBirth: string; gender: string; allergies?: string; specialNeeds?: string; favoriteSong?: string; favoriteColor?: string; favoriteCharacter?: string; healthProfile?: string; };
   emergencyContact: { name: string; phone: string; relationship: string };
@@ -61,9 +64,14 @@ const PROGRAM_ACCENTS: Record<string, string> = {
   "ballet": "#E91E8C",
 };
 
+function getProgramLabel(programId: string): string {
+  return PROGRAM_NAMES[programId] || PROGRAM_SLOTS[programId as keyof typeof PROGRAM_SLOTS]?.name || programId.replace(/-/g, " ");
+}
+
 const STATUS_STYLES: Record<Status, string> = {
   pending: "bg-amber-100 text-amber-700",
   approved: "bg-green-100 text-green-700",
+  active: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-600",
   "early-bird": "bg-orange-100 text-orange-700",
   expired: "bg-rose-100 text-rose-700",
@@ -73,6 +81,7 @@ const STATUS_STYLES: Record<Status, string> = {
 const STATUS_LABELS: Record<Status, string> = {
   pending: "⏳ Pending",
   approved: "✅ Approved",
+  active: "✅ Active Enrollment",
   rejected: "❌ Rejected",
   "early-bird": "🐣 Early Bird",
   expired: "⏰ Expired Slot",
@@ -95,6 +104,84 @@ function isTestRegistration(r: Registration): boolean {
     email === "ian.valmores@gmail.com" ||
     name.includes("ian angelo valmores")
   );
+}
+
+function getAdventureNumber(registration: Pick<Registration, "adventureNumber" | "period">): number | null {
+  const number = Number(registration.adventureNumber);
+  if (Number.isInteger(number) && number > 0) return number;
+  const match = registration.period?.match(/adventure[-_ ]?(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function adventureLabel(registration: Pick<Registration, "adventureNumber" | "period">): string {
+  const number = getAdventureNumber(registration);
+  return number ? `Adventure ${number}` : "Cycle not tagged";
+}
+
+function formatAdventureDate(value?: string | null): string | null {
+  if (!value) return null;
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = dateOnly
+    ? new Date(Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]), 12))
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-PH", {
+    timeZone: "Asia/Manila",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function getRegistrationTimeline(registration: Registration, registrations: Registration[]): Registration[] {
+  const normalizedName = `${registration.childInfo.firstName} ${registration.childInfo.lastName}`.trim().toLowerCase().replace(/\s+/g, " ");
+  const normalizedDob = String(registration.childInfo.dateOfBirth || "").slice(0, 10);
+  const parentEmail = (registration.parentInfo.email || "").trim().toLowerCase();
+  const parentPhone = (registration.parentInfo.phone || "").replace(/\D/g, "");
+
+  return registrations
+    .filter((candidate) => {
+      if (candidate.id === registration.id) return true;
+      const candidateName = `${candidate.childInfo.firstName} ${candidate.childInfo.lastName}`.trim().toLowerCase().replace(/\s+/g, " ");
+      if (candidateName !== normalizedName) return false;
+      const candidateDob = String(candidate.childInfo.dateOfBirth || "").slice(0, 10);
+      if (normalizedDob && candidateDob) return normalizedDob === candidateDob;
+      const candidateEmail = (candidate.parentInfo.email || "").trim().toLowerCase();
+      const candidatePhone = (candidate.parentInfo.phone || "").replace(/\D/g, "");
+      return Boolean((parentEmail && candidateEmail === parentEmail) || (parentPhone && candidatePhone === parentPhone));
+    })
+    .sort((left, right) => {
+      const leftAdventure = getAdventureNumber(left) ?? Number.MAX_SAFE_INTEGER;
+      const rightAdventure = getAdventureNumber(right) ?? Number.MAX_SAFE_INTEGER;
+      if (leftAdventure !== rightAdventure) return leftAdventure - rightAdventure;
+      return new Date(left.submittedAt).getTime() - new Date(right.submittedAt).getTime();
+    });
+}
+
+function occupiesAdventureSlot(registration: Registration, now = Date.now()): boolean {
+  if (registration.status === "approved" || registration.status === "active") return true;
+  if (registration.status !== "reserved" && registration.status !== "pending") return false;
+  return Boolean(registration.reservedUntil && new Date(registration.reservedUntil).getTime() > now);
+}
+
+function countUniqueChildren(registrations: Registration[]): number {
+  const children = new Map<string, Set<string>>();
+  let unidentified = 0;
+  for (const registration of registrations) {
+    const firstName = (registration.childInfo?.firstName || "").trim().normalize("NFKC").toLowerCase();
+    const lastName = (registration.childInfo?.lastName || "").trim().normalize("NFKC").toLowerCase();
+    const childName = `${firstName} ${lastName}`.trim().replace(/\s+/g, " ");
+    if (!childName) {
+      unidentified += 1;
+      continue;
+    }
+    const dates = children.get(childName) || new Set<string>();
+    const dateOfBirth = String(registration.childInfo?.dateOfBirth || "").slice(0, 10);
+    if (dateOfBirth) dates.add(dateOfBirth);
+    children.set(childName, dates);
+  }
+  return unidentified + [...children.values()].reduce((count, dates) => count + Math.max(1, dates.size), 0);
 }
 
 const SUMMARY_HTML_ENTITIES: Record<string, string> = {
@@ -228,9 +315,11 @@ function SectionCard({ emoji, title, children }: { emoji: string; title: string;
 }
 
 function DetailModal({
-  reg, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, isProcessing,
+  reg, allRegistrations, onRefreshRegistrations, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, isProcessing,
 }: {
   reg: Registration;
+  allRegistrations: Registration[];
+  onRefreshRegistrations: () => Promise<Registration[]>;
   onClose: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
@@ -247,6 +336,7 @@ function DetailModal({
   const [previousBalanceInput, setPreviousBalanceInput] = useState(typeof reg.previousAdventureBalance === "number" ? String(reg.previousAdventureBalance) : "");
   const [savingPreviousBalance, setSavingPreviousBalance] = useState(false);
   const accent = PROGRAM_ACCENTS[reg.program] || "#0033A0";
+  const adventureTimeline = getRegistrationTimeline(reg, allRegistrations);
   const isEarlyBird = reg.status === "early-bird";
   const isPending = reg.status === "pending";
   const isReserved = (reg as any).status === "reserved" || (reg as any).status === "expired";
@@ -260,13 +350,17 @@ function DetailModal({
   const realRemainingBalance = totalCost !== null ? totalCost - (reg.amountPaid || 0) : null;
   const requiredDownpayment = effectiveProgramRate > 0 ? Math.round(effectiveProgramRate * 0.6) : (programDetails ? programDetails.downpayment : 0);
 
-  function handleGenerateSummary() {
+  async function handleGenerateSummary() {
     const summaryWindow = window.open("", "_blank");
     if (!summaryWindow) {
       window.alert("Please allow pop-ups to open the registration summary.");
       return;
     }
     summaryWindow.opener = null;
+    summaryWindow.document.write("<p style='font-family:Arial,sans-serif;padding:24px;color:#334155'>Preparing the latest registration and Adventure summary…</p>");
+    const latestRegistrations = await onRefreshRegistrations();
+    const reportRegistrations = latestRegistrations.length > 0 ? latestRegistrations : allRegistrations;
+    const reportTimeline = getRegistrationTimeline(reg, reportRegistrations);
 
     const schedule = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
     const chosenSession = schedule?.classes.find((session) => session.name === reg.classTime);
@@ -279,6 +373,47 @@ function DetailModal({
       : "—";
     const studentName = `${reg.childInfo.firstName || ""} ${reg.childInfo.lastName || ""}`.trim();
     const currentRemaining = realRemainingBalance === null ? null : Math.max(0, realRemainingBalance);
+    const timelineSummaryRows = reportTimeline.map((entry) => {
+      const entryProgram = PROGRAM_SLOTS[entry.program as keyof typeof PROGRAM_SLOTS];
+      const entrySession = entryProgram?.classes.find((session) => session.name === entry.classTime);
+      const entryStatus = isRegExpired(entry)
+        ? "Reservation expired"
+        : entry.status === "reserved" || entry.status === "pending"
+          ? entry.receiptUrl ? "Receipt submitted · awaiting review" : "Reserved · payment pending"
+          : STATUS_LABELS[entry.status] || entry.status;
+      const startDate = formatAdventureDate(entry.adventureStartDate);
+      const timing = `${entryProgram?.schedule ? `${entryProgram.schedule} · ` : ""}${entry.classTime}${entrySession?.time ? ` · ${entrySession.time}` : ""}`;
+      return row(`${adventureLabel(entry)} · ${getProgramLabel(entry.program)}`, `${timing} · ${entryStatus}${startDate ? ` · Starts ${startDate}` : ""}`);
+    }).join("");
+    const targetAdventure = getAdventureNumber(reg);
+    const currentCycleRegistrations = reportRegistrations.filter((entry) =>
+      getAdventureNumber(entry) === targetAdventure && !isTestRegistration(entry) && occupiesAdventureSlot(entry)
+    );
+    const capacityPrograms = ["curious-explorer", "everyday-curious", "creative-explorer", "brave-explorer"] as const;
+    const availabilityRows = capacityPrograms.flatMap((programId) => {
+      const program = PROGRAM_SLOTS[programId];
+      return program.classes.map((session) => {
+        const classAlias = session.name.includes("Session")
+          ? session.name.replace("Session", "Class")
+          : session.name.replace("Class", "Session");
+        const inSession = currentCycleRegistrations.filter((entry) =>
+          entry.program === programId && (entry.classTime === session.name || entry.classTime === classAlias)
+        );
+        const unpaidHolds = inSession.filter((entry) =>
+          (entry.status === "reserved" || entry.status === "pending") && !entry.receiptUrl && !(Number(entry.amountPaid) > 0)
+        );
+        const awaitingReview = inSession.filter((entry) =>
+          (entry.status === "reserved" || entry.status === "pending") && Boolean(entry.receiptUrl || Number(entry.amountPaid) > 0)
+        );
+        const taken = countUniqueChildren(inSession);
+        const schedule = `${program.schedule} · ${session.name} · ${session.time}`;
+        const availability = `${taken}/${session.maxSlots} occupied · ${Math.max(0, session.maxSlots - taken)} slots left · ${countUniqueChildren(unpaidHolds)} unpaid holds · ${countUniqueChildren(awaitingReview)} awaiting payment review`;
+        return row(schedule, availability);
+      });
+    }).join("");
+    const availabilitySection = hasAdventureCycle
+      ? `<section class="section"><h2>Session Availability · ${escapeSummaryHtml(adventureLabel(reg))}</h2><p class="muted">Counts reflect this Adventure’s active approved registrations and unexpired reservations, including unpaid holds, as of report generation.</p><table class="table">${availabilityRows}</table></section>`
+      : "";
     const summaryHtml = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registration Summary - ${escapeSummaryHtml(studentName)}</title>
 <style>
@@ -287,7 +422,9 @@ function DetailModal({
 <div class="actions"><button class="close" onclick="window.close()">Close</button><button onclick="window.print()">Print / Save as PDF</button></div>
 <main class="page"><div class="brand">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</div><div class="content">
   <div class="title"><div><h1>Registration Summary</h1><div class="muted">Prepared ${escapeSummaryHtml(new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }))}</div></div><span class="badge">${escapeSummaryHtml(STATUS_LABELS[reg.status] || reg.status)}</span></div>
-  <section class="section"><h2>Explorer & Session</h2><table class="table">${row("Student", studentName)}${row("Nickname", reg.childInfo.nickname || "—")}${row("Date of Birth", reg.childInfo.dateOfBirth)}${row("Gender", reg.childInfo.gender)}${row("Program", PROGRAM_NAMES[reg.program] || reg.program)}${row("Session days", schedule?.schedule || "—")}${row("Session", reg.classTime)}${row("Session time", chosenSession?.time || "—")}${row("Registration date", submittedDate)}${row("Registration reference", reg.id)}</table></section>
+  <section class="section"><h2>Explorer & Session</h2><table class="table">${row("Student", studentName)}${row("Adventure", adventureLabel(reg))}${row("Adventure start date", formatAdventureDate(reg.adventureStartDate) || "Not scheduled")}${row("Nickname", reg.childInfo.nickname || "—")}${row("Date of Birth", reg.childInfo.dateOfBirth)}${row("Gender", reg.childInfo.gender)}${row("Program", getProgramLabel(reg.program))}${row("Session days", schedule?.schedule || "—")}${row("Session", reg.classTime)}${row("Session time", chosenSession?.time || "—")}${row("Registration date", submittedDate)}${row("Registration reference", reg.id)}</table></section>
+  <section class="section"><h2>Adventure Timeline</h2><table class="table">${timelineSummaryRows || row("History", "No other registrations found for this Explorer.")}</table></section>
+  ${availabilitySection}
   <section class="section"><h2>Parent / Guardian</h2><table class="table">${row("Name", reg.parentInfo.name)}${row("Relationship", reg.parentInfo.relationship)}${row("Email", reg.parentInfo.email)}${row("Phone", reg.parentInfo.phone)}</table></section>
   <section class="section"><h2>Emergency Contact</h2><table class="table">${row("Name", reg.emergencyContact?.name)}${row("Relationship", reg.emergencyContact?.relationship)}${row("Phone", reg.emergencyContact?.phone)}</table></section>
   <section class="section"><h2>Payment Summary</h2><table class="table">${row("Program fee", money(effectiveProgramRate))}${row("Initial amount due", money(reg.amountDue || requiredDownpayment))}${row("Amount paid", money(reg.amountPaid || 0))}${row("Current session balance", money(currentRemaining))}${hasAdventureCycle ? row("Previous adventure unpaid balance", typeof reg.previousAdventureBalance === "number" ? money(reg.previousAdventureBalance) : "Not recorded") : ""}${row("Payment method", reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) || "—")}${row("Reference number", reg.referenceNumber || "—")}</table></section>
@@ -353,7 +490,7 @@ function DetailModal({
                 {reg.childInfo.firstName} {reg.childInfo.lastName}
               </h2>
               <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-[#64748b]">
-                <span style={{ color: accent }}>{PROGRAM_NAMES[reg.program] || reg.program}</span>
+                <span style={{ color: accent }}>{getProgramLabel(reg.program)}</span>
                 <span>•</span>
                 <span>{reg.classTime}</span>
               </div>
@@ -362,6 +499,9 @@ function DetailModal({
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold shadow-sm ${STATUS_STYLES[reg.status]}`}>
                   {STATUS_LABELS[reg.status]}
+                </span>
+                <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0033A0]">
+                  {adventureLabel(reg)}
                 </span>
                 {isPioneer && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-800 shadow-sm">
@@ -389,6 +529,61 @@ function DetailModal({
 
           {/* ── Scrollable body ── */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+
+            {/* Registration history across Adventures */}
+            <SectionCard emoji="🗺️" title="Adventure Timeline">
+              <div className="py-3">
+                <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+                  Each card is a separate registration. Adventures are ordered by cycle, with status and session details shown for each one.
+                </p>
+                <div className="relative space-y-0">
+                  {adventureTimeline.map((entry, index) => {
+                    const adventure = getAdventureNumber(entry);
+                    const entryProgram = PROGRAM_SLOTS[entry.program as keyof typeof PROGRAM_SLOTS];
+                    const entrySession = entryProgram?.classes.find((session) => session.name === entry.classTime);
+                    const isExpired = isRegExpired(entry);
+                    const paymentState = isExpired
+                      ? "Reservation expired"
+                      : entry.status === "reserved" || entry.status === "pending"
+                        ? entry.receiptUrl ? "Receipt submitted · awaiting review" : "Reserved · payment pending"
+                        : STATUS_LABELS[entry.status] || entry.status;
+                    const startDate = formatAdventureDate(entry.adventureStartDate);
+                    const registrationDate = entry.submittedAt
+                      ? new Date(entry.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+                      : "Date unavailable";
+
+                    return (
+                      <div key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
+                        <div className="flex w-5 shrink-0 flex-col items-center">
+                          <span className={`z-10 mt-1 h-3 w-3 rounded-full border-2 ${entry.id === reg.id ? "border-[#0033A0] bg-[#0033A0]" : "border-blue-300 bg-white"}`} />
+                          {index < adventureTimeline.length - 1 && <span className="absolute bottom-0 left-[9px] top-4 w-px bg-blue-100" />}
+                        </div>
+                        <div className={`min-w-0 flex-1 rounded-xl border p-3 ${entry.id === reg.id ? "border-blue-200 bg-blue-50/70" : "border-slate-100 bg-slate-50/70"}`}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[12px] font-extrabold text-[#002f76]">
+                                {adventure ? `Adventure ${adventure}` : "Adventure not tagged"} · {getProgramLabel(entry.program)}
+                              </p>
+                              <p className="mt-0.5 text-[11px] font-semibold text-slate-600">
+                                {entryProgram?.schedule ? `${entryProgram.schedule} · ` : ""}{entry.classTime}{entrySession?.time ? ` · ${entrySession.time}` : ""}
+                              </p>
+                            </div>
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isExpired ? STATUS_STYLES.expired : STATUS_STYLES[entry.status] || "bg-slate-100 text-slate-600"}`}>
+                              {paymentState}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
+                            <span>{startDate ? `Starts ${startDate}` : `Registered ${registrationDate}`}</span>
+                            {startDate && <span>Registered {registrationDate}</span>}
+                            {typeof entry.amountPaid === "number" && entry.amountPaid > 0 && <span>Paid ₱{entry.amountPaid.toLocaleString("en-PH")}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </SectionCard>
 
             {/* Receipt */}
             {reg.receiptUrl && (
@@ -440,11 +635,11 @@ function DetailModal({
 
             {hasAdventureCycle && <SectionCard emoji="🧾" title="Previous Adventure Balance">
               <p className="py-3 text-xs leading-relaxed text-slate-500">
-                Unpaid amount carried over from Adventure 1. This is tracked separately and does not change this registration’s Adventure 2 payment or balance.
+                Unpaid balance carried over from a previous Adventure is tracked separately from this registration’s payment and balance.
               </p>
               {!editingPreviousBalance ? (
                 <div className="flex items-center justify-between gap-3 border-t border-slate-100 py-3">
-                  <span className="text-[12px] font-semibold text-[#94a3b8]">Adventure 1 unpaid</span>
+                  <span className="text-[12px] font-semibold text-[#94a3b8]">Previous Adventure unpaid</span>
                   <div className="flex items-center gap-3">
                     <span className={`text-[13px] font-bold ${reg.previousAdventureBalance ? "text-red-600" : "text-slate-500"}`}>
                       {typeof reg.previousAdventureBalance === "number" ? `₱${Number(reg.previousAdventureBalance).toLocaleString("en-PH")}` : "Not set"}
@@ -461,7 +656,7 @@ function DetailModal({
               ) : (
                 <div className="space-y-3 border-t border-slate-100 py-3">
                   <label className="block text-xs font-semibold text-slate-600" htmlFor="previous-adventure-balance">
-                    Adventure 1 unpaid balance (₱)
+                    Previous Adventure unpaid balance (₱)
                   </label>
                   <input
                     id="previous-adventure-balance"
@@ -1051,7 +1246,7 @@ function LeadDetailModal({
             <SectionCard emoji="🎯" title="Program & Session Details">
               <InfoRow
                 label="Selected Program"
-                value={lead.selectedProgram ? (PROGRAM_NAMES[lead.selectedProgram] || lead.selectedProgram) : "Not selected yet"}
+                value={lead.selectedProgram ? getProgramLabel(lead.selectedProgram) : "Not selected yet"}
                 highlight={lead.selectedProgram ? "blue" : undefined}
               />
               <InfoRow
@@ -1143,7 +1338,8 @@ export default function AdminRegistrationsPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterTab>("pending");
+  const [filter, setFilter] = useState<FilterTab>("all");
+  const [adventureFilter, setAdventureFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [programFilter, setProgramFilter] = useState("all");
   const [leadSubFilter, setLeadSubFilter] = useState<"all" | "in-progress" | "contacted">("all");
@@ -1169,17 +1365,52 @@ export default function AdminRegistrationsPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  async function fetchRegistrations() {
+  async function fetchRegistrations(): Promise<Registration[]> {
     try {
-      if (!user) return;
+      if (!user) return [];
       const idToken = await user.getIdToken();
       const res = await fetch("/api/registrations", {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = await res.json();
-      if (data.success) setRegistrations(data.data);
-    } catch { /* ignore */ }
+      if (data.success) {
+        setRegistrations(data.data);
+        return data.data as Registration[];
+      }
+      return [];
+    } catch { return []; }
     finally { setLoading(false); }
+  }
+
+  async function handleTagUntaggedAsAdventureOne() {
+    const untaggedRegistrations = registrations.filter((registration) => getAdventureNumber(registration) === null);
+    if (!user || untaggedRegistrations.length === 0) return;
+
+    setIsProcessing(true);
+    try {
+      const idToken = await user.getIdToken(true);
+      const response = await fetch("/api/registrations/tag-adventure", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ ids: untaggedRegistrations.map((registration) => registration.id) }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Could not tag the registrations.");
+      }
+
+      setToast(`✅ Tagged ${data.updatedCount} registration${data.updatedCount === 1 ? "" : "s"} as Adventure 1.`);
+      await fetchRegistrations();
+      setAdventureFilter("1");
+      setFilter("all");
+    } catch (error) {
+      setToast(`❌ ${error instanceof Error ? error.message : "Could not tag the registrations."}`);
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
   async function fetchLeads() {
@@ -1369,14 +1600,30 @@ export default function AdminRegistrationsPage() {
     }
   }
 
+  const adventureGroups = [...new Set(registrations.map((registration) => {
+    const number = getAdventureNumber(registration);
+    return number ? String(number) : "unassigned";
+  }))].sort((left, right) => {
+    if (left === "unassigned") return 1;
+    if (right === "unassigned") return -1;
+    return Number(left) - Number(right);
+  });
+
+  const registrationsForAdventure = registrations.filter((registration) => {
+    const adventureNumber = getAdventureNumber(registration);
+    return adventureFilter === "all" ||
+      (adventureFilter === "unassigned" ? adventureNumber === null : adventureNumber === Number(adventureFilter));
+  });
+
   const counts = {
-    all: registrations.length,
-    pending: registrations.filter(r => r.status === "pending").length,
-    reserved: registrations.filter(r => r.status === "reserved" && !isRegExpired(r)).length,
-    "early-bird": registrations.filter(r => r.status === "early-bird" && !isRegExpired(r)).length,
-    expired: registrations.filter(isRegExpired).length,
-    approved: registrations.filter(r => r.status === "approved").length,
-    rejected: registrations.filter(r => r.status === "rejected").length,
+    all: registrationsForAdventure.length,
+    pending: registrationsForAdventure.filter(r => r.status === "pending").length,
+    reserved: registrationsForAdventure.filter(r => r.status === "reserved" && !isRegExpired(r)).length,
+    "early-bird": registrationsForAdventure.filter(r => r.status === "early-bird" && !isRegExpired(r)).length,
+    expired: registrationsForAdventure.filter(isRegExpired).length,
+    approved: registrationsForAdventure.filter(r => r.status === "approved").length,
+    active: registrationsForAdventure.filter(r => r.status === "active").length,
+    rejected: registrationsForAdventure.filter(r => r.status === "rejected").length,
   };
 
   const prospectiveLeads = leads.filter(l => l.status !== "converted" && l.status !== "archived");
@@ -1384,14 +1631,15 @@ export default function AdminRegistrationsPage() {
   const contactedLeadsCount = prospectiveLeads.filter(l => l.status === "contacted").length;
 
   const tabs: { key: FilterTab; label: string }[] = [
+    { key: "all", label: `All Submitted (${counts.all})` },
     { key: "pending", label: `Pending (${counts.pending})` },
     { key: "reserved", label: `🔒 Reserved (${counts.reserved})` },
     { key: "early-bird", label: `🐣 Early Bird (${counts["early-bird"]})` },
     { key: "expired", label: `⏰ Expired Slots (${counts.expired})` },
     { key: "approved", label: `Approved (${counts.approved})` },
+    { key: "active", label: `Active (${counts.active})` },
     { key: "rejected", label: `Rejected (${counts.rejected})` },
     { key: "leads", label: `📝 In-Progress Leads (${prospectiveLeads.length})` },
-    { key: "all", label: `All Submitted (${counts.all})` },
   ];
 
   const q = search.toLowerCase();
@@ -1411,11 +1659,14 @@ export default function AdminRegistrationsPage() {
     }
 
     const matchProgram = programFilter === "all" || r.program === programFilter;
+    const adventureNumber = getAdventureNumber(r);
+    const matchAdventure = adventureFilter === "all" ||
+      (adventureFilter === "unassigned" ? adventureNumber === null : adventureNumber === Number(adventureFilter));
     const matchSearch = !q ||
       `${r.childInfo.firstName} ${r.childInfo.lastName}`.toLowerCase().includes(q) ||
       r.parentInfo.name.toLowerCase().includes(q) ||
-      (PROGRAM_NAMES[r.program] || r.program).toLowerCase().includes(q);
-    return matchStatus && matchProgram && matchSearch;
+      getProgramLabel(r.program).toLowerCase().includes(q);
+    return matchStatus && matchProgram && matchAdventure && matchSearch;
   });
 
   const filteredLeads = prospectiveLeads.filter(l => {
@@ -1433,7 +1684,7 @@ export default function AdminRegistrationsPage() {
       (l.parentInfo?.name || "").toLowerCase().includes(q) ||
       (l.parentInfo?.email || "").toLowerCase().includes(q) ||
       (l.parentInfo?.phone || "").includes(q) ||
-      (PROGRAM_NAMES[l.selectedProgram || ""] || l.selectedProgram || "").toLowerCase().includes(q);
+      (l.selectedProgram ? getProgramLabel(l.selectedProgram) : "").toLowerCase().includes(q);
     return matchSubFilter && matchProgram && matchSearch;
   });
 
@@ -1460,31 +1711,79 @@ export default function AdminRegistrationsPage() {
             onChange={e => setProgramFilter(e.target.value)}
           >
             <option value="all">All Programs</option>
-            <option value="curious-explorer">Curious Explorer</option>
-            <option value="everyday-curious">Everyday Explorer</option>
-            <option value="creative-explorer">Creative Explorer</option>
-            <option value="brave-explorer">Brave Explorer</option>
-            <option value="ballet">Ballet</option>
+            {Object.entries(PROGRAM_SLOTS).map(([programId, program]) => (
+              <option key={programId} value={programId}>{program.name}</option>
+            ))}
           </select>
         </div>
 
-        {/* Filter tabs */}
-        <div className="mb-5 flex flex-wrap gap-2">
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setFilter(tab.key)}
-              className={[
-                "rounded-2xl px-4 py-2 text-[13px] font-bold transition-all duration-150",
-                filter === tab.key
-                  ? "bg-[#0033A0] text-white shadow-md shadow-[#0033A0]/20"
-                  : "bg-white border border-slate-200 text-[#64748b] hover:border-[#0033A0]/30",
-              ].join(" ")}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Unified registration filters */}
+        <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          {filter !== "leads" && adventureGroups.length > 0 && (
+            <div className="pb-3">
+              <p className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Adventure</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: "all", label: `All Adventures (${registrations.length})` },
+                  ...adventureGroups.map((key) => ({
+                    key,
+                    label: key === "unassigned"
+                      ? `Cycle not tagged (${registrations.filter((registration) => getAdventureNumber(registration) === null).length})`
+                      : `Adventure ${key} (${registrations.filter((registration) => getAdventureNumber(registration) === Number(key)).length})`,
+                  })),
+                ].map((group) => (
+                  <button
+                    key={group.key}
+                    type="button"
+                    onClick={() => {
+                      setAdventureFilter(group.key);
+                      setFilter("all");
+                    }}
+                    className={`rounded-xl px-3 py-1.5 text-[12px] font-bold transition-colors ${
+                      adventureFilter === group.key
+                        ? "bg-[#0033A0] text-white shadow-sm"
+                        : "border border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                    }`}
+                  >
+                    {group.label}
+                  </button>
+                ))}
+              {adventureFilter === "unassigned" && registrationsForAdventure.length > 0 && (
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={handleTagUntaggedAsAdventureOne}
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-extrabold text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isProcessing ? "Tagging…" : `Tag ${registrationsForAdventure.length} as Adventure 1`}
+                </button>
+              )}
+              </div>
+            </div>
+          )}
+          <div className={`${filter !== "leads" && adventureGroups.length > 0 ? "border-t border-slate-100 pt-3" : ""}`}>
+            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">
+              {filter === "leads" ? "Lead status" : "Registration status"}
+              {filter !== "leads" && <span className="ml-2 font-semibold normal-case tracking-normal text-slate-400">Counts update for the selected Adventure</span>}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {tabs.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setFilter(tab.key)}
+                  className={[
+                    "rounded-xl px-3.5 py-2 text-[12px] font-bold transition-all duration-150",
+                    filter === tab.key
+                      ? "bg-[#0033A0] text-white shadow-md shadow-[#0033A0]/20"
+                      : "bg-slate-50 border border-slate-200 text-[#64748b] hover:border-[#0033A0]/30",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {/* ── LEADS VIEW ── */}
         {filter === "leads" ? (
@@ -1647,7 +1946,7 @@ export default function AdminRegistrationsPage() {
                                     color: PROGRAM_ACCENTS[lead.selectedProgram] || "#0033A0",
                                   }}
                                 >
-                                  {PROGRAM_NAMES[lead.selectedProgram] || lead.selectedProgram}
+                                  {getProgramLabel(lead.selectedProgram)}
                                 </span>
                                 {lead.selectedClass && (
                                   <p className="text-[11px] text-[#64748b] mt-0.5 font-medium">{lead.selectedClass}</p>
@@ -1713,7 +2012,7 @@ export default function AdminRegistrationsPage() {
             <div className="flex h-64 flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white/70 text-center p-8">
               <span className="text-4xl mb-3">📋</span>
               <p className="text-[16px] font-bold text-[#0033A0]">No registrations found</p>
-              <p className="mt-1 text-[13px] text-[#64748b]">{search ? "Try a different search term." : "New registrations will appear here once submitted."}</p>
+              <p className="mt-1 text-[13px] text-[#64748b]">{search ? "Try a different search term." : "No registrations match these filters. Try All Submitted or choose another Adventure."}</p>
             </div>
           ) : (
             <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -1756,6 +2055,9 @@ export default function AdminRegistrationsPage() {
                               )}
                             </div>
                             {reg.childInfo.nickname && <p className="text-[11px] text-[#94a3b8]">{reg.childInfo.nickname}</p>}
+                            <span className="mt-1 inline-flex rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-[#0033A0]">
+                              {adventureLabel(reg)}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -1770,7 +2072,7 @@ export default function AdminRegistrationsPage() {
                           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
                           style={{ backgroundColor: `${PROGRAM_ACCENTS[reg.program]}22`, color: PROGRAM_ACCENTS[reg.program] || "#334155" }}
                         >
-                          {PROGRAM_NAMES[reg.program] || reg.program}
+                                  {getProgramLabel(reg.program)}
                         </span>
                       </td>
                       {/* Class */}
@@ -1796,7 +2098,7 @@ export default function AdminRegistrationsPage() {
                 </tbody>
               </table>
               <div className="px-5 py-3 bg-[#f8fafc] border-t border-slate-200 text-[12px] font-semibold text-[#94a3b8]">
-                Showing {filtered.length} of {registrations.length} registration{registrations.length !== 1 ? "s" : ""}
+                Showing {filtered.length} of {registrationsForAdventure.length} registration{registrationsForAdventure.length !== 1 ? "s" : ""} in {adventureFilter === "all" ? "all Adventures" : adventureFilter === "unassigned" ? "untagged cycles" : `Adventure ${adventureFilter}`}
               </div>
             </div>
           )
@@ -1807,6 +2109,8 @@ export default function AdminRegistrationsPage() {
       {selected && (
         <DetailModal
           reg={selected}
+          allRegistrations={registrations}
+          onRefreshRegistrations={fetchRegistrations}
           onClose={() => setSelected(null)}
           onApprove={handleApprove}
           onReject={handleReject}
