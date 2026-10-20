@@ -18,7 +18,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const rawIds = Array.isArray(body?.ids) ? body.ids : [];
-    const ids = [...new Set(rawIds.filter((id: unknown): id is string => typeof id === "string" && ObjectId.isValid(id)))];
+    const validIds = rawIds.filter((id: unknown): id is string => typeof id === "string" && ObjectId.isValid(id));
+    const ids: string[] = Array.from(new Set<string>(validIds));
 
     if (ids.length === 0 || ids.length > 100 || ids.length !== rawIds.length) {
       return NextResponse.json({ error: "Provide between 1 and 100 valid registration IDs." }, { status: 400 });
@@ -28,7 +29,10 @@ export async function POST(request: Request) {
     const registrations = db.collection("student_registrations");
     const objectIds = ids.map((id) => new ObjectId(id));
     const records = await registrations
-      .find({ _id: { $in: objectIds } }, { projection: { adventureNumber: 1, period: 1 } })
+      .find<{ _id: ObjectId; adventureNumber?: unknown; period?: unknown }>(
+        { _id: { $in: objectIds } },
+        { projection: { adventureNumber: 1, period: 1 } }
+      )
       .toArray();
 
     if (records.length !== ids.length || records.some((record) => !isUntaggedAdventure(record))) {

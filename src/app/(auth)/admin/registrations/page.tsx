@@ -1397,6 +1397,7 @@ export default function AdminRegistrationsPage() {
       const latestRegistrations = await fetchRegistrations();
       const reportRegistrations = (latestRegistrations.length > 0 ? latestRegistrations : registrations)
         .filter((registration) => !isTestRegistration(registration));
+      const excelExport = await createAdventureExcel(reportRegistrations);
       const adventureGroups = new Map<string, Registration[]>();
 
       for (const registration of reportRegistrations) {
@@ -1503,8 +1504,8 @@ export default function AdminRegistrationsPage() {
       ].filter(Boolean).join(" · ");
       const reportHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeSummaryHtml(reportTitle)}</title>
 <style>
-*{box-sizing:border-box}body{margin:0;padding:20px 0;background:#f4f7fc;color:#16356b;font-family:Arial,Helvetica,sans-serif}.page{width:100%;max-width:none;margin:0;background:#fff;border:1px solid #dce5f0;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(25,55,105,.08)}.brand{display:flex;align-items:center;min-height:58px;padding:15px 28px;background:#082f78;border-bottom:4px solid #ffd84d;color:#fff;font-size:13px;font-weight:800;letter-spacing:.06em}.content{padding:28px clamp(18px,3vw,48px)}.title{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.title h1{margin:0 0 7px;color:#082f78;font-size:25px;line-height:1.2}.muted{margin:4px 0 0;color:#71809a;font-size:12px;line-height:1.4}.actions{width:calc(100% - 40px);margin:0 20px 12px;display:flex;justify-content:flex-end;gap:8px}.actions button{border:0;border-radius:8px;padding:10px 15px;background:#0033a0;color:#fff;font-weight:700;font-size:12px;cursor:pointer}.actions .close{background:#e8eef6;color:#334155}.adventure{margin-top:24px;padding:22px;border:1px solid #dfe7f2;border-radius:14px;background:#fff;break-inside:avoid}.adventure-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid #edf1f6}.eyebrow{color:#71809a;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.adventure-heading h2{margin:4px 0 0;color:#0033a0;font-size:21px}.registration-count{padding:7px 11px;border-radius:20px;background:#eef4ff;color:#0033a0;font-size:12px;font-weight:800;white-space:nowrap}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}.metrics div{min-height:76px;padding:13px 14px;border:1px solid #e3eaf3;border-radius:10px;background:#f9fbfe}.metrics strong,.metrics span{display:block}.metrics strong{color:#0033a0;font-size:22px;line-height:1.2}.metrics span{margin-top:5px;color:#65738a;font-size:11px;line-height:1.35}.section-intro{margin:16px 0 12px;color:#50627d;font-size:12px;line-height:1.5}.program-list{display:grid;gap:13px}.program-card{overflow:hidden;border:1px solid #e1e8f1;border-radius:12px;background:#fff;break-inside:avoid}.program-heading{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#f8faff;border-bottom:1px solid #e8eef6;box-shadow:inset 4px 0 var(--accent)}.program-icon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#fff;border:1px solid #e4eaf2;font-size:20px}.program-heading h3{margin:0;color:#183c77;font-size:14px}.program-heading p{margin:4px 0 0;color:#71809a;font-size:11px}.program-content{padding:14px 16px}.session-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.session-card{padding:12px;border:1px solid #e5ebf3;border-radius:10px;background:#fff}.session-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.session-top>div:first-child strong,.session-top>div:first-child span,.spaces strong,.spaces span{display:block}.session-top>div:first-child strong{color:#27446f;font-size:12px}.session-top>div:first-child span{margin-top:4px;color:#71809a;font-size:11px}.spaces{text-align:right;white-space:nowrap}.spaces strong{color:#16804a;font-size:13px}.spaces span{margin-top:3px;color:#758198;font-size:10px}.session-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid #eff2f6}.session-meta span{padding:4px 7px;border-radius:12px;background:#f2f5f9;color:#56647a;font-size:10px}.session-meta .expired{background:#fff1f0;color:#b42318}.program-content h4{margin:18px 0 7px;color:#5b6a82;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.student-list{border-top:1px solid #e9eef5}.student-row{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) minmax(160px,1.2fr) 90px;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid #edf1f6}.student-row:last-child{border-bottom:0}.student-name{color:#18396f;font-size:11px;font-weight:700}.student-session strong,.student-session span{display:block}.student-session strong{color:#465974;font-size:11px}.student-session span,.registered{margin-top:3px;color:#7d899d;font-size:10px}.status{justify-self:start;padding:5px 8px;border-radius:12px;background:#e9f8ef;color:#18794e;font-size:10px;font-weight:700;line-height:1.25}.status-pending{background:#fff7df;color:#9a6700}.status-rejected,.status-expired{background:#fff0ef;color:#b42318}.class-roster{margin-top:12px;padding-top:9px;border-top:1px solid #edf1f6}.class-roster h4{display:flex;align-items:center;justify-content:space-between;margin:0 0 5px;color:#66758c;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.class-roster h4 span{padding:3px 7px;border-radius:10px;background:#f1f4f8;color:#56647a}.class-roster .student-row{grid-template-columns:minmax(130px,1fr) auto 110px;padding:8px 2px}.class-roster .student-row>strong{color:#18396f;font-size:11px}.empty-roster{margin:8px 0 0;color:#8793a7;font-size:11px}.expired-section{margin-top:22px;padding:18px;border:1px solid #f0c7c4;border-radius:12px;background:#fffafa}.expired-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #f7e2e0}.expired-heading h3{margin:4px 0;color:#9f3029;font-size:16px}.expired-heading p{margin:3px 0 0;color:#795957;font-size:11px}.expired-count{padding:6px 10px;border-radius:14px;background:#ffedeb;color:#a53d35;font-size:11px;font-weight:800;white-space:nowrap}.expired-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.expired-card{overflow:hidden;border:1px solid #f1dedc;border-radius:9px;background:#fff}.expired-card header{display:grid;gap:4px;padding:10px 12px;background:#fff6f5;border-bottom:1px solid #f5e8e7}.expired-card header strong{color:#573e3d;font-size:11px}.expired-card header span{color:#8d6d6a;font-size:10px}.expired-row{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid #f4eeee}.expired-row:last-child{border-bottom:0}.expired-row strong{color:#7d3430;font-size:11px}.expired-row span{color:#907a78;font-size:10px;white-space:nowrap}.note{margin:16px 0 0;padding:11px 13px;border-left:3px solid #f0b429;border-radius:4px;background:#fff9e9;color:#665523;font-size:11px;line-height:1.5}@media(max-width:700px){body{padding:12px}.content{padding:16px}.adventure{padding:14px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.session-list{grid-template-columns:1fr}.student-row{grid-template-columns:1fr 1fr;gap:7px}.registered{margin-top:0}}@page{margin:8mm}@media print{body{padding:0;background:#fff}.page{width:100%;max-width:none;border:0;border-radius:0;box-shadow:none;overflow:visible}.actions{display:none}.content{padding:8px}.adventure{padding:10px;margin:0 0 12px;break-inside:auto;page-break-inside:auto;border:0}.adventure-heading,.metrics,.program-heading,.session-card,.student-row,.expired-card{break-inside:avoid;page-break-inside:avoid}.program-card{break-inside:auto;page-break-inside:auto;border-radius:8px}.program-heading{break-after:avoid;page-break-after:avoid}.program-content{padding:8px}.program-list{gap:8px}.session-list{gap:6px}.session-card{padding:8px}.class-roster .student-row{padding:5px}.expired-section{break-inside:auto;page-break-inside:auto}.program-heading,.session-card,.metrics div{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style></head><body><div class="actions"><button class="close" onclick="window.close()">Close</button><button onclick="window.print()">Print / Save as PDF</button></div><main class="page"><div class="brand">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</div><div class="content"><header class="title"><div><h1>${escapeSummaryHtml(reportTitle)}</h1><div class="muted">${escapeSummaryHtml(reportSubtitle)}</div></div></header>${reportSections || `<p class="note">No registrations were found for this Adventure.</p>`}</div></main></body></html>`;
+*{box-sizing:border-box}body{margin:0;padding:20px 0;background:#f4f7fc;color:#16356b;font-family:Arial,Helvetica,sans-serif}.page{width:100%;max-width:none;margin:0;background:#fff;border:1px solid #dce5f0;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(25,55,105,.08)}.brand{display:flex;align-items:center;min-height:58px;padding:15px 28px;background:#082f78;border-bottom:4px solid #ffd84d;color:#fff;font-size:13px;font-weight:800;letter-spacing:.06em}.content{padding:28px clamp(18px,3vw,48px)}.title{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.title h1{margin:0 0 7px;color:#082f78;font-size:25px;line-height:1.2}.muted{margin:4px 0 0;color:#71809a;font-size:12px;line-height:1.4}.actions{width:calc(100% - 40px);margin:0 20px 12px;display:flex;justify-content:flex-end;gap:8px}.actions button,.actions a{display:inline-flex;align-items:center;border:0;border-radius:8px;padding:10px 15px;background:#0033a0;color:#fff;font-weight:700;font-size:12px;text-decoration:none;cursor:pointer}.actions .close{background:#e8eef6;color:#334155}.actions .excel{background:#e9f8ef;color:#18794e}.adventure{margin-top:24px;padding:22px;border:1px solid #dfe7f2;border-radius:14px;background:#fff;break-inside:avoid}.adventure-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid #edf1f6}.eyebrow{color:#71809a;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.adventure-heading h2{margin:4px 0 0;color:#0033a0;font-size:21px}.registration-count{padding:7px 11px;border-radius:20px;background:#eef4ff;color:#0033a0;font-size:12px;font-weight:800;white-space:nowrap}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}.metrics div{min-height:76px;padding:13px 14px;border:1px solid #e3eaf3;border-radius:10px;background:#f9fbfe}.metrics strong,.metrics span{display:block}.metrics strong{color:#0033a0;font-size:22px;line-height:1.2}.metrics span{margin-top:5px;color:#65738a;font-size:11px;line-height:1.35}.section-intro{margin:16px 0 12px;color:#50627d;font-size:12px;line-height:1.5}.program-list{display:grid;gap:13px}.program-card{overflow:hidden;border:1px solid #e1e8f1;border-radius:12px;background:#fff;break-inside:avoid}.program-heading{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#f8faff;border-bottom:1px solid #e8eef6;box-shadow:inset 4px 0 var(--accent)}.program-icon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#fff;border:1px solid #e4eaf2;font-size:20px}.program-heading h3{margin:0;color:#183c77;font-size:14px}.program-heading p{margin:4px 0 0;color:#71809a;font-size:11px}.program-content{padding:14px 16px}.session-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.session-card{padding:12px;border:1px solid #e5ebf3;border-radius:10px;background:#fff}.session-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.session-top>div:first-child strong,.session-top>div:first-child span,.spaces strong,.spaces span{display:block}.session-top>div:first-child strong{color:#27446f;font-size:12px}.session-top>div:first-child span{margin-top:4px;color:#71809a;font-size:11px}.spaces{text-align:right;white-space:nowrap}.spaces strong{color:#16804a;font-size:13px}.spaces span{margin-top:3px;color:#758198;font-size:10px}.session-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid #eff2f6}.session-meta span{padding:4px 7px;border-radius:12px;background:#f2f5f9;color:#56647a;font-size:10px}.session-meta .expired{background:#fff1f0;color:#b42318}.program-content h4{margin:18px 0 7px;color:#5b6a82;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.student-list{border-top:1px solid #e9eef5}.student-row{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) minmax(160px,1.2fr) 90px;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid #edf1f6}.student-row:last-child{border-bottom:0}.student-name{color:#18396f;font-size:11px;font-weight:700}.student-session strong,.student-session span{display:block}.student-session strong{color:#465974;font-size:11px}.student-session span,.registered{margin-top:3px;color:#7d899d;font-size:10px}.status{justify-self:start;padding:5px 8px;border-radius:12px;background:#e9f8ef;color:#18794e;font-size:10px;font-weight:700;line-height:1.25}.status-pending{background:#fff7df;color:#9a6700}.status-rejected,.status-expired{background:#fff0ef;color:#b42318}.class-roster{margin-top:12px;padding-top:9px;border-top:1px solid #edf1f6}.class-roster h4{display:flex;align-items:center;justify-content:space-between;margin:0 0 5px;color:#66758c;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.class-roster h4 span{padding:3px 7px;border-radius:10px;background:#f1f4f8;color:#56647a}.class-roster .student-row{grid-template-columns:minmax(130px,1fr) auto 110px;padding:8px 2px}.class-roster .student-row>strong{color:#18396f;font-size:11px}.empty-roster{margin:8px 0 0;color:#8793a7;font-size:11px}.expired-section{margin-top:22px;padding:18px;border:1px solid #f0c7c4;border-radius:12px;background:#fffafa}.expired-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #f7e2e0}.expired-heading h3{margin:4px 0;color:#9f3029;font-size:16px}.expired-heading p{margin:3px 0 0;color:#795957;font-size:11px}.expired-count{padding:6px 10px;border-radius:14px;background:#ffedeb;color:#a53d35;font-size:11px;font-weight:800;white-space:nowrap}.expired-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.expired-card{overflow:hidden;border:1px solid #f1dedc;border-radius:9px;background:#fff}.expired-card header{display:grid;gap:4px;padding:10px 12px;background:#fff6f5;border-bottom:1px solid #f5e8e7}.expired-card header strong{color:#573e3d;font-size:11px}.expired-card header span{color:#8d6d6a;font-size:10px}.expired-row{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid #f4eeee}.expired-row:last-child{border-bottom:0}.expired-row strong{color:#7d3430;font-size:11px}.expired-row span{color:#907a78;font-size:10px;white-space:nowrap}.note{margin:16px 0 0;padding:11px 13px;border-left:3px solid #f0b429;border-radius:4px;background:#fff9e9;color:#665523;font-size:11px;line-height:1.5}@media(max-width:700px){body{padding:12px}.content{padding:16px}.adventure{padding:14px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.session-list{grid-template-columns:1fr}.student-row{grid-template-columns:1fr 1fr;gap:7px}.registered{margin-top:0}}@page{margin:8mm}@media print{body{padding:0;background:#fff}.page{width:100%;max-width:none;border:0;border-radius:0;box-shadow:none;overflow:visible}.actions{display:none}.content{padding:8px}.adventure{padding:10px;margin:0 0 12px;break-inside:auto;page-break-inside:auto;border:0}.adventure-heading,.metrics,.program-heading,.session-card,.student-row,.expired-card{break-inside:avoid;page-break-inside:avoid}.program-card{break-inside:auto;page-break-inside:auto;border-radius:8px}.program-heading{break-after:avoid;page-break-after:avoid}.program-content{padding:8px}.program-list{gap:8px}.session-list{gap:6px}.session-card{padding:8px}.class-roster .student-row{padding:5px}.expired-section{break-inside:auto;page-break-inside:auto}.program-heading,.session-card,.metrics div{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body><div class="actions"><button class="close" onclick="window.close()">Close</button><a class="excel" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${excelExport.base64}" download="${escapeSummaryHtml(excelExport.fileName)}">Download Excel</a><button onclick="window.print()">Print / Save as PDF</button></div><main class="page"><div class="brand">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</div><div class="content"><header class="title"><div><h1>${escapeSummaryHtml(reportTitle)}</h1><div class="muted">${escapeSummaryHtml(reportSubtitle)}</div></div></header>${reportSections || `<p class="note">No registrations were found for this Adventure.</p>`}</div></main></body></html>`;
       summaryWindow.document.open();
       summaryWindow.document.write(reportHtml);
       summaryWindow.document.close();
@@ -1513,6 +1514,173 @@ export default function AdminRegistrationsPage() {
     } finally {
       setIsProcessing(false);
     }
+  }
+
+  async function createAdventureExcel(reportRegistrations: Registration[]) {
+      const adventureGroups = new Map<string, Registration[]>();
+
+      for (const registration of reportRegistrations) {
+        const number = getAdventureNumber(registration);
+        const key = number === null ? "unassigned" : String(number);
+        if (adventureFilter !== "all" && key !== adventureFilter) continue;
+        adventureGroups.set(key, [...(adventureGroups.get(key) || []), registration]);
+      }
+
+      const orderedGroups = [...adventureGroups.entries()].sort(([left], [right]) => {
+        if (left === "unassigned") return 1;
+        if (right === "unassigned") return -1;
+        return Number(left) - Number(right);
+      });
+      const overviewRows: (string | number)[][] = [[
+        "Adventure", "Start Date", "Registration Records", "Reserved · Unpaid", "Payments to Review", "Expired Reservations",
+      ]];
+      const classRows: (string | number)[][] = [[
+        "Adventure", "Program", "Program Days", "Class", "Class Time", "Total Slots", "Slots Filled", "Slots Left", "Unpaid Reservations", "Payments to Review",
+      ]];
+      const registrationRows: (string | number)[][] = [[
+        "Adventure", "Student", "Parent / Guardian", "Program", "Program Days", "Class", "Class Time", "Status", "Registered",
+      ]];
+      const expiredRows: (string | number)[][] = [[
+        "Adventure", "Student", "Parent / Guardian", "Program", "Class", "Class Time", "Status", "Registered",
+      ]];
+      const programOrder = Object.keys(PROGRAM_SLOTS);
+      const programIndex = (programId: string) => {
+        const index = programOrder.indexOf(programId);
+        return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+      };
+      const sessionOrder = (registration: Registration) => {
+        const classes = PROGRAM_SLOTS[registration.program as keyof typeof PROGRAM_SLOTS]?.classes || [];
+        const aliasIndex = classes.findIndex((session) =>
+          registration.classTime === (session.name.includes("Session")
+            ? session.name.replace("Session", "Class")
+            : session.name.replace("Class", "Session"))
+        );
+        const directIndex = classes.findIndex((session) => registration.classTime === session.name);
+        return directIndex >= 0 ? directIndex : aliasIndex >= 0 ? aliasIndex : Number.MAX_SAFE_INTEGER;
+      };
+      const compareRegistrationsBySchedule = (left: Registration, right: Registration) => {
+        const programDifference = programIndex(left.program) - programIndex(right.program);
+        if (programDifference !== 0) return programDifference;
+        const sessionDifference = sessionOrder(left) - sessionOrder(right);
+        if (sessionDifference !== 0) return sessionDifference;
+        return `${left.childInfo.firstName} ${left.childInfo.lastName}`.localeCompare(`${right.childInfo.firstName} ${right.childInfo.lastName}`);
+      };
+
+      for (const [key, groupRegistrations] of orderedGroups) {
+        const adventureName = key === "unassigned" ? "Cycle not tagged" : `Adventure ${key}`;
+        const startDate = groupRegistrations.find((registration) => registration.adventureStartDate)?.adventureStartDate;
+        const unpaidHolds = groupRegistrations.filter((registration) =>
+          (registration.status === "reserved" || registration.status === "pending") &&
+          occupiesAdventureSlot(registration) && !registration.receiptUrl && !(Number(registration.amountPaid) > 0)
+        );
+        const awaitingReview = groupRegistrations.filter((registration) =>
+          (registration.status === "reserved" || registration.status === "pending") &&
+          occupiesAdventureSlot(registration) && Boolean(registration.receiptUrl || Number(registration.amountPaid) > 0)
+        );
+        const expiredReservations = groupRegistrations.filter(isRegExpired);
+        overviewRows.push([
+          adventureName,
+          formatAdventureDate(startDate) || "Not scheduled",
+          groupRegistrations.length,
+          countUniqueChildren(unpaidHolds),
+          countUniqueChildren(awaitingReview),
+          countUniqueChildren(expiredReservations),
+        ]);
+
+        const currentRegistrations = groupRegistrations.filter((registration) => !isRegExpired(registration));
+        const programIds = [...new Set(currentRegistrations.map((registration) => registration.program))]
+          .sort((left, right) => programIndex(left) - programIndex(right));
+        for (const programId of programIds) {
+          const program = PROGRAM_SLOTS[programId as keyof typeof PROGRAM_SLOTS];
+          const programRegistrations = currentRegistrations.filter((registration) => registration.program === programId);
+          const schedule = program?.schedule || "Schedule to be confirmed";
+          for (const session of program?.classes || []) {
+            const alias = session.name.includes("Session")
+              ? session.name.replace("Session", "Class")
+              : session.name.replace("Class", "Session");
+            const matches = (registration: Registration) => registration.classTime === session.name || registration.classTime === alias;
+            const occupied = countUniqueChildren(programRegistrations.filter((registration) => matches(registration) && occupiesAdventureSlot(registration)));
+            const unpaid = countUniqueChildren(unpaidHolds.filter((registration) => registration.program === programId && matches(registration)));
+            const review = countUniqueChildren(awaitingReview.filter((registration) => registration.program === programId && matches(registration)));
+            classRows.push([
+              adventureName,
+              program?.name || getProgramLabel(programId),
+              schedule,
+              session.name,
+              session.time || "Time to be confirmed",
+              typeof session.maxSlots === "number" ? session.maxSlots : "Flexible",
+              occupied,
+              typeof session.maxSlots === "number" ? Math.max(0, session.maxSlots - occupied) : "Flexible",
+              unpaid,
+              review,
+            ]);
+          }
+        }
+
+        for (const registration of [...currentRegistrations].sort(compareRegistrationsBySchedule)) {
+          const program = PROGRAM_SLOTS[registration.program as keyof typeof PROGRAM_SLOTS];
+          const session = program?.classes.find((candidate) =>
+            registration.classTime === candidate.name ||
+            registration.classTime === (candidate.name.includes("Session")
+              ? candidate.name.replace("Session", "Class")
+              : candidate.name.replace("Class", "Session"))
+          );
+          const studentName = `${registration.childInfo.firstName || ""} ${registration.childInfo.lastName || ""}`.trim();
+          const submitted = registration.submittedAt
+            ? new Date(registration.submittedAt).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+            : "—";
+          registrationRows.push([
+            adventureName,
+            studentName,
+            registration.parentInfo?.name || "—",
+            program?.name || getProgramLabel(registration.program),
+            program?.schedule || "Schedule to be confirmed",
+            registration.classTime || "Class not selected",
+            session?.time || "Time to be confirmed",
+            (STATUS_LABELS[registration.status] || registration.status).replace(/^[^\p{L}\p{N}]+/u, ""),
+            submitted,
+          ]);
+        }
+
+        for (const registration of [...expiredReservations].sort(compareRegistrationsBySchedule)) {
+          const program = PROGRAM_SLOTS[registration.program as keyof typeof PROGRAM_SLOTS];
+          const session = program?.classes.find((candidate) => registration.classTime === candidate.name);
+          const studentName = `${registration.childInfo.firstName || ""} ${registration.childInfo.lastName || ""}`.trim();
+          const submitted = registration.submittedAt
+            ? new Date(registration.submittedAt).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+            : "—";
+          expiredRows.push([
+            adventureName,
+            studentName,
+            registration.parentInfo?.name || "—",
+            program?.name || getProgramLabel(registration.program),
+            registration.classTime || "Class not selected",
+            session?.time || "Time to be confirmed",
+            "Expired · does not hold a place",
+            submitted,
+          ]);
+        }
+      }
+
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.utils.book_new();
+      const addSheet = (name: string, rows: (string | number)[][]) => {
+        const worksheet = XLSX.utils.aoa_to_sheet(rows);
+        worksheet["!cols"] = rows[0].map((heading, index) => ({
+          wch: Math.min(34, Math.max(String(heading).length + 2, ...rows.slice(1).map((row) => String(row[index] ?? "").length + 2))),
+        }));
+        if (worksheet["!ref"]) worksheet["!autofilter"] = { ref: worksheet["!ref"] };
+        XLSX.utils.book_append_sheet(workbook, worksheet, name);
+      };
+      addSheet("Program & Time Slots", classRows);
+      addSheet("Adventure Overview", overviewRows);
+      addSheet("Registrations", registrationRows);
+      addSheet("Expired Reservations", expiredRows);
+      const adventureFileName = adventureFilter === "all"
+        ? "All_Adventures"
+        : adventureFilter === "unassigned" ? "Untagged_Registrations" : `Adventure_${adventureFilter}`;
+      const base64 = XLSX.write(workbook, { bookType: "xlsx", type: "base64" });
+      return { base64, fileName: `Merry_Explorers_${adventureFileName}_Summary.xlsx` };
   }
 
   async function handleTagUntaggedAsAdventureOne() {

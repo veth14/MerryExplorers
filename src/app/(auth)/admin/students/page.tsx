@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { StudentEditModal } from "@/components/admin/StudentEditModal";
 import { ParentAccountCreateModal } from "@/components/admin/ParentAccountCreateModal";
 import { ExplorerDetailModal } from "@/components/admin/ExplorerDetailModal";
+import { PROGRAM_SLOTS } from "@/data/landing";
 
 interface Student {
   id: string;
@@ -164,6 +165,17 @@ function isIanAngeloValmores(item: any): boolean {
 
 function getAdventureKey(program: string) {
   return program === "everyday-explorer" ? "everyday-curious" : program;
+}
+
+function getStudentAdvNum(s?: Student | null): number {
+  if (!s) return 2;
+  if (typeof s.adventureNumber === "number" && s.adventureNumber > 0) return s.adventureNumber;
+  if (typeof s.activeAdventureNumber === "number" && s.activeAdventureNumber > 0) return s.activeAdventureNumber;
+  if (s.period && /adventure\s*[-_]?\s*(\d+)/i.test(s.period)) {
+    const m = s.period.match(/adventure\s*[-_]?\s*(\d+)/i);
+    if (m) return parseInt(m[1], 10);
+  }
+  return 2;
 }
 
 function formatRegistrationDate(value?: string) {
@@ -375,7 +387,7 @@ export default function AdminStudentsPage() {
   const userId = user?.uid;
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<"students" | "parents">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "parents" | "reschedule">("students");
   const [students, setStudents] = useState<Student[]>([]);
   const [parents, setParents] = useState<ParentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,6 +406,74 @@ export default function AdminStudentsPage() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // ─── Reschedule tab state ─────────────────────────────────────────────────
+  const [rescheduleModal, setRescheduleModal] = useState<Student | null>(null);
+  const [reschedNewTime, setReschedNewTime] = useState("");
+  const [reschedNewSchedule, setReschedNewSchedule] = useState("");
+  const [reschedReason, setReschedReason] = useState("");
+  const [reschedSaving, setReschedSaving] = useState(false);
+  const [reschedSearch, setReschedSearch] = useState("");
+  const [reschedProgFilter, setReschedProgFilter] = useState("all");
+  const [reschedAdvFilter, setReschedAdvFilter] = useState<number>(2);
+
+  // Auto-sync to highest available adventure if needed
+  useEffect(() => {
+    if (students.length > 0) {
+      const realEnrolled = students.filter(s =>
+        !isIanAngeloValmores(s) &&
+        (s.status === "active" || s.paid === true || s.paymentStatus === "approved" || s.paymentStatus === "confirmed")
+      );
+      const advNums = Array.from(
+        new Set(
+          realEnrolled
+            .map(getStudentAdvNum)
+            .filter((n): n is number => typeof n === "number" && n > 0)
+        )
+      ).sort((a, b) => b - a);
+
+      if (advNums.length > 0 && !advNums.includes(reschedAdvFilter)) {
+        setReschedAdvFilter(advNums[0]);
+      }
+    }
+  }, [students, reschedAdvFilter]);
+
+  async function handleReschedule() {
+    if (!rescheduleModal) return;
+    if (!reschedNewTime.trim() && !reschedNewSchedule.trim()) {
+      showToast("Please enter a new class time or schedule day.");
+      return;
+    }
+    setReschedSaving(true);
+    try {
+      const res = await fetch("/api/students/reschedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: rescheduleModal.id,
+          classTime: reschedNewTime.trim() || rescheduleModal.classTime,
+          schedule: reschedNewSchedule.trim() || rescheduleModal.schedule,
+          reason: reschedReason.trim(),
+        }),
+      });
+      if (res.ok) {
+        const childName = `${rescheduleModal.childInfo?.firstName || ""} ${rescheduleModal.childInfo?.lastName || ""}`.trim();
+        showToast(`✅ Rescheduled ${childName} successfully!`);
+        setRescheduleModal(null);
+        setReschedNewTime("");
+        setReschedNewSchedule("");
+        setReschedReason("");
+        loadData();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(`Error: ${data.error || "Failed to reschedule"}`);
+      }
+    } catch {
+      showToast("Network error. Please try again.");
+    } finally {
+      setReschedSaving(false);
+    }
+  }
 
   const loadData = () => {
     setLoading(true);
@@ -611,6 +691,30 @@ export default function AdminStudentsPage() {
     };
   }, [groupedExplorers, parents]);
 
+  // Reschedule adventure-specific KPIs — dynamic per selected adventure
+  const reschedStats = useMemo(() => {
+    const realPaid = students.filter(s =>
+      !isIanAngeloValmores(s) &&
+      (s.status === "active" || s.paid === true || s.paymentStatus === "approved" || s.paymentStatus === "confirmed")
+    );
+
+    const advStudents = realPaid.filter(s => getStudentAdvNum(s) === reschedAdvFilter);
+    const scheduled = advStudents.filter(s => Boolean(s.schedule && s.classTime && !s.schedule.startsWith("⚠️")));
+    const unassigned = advStudents.filter(s => !s.schedule || !s.classTime || s.schedule.startsWith("⚠️"));
+    const sessionGroups = new Set(
+      advStudents
+        .map(s => [s.schedule, s.classTime].filter(Boolean).join(" · "))
+        .filter(k => k && !k.startsWith("⚠️"))
+    );
+
+    return {
+      totalEnrolled: advStudents.length,
+      scheduledCount: scheduled.length,
+      unassignedCount: unassigned.length,
+      sessionGroupsCount: sessionGroups.size,
+    };
+  }, [students, reschedAdvFilter]);
+
   return (
     <AppShell title="Students & Family Directory">
       <style>{`
@@ -697,14 +801,19 @@ export default function AdminStudentsPage() {
 
       <ClassCapacityTracker />
 
-      {/* ── Stats Row (KPIs - Strictly Real Students & Families Only) ── */}
+      {/* ── Stats Row (KPIs - Strictly Real Students & Families Only, updates per Adventure when on Reschedule) ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
-        {[
+        {(activeTab === "reschedule" ? [
+          { label: `Enrolled in Adv ${reschedAdvFilter}`, value: reschedStats.totalEnrolled, icon: "🌟", color: "#002f76", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
+          { label: "Confirmed in Sessions", value: reschedStats.scheduledCount, icon: "🗓️", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
+          { label: "Unassigned / Needs Slot", value: reschedStats.unassignedCount, icon: "⚠️", color: reschedStats.unassignedCount > 0 ? "#b45309" : "#64748b", bg: reschedStats.unassignedCount > 0 ? "linear-gradient(135deg,#fffbeb,#fef3c7)" : "linear-gradient(135deg,#f8fafc,#f1f5f9)" },
+          { label: "Active Session Groups", value: reschedStats.sessionGroupsCount, icon: "🏫", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
+        ] : [
           { label: "Total Explorers", value: stats.totalKids, icon: "🧒", color: "#0050d5", bg: "linear-gradient(135deg,#eff6ff,#dbeafe)" },
           { label: "Active Enrolled", value: stats.activeKids, icon: "✅", color: "#15803d", bg: "linear-gradient(135deg,#f0fdf4,#dcfce7)" },
           { label: "Registered Next Adv", value: stats.renewedKids, icon: "🚀", color: "#b45309", bg: "linear-gradient(135deg,#fffbeb,#fef3c7)" },
           { label: "Total Families", value: stats.totalParents, icon: "👨‍👩‍👧", color: "#7c3aed", bg: "linear-gradient(135deg,#f5f3ff,#ede9fe)" },
-        ].map((s) => (
+        ]).map((s) => (
           <div
             key={s.label}
             style={{
@@ -798,6 +907,29 @@ export default function AdminStudentsPage() {
         >
           <span>👨‍👩‍👧</span>
           <span>Parents & Guardians ({realParents.length} real)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("reschedule")}
+          style={{
+            padding: "10px 22px",
+            borderRadius: "14px",
+            fontSize: "13px",
+            fontWeight: "800",
+            cursor: "pointer",
+            border: "none",
+            background: activeTab === "reschedule"
+              ? "linear-gradient(135deg, #002f76, #0050d5)"
+              : "transparent",
+            color: activeTab === "reschedule" ? "white" : "#64748b",
+            boxShadow: activeTab === "reschedule" ? "0 4px 12px rgba(0, 47, 118, 0.25)" : "none",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <span>🔄</span>
+          <span>Reschedule Sessions</span>
         </button>
       </div>
 
@@ -931,6 +1063,603 @@ export default function AdminStudentsPage() {
           <div style={{ fontSize: "28px", marginBottom: "8px" }}>🔒</div>
           <div style={{ fontWeight: "800", fontSize: "16px", marginBottom: "6px" }}>Directory could not be loaded</div>
           <div style={{ fontSize: "13px" }}>{loadError}</div>
+        </div>
+      ) : activeTab === "reschedule" ? (
+        /* ═══════════════════════════════════════════════════
+           TAB 3: RESCHEDULE SESSIONS
+           ═══════════════════════════════════════════════════ */
+        <div>
+          {/* ── Adventure Category Bar (Per-Adventure Only, No 'All') ── */}
+          {(() => {
+            const realPaid = students.filter(s =>
+              !isIanAngeloValmores(s) &&
+              (s.status === "active" || s.paid === true || s.paymentStatus === "approved" || s.paymentStatus === "confirmed")
+            );
+
+            const distinctAdvs = Array.from(
+              new Set(
+                realPaid
+                  .map(getStudentAdvNum)
+                  .filter((n): n is number => typeof n === "number" && n > 0)
+              )
+            ).sort((a, b) => a - b);
+
+            const advList = distinctAdvs.length > 0 ? distinctAdvs : [1, 2];
+
+            return (
+              <div style={{
+                background: "white",
+                borderRadius: "20px",
+                padding: "12px 20px",
+                boxShadow: "0 4px 20px rgba(0, 47, 118, 0.05)",
+                border: "1.5px solid #dbe4f6",
+                marginBottom: "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginRight: "6px" }}>
+                    <span style={{ fontSize: "16px" }}>🗺️</span>
+                    <span style={{ fontSize: "11px", fontWeight: "900", color: "#002f76", textTransform: "uppercase", letterSpacing: "1px" }}>
+                      Adventure Cycle
+                    </span>
+                  </div>
+
+                  {advList.map(num => {
+                    const active = reschedAdvFilter === num;
+                    const count = realPaid.filter(s => getStudentAdvNum(s) === num).length;
+                    return (
+                      <button
+                        key={num}
+                        onClick={() => setReschedAdvFilter(num)}
+                        style={{
+                          padding: "8px 18px",
+                          borderRadius: "14px",
+                          fontSize: "13px",
+                          fontWeight: "800",
+                          border: active ? "none" : "1.5px solid #dbe4f6",
+                          background: active ? "linear-gradient(135deg, #001a4d 0%, #002f76 100%)" : "white",
+                          color: active ? "#ffb800" : "#475569",
+                          cursor: "pointer",
+                          boxShadow: active ? "0 4px 14px rgba(0, 26, 77, 0.25)" : "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <span style={{ fontSize: "12px" }}>🌟</span>
+                        <span>Adventure {num}</span>
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: "800",
+                          background: active ? "rgba(255, 184, 0, 0.2)" : "#f1f5f9",
+                          color: active ? "#ffb800" : "#64748b",
+                          padding: "2px 8px",
+                          borderRadius: "10px",
+                          minWidth: "20px",
+                          textAlign: "center",
+                        }}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "#64748b" }}>
+                  Selected Cycle: <span style={{ color: "#002f76", fontWeight: "900" }}>Adventure {reschedAdvFilter}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Reschedule toolbar (Search + Program Pills + Live Count) ── */}
+          <div style={{
+            background: "white",
+            borderRadius: "20px",
+            padding: "18px 22px",
+            boxShadow: "0 4px 24px rgba(0, 47, 118, 0.06)",
+            border: "1.5px solid #dbe4f6",
+            marginBottom: "20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "14px",
+          }}>
+            {/* Row 1: search + dynamic adventure-filtered count */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ position: "relative", flex: "1 1 240px", minWidth: "180px" }}>
+                <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", fontSize: "15px", pointerEvents: "none" }}>🔍</span>
+                <input
+                  value={reschedSearch}
+                  onChange={e => setReschedSearch(e.target.value)}
+                  placeholder="Search by student or parent name…"
+                  style={{ width: "100%", paddingLeft: "38px", paddingRight: "14px", paddingTop: "10px", paddingBottom: "10px", border: "1.5px solid #dbe4f6", borderRadius: "12px", fontSize: "13px", fontWeight: "600", color: "#334155", outline: "none", background: "#f8faff", boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "1px", flexShrink: 0 }}>
+                <span style={{ fontSize: "20px", fontWeight: "900", color: "#002f76", lineHeight: 1 }}>
+                  {reschedStats.totalEnrolled}
+                </span>
+                <span style={{ fontSize: "10px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Adv {reschedAdvFilter} Enrolled
+                </span>
+              </div>
+            </div>
+
+            {/* Row 2: Program filter chips */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+              <span style={{ fontSize: "10px", fontWeight: "800", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginRight: "4px" }}>Program</span>
+              {[{ id: "all", label: "All Programs" }, ...FILTERS.filter(f => f.id !== "all")].map(f => {
+                const meta = PROGRAM_META[f.id];
+                const active = reschedProgFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setReschedProgFilter(f.id)}
+                    style={{
+                      padding: "6px 14px", borderRadius: "16px", fontSize: "12px", fontWeight: "700",
+                      border: active ? "none" : "1.5px solid #dbe4f6",
+                      background: active ? (meta?.bg || "#eff6ff") : "white",
+                      color: active ? (meta?.color || "#002f76") : "#64748b",
+                      cursor: "pointer",
+                      boxShadow: active ? "0 2px 8px rgba(0, 47, 118, 0.15)" : "none",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {f.id !== "all" && meta ? `${meta.emoji} ` : ""}{f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Schedule groups ── */}
+          {(() => {
+            const realStudents = students.filter(s => !isIanAngeloValmores(s));
+
+            // Helper: is this student's payment confirmed/approved?
+            const isPaid = (s: Student) =>
+              s.status === "active" ||
+              s.paid === true ||
+              s.paymentStatus === "approved" ||
+              s.paymentStatus === "confirmed";
+
+            // Only enrolled/paid students are eligible for rescheduling
+            const enrolledStudents = realStudents.filter(isPaid);
+
+            const filtered = enrolledStudents.filter(s => {
+              const q = reschedSearch.toLowerCase().trim();
+              const matchSearch = !q ||
+                `${s.childInfo?.firstName} ${s.childInfo?.lastName}`.toLowerCase().includes(q) ||
+                (s.parentInfo?.name || "").toLowerCase().includes(q) ||
+                (s.parentInfo?.email || "").toLowerCase().includes(q);
+              const matchProg = reschedProgFilter === "all" ||
+                s.program === reschedProgFilter ||
+                (s.program === "everyday-explorer" && reschedProgFilter === "everyday-curious");
+              const matchAdv = getStudentAdvNum(s) === reschedAdvFilter;
+              return matchSearch && matchProg && matchAdv;
+            });
+
+            // Group by current schedule + classTime
+            const groups = new Map<string, Student[]>();
+            for (const s of filtered) {
+              const key = [s.schedule, s.classTime].filter(Boolean).join(" · ") || "⚠️ No Schedule Set";
+              const list = groups.get(key) || [];
+              list.push(s);
+              groups.set(key, list);
+            }
+
+            if (filtered.length === 0) {
+              return (
+                <div style={{ background: "white", borderRadius: "20px", padding: "80px 24px", textAlign: "center", border: "2px dashed #dbe4f6" }}>
+                  <div style={{ fontSize: "48px", marginBottom: "12px" }}>🔄</div>
+                  <div style={{ fontWeight: "800", color: "#002f76", fontSize: "18px", marginBottom: "6px" }}>No students found</div>
+                  <div style={{ color: "#94a3b8", fontSize: "14px" }}>Try adjusting your search or filter.</div>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                {Array.from(groups.entries()).map(([scheduleKey, groupStudents]) => {
+                  const count = groupStudents.length;
+                  const isUnset = scheduleKey.startsWith("⚠️");
+                  return (
+                    <div key={scheduleKey} style={{ background: "white", borderRadius: "20px", border: isUnset ? "1.5px solid #fde68a" : "1.5px solid #dbe4f6", boxShadow: isUnset ? "0 4px 24px rgba(245,158,11,0.08)" : "0 4px 24px rgba(0, 47, 118, 0.05)", overflow: "hidden" }}>
+                      {/* Group header */}
+                      <div style={{ padding: "14px 24px", background: isUnset ? "linear-gradient(135deg, #fffbeb, #fef3c7)" : "linear-gradient(135deg, #f0f5ff, #e6efff)", borderBottom: isUnset ? "1.5px solid #fde68a" : "1.5px solid #dbe4f6", display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ width: "38px", height: "38px", borderRadius: "12px", background: isUnset ? "linear-gradient(135deg, #f59e0b, #fbbf24)" : "linear-gradient(135deg, #002f76, #0050d5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", flexShrink: 0 }}>{isUnset ? "⚠️" : "🗓️"}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: "900", fontSize: "15px", color: isUnset ? "#92400e" : "#002f76" }}>{scheduleKey}</div>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: isUnset ? "#d97706" : "#0050d5", marginTop: "2px" }}>{count} student{count !== 1 ? "s" : ""} on this schedule</div>
+                        </div>
+                      </div>
+
+                      {/* Column header */}
+                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.6fr 1.4fr 110px", padding: "10px 24px", background: isUnset ? "#fffbeb" : "#f8faff", borderBottom: isUnset ? "1px solid #fde68a" : "1px solid #e2e8f0" }}>
+                        {["Student", "Program", "Current Schedule", "Parent", "Action"].map((h, i) => (
+                          <div key={i} style={{ fontSize: "10px", fontWeight: "800", color: isUnset ? "#d97706" : "#002f76", textTransform: "uppercase", letterSpacing: "0.7px", textAlign: h === "Action" ? "right" : "left" }}>{h}</div>
+                        ))}
+                      </div>
+
+                      {/* Rows */}
+                      {groupStudents.map((student, idx) => {
+                        const prog = PROGRAM_META[student.program] || PROGRAM_META["everyday-curious"];
+                        const childName = `${student.childInfo?.firstName || ""} ${student.childInfo?.lastName || ""}`.trim();
+                        const avatarGrad = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+                        return (
+                          <div
+                            key={student.id}
+                            style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.6fr 1.4fr 110px", padding: "14px 24px", borderBottom: idx < groupStudents.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white", transition: "background 0.15s" }}
+                          >
+                            {/* Student — name + nickname + adventure number as a small inline tag */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>
+                              <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: avatarGrad, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "13px", fontWeight: "800", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
+                                {getInitials(childName)}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: "800", fontSize: "14px", color: "#0f172a", lineHeight: 1.2 }}>{childName}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px", flexWrap: "wrap" }}>
+                                  {student.childInfo?.nickname && (
+                                    <span style={{ fontSize: "11px", color: "#0050d5", fontWeight: "700" }}>&ldquo;{student.childInfo.nickname}&rdquo;</span>
+                                  )}
+                                  {(() => {
+                                    const advNum = student.adventureNumber ?? student.activeAdventureNumber;
+                                    const isNonAdv = ["saturday-playdate", "ballet"].includes(student.program);
+                                    if (isNonAdv) return null;
+                                    return (
+                                      <span style={{ fontSize: "10px", fontWeight: "800", color: "#64748b", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "1px 6px", letterSpacing: "0.2px" }}>
+                                        Adv {advNum ?? "?"}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Program */}
+                            <div>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 9px", borderRadius: "20px", fontSize: "11px", fontWeight: "700", background: prog?.bg || "#eff6ff", color: prog?.color || "#002f76", border: `1px solid ${prog?.color ? prog.color + "22" : "#dbe4f6"}` }}>
+                                {prog?.emoji || "⭐"} {prog?.label || student.programName}
+                              </span>
+                            </div>
+
+                            {/* Current Schedule */}
+                            <div>
+                              {student.schedule && (
+                                <div style={{ fontSize: "12px", fontWeight: "700", color: "#334155" }}>📅 {student.schedule}</div>
+                              )}
+                              {student.classTime && (
+                                <div style={{ fontSize: "11px", fontWeight: "600", color: "#64748b", marginTop: "2px" }}>🕒 {student.classTime}</div>
+                              )}
+                              {!student.schedule && !student.classTime && (
+                                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "700", background: "#fffbeb", padding: "2px 8px", borderRadius: "10px" }}>⚠️ Not set</span>
+                              )}
+                            </div>
+
+                            {/* Parent */}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "12px", fontWeight: "700", color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{student.parentInfo?.name || "—"}</div>
+                              <div style={{ fontSize: "10.5px", color: "#94a3b8", fontWeight: "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{student.parentInfo?.email || ""}</div>
+                            </div>
+
+                            {/* Action */}
+                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <button
+                                onClick={() => {
+                                  setRescheduleModal(student);
+                                  setReschedNewTime(student.classTime || "");
+                                  setReschedNewSchedule(student.schedule || "");
+                                  setReschedReason("");
+                                }}
+                                style={{ padding: "7px 14px", borderRadius: "10px", background: "linear-gradient(135deg, #002f76, #0050d5)", color: "white", fontSize: "12px", fontWeight: "800", border: "none", cursor: "pointer", boxShadow: "0 3px 10px rgba(0, 47, 118, 0.2)", whiteSpace: "nowrap" }}
+                              >
+                                🔄 Move
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* ── Reschedule Modal (Merry Explorers Design System & Live Capacity Dropdown) ── */}
+          {rescheduleModal && (() => {
+            const childName = `${rescheduleModal.childInfo?.firstName || ""} ${rescheduleModal.childInfo?.lastName || ""}`.trim();
+            const prog = PROGRAM_META[rescheduleModal.program] || PROGRAM_META["everyday-curious"];
+            // Only count enrolled/paid students for slot capacity (pending payments don't consume a slot)
+            const realStudents = students.filter(s =>
+              !isIanAngeloValmores(s) &&
+              (s.status === "active" || s.paid === true || s.paymentStatus === "approved" || s.paymentStatus === "confirmed")
+            );
+
+            // Extract program config from landing
+            const targetProgDef = (PROGRAM_SLOTS as any)[rescheduleModal.program] || (PROGRAM_SLOTS as any)["everyday-curious"];
+            const currentSchedulePreset = targetProgDef?.schedule || rescheduleModal.schedule || "";
+
+            const targetAdv = getStudentAdvNum(rescheduleModal);
+
+            // Helper to compute slot availability for any class within this adventure
+            const getSlotAvailability = (progId: string, className: string, maxSlots: number) => {
+              const taken = realStudents.filter(s => {
+                const matchAdv = getStudentAdvNum(s) === targetAdv;
+                const matchProg = s.program === progId || (progId === "everyday-curious" && s.program === "everyday-explorer");
+                const ct = (s.classTime || "").toLowerCase();
+                const cn = className.toLowerCase();
+                return matchAdv && matchProg && (ct.includes(cn) || cn.includes(ct));
+              }).length;
+              const available = Math.max(0, maxSlots - taken);
+              return { taken, available, maxSlots };
+            };
+
+            // Selected slot stats
+            const selectedMatchClass = targetProgDef?.classes?.find((c: any) =>
+              c.name.toLowerCase() === reschedNewTime.toLowerCase() ||
+              reschedNewTime.toLowerCase().includes(c.name.toLowerCase()) ||
+              c.time.toLowerCase() === reschedNewTime.toLowerCase()
+            );
+            const slotStats = selectedMatchClass
+              ? getSlotAvailability(rescheduleModal.program, selectedMatchClass.name, selectedMatchClass.maxSlots || 4)
+              : null;
+
+            return (
+              <div
+                onClick={() => setRescheduleModal(null)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 1000,
+                  background: "rgba(0, 26, 77, 0.6)",
+                  backdropFilter: "blur(6px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "20px",
+                }}
+              >
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    background: "white",
+                    borderRadius: "26px",
+                    width: "100%",
+                    maxWidth: "540px",
+                    boxShadow: "0 28px 70px rgba(0, 26, 77, 0.28)",
+                    border: "1.5px solid #dbe4f6",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Modal header - Brand Navy Gradient with Gold Accents */}
+                  <div style={{ padding: "22px 28px", background: "linear-gradient(135deg, #001a4d 0%, #002f76 60%, #0050d5 100%)", display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "rgba(255,255,255,0.14)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", border: "1.5px solid rgba(255,184,0,0.4)", flexShrink: 0 }}>
+                      🔄
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <h2 style={{ fontSize: "18px", fontWeight: "900", color: "white", margin: 0, lineHeight: 1.2 }}>
+                          Reschedule Session
+                        </h2>
+                        <span style={{ fontSize: "11px", fontWeight: "800", color: "#ffb800", background: "rgba(255,184,0,0.18)", padding: "2px 8px", borderRadius: "8px", border: "1px solid rgba(255,184,0,0.3)" }}>
+                          Adv {targetAdv}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "12.5px", color: "#ffb800", marginTop: "3px", fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {childName}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setRescheduleModal(null)}
+                      style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.14)", border: "1.5px solid rgba(255,255,255,0.3)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "15px", fontWeight: "700", flexShrink: 0 }}
+                    >✕</button>
+                  </div>
+
+                  {/* Modal body */}
+                  <div style={{ padding: "26px 28px" }}>
+                    {/* Current info card */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "13px 16px", background: "#f0f5ff", borderRadius: "14px", border: "1.5px solid #dbe4f6", marginBottom: "22px" }}>
+                      <span style={{ fontSize: "24px", flexShrink: 0 }}>{prog?.emoji || "⭐"}</span>
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#002f76" }}>{prog?.label || rescheduleModal.programName}</div>
+                        <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: "600", marginTop: "2px" }}>
+                          Current: <span style={{ color: "#0050d5", fontWeight: "700" }}>{rescheduleModal.schedule || "—"}</span> · <span style={{ color: "#0050d5", fontWeight: "700" }}>{rescheduleModal.classTime || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Dropdown Button: Select Available Session & Time with Slots Left ── */}
+                    <div style={{ marginBottom: "18px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "800", color: "#002f76", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                          🎯 Select Target Session & Time
+                        </label>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#64748b" }}>
+                          Live Slot Capacity
+                        </span>
+                      </div>
+
+                      <select
+                        value={
+                          selectedMatchClass
+                            ? `${reschedNewSchedule || currentSchedulePreset}|||${selectedMatchClass.name}`
+                            : reschedNewTime ? "custom" : ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "custom") {
+                            // keep existing or clear for custom typing
+                            return;
+                          }
+                          const [sched, clsName] = val.split("|||");
+                          if (sched && clsName) {
+                            setReschedNewSchedule(sched);
+                            setReschedNewTime(clsName);
+                          }
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          border: "1.5px solid #0050d5",
+                          borderRadius: "14px",
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          color: "#0f172a",
+                          outline: "none",
+                          background: "#f8faff",
+                          boxSizing: "border-box",
+                          fontFamily: "inherit",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 8px rgba(0, 47, 118, 0.08)",
+                        }}
+                      >
+                        <option value="" disabled>-- Choose a session slot --</option>
+
+                        {/* Standard sessions for current program */}
+                        {targetProgDef && targetProgDef.classes?.length > 0 && (
+                          <optgroup label={`Standard ${targetProgDef.name} Sessions`}>
+                            {targetProgDef.classes.map((cls: any) => {
+                              const stats = getSlotAvailability(rescheduleModal.program, cls.name, cls.maxSlots || 4);
+                              const isFull = stats.available === 0;
+                              const slotText = isFull ? "🔴 FULL (0 slots left)" : `🟢 ${stats.available} slots left (${stats.taken}/${stats.maxSlots} taken)`;
+                              return (
+                                <option
+                                  key={cls.name}
+                                  value={`${targetProgDef.schedule}|||${cls.name}`}
+                                >
+                                  {cls.name} · {cls.time} ({targetProgDef.schedule}) — {slotText}
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+                        )}
+
+                        {/* Other programs sessions */}
+                        {Object.entries(PROGRAM_SLOTS).map(([pId, pConfig]: [string, any]) => {
+                          if (pId === rescheduleModal.program) return null;
+                          return (
+                            <optgroup key={pId} label={`Other: ${pConfig.name} (${pConfig.schedule})`}>
+                              {pConfig.classes?.map((cls: any) => {
+                                const stats = getSlotAvailability(pId, cls.name, cls.maxSlots || 4);
+                                const isFull = stats.available === 0;
+                                const slotText = isFull ? "🔴 FULL" : `🟢 ${stats.available} left`;
+                                return (
+                                  <option key={`${pId}-${cls.name}`} value={`${pConfig.schedule}|||${cls.name}`}>
+                                    {cls.name} · {cls.time} ({pConfig.schedule}) — {slotText}
+                                  </option>
+                                );
+                              })}
+                            </optgroup>
+                          );
+                        })}
+
+                        <option value="custom">✏️ Enter Custom Schedule & Time Manually...</option>
+                      </select>
+                    </div>
+
+                    {/* ── Slot Detail & Capacity Indicator Card ── */}
+                    <div style={{ padding: "12px 16px", borderRadius: "14px", background: "#f8faff", border: "1.5px solid #dbe4f6", marginBottom: "18px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                        <div>
+                          <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Selected Session Days & Time:</div>
+                          <div style={{ fontSize: "13px", fontWeight: "800", color: "#002f76", marginTop: "2px" }}>
+                            📅 {reschedNewSchedule || "Not chosen yet"} · 🕒 {reschedNewTime || "Not chosen yet"}
+                            {selectedMatchClass?.time ? ` (${selectedMatchClass.time})` : ""}
+                          </div>
+                        </div>
+
+                        {slotStats ? (
+                          <span
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: "12px",
+                              fontSize: "11.5px",
+                              fontWeight: "800",
+                              background: slotStats.available > 0 ? "#dcfce7" : "#fee2e2",
+                              color: slotStats.available > 0 ? "#15803d" : "#b91c1c",
+                              border: slotStats.available > 0 ? "1px solid #86efac" : "1px solid #fca5a5",
+                            }}
+                          >
+                            {slotStats.available > 0 ? `✓ ${slotStats.available} slots left (${slotStats.taken}/${slotStats.maxSlots} enrolled)` : `⚠️ Session Full (${slotStats.taken}/${slotStats.maxSlots})`}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "600" }}>Custom Slot</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Optional: manual edits if custom or fine-tuning */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "18px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "10.5px", fontWeight: "800", color: "#002f76", marginBottom: "6px", textTransform: "uppercase" }}>
+                          📅 Schedule Days
+                        </label>
+                        <input
+                          value={reschedNewSchedule}
+                          onChange={e => setReschedNewSchedule(e.target.value)}
+                          placeholder="e.g. Monday & Wednesday"
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #dbe4f6", borderRadius: "10px", fontSize: "12px", fontWeight: "600", color: "#334155", outline: "none", background: "white", boxSizing: "border-box" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: "10.5px", fontWeight: "800", color: "#002f76", marginBottom: "6px", textTransform: "uppercase" }}>
+                          🕒 Class Time / Session
+                        </label>
+                        <input
+                          value={reschedNewTime}
+                          onChange={e => setReschedNewTime(e.target.value)}
+                          placeholder="e.g. Morning Session"
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #dbe4f6", borderRadius: "10px", fontSize: "12px", fontWeight: "600", color: "#334155", outline: "none", background: "white", boxSizing: "border-box" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Reason */}
+                    <div style={{ marginBottom: "24px" }}>
+                      <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#002f76", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        📝 Reason / Notes <span style={{ fontWeight: "500", textTransform: "none", fontSize: "11px", color: "#64748b" }}>(optional)</span>
+                      </label>
+                      <textarea
+                        value={reschedReason}
+                        onChange={e => setReschedReason(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. Parent requested change, schedule conflict with another class…"
+                        style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #dbe4f6", borderRadius: "10px", fontSize: "12px", fontWeight: "600", color: "#334155", outline: "none", background: "#f8faff", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
+                      />
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button
+                        onClick={() => setRescheduleModal(null)}
+                        style={{ flex: 1, padding: "12px", borderRadius: "12px", border: "1.5px solid #cbd5e1", background: "white", color: "#475569", fontSize: "13px", fontWeight: "800", cursor: "pointer", transition: "background 0.2s" }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleReschedule}
+                        disabled={reschedSaving}
+                        style={{ flex: 2, padding: "12px", borderRadius: "12px", border: "none", background: reschedSaving ? "#93c5fd" : "linear-gradient(135deg, #002f76, #0050d5)", color: "white", fontSize: "13px", fontWeight: "800", cursor: reschedSaving ? "not-allowed" : "pointer", boxShadow: reschedSaving ? "none" : "0 6px 18px rgba(0, 47, 118, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                      >
+                        {reschedSaving ? (
+                          <>
+                            <span style={{ display: "inline-block", width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)", borderTop: "2px solid white", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                            Saving…
+                          </>
+                        ) : "🔄 Confirm Reschedule"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       ) : activeTab === "students" ? (
         /* ═══════════════════════════════════════════════════
