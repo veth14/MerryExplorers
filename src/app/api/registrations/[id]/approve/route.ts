@@ -61,6 +61,31 @@ function formatClassTime(program: string, classTime: string): string {
   return time ? `${classTime} (${time})` : classTime;
 }
 
+function formatStartDate(value: string | Date | null | undefined): string {
+  if (!value) return "To be announced";
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Intl.DateTimeFormat("en-PH", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "Asia/Manila",
+    }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-PH", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "Asia/Manila",
+  }).format(date);
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -189,6 +214,7 @@ export async function POST(
       const programName = PROGRAM_NAMES[program] || program;
       const schedule = PROGRAM_SCHEDULES[program] || "";
       const classTimeDisplay = formatClassTime(program, classTime);
+      const startDateDisplay = formatStartDate(adventureStartDate);
       const parentEmail = (parentInfo?.email || "").toLowerCase().trim();
       const parentEmailRegex = new RegExp(`^${parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
       const pioneerFamily = parentEmail
@@ -268,6 +294,7 @@ export async function POST(
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Program</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${programName}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Class</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${classTimeDisplay}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Schedule</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${schedule}</td></tr>
+                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Session Start Date</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${startDateDisplay}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Sessions</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${prog?.sessions || "—"} Sessions</td></tr>
                           </table>
                         </div>
