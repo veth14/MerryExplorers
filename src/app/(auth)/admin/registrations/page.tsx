@@ -22,6 +22,7 @@ interface Registration {
   amountDue?: number;
   amountPaid?: number;
   creditBalance?: number;
+  previousAdventureBalance?: number;
   referenceNumber?: string;
   receiptUrl: string;
   signatureUrl?: string;
@@ -207,7 +208,7 @@ function SectionCard({ emoji, title, children }: { emoji: string; title: string;
 }
 
 function DetailModal({
-  reg, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, isProcessing,
+  reg, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, isProcessing,
 }: {
   reg: Registration;
   onClose: () => void;
@@ -215,16 +216,21 @@ function DetailModal({
   onReject: (id: string, reason: string) => void;
   onEarlyBird: (id: string, deadline: string) => void;
   onOpenPayment: (id: string) => void;
+  onSavePreviousAdventureBalance: (id: string, amount: number) => Promise<boolean>;
   isProcessing: boolean;
 }) {
   const [rejectMode, setRejectMode] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState(false);
   const [reason, setReason] = useState("");
   const [earlyBirdDeadline, setEarlyBirdDeadline] = useState("");
+  const [editingPreviousBalance, setEditingPreviousBalance] = useState(false);
+  const [previousBalanceInput, setPreviousBalanceInput] = useState(typeof reg.previousAdventureBalance === "number" ? String(reg.previousAdventureBalance) : "");
+  const [savingPreviousBalance, setSavingPreviousBalance] = useState(false);
   const accent = PROGRAM_ACCENTS[reg.program] || "#0033A0";
   const isEarlyBird = reg.status === "early-bird";
   const isPending = reg.status === "pending";
   const isReserved = (reg as any).status === "reserved" || (reg as any).status === "expired";
+  const hasAdventureCycle = !["ballet", "virtual-session", "saturday-playdate"].includes(reg.program);
   
   // Calculate true remaining balance for the whole program
   const programDetails = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
@@ -364,6 +370,75 @@ function DetailModal({
               ) : null}
               <InfoRow label="Reference No." value={reg.referenceNumber || "—"} />
             </SectionCard>
+
+            {hasAdventureCycle && <SectionCard emoji="🧾" title="Previous Adventure Balance">
+              <p className="py-3 text-xs leading-relaxed text-slate-500">
+                Unpaid amount carried over from Adventure 1. This is tracked separately and does not change this registration’s Adventure 2 payment or balance.
+              </p>
+              {!editingPreviousBalance ? (
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 py-3">
+                  <span className="text-[12px] font-semibold text-[#94a3b8]">Adventure 1 unpaid</span>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-[13px] font-bold ${reg.previousAdventureBalance ? "text-red-600" : "text-slate-500"}`}>
+                      {typeof reg.previousAdventureBalance === "number" ? `₱${Number(reg.previousAdventureBalance).toLocaleString("en-PH")}` : "Not set"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setPreviousBalanceInput(typeof reg.previousAdventureBalance === "number" ? String(reg.previousAdventureBalance) : ""); setEditingPreviousBalance(true); }}
+                      className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#0033A0] hover:bg-blue-100"
+                    >
+                      Set amount
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 border-t border-slate-100 py-3">
+                  <label className="block text-xs font-semibold text-slate-600" htmlFor="previous-adventure-balance">
+                    Adventure 1 unpaid balance (₱)
+                  </label>
+                  <input
+                    id="previous-adventure-balance"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={previousBalanceInput}
+                    onChange={(event) => setPreviousBalanceInput(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-400"
+                    placeholder="Leave blank if unknown; enter 0 if none"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setEditingPreviousBalance(false)} className="rounded-lg px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                    <button
+                      type="button"
+                      disabled={savingPreviousBalance || previousBalanceInput.trim() === "" || !Number.isFinite(Number(previousBalanceInput)) || Number(previousBalanceInput) < 0}
+                      onClick={async () => {
+                        setSavingPreviousBalance(true);
+                        const saved = await onSavePreviousAdventureBalance(reg.id, Number(previousBalanceInput));
+                        setSavingPreviousBalance(false);
+                        if (saved) setEditingPreviousBalance(false);
+                      }}
+                      className="rounded-lg bg-[#0033A0] px-4 py-2 text-xs font-bold text-white hover:bg-[#00277a] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {savingPreviousBalance ? "Saving…" : "Save balance"}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingPreviousBalance}
+                    onClick={async () => {
+                      setSavingPreviousBalance(true);
+                      const saved = await onSavePreviousAdventureBalance(reg.id, 0);
+                      setSavingPreviousBalance(false);
+                      if (saved) { setPreviousBalanceInput("0"); setEditingPreviousBalance(false); }
+                    }}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    Clear previous balance
+                  </button>
+                </div>
+              )}
+            </SectionCard>}
 
             {/* Child */}
             <SectionCard emoji="🧒" title="Child Information">
@@ -1066,6 +1141,45 @@ export default function AdminRegistrationsPage() {
     finally { setIsProcessing(false); }
   }
 
+  async function handleSavePreviousAdventureBalance(id: string, amount: number): Promise<boolean> {
+    setIsProcessing(true);
+    try {
+      if (!user) {
+        setToast("❌ Your session has expired. Please sign in again.");
+        return false;
+      }
+
+      const idToken = await user.getIdToken(true);
+      const res = await fetch(`/api/registrations/${id}/previous-balance`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setToast(`❌ ${data.error || "Failed to update previous balance"}`);
+        return false;
+      }
+
+      setToast("✅ Adventure 1 balance updated.");
+      setRegistrations((current) => current.map((reg) => reg.id === id
+        ? { ...reg, previousAdventureBalance: data.previousAdventureBalance }
+        : reg));
+      setSelected((current) => current?.id === id
+        ? { ...current, previousAdventureBalance: data.previousAdventureBalance }
+        : current);
+      return true;
+    } catch {
+      setToast("❌ Network error");
+      return false;
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   const counts = {
     all: registrations.length,
     pending: registrations.filter(r => r.status === "pending").length,
@@ -1509,6 +1623,7 @@ export default function AdminRegistrationsPage() {
           onReject={handleReject}
           onEarlyBird={handleEarlyBird}
           onOpenPayment={handleOpenPayment}
+          onSavePreviousAdventureBalance={handleSavePreviousAdventureBalance}
           isProcessing={isProcessing}
         />
       )}

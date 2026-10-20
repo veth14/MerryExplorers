@@ -19,6 +19,7 @@ import {
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { readReceipt, type ReceiptData } from "@/lib/receipt-ocr";
+import { useAuth } from "@/lib/auth-context";
 
 type Payment = {
   id: string;
@@ -286,6 +287,23 @@ const firstPaymentAmount = (r: any) => Math.max(0, (r.amountPaid || r.amountDue 
 const isBalanceRow = (p: { id: string }) => p.id.startsWith("bal-");
 
 const fullChildName = (r: any) => `${r?.childInfo?.firstName ?? ""} ${r?.childInfo?.lastName ?? ""}`.trim();
+
+function registrationSessionInfo(registration: any) {
+  const program = (PROGRAM_SLOTS as Record<string, any>)[registration?.program];
+  const sessionChoice = String(registration?.classTime || "").trim();
+  const normalizedChoice = sessionChoice.replace(/\s+Class$/i, " Session").toLowerCase();
+  const selectedSession = (program?.classes || []).find((sessionOption: any) =>
+    String(sessionOption.name || "").toLowerCase() === normalizedChoice ||
+    String(sessionOption.name || "").toLowerCase() === sessionChoice.toLowerCase()
+  );
+  const session = selectedSession
+    ? `${selectedSession.name} · ${selectedSession.time}`
+    : sessionChoice || "Session not set";
+  return {
+    days: program?.schedule || "Days not set",
+    session,
+  };
+}
 
 const fmtShort = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -579,6 +597,7 @@ const EMPTY_FORM = {
   referenceNumber: "",
   paidOn: "",
   adminNote: "",
+  previousAdventureBalance: "",
   verifyNow: true,
   sendEmail: true,
   waiveInterest: false,
@@ -615,6 +634,7 @@ function calcStats(items: PaymentItem[]) {
 }
 
 function AdminPaymentsPageInner() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -638,6 +658,9 @@ function AdminPaymentsPageInner() {
   const prevCurNum = useRef<number | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailItem | null>(null);
+  const [approvalPreviousBalance, setApprovalPreviousBalance] = useState("");
+  const [approvalPreviousBalanceSaved, setApprovalPreviousBalanceSaved] = useState(false);
+  const [savingApprovalPreviousBalance, setSavingApprovalPreviousBalance] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [rejectTarget, setRejectTarget] = useState<{ uid: string; paymentId: string | null; type: PaymentKind } | null>(null);
@@ -649,6 +672,7 @@ function AdminPaymentsPageInner() {
 
   // ── Manual encoding state ──
   const [manualOpen, setManualOpen] = useState(false);
+  const [manualAdventureMode, setManualAdventureMode] = useState<"current" | "next">("current");
   const [form, setForm] = useState({ ...EMPTY_FORM, paidOn: todayIso() });
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptName, setReceiptName] = useState("");
@@ -685,6 +709,13 @@ function AdminPaymentsPageInner() {
 
   function openDetail(item: DetailItem) {
     setImgFailed(false);
+    const registration = item.type === "registration"
+      ? allRegistrations.find((r) => String(r.id) === String(item.uid))
+      : null;
+    setApprovalPreviousBalance(typeof registration?.previousAdventureBalance === "number"
+      ? String(registration.previousAdventureBalance)
+      : "");
+    setApprovalPreviousBalanceSaved(typeof registration?.previousAdventureBalance === "number");
     setDetail(item);
     // when switching payments from the ledger, jump back to the top so the new info is visible
     modalRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -808,6 +839,7 @@ function AdminPaymentsPageInner() {
     lastOcrRef.current = null;
     paidOnTouched.current = false;
     methodTouched.current = false;
+    setManualAdventureMode("current");
     setManualOpen(true);
 
     // Clean the query params so a page refresh doesn't re-open the modal
@@ -1107,6 +1139,45 @@ function AdminPaymentsPageInner() {
   }, [renewalRowsAll]);
 
   // Verify runs immediately; reject opens the custom reason modal first
+  async function saveApprovalPreviousBalance() {
+    if (!detail || detail.type !== "registration") return;
+    const amount = Number(approvalPreviousBalance);
+    if (
+      approvalPreviousBalance.trim() === "" ||
+      !Number.isFinite(amount) ||
+      amount < 0 ||
+      Math.abs(Math.round(amount * 100) - amount * 100) > 0.000001
+    ) {
+      showToast("Enter a valid previous adventure balance, or clear the field to skip it.", "error");
+      return;
+    }
+
+    setSavingApprovalPreviousBalance(true);
+    try {
+      const result = await postJson(`/api/registrations/${detail.uid}/previous-balance`, "PATCH", { amount });
+      if (!result.ok) {
+        setApprovalPreviousBalanceSaved(false);
+        showToast(result.error || "Could not save the previous adventure balance.", "error");
+        return;
+      }
+
+      setApprovalPreviousBalance(String(result.data.previousAdventureBalance));
+      setApprovalPreviousBalanceSaved(true);
+      setAllRegistrations((current) => current.map((registration) => String(registration.id) === String(detail.uid)
+        ? { ...registration, previousAdventureBalance: result.data.previousAdventureBalance }
+        : registration));
+      setRegistrations((current) => current.map((registration) => String(registration.id) === String(detail.uid)
+        ? { ...registration, previousAdventureBalance: result.data.previousAdventureBalance }
+        : registration));
+      showToast("Previous adventure balance saved. You can verify the payment now.");
+    } catch {
+      setApprovalPreviousBalanceSaved(false);
+      showToast("Network error saving the previous adventure balance.", "error");
+    } finally {
+      setSavingApprovalPreviousBalance(false);
+    }
+  }
+
   function handleAction(uid: string, paymentId: string | null, action: "verify" | "reject", type: PaymentKind) {
     if (action === "reject") {
       setRejectReason("");
@@ -1146,7 +1217,10 @@ function AdminPaymentsPageInner() {
     try {
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) window.location.reload();
-      else showToast("Action failed. Please try again.", "error");
+      else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "Action failed. Please try again.", "error");
+      }
     } catch { showToast("Network error. Please try again.", "error"); }
     finally { setActioning(null); }
   }
@@ -1248,12 +1322,19 @@ function AdminPaymentsPageInner() {
     lastOcrRef.current = null;
     paidOnTouched.current = false;
     methodTouched.current = false;
+    setManualAdventureMode("current");
     setManualOpen(true);
   }
 
   // Opens Encode Payment with one registration already chosen (used by the "No receipt yet" rows of the Next tab)
   function openManualFor(r: any) {
-    setForm({ ...EMPTY_FORM, paidOn: todayIso(), type: "registration", registrationId: r.id });
+    setForm({
+      ...EMPTY_FORM,
+      paidOn: todayIso(),
+      type: "registration",
+      registrationId: r.id,
+      previousAdventureBalance: typeof r.previousAdventureBalance === "number" ? String(r.previousAdventureBalance) : "",
+    });
     setParentFilter(fullChildName(r));
     setReceipt(null);
     setReceiptName("");
@@ -1265,6 +1346,7 @@ function AdminPaymentsPageInner() {
     lastOcrRef.current = null;
     paidOnTouched.current = false;
     methodTouched.current = false;
+    setManualAdventureMode(regAdventureNum(r, regCtx) === tl.curNum + 1 ? "next" : "current");
     setManualOpen(true);
   }
 
@@ -1277,13 +1359,35 @@ function AdminPaymentsPageInner() {
 
   const registrationOptions = useMemo(() => {
     const q = parentFilter.toLowerCase();
-    return allRegistrations
+    const targetAdventure = tl.curNum + (manualAdventureMode === "next" ? 1 : 0);
+    const matching = allRegistrations
       .filter((r) => {
         const name = `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""} ${r.parentInfo?.name ?? ""} ${r.parentInfo?.email ?? ""}`;
-        return !q || name.toLowerCase().includes(q);
+        return String(r.status || "").toLowerCase() !== "expired" &&
+          regAdventureNum(r, regCtx) === targetAdventure &&
+          (!q || name.toLowerCase().includes(q));
       })
-      .sort((a, b) => (a.childInfo?.firstName || "").localeCompare(b.childInfo?.firstName || ""));
-  }, [allRegistrations, parentFilter]);
+      .sort((a, b) => new Date(b.submittedAt || b.createdAt || 0).getTime() - new Date(a.submittedAt || a.createdAt || 0).getTime());
+
+    // A family can have separate registrations for different Adventures, but duplicate
+    // records for the same child, parent, program, and Adventure should appear only once here.
+    const unique = new Map<string, any>();
+    for (const r of matching) {
+      const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+      const child = normalize(fullChildName(r));
+      const parent = normalize(r.parentInfo?.email || r.parentInfo?.name);
+      const program = normalize(r.program);
+      const adventure = regAdventureNum(r, regCtx);
+      const key = [child, parent, program, adventure].join("|");
+      if (!unique.has(key)) unique.set(key, r);
+    }
+
+    return [...unique.values()].sort((a, b) =>
+      fullChildName(a).localeCompare(fullChildName(b)) ||
+      regAdventureNum(a, regCtx) - regAdventureNum(b, regCtx) ||
+      String(a.program || "").localeCompare(String(b.program || ""))
+    );
+  }, [allRegistrations, parentFilter, regCtx, manualAdventureMode, tl.curNum]);
 
   // Same rules as the details modal (calcRegistrationTerms) so the numbers always match.
   // `asOf` = the date interest is calculated up to. Omit it for "today" (list rows, details modal);
@@ -1379,6 +1483,7 @@ function AdminPaymentsPageInner() {
 
   // ── Follow-up payment: paying off what's left on a registration that already has a payment ──
   const isFollowUp = form.type === "registration" && !!selectedReg && !!regCalc && !regCalc.isInitial;
+  const needsPreviousAdventureBalance = !!selectedReg && !isFollowUp && advOf(selectedReg) >= 2;
   const followTerms = isFollowUp ? regCalc!.terms : null;
 
   // ── Interest rule: no interest is owed for a payment made before the first interest Monday ──
@@ -1470,7 +1575,15 @@ function AdminPaymentsPageInner() {
   }, [form.type, form.paidOn, selectedReg, tl, regAdvMap]);
 
   async function postJson(url: string, method: string, body: any) {
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const idToken = user ? await user.getIdToken(true) : null;
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
     const data = await res.json().catch(() => null);
     return { ok: res.ok && data?.success !== false, error: (data?.error as string | undefined) || "", data };
   }
@@ -1550,6 +1663,12 @@ function AdminPaymentsPageInner() {
     if (!form.paidOn) return setManualError("Enter the date the parent paid.");
     if (!form.referenceNumber.trim()) return setManualError("Reference number is required (copy it from the receipt).");
     if (!receipt) return setManualError("Please upload the receipt (photo or screenshot).");
+    if (needsPreviousAdventureBalance && form.verifyNow && form.previousAdventureBalance.trim() !== "") {
+      const previousBalance = Number(form.previousAdventureBalance);
+      if (!Number.isFinite(previousBalance) || previousBalance < 0 || Math.abs(Math.round(previousBalance * 100) - previousBalance * 100) > 0.000001) {
+        return setManualError("Enter a valid previous adventure balance, or clear the field to skip it.");
+      }
+    }
 
     if (isFollowUp) {
       if (followStatusBlocked)
@@ -1570,6 +1689,15 @@ function AdminPaymentsPageInner() {
     try {
       let balanceResult: any | null = null; // what the server stored for a balance payment
       let approveEmailed = false; // the approve route already emailed the parent ("Officially Registered")
+
+      if (form.type === "registration" && !isFollowUp && needsPreviousAdventureBalance && form.verifyNow && form.previousAdventureBalance.trim() !== "") {
+        const savedPreviousBalance = await postJson(`/api/registrations/${form.registrationId}/previous-balance`, "PATCH", {
+          amount: Number(form.previousAdventureBalance),
+        });
+        if (!savedPreviousBalance.ok) {
+          return setManualError(savedPreviousBalance.error || "Could not save the previous adventure balance.");
+        }
+      }
 
       if (form.type === "registration") {
         if (isFollowUp) {
@@ -1880,6 +2008,9 @@ function AdminPaymentsPageInner() {
         const bd = calcBreakdown();
         // status of this registration, so the due date can say "set after approval" while it is pending
         const detailStatus = type === "registration" ? registrations.find((x) => x.id === detail.uid)?.status : undefined;
+        const requiresPreviousBalance = status === "pending" && type === "registration" && !isBalanceRow(payment) && (advThis ?? 1) >= 2;
+        const previousBalanceNumber = Number(approvalPreviousBalance);
+        const hasValidPreviousBalance = approvalPreviousBalance.trim() !== "" && Number.isFinite(previousBalanceNumber) && previousBalanceNumber >= 0 && Math.abs(Math.round(previousBalanceNumber * 100) - previousBalanceNumber * 100) <= 0.000001;
         const isLink = !!payment.receiptBase64 && payment.receiptBase64.startsWith("http");
         const pctRes = Math.round(RESERVATION_RATE * 100);
         const pctInt = Math.round(WEEKLY_INTEREST_RATE * 100);
@@ -1994,12 +2125,49 @@ function AdminPaymentsPageInner() {
                   <div style={{ marginTop: "12px", padding: "12px 14px", borderRadius: "12px", background: "#fffbeb", border: "1px solid #fde68a", display: "flex", gap: "14px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
                     <div style={{ fontSize: "12px", color: "#92400e", fontWeight: 600, flex: "1 1 320px" }}>
                       <b>Waiting for your review{daysSince(payment.submittedAt) > 0 ? ` (${daysSince(payment.submittedAt)} day${daysSince(payment.submittedAt) > 1 ? "s" : ""})` : ""}.</b> {pendingHelp}
+                      {requiresPreviousBalance && (
+                        <div style={{ marginTop: "10px", padding: "10px", borderRadius: "10px", background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                          <label htmlFor="approval-previous-adventure-balance" style={{ display: "block", marginBottom: "5px", fontWeight: 800, color: "#9a3412" }}>
+                            Previous adventure unpaid balance (₱) · optional
+                          </label>
+                          <input
+                            id="approval-previous-adventure-balance"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={approvalPreviousBalance}
+                            onChange={(event) => {
+                              setApprovalPreviousBalance(event.target.value);
+                              setApprovalPreviousBalanceSaved(false);
+                            }}
+                            placeholder="Leave blank if unknown; enter 0 if none"
+                            style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", border: "1px solid #fdba74", borderRadius: "8px", background: "white", color: "#334155", fontSize: "13px", fontWeight: 700 }}
+                          />
+                          <div style={{ marginTop: "5px", color: "#9a3412", fontSize: "11px" }}>
+                            Check the family&apos;s manual Adventure 1 record. This amount stays separate from the Adventure {advThis} payment.
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+                            <span style={{ color: approvalPreviousBalanceSaved ? "#15803d" : "#9a3412", fontSize: "11px", fontWeight: 800 }}>
+                              {approvalPreviousBalanceSaved ? "✓ Saved" : approvalPreviousBalance.trim() ? "Save the amount before verifying" : "Optional — you can verify without it"}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={savingApprovalPreviousBalance || !hasValidPreviousBalance}
+                              onClick={() => void saveApprovalPreviousBalance()}
+                              style={{ padding: "7px 11px", borderRadius: "8px", border: "none", background: "#0050d5", color: "white", fontSize: "11px", fontWeight: 800, cursor: savingApprovalPreviousBalance || !hasValidPreviousBalance ? "not-allowed" : "pointer", opacity: savingApprovalPreviousBalance || !hasValidPreviousBalance ? 0.55 : 1 }}
+                            >
+                              {savingApprovalPreviousBalance ? "Saving…" : "Save balance"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button
-                        disabled={!!actioning}
+                        disabled={!!actioning || savingApprovalPreviousBalance || (requiresPreviousBalance && approvalPreviousBalance.trim() !== "" && (!hasValidPreviousBalance || !approvalPreviousBalanceSaved))}
                         onClick={() => { handleAction(detail.uid, type === "session" || (type === "registration" && isBalanceRow(payment)) ? payment.id : null, "verify", type); }}
-                        style={{ padding: "8px 16px", borderRadius: "10px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                        style={{ padding: "8px 16px", borderRadius: "10px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: actioning || savingApprovalPreviousBalance || (requiresPreviousBalance && approvalPreviousBalance.trim() !== "" && (!hasValidPreviousBalance || !approvalPreviousBalanceSaved)) ? "not-allowed" : "pointer", opacity: actioning || savingApprovalPreviousBalance || (requiresPreviousBalance && approvalPreviousBalance.trim() !== "" && (!hasValidPreviousBalance || !approvalPreviousBalanceSaved)) ? 0.55 : 1 }}
                       >
                         ✓ Verify
                       </button>
@@ -2251,15 +2419,51 @@ function AdminPaymentsPageInner() {
                     </select>
                   </div>
 
+                  {form.type === "registration" && (
+                    <div style={field}>
+                      <span style={label}>Adventure</span>
+                      <div style={{ display: "flex", gap: "8px", padding: "4px", borderRadius: "12px", background: "#f1f5f9" }}>
+                        {([
+                          { mode: "current" as const, title: `Current · Adventure ${tl.curNum}` },
+                          { mode: "next" as const, title: `Next · Adventure ${tl.curNum + 1}` },
+                        ]).map(({ mode, title }) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => {
+                              setManualAdventureMode(mode);
+                              setF({ registrationId: "", amountPaid: ocrAmountText, previousAdventureBalance: "" });
+                            }}
+                            style={{ flex: 1, padding: "9px 10px", border: "none", borderRadius: "9px", background: manualAdventureMode === mode ? "white" : "transparent", color: manualAdventureMode === mode ? "#0033a0" : "#64748b", fontSize: "12px", fontWeight: 800, boxShadow: manualAdventureMode === mode ? "0 1px 3px rgba(15,23,42,0.12)" : "none", cursor: "pointer" }}
+                          >
+                            {title}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: "5px", fontSize: "11px", color: "#64748b" }}>
+                        Choose whether you’re encoding a payment for the current or upcoming Adventure.
+                      </div>
+                    </div>
+                  )}
+
                   <div style={field}>
-                    <span style={label}>{form.type === "registration" ? "Registration (child / parent)" : "Parent account"}</span>
+                    <span style={label}>{form.type === "registration" ? `Registration · Adventure ${tl.curNum + (manualAdventureMode === "next" ? 1 : 0)}` : "Parent account"}</span>
                     <input value={parentFilter} onChange={(e) => setParentFilter(e.target.value)} placeholder="Type to filter by name or email…" style={{ ...input, marginBottom: "6px" }} />
                     {form.type === "registration" ? (
-                      <select value={form.registrationId} onChange={(e) => setF({ registrationId: e.target.value, amountPaid: ocrAmountText, waiveInterest: false })} style={input}>
+                      <select value={form.registrationId} onChange={(e) => {
+                        const chosen = allRegistrations.find((r) => String(r.id) === e.target.value);
+                        setF({
+                          registrationId: e.target.value,
+                          amountPaid: ocrAmountText,
+                          waiveInterest: false,
+                          previousAdventureBalance: typeof chosen?.previousAdventureBalance === "number" ? String(chosen.previousAdventureBalance) : "",
+                        });
+                      }} style={input}>
                         <option value="">Select registration…</option>
+                        {registrationOptions.length === 0 && <option value="" disabled>No registrations for this Adventure</option>}
                         {registrationOptions.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {(r.childInfo?.firstName || "") + " " + (r.childInfo?.lastName || "")} — {r.parentInfo?.name || r.parentInfo?.email} · {r.status}
+                            {fullChildName(r)} — {r.parentInfo?.name || r.parentInfo?.email}{r.program ? ` · ${r.program}` : ""} · {registrationSessionInfo(r).days} · {registrationSessionInfo(r).session} · {r.status}
                           </option>
                         ))}
                       </select>
@@ -2283,6 +2487,8 @@ function AdminPaymentsPageInner() {
                       <div style={row}><span style={muted}>Email</span><span style={{ wordBreak: "break-all", textAlign: "right" }}>{selectedReg.parentInfo?.email || "—"}</span></div>
                       <div style={row}><span style={muted}>Child</span><span>{`${selectedReg.childInfo?.firstName ?? ""} ${selectedReg.childInfo?.lastName ?? ""}`.trim() || "—"}</span></div>
                       <div style={row}><span style={muted}>Program</span><span>{selectedReg.program === "everyday-curious" ? "Everyday Explorer" : selectedReg.program || "—"}</span></div>
+                      <div style={row}><span style={muted}>Days</span><span style={{ textAlign: "right", maxWidth: "65%" }}>{registrationSessionInfo(selectedReg).days}</span></div>
+                      <div style={row}><span style={muted}>Session</span><span style={{ textAlign: "right", maxWidth: "65%" }}>{registrationSessionInfo(selectedReg).session}</span></div>
                       <div style={row}><span style={muted}>Adventure</span><span>{`Adventure ${advOf(selectedReg)}`}</span></div>
                       <div style={row}><span style={muted}>Status</span><span style={{ textTransform: "uppercase" }}>{selectedReg.status || "—"}</span></div>
                       <div style={row}>
@@ -2539,6 +2745,28 @@ function AdminPaymentsPageInner() {
                       </div>
                     );
                   })()}
+
+                  {needsPreviousAdventureBalance && (
+                    <div style={{ ...field, padding: "12px", borderRadius: "12px", background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                      <label htmlFor="manual-previous-adventure-balance" style={{ ...label, color: "#9a3412" }}>
+                        Previous adventure unpaid balance (₱) · optional
+                      </label>
+                      <input
+                        id="manual-previous-adventure-balance"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={form.previousAdventureBalance}
+                        onChange={(event) => setF({ previousAdventureBalance: event.target.value })}
+                        placeholder="Leave blank if unknown; enter 0 if none"
+                        style={input}
+                      />
+                      <div style={{ marginTop: "5px", fontSize: "11px", lineHeight: 1.5, color: "#9a3412" }}>
+                        Check the family&apos;s manual Adventure 1 record if available. Leave blank if unknown. This amount stays separate from this registration&apos;s Adventure {selectedReg ? advOf(selectedReg) : ""} payment.
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ ...field, marginTop: "14px" }}>
                     <span style={label}>Admin note (optional)</span>
@@ -2963,7 +3191,12 @@ function AdminPaymentsPageInner() {
                               (pendingItems.length > 1 ? `Verifies the oldest of ${pendingItems.length} pending payments. Open Details to review each one. ` : "") +
                               (g.pendingItem.type === "registration" ? "Approves the registration, registers the student and emails the parent." : "Mark this payment as verified.")
                             }
-                            onClick={(e) => { e.stopPropagation(); const pi = g.pendingItem!; handleAction(pi.uid, pi.type === "session" || (pi.type === "registration" && isBalanceRow(pi.payment)) ? pi.payment.id : null, "verify", pi.type); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const pi = g.pendingItem!;
+                              if (pi.type === "registration" && !isBalanceRow(pi.payment)) openDetail(pi);
+                              else handleAction(pi.uid, pi.type === "session" || (pi.type === "registration" && isBalanceRow(pi.payment)) ? pi.payment.id : null, "verify", pi.type);
+                            }}
                             disabled={!!actioning}
                             style={{ padding: "6px 12px", borderRadius: "8px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                           >
@@ -3225,7 +3458,7 @@ function AdminPaymentsPageInner() {
                             <>
                               <button
                                 title="Approves the registration, registers the student and emails the parent."
-                                onClick={(e) => { e.stopPropagation(); handleAction(r.id, null, "verify", "registration"); }}
+                                onClick={(e) => { e.stopPropagation(); openDetail(detailItem); }}
                                 disabled={!!actioning}
                                 style={{ padding: "6px 12px", borderRadius: "8px", background: "#10b981", color: "white", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}
                               >
