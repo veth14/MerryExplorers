@@ -40,7 +40,9 @@ function buildFollowUp(lead: any) {
   const parentName = String(lead.parentInfo?.name || "Parent/Guardian").trim();
   const greetingName = parentName.split(/\s+/)[0] || "there";
   const childName = [lead.childInfo?.firstName, lead.childInfo?.lastName].filter(Boolean).join(" ") || "your child";
-  const programName = PROGRAM_LABELS[lead.selectedProgram] || lead.selectedProgram || "a program";
+  const programName = PROGRAM_LABELS[lead.selectedProgram] || lead.selectedProgram;
+  const hasProgramSelection = Boolean(lead.selectedProgram);
+  const hasSessionSelection = Boolean(lead.selectedClass);
   const programDetails = lead.selectedProgram
     ? PROGRAM_SLOTS[lead.selectedProgram as keyof typeof PROGRAM_SLOTS]
     : null;
@@ -52,7 +54,9 @@ function buildFollowUp(lead: any) {
   const progressText = step === 0
     ? `You started a registration for ${childName}, and we’re here if you have questions before choosing a program and session.`
     : step === 1
-      ? `You were looking at ${programName}${session}. If you need help choosing a session or moving to the next step, we’d be happy to help.`
+      ? hasProgramSelection
+        ? `You were looking at ${programName}${session}. If you need help choosing a session or moving to the next step, we’d be happy to help.`
+        : `You reached the program and session selection step. If you need help choosing a program or session, we’d be happy to help.`
       : step === 2
         ? `You reached the consents and waivers for ${childName}’s registration. If anything is unclear, please reach out and we can guide you through it.`
         : `You reached the review and payment step for ${childName}’s registration. If you need help completing it, just let us know.`;
@@ -80,10 +84,10 @@ function buildFollowUp(lead: any) {
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;width:40%;">Explorer</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(childName)}</td></tr>
               <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Current Step</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(stepLabel)}</td></tr>
-              <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Program</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(programDetails?.name || programName)}</td></tr>
-              <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Session</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(lead.selectedClass || "Not selected yet")}</td></tr>
-              ${programDetails?.schedule ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Session days</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(programDetails.schedule)}</td></tr>` : ""}
-              ${selectedSession?.time ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Session time</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(selectedSession.time)}</td></tr>` : ""}
+              ${hasProgramSelection ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Program</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(programDetails?.name || programName)}</td></tr>` : ""}
+              ${hasSessionSelection ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Session</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(lead.selectedClass)}</td></tr>` : ""}
+              ${hasSessionSelection && programDetails?.schedule ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Session days</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(programDetails.schedule)}</td></tr>` : ""}
+              ${hasSessionSelection && selectedSession?.time ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;font-weight:600;">Session time</td><td style="padding:6px 0;color:#0033a0;font-size:14px;font-weight:700;">${escapeHtml(selectedSession.time)}</td></tr>` : ""}
             </table>
           </div>
           <div style="margin:0 0 22px;padding:19px 22px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:16px;">
@@ -102,7 +106,15 @@ function buildFollowUp(lead: any) {
   </table>
 </body></html>`;
 
-  const text = `Hi ${greetingName},\n\n${progressText}\n\nRegistration progress: ${stepLabel}\nProgram: ${programDetails?.name || programName}\nSession: ${lead.selectedClass || "Not selected yet"}${programDetails?.schedule ? `\nSession days: ${programDetails.schedule}` : ""}${selectedSession?.time ? `\nSession time: ${selectedSession.time}` : ""}\n\nDo you need help in registration? Kindly message us on Facebook Messenger or visit our Facebook page. We’ll be happy to help you!\n\nMessage us: ${FACEBOOK_MESSENGER_URL}\nFacebook page: ${FACEBOOK_PAGE_URL}\n\nWarmly,\nMerry Explorers Playgroup Learning Center`;
+  const selectionLines: string[] = [];
+  if (hasProgramSelection) selectionLines.push(`Program: ${programDetails?.name || programName}`);
+  if (hasSessionSelection) {
+    selectionLines.push(`Session: ${lead.selectedClass}`);
+    if (programDetails?.schedule) selectionLines.push(`Session days: ${programDetails.schedule}`);
+    if (selectedSession?.time) selectionLines.push(`Session time: ${selectedSession.time}`);
+  }
+  const selectionSummary = selectionLines.length ? `\n${selectionLines.join("\n")}` : "";
+  const text = `Hi ${greetingName},\n\n${progressText}\n\nExplorer: ${childName}\nCurrent step: ${stepLabel}${selectionSummary}\n\nDo you need help in registration? Kindly message us on Facebook Messenger or visit our Facebook page. We’ll be happy to help you!\n\nMessage us: ${FACEBOOK_MESSENGER_URL}\nFacebook page: ${FACEBOOK_PAGE_URL}\n\nWarmly,\nMerry Explorers Playgroup Learning Center`;
   return { to: String(lead.parentInfo?.email || "").trim(), subject, html, text, step, stepLabel };
 }
 
