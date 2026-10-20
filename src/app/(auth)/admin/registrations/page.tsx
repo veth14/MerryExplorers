@@ -97,6 +97,18 @@ function isTestRegistration(r: Registration): boolean {
   );
 }
 
+const SUMMARY_HTML_ENTITIES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+function escapeSummaryHtml(value: unknown): string {
+  return String(value ?? "—").replace(/[&<>"']/g, (character) => SUMMARY_HTML_ENTITIES[character]);
+}
+
 type FilterTab = "all" | Status | "reserved" | "leads" | "expired";
 
 interface Lead {
@@ -156,7 +168,7 @@ interface Lead {
 
 const LEAD_STEP_LABELS: Record<number, { label: string; badge: string; color: string; bg: string }> = {
   0: { label: "Step 0: Parent & Child Details", badge: "Details", color: "text-amber-800", bg: "bg-amber-100" },
-  1: { label: "Step 1: Program & Class Choice", badge: "Program Selection", color: "text-blue-800", bg: "bg-blue-100" },
+  1: { label: "Step 1: Program & Session Choice", badge: "Program & Session", color: "text-blue-800", bg: "bg-blue-100" },
   2: { label: "Step 2: Consents & Waivers", badge: "Consents & Waivers", color: "text-purple-800", bg: "bg-purple-100" },
   3: { label: "Step 3: Review & Payment", badge: "Review & Payment", color: "text-rose-800", bg: "bg-rose-100" },
 };
@@ -248,6 +260,46 @@ function DetailModal({
   const realRemainingBalance = totalCost !== null ? totalCost - (reg.amountPaid || 0) : null;
   const requiredDownpayment = effectiveProgramRate > 0 ? Math.round(effectiveProgramRate * 0.6) : (programDetails ? programDetails.downpayment : 0);
 
+  function handleGenerateSummary() {
+    const summaryWindow = window.open("", "_blank");
+    if (!summaryWindow) {
+      window.alert("Please allow pop-ups to open the registration summary.");
+      return;
+    }
+    summaryWindow.opener = null;
+
+    const schedule = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
+    const chosenSession = schedule?.classes.find((session) => session.name === reg.classTime);
+    const row = (label: string, value: unknown) => `<tr><th>${escapeSummaryHtml(label)}</th><td>${escapeSummaryHtml(value)}</td></tr>`;
+    const submittedDate = reg.submittedAt
+      ? new Date(reg.submittedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })
+      : "—";
+    const money = (value: number | null | undefined) => typeof value === "number"
+      ? `₱${value.toLocaleString("en-PH")}`
+      : "—";
+    const studentName = `${reg.childInfo.firstName || ""} ${reg.childInfo.lastName || ""}`.trim();
+    const currentRemaining = realRemainingBalance === null ? null : Math.max(0, realRemainingBalance);
+    const summaryHtml = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registration Summary - ${escapeSummaryHtml(studentName)}</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;padding:28px;background:#f1f6ff;color:#17366b;font-family:Arial,Helvetica,sans-serif}.page{max-width:800px;margin:0 auto;background:#fff;border:1px solid #d9e6f7;border-radius:18px;overflow:hidden}.brand{background:#ffd84d;padding:22px 30px;color:#002f76;font-weight:800;letter-spacing:.04em}.content{padding:28px 32px}.title{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.title h1{margin:0 0 6px;color:#002f76;font-size:25px}.muted{color:#64748b;font-size:13px}.badge{display:inline-block;padding:7px 12px;border-radius:20px;background:#eef4ff;color:#0033a0;font-size:12px;font-weight:800}.section{margin-top:24px}.section h2{padding-bottom:8px;border-bottom:2px solid #e6eef9;color:#0033a0;font-size:14px;text-transform:uppercase;letter-spacing:.06em}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 12px;border-bottom:1px solid #e9eef5;text-align:left;vertical-align:top;font-size:13px;line-height:1.45}.table th{width:34%;color:#64748b;font-weight:700}.table td{color:#17366b;font-weight:600}.notes{margin-top:22px;padding:14px 16px;border-radius:12px;background:#f7faff;color:#526b8d;font-size:12px;line-height:1.55}.actions{max-width:800px;margin:16px auto;display:flex;justify-content:flex-end;gap:10px}.actions button{border:0;border-radius:10px;padding:11px 16px;background:#0033a0;color:#fff;font-weight:700;cursor:pointer}.actions .close{background:#e7eef8;color:#334155}@media print{body{padding:0;background:#fff}.page{max-width:none;border:0;border-radius:0}.actions{display:none}.content{padding:22px 26px}}
+</style></head><body>
+<div class="actions"><button class="close" onclick="window.close()">Close</button><button onclick="window.print()">Print / Save as PDF</button></div>
+<main class="page"><div class="brand">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</div><div class="content">
+  <div class="title"><div><h1>Registration Summary</h1><div class="muted">Prepared ${escapeSummaryHtml(new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }))}</div></div><span class="badge">${escapeSummaryHtml(STATUS_LABELS[reg.status] || reg.status)}</span></div>
+  <section class="section"><h2>Explorer & Session</h2><table class="table">${row("Student", studentName)}${row("Nickname", reg.childInfo.nickname || "—")}${row("Date of Birth", reg.childInfo.dateOfBirth)}${row("Gender", reg.childInfo.gender)}${row("Program", PROGRAM_NAMES[reg.program] || reg.program)}${row("Session days", schedule?.schedule || "—")}${row("Session", reg.classTime)}${row("Session time", chosenSession?.time || "—")}${row("Registration date", submittedDate)}${row("Registration reference", reg.id)}</table></section>
+  <section class="section"><h2>Parent / Guardian</h2><table class="table">${row("Name", reg.parentInfo.name)}${row("Relationship", reg.parentInfo.relationship)}${row("Email", reg.parentInfo.email)}${row("Phone", reg.parentInfo.phone)}</table></section>
+  <section class="section"><h2>Emergency Contact</h2><table class="table">${row("Name", reg.emergencyContact?.name)}${row("Relationship", reg.emergencyContact?.relationship)}${row("Phone", reg.emergencyContact?.phone)}</table></section>
+  <section class="section"><h2>Payment Summary</h2><table class="table">${row("Program fee", money(effectiveProgramRate))}${row("Initial amount due", money(reg.amountDue || requiredDownpayment))}${row("Amount paid", money(reg.amountPaid || 0))}${row("Current session balance", money(currentRemaining))}${hasAdventureCycle ? row("Previous adventure unpaid balance", typeof reg.previousAdventureBalance === "number" ? money(reg.previousAdventureBalance) : "Not recorded") : ""}${row("Payment method", reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) || "—")}${row("Reference number", reg.referenceNumber || "—")}</table></section>
+  <section class="section"><h2>Additional Information</h2><table class="table">${row("Uniform kit", reg.uniformOrdered ? "Ordered" : "Not ordered")}${row("Photo consent", reg.photoConsent === "yes" ? "Allowed" : "Not allowed")}${row("Health profile", reg.childInfo.healthProfile || "None noted")}${row("Allergies", reg.childInfo.allergies || "None noted")}${row("Special needs", reg.childInfo.specialNeeds || "None noted")}</table></section>
+  <div class="notes">This summary is for registration reference. Previous adventure balance and current session balance are shown separately.</div>
+</div></main></body></html>`;
+
+    summaryWindow.document.open();
+    summaryWindow.document.write(summaryHtml);
+    summaryWindow.document.close();
+  }
+
   return (
     <AnimatePresence>
       {/* Backdrop */}
@@ -324,6 +376,13 @@ function DetailModal({
                 <span className="text-[11px] text-[#94a3b8] font-medium">
                   Submitted {new Date(reg.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
+                <button
+                  type="button"
+                  onClick={handleGenerateSummary}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-extrabold text-[#0033A0] hover:bg-blue-100 transition-colors"
+                >
+                  🧾 Generate Registration Summary
+                </button>
               </div>
             </div>
           </div>
@@ -653,9 +712,7 @@ function LeadDetailModal({
     : "#0033A0";
 
   const childName = [lead.childInfo?.firstName, lead.childInfo?.lastName].filter(Boolean).join(" ") || "Prospective Student";
-  const parentPhone = lead.parentInfo?.phone;
   const parentEmail = lead.parentInfo?.email;
-  const whatsAppUrl = formatWhatsAppUrl(parentPhone, lead.parentInfo?.name, lead.childInfo?.firstName);
 
   const stepMeta = LEAD_STEP_LABELS[lead.step] || {
     label: lead.stepName || `Step ${lead.step}`,
@@ -753,7 +810,7 @@ function LeadDetailModal({
         className="fixed inset-x-0 bottom-0 z-50 md:inset-0 md:flex md:items-center md:justify-center md:p-6 pointer-events-none"
       >
         <div
-          className="pointer-events-auto w-full md:max-w-xl md:rounded-[2rem] bg-[#f4f7fb] shadow-[0_-8px_40px_rgba(0,0,0,0.15)] md:shadow-[0_30px_80px_rgba(0,0,0,0.2)] flex flex-col max-h-[92dvh] md:max-h-[88vh] rounded-t-[2rem] border-t-[8px] overflow-hidden"
+          className="pointer-events-auto w-full md:max-w-5xl md:rounded-[2rem] bg-[#f4f7fb] shadow-[0_-8px_40px_rgba(0,0,0,0.15)] md:shadow-[0_30px_80px_rgba(0,0,0,0.2)] flex flex-col max-h-[94dvh] md:max-h-[90vh] rounded-t-[2rem] border-t-[8px] overflow-hidden"
           style={{ borderColor: accent }}
         >
           {/* Drag handle (mobile) */}
@@ -796,43 +853,9 @@ function LeadDetailModal({
             </div>
           </div>
 
-          {/* ── Direct Action Buttons ── */}
-          <div className="bg-[#eef4ff] px-6 py-2.5 border-b border-slate-100 flex flex-wrap gap-2 items-center justify-between">
-            <span className="text-[12px] font-bold text-[#0033A0]">Quick Contact:</span>
-            <div className="flex flex-wrap gap-2">
-              {parentPhone && (
-                <>
-                  <a
-                    href={`tel:${parentPhone}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[12px] font-bold text-[#0033A0] shadow-sm hover:bg-[#0033A0] hover:text-white transition-all"
-                  >
-                    📞 Call
-                  </a>
-                  {whatsAppUrl && (
-                    <a
-                      href={whatsAppUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 text-white text-[12px] font-bold shadow-sm hover:bg-green-700 transition-all"
-                    >
-                      💬 WhatsApp
-                    </a>
-                  )}
-                </>
-              )}
-              {parentEmail && (
-                <a
-                  href={`mailto:${parentEmail}?subject=${encodeURIComponent("Merry Explorers Registration Assistance")}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[12px] font-bold text-[#334155] shadow-sm hover:bg-slate-50 transition-all"
-                >
-                  ✉️ Email
-                </a>
-              )}
-            </div>
-          </div>
-
           {/* ── Scrollable Body ── */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 md:px-7">
+            <div className="space-y-4">
 
             {/* Funnel Step Stepper */}
             <SectionCard emoji="🧭" title="Registration Progress">
@@ -940,6 +963,8 @@ function LeadDetailModal({
               </div>
             </SectionCard>
 
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+              <div className="space-y-4">
             {/* Staff Follow-up & Notes */}
             <SectionCard emoji="📝" title="Staff Follow-Up & Notes">
               <div className="py-3 space-y-3">
@@ -987,6 +1012,9 @@ function LeadDetailModal({
               </div>
             </SectionCard>
 
+              </div>
+              <div className="space-y-4">
+
             {/* Child Details */}
             <SectionCard emoji="🧒" title="Child Information">
               <InfoRow label="First Name" value={lead.childInfo?.firstName || "—"} />
@@ -1020,14 +1048,14 @@ function LeadDetailModal({
             </SectionCard>
 
             {/* Selections made so far */}
-            <SectionCard emoji="🎯" title="Program & Options Reached">
+            <SectionCard emoji="🎯" title="Program & Session Details">
               <InfoRow
                 label="Selected Program"
                 value={lead.selectedProgram ? (PROGRAM_NAMES[lead.selectedProgram] || lead.selectedProgram) : "Not selected yet"}
                 highlight={lead.selectedProgram ? "blue" : undefined}
               />
               <InfoRow
-                label="Selected Class"
+                label="Selected Session"
                 value={lead.selectedClass || "Not selected yet"}
               />
               {lead.promoCode && (
@@ -1058,8 +1086,9 @@ function LeadDetailModal({
                 </div>
               </SectionCard>
             )}
-
-            <div className="h-2" />
+              </div>
+            </div>
+          </div>
           </div>
 
           {/* Footer actions */}
