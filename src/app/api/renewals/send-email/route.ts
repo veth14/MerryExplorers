@@ -195,7 +195,10 @@ export async function POST(request: Request) {
       ? studentReg.balancePayments.reduce((acc: number, b: any) => acc + (Number(b.amountPaid) || 0), 0)
       : 0;
     const totalPaid = initialPaid + balancePaid;
-    const remainingToConfirm = Math.max(0, expectedDownpayment - totalPaid);
+    const prevAdventureBal = typeof studentReg?.previousAdventureBalance === "number" ? studentReg.previousAdventureBalance : 0;
+    const paidToPrevious = Math.min(totalPaid, prevAdventureBal);
+    const appliedToCurrentSession = Math.max(0, totalPaid - paidToPrevious);
+    const remainingToConfirm = Math.max(0, expectedDownpayment - appliedToCurrentSession);
 
     // Default configuration
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merry-explorers.vercel.app";

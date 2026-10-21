@@ -241,8 +241,11 @@ export async function POST(
       const prevAdventureBal = typeof registration.previousAdventureBalance === "number"
         ? registration.previousAdventureBalance
         : 0;
-      const sessionBalance = Math.max(0, totalRate - amountPaid);
-      const totalRemaining = sessionBalance + prevAdventureBal;
+      const paidToPrevious = Math.min(amountPaid, prevAdventureBal);
+      const appliedToCurrentSession = Math.max(0, amountPaid - paidToPrevious);
+      const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
+      const sessionBalance = Math.max(0, totalRate - appliedToCurrentSession);
+      const totalRemaining = sessionBalance + remainingPrevious;
       const isFullyPaid = totalRemaining <= 0;
 
       await transporter.sendMail({
@@ -311,8 +314,12 @@ export async function POST(
                           <p style="margin: 0 0 14px 0; color: #92400e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">💰 Payment Summary</p>
                           <table width="100%" cellpadding="0" cellspacing="0">
                             <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Total Rate${isPioneerRegistration ? " · Pioneer Family Rate" : ""}</td><td style="padding: 5px 0; color: #78350f; font-size: 14px; font-weight: 700; text-align: right;">₱${totalRate.toLocaleString()}</td></tr>
-                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Amount Paid</td><td style="padding: 5px 0; color: #16a34a; font-size: 14px; font-weight: 700; text-align: right;">₱${amountPaid.toLocaleString()} ✓</td></tr>
-                            ${prevAdventureBal > 0 ? `<tr><td style="padding: 5px 0; color: #dc2626; font-size: 13px;">Previous Adventure Unpaid Balance</td><td style="padding: 5px 0; color: #dc2626; font-size: 14px; font-weight: 700; text-align: right;">+ ₱${prevAdventureBal.toLocaleString()}</td></tr>` : ""}
+                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Amount Paid (Receipt)</td><td style="padding: 5px 0; color: #16a34a; font-size: 14px; font-weight: 700; text-align: right;">₱${amountPaid.toLocaleString()} ✓</td></tr>
+                            ${paidToPrevious > 0 ? `
+                            <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Deducted for Previous Adventure</td><td style="padding: 5px 0; color: #b45309; font-size: 14px; font-weight: 700; text-align: right;">- ₱${paidToPrevious.toLocaleString()} (Adv ${(adventureNumber ? adventureNumber - 1 : 1)} cleared)</td></tr>
+                            <tr><td style="padding: 5px 0; color: #0033A0; font-size: 13px; font-weight: 700;">Applied to Current Session</td><td style="padding: 5px 0; color: #0033A0; font-size: 14px; font-weight: 700; text-align: right;">₱${appliedToCurrentSession.toLocaleString()}</td></tr>
+                            ` : ""}
+                            ${remainingPrevious > 0 ? `<tr><td style="padding: 5px 0; color: #dc2626; font-size: 13px;">Previous Adventure Unpaid Balance</td><td style="padding: 5px 0; color: #dc2626; font-size: 14px; font-weight: 700; text-align: right;">+ ₱${remainingPrevious.toLocaleString()}</td></tr>` : ""}
                             <tr>
                               <td style="padding: 10px 0 4px 0; color: #92400e; font-size: 13px; font-weight: 700; border-top: 1px solid #fde68a;">Remaining Balance</td>
                               <td style="padding: 10px 0 4px 0; color: ${isFullyPaid ? "#16a34a" : "#b45309"}; font-size: 15px; font-weight: 800; text-align: right; border-top: 1px solid #fde68a;">

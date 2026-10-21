@@ -115,8 +115,14 @@ export async function GET(request: Request) {
       const balancePaid = Array.isArray(r.balancePayments)
         ? r.balancePayments.reduce((acc: number, b: any) => acc + (Number(b.amountPaid) || 0), 0)
         : 0;
-      const amountPaid = initialPaid + balancePaid;
-      const remainingBalance = Math.max(0, totalTuition - amountPaid);
+      const totalPaid = initialPaid + balancePaid;
+      const prevAdventureBal = typeof r.previousAdventureBalance === "number" ? r.previousAdventureBalance : 0;
+      const paidToPrevious = Math.min(totalPaid, prevAdventureBal);
+      const appliedToCurrentSession = Math.max(0, totalPaid - paidToPrevious);
+      const remainingPrev = Math.max(0, prevAdventureBal - paidToPrevious);
+      const sessionRemaining = Math.max(0, totalTuition - appliedToCurrentSession);
+      const remainingBalance = sessionRemaining + remainingPrev;
+      const amountPaid = appliedToCurrentSession;
 
       const isPromo = Boolean(r.isPromoRegistration);
       const reservationType = isPromo ? "Promo code reservation" : "Direct payment (no code)";

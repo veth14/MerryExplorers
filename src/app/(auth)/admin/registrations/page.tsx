@@ -298,7 +298,7 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
   return (
     <div className="flex items-start justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
       <span className="text-[12px] font-semibold text-[#94a3b8] shrink-0 pt-0.5 w-[38%]">{label}</span>
-      <span className={`text-[13px] font-bold text-right break-words ${highlightCls}`}>{value}</span>
+      <span className={`text-[13px] font-bold text-right break-all min-w-0 ${highlightCls}`}>{value}</span>
     </div>
   );
 }
@@ -348,7 +348,16 @@ function DetailModal({
   const isPioneer = Boolean(reg.isPioneer);
   const effectiveProgramRate = reg.customRate || (isPioneer && reg.program === "creative-explorer" ? 4820 : (isPioneer && reg.program === "curious-explorer" ? 4295 : (programDetails ? programDetails.rate : 0)));
   const totalCost = effectiveProgramRate > 0 ? effectiveProgramRate + (!isPioneer && reg.uniformOrdered ? UNIFORM_KIT.price : 0) : null;
-  const realRemainingBalance = totalCost !== null ? totalCost - (reg.amountPaid || 0) : null;
+  const totalPaid = Number(reg.amountPaid) || 0;
+  const prevAdventureBal = typeof reg.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
+  // If there is an unpaid balance from previous adventure, deduct it from the receipt payment
+  const paidToPrevious = Math.min(totalPaid, prevAdventureBal);
+  // Net payment applied to current session (e.g. 3,786 - 1,786 = 2,000)
+  const appliedToCurrentSession = Math.max(0, totalPaid - paidToPrevious);
+  // Remaining session balance (e.g. 4,295 - 2,000 = 2,295)
+  const sessionRemaining = totalCost !== null ? Math.max(0, totalCost - appliedToCurrentSession) : null;
+  const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
+  const totalRemainingBalance = (sessionRemaining ?? 0) + remainingPrevious;
   const requiredDownpayment = effectiveProgramRate > 0 ? Math.round(effectiveProgramRate * 0.6) : (programDetails ? programDetails.downpayment : 0);
 
   async function handleGenerateSummary() {
@@ -373,7 +382,9 @@ function DetailModal({
       ? `₱${value.toLocaleString("en-PH")}`
       : "—";
     const studentName = `${reg.childInfo.firstName || ""} ${reg.childInfo.lastName || ""}`.trim();
-    const currentRemaining = realRemainingBalance === null ? null : Math.max(0, realRemainingBalance);
+    const currentRemaining = sessionRemaining;
+    const summaryPrevBal = remainingPrevious;
+    const summaryTotalBal = totalRemainingBalance;
     const timelineSummaryRows = reportTimeline.map((entry) => {
       const entryProgram = PROGRAM_SLOTS[entry.program as keyof typeof PROGRAM_SLOTS];
       const entrySession = entryProgram?.classes.find((session) => session.name === entry.classTime);
@@ -428,7 +439,7 @@ function DetailModal({
   ${availabilitySection}
   <section class="section"><h2>Parent / Guardian</h2><table class="table">${row("Name", reg.parentInfo.name)}${row("Relationship", reg.parentInfo.relationship)}${row("Email", reg.parentInfo.email)}${row("Phone", reg.parentInfo.phone)}</table></section>
   <section class="section"><h2>Emergency Contact</h2><table class="table">${row("Name", reg.emergencyContact?.name)}${row("Relationship", reg.emergencyContact?.relationship)}${row("Phone", reg.emergencyContact?.phone)}</table></section>
-  <section class="section"><h2>Payment Summary</h2><table class="table">${row("Program fee", money(effectiveProgramRate))}${row("Initial amount due", money(reg.amountDue || requiredDownpayment))}${row("Amount paid", money(reg.amountPaid || 0))}${row("Current session balance", money(currentRemaining))}${hasAdventureCycle ? row("Previous adventure unpaid balance", typeof reg.previousAdventureBalance === "number" ? money(reg.previousAdventureBalance) : "Not recorded") : ""}${row("Payment method", reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) || "—")}${row("Reference number", reg.referenceNumber || "—")}</table></section>
+  <section class="section"><h2>Payment Summary</h2><table class="table">${row("Program fee", `${money(effectiveProgramRate)}${isPioneer ? " (Pioneer Family Rate)" : ""}`)}${row("Initial amount due", money(reg.amountDue || requiredDownpayment))}${row("Amount paid (receipt)", money(totalPaid))}${prevAdventureBal > 0 ? row("Deducted for previous adventure", `-${money(paidToPrevious)} (Adv 1 cleared)`) : ""}${prevAdventureBal > 0 ? row("Applied to current session", money(appliedToCurrentSession)) : ""}${row("Remaining balance", money(totalRemainingBalance))}${row("Payment method", reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) || "—")}${row("Reference number", reg.referenceNumber || "—")}</table></section>
   <section class="section"><h2>Additional Information</h2><table class="table">${row("Uniform kit", reg.uniformOrdered ? "Ordered" : "Not ordered")}${row("Photo consent", reg.photoConsent === "yes" ? "Allowed" : "Not allowed")}${row("Health profile", reg.childInfo.healthProfile || "None noted")}${row("Allergies", reg.childInfo.allergies || "None noted")}${row("Special needs", reg.childInfo.specialNeeds || "None noted")}</table></section>
   <div class="notes">This summary is for registration reference. Previous adventure balance and current session balance are shown separately.</div>
 </div></main></body></html>`;
@@ -611,6 +622,10 @@ function DetailModal({
                 highlight={reg.paymentType === "full" ? "green" : "blue"} 
               />
               <InfoRow 
+                label="Program Rate" 
+                value={effectiveProgramRate > 0 ? `₱${effectiveProgramRate.toLocaleString()}${isPioneer ? " (Pioneer Family Rate)" : ""}` : "—"} 
+              />
+              <InfoRow 
                 label={reg.paymentType === "full" ? "Amount Due" : "Required Downpayment"} 
                 value={
                   reg.amountDue && reg.amountDue > 0
@@ -618,40 +633,79 @@ function DetailModal({
                     : (requiredDownpayment > 0 ? `₱${requiredDownpayment.toLocaleString()} (60% Downpayment)` : "—")
                 } 
               />
-              <InfoRow label="Amount Paid" value={reg.amountPaid ? `₱${reg.amountPaid.toLocaleString()}` : "—"} highlight={reg.amountPaid && reg.amountDue && reg.amountPaid >= reg.amountDue ? "green" : undefined} />
-              
-              {reg.paymentType !== "full" && realRemainingBalance !== null && (
+              <InfoRow 
+                label="Amount Paid (Receipt)" 
+                value={totalPaid ? `₱${totalPaid.toLocaleString()}` : "—"} 
+                highlight={totalCost !== null && appliedToCurrentSession >= totalCost ? "green" : undefined} 
+              />
+              {prevAdventureBal > 0 && (
+                <>
+                  <InfoRow 
+                    label="Deducted for Previous Adventure" 
+                    value={`-₱${paidToPrevious.toLocaleString()} (Adv 1 cleared)`} 
+                  />
+                  <InfoRow 
+                    label="Applied to Current Session" 
+                    value={`₱${appliedToCurrentSession.toLocaleString()}`} 
+                    highlight="blue" 
+                  />
+                </>
+              )}
+              {reg.paymentType !== "full" && sessionRemaining !== null && (
                 <InfoRow 
                   label="Remaining Balance" 
-                  value={`₱${Math.max(0, realRemainingBalance).toLocaleString()}${isPioneer ? " (Pioneer Rate)" : ""}`} 
+                  value={`₱${totalRemainingBalance.toLocaleString()}`} 
                   highlight="red" 
                 />
               )}
-
-              {reg.creditBalance && reg.creditBalance > 0 ? (
-                <InfoRow label="Credit Balance (Overpaid vs Required)" value={`+₱${reg.creditBalance.toLocaleString()}`} highlight="green" />
-              ) : null}
+              {totalCost !== null && appliedToCurrentSession > totalCost && (
+                <InfoRow label="Credit Balance (Overpayment)" value={`+₱${(appliedToCurrentSession - totalCost).toLocaleString()}`} highlight="green" />
+              )}
               <InfoRow label="Reference No." value={reg.referenceNumber || "—"} />
             </SectionCard>
 
             {hasAdventureCycle && <SectionCard emoji="🧾" title="Previous Adventure Balance">
-              <p className="py-3 text-xs leading-relaxed text-slate-500">
-                Unpaid balance carried over from a previous Adventure is tracked separately from this registration’s payment and balance.
+              <p className="py-2.5 text-xs leading-relaxed text-slate-500">
+                {prevAdventureBal > 0 && remainingPrevious === 0 ? (
+                  <span className="text-emerald-700 font-semibold">
+                    ✓ The ₱{prevAdventureBal.toLocaleString()} previous balance was fully settled by this registration&apos;s payment. It is cleared and will not carry over to future Adventures.
+                  </span>
+                ) : prevAdventureBal > 0 && paidToPrevious > 0 ? (
+                  <span className="text-amber-700 font-semibold">
+                    ₱{paidToPrevious.toLocaleString()} was settled from this payment. The remaining ₱{remainingPrevious.toLocaleString()} remains unpaid.
+                  </span>
+                ) : (
+                  "Unpaid balance carried over from a previous Adventure is tracked separately and deducted first from this registration’s payment."
+                )}
               </p>
               {!editingPreviousBalance ? (
-                <div className="flex items-center justify-between gap-3 border-t border-slate-100 py-3">
-                  <span className="text-[12px] font-semibold text-[#94a3b8]">Previous Adventure unpaid</span>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-[13px] font-bold ${reg.previousAdventureBalance ? "text-red-600" : "text-slate-500"}`}>
-                      {typeof reg.previousAdventureBalance === "number" ? `₱${Number(reg.previousAdventureBalance).toLocaleString("en-PH")}` : "Not set"}
+                <div className="space-y-2 border-t border-slate-100 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[12px] font-semibold text-[#94a3b8]">Carried-over balance</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[13px] font-bold text-slate-700">
+                        {typeof reg.previousAdventureBalance === "number" ? `₱${Number(reg.previousAdventureBalance).toLocaleString("en-PH")}` : "Not set"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setPreviousBalanceInput(typeof reg.previousAdventureBalance === "number" ? String(reg.previousAdventureBalance) : ""); setEditingPreviousBalance(true); }}
+                        className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#0033A0] hover:bg-blue-100"
+                      >
+                        Set amount
+                      </button>
+                    </div>
+                  </div>
+                  {paidToPrevious > 0 && (
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-[#94a3b8] font-semibold">Deducted from payment</span>
+                      <span className="font-bold text-emerald-700">-₱{paidToPrevious.toLocaleString()} (Adv 1 cleared)</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-3 text-xs pt-1.5 border-t border-slate-100">
+                    <span className="text-[#94a3b8] font-semibold">Previous Adventure unpaid</span>
+                    <span className={`text-[13px] font-bold ${remainingPrevious === 0 ? "text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md" : "text-red-600"}`}>
+                      {remainingPrevious === 0 ? "₱0 (Fully Cleared ✓)" : `₱${remainingPrevious.toLocaleString("en-PH")}`}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => { setPreviousBalanceInput(typeof reg.previousAdventureBalance === "number" ? String(reg.previousAdventureBalance) : ""); setEditingPreviousBalance(true); }}
-                      className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#0033A0] hover:bg-blue-100"
-                    >
-                      Set amount
-                    </button>
                   </div>
                 </div>
               ) : (

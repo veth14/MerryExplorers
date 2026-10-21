@@ -57,21 +57,28 @@ export async function GET(
     const paidVerified = isRegistrationVerified(registration.status)
       ? Number(registration.amountPaid || registration.amountDue || 0)
       : 0;
-    const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
-      + (registration.uniformOrdered ? 650 : 0);
-    const terms = calcRegistrationTerms(pricingRegistration, student, paidVerified, fallbackTotal);
     const prevAdventureBal = typeof registration.previousAdventureBalance === "number"
       ? registration.previousAdventureBalance
       : 0;
+    // Deduct previous adventure unpaid balance first from the receipt payment
+    const paidToPrevious = Math.min(paidVerified, prevAdventureBal);
+    const appliedToCurrentSession = Math.max(0, paidVerified - paidToPrevious);
+    const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
+      + (registration.uniformOrdered ? 650 : 0);
+    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToCurrentSession, fallbackTotal);
+    const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
     const sessionBalance = terms.balance;
-    const totalBalance = sessionBalance != null ? sessionBalance + prevAdventureBal : (prevAdventureBal > 0 ? prevAdventureBal : null);
-    const totalPayable = terms.totalPayable != null ? terms.totalPayable + prevAdventureBal : totalBalance;
+    const totalBalance = sessionBalance != null ? sessionBalance + remainingPrevious : (remainingPrevious > 0 ? remainingPrevious : null);
+    const totalPayable = terms.totalPayable != null ? terms.totalPayable + remainingPrevious : totalBalance;
     const balanceInfo = isRegistrationVerified(registration.status) && totalBalance != null
       ? {
           total: terms.due,
           paid: paidVerified,
+          paidToPrevious,
+          appliedToCurrentSession,
           sessionBalance,
-          previousAdventureBalance: prevAdventureBal,
+          previousAdventureBalance: remainingPrevious,
+          originalPreviousAdventureBalance: prevAdventureBal,
           balance: totalBalance,
           interest: terms.interest,
           weeksOfInterest: terms.mondays,
