@@ -665,7 +665,17 @@ export default function RenewPage() {
                   </span>
                 </div>
                 <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure 2 Program</h2>
-                <p className="vp-sub mb-6">Select the program and class time for {childNick}&apos;s Adventure 2 journey.</p>
+                <p className="vp-sub mb-4">Follow both steps to choose {childNick ? `${childNick}'s` : "your child's"} class. You must choose a session time before continuing.</p>
+                <div className="mb-6 grid gap-2 sm:grid-cols-2" aria-label="Program selection steps">
+                  <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${selectedProgram ? "border-emerald-400 bg-emerald-50" : "border-[#0b2a82] bg-[#fff6cf]"}`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#0b2a82] bg-white text-sm font-black text-[#0b2a82]">{selectedProgram ? "✓" : "1"}</span>
+                    <span className="text-[13px] font-extrabold text-[#0b2a82]">Choose a program</span>
+                  </div>
+                  <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${selectedClass ? "border-emerald-400 bg-emerald-50" : selectedProgram ? "border-[#0b2a82] bg-[#fff6cf]" : "border-[#b6dcf5] bg-white"}`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#0b2a82] bg-white text-sm font-black text-[#0b2a82]">{selectedClass ? "✓" : "2"}</span>
+                    <span className="text-[13px] font-extrabold text-[#0b2a82]">Choose a session time</span>
+                  </div>
+                </div>
 
                 {/* Tab filter styled like portal tabs */}
                 <div className="mb-6 flex flex-wrap justify-center gap-2.5">
@@ -734,6 +744,9 @@ export default function RenewPage() {
                             if (isUnavailable) return;
                             setSelectedProgram(p.id as ProgramId);
                             setSelectedClass("");
+                            window.setTimeout(() => {
+                              document.getElementById(`session-times-${p.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }, 80);
                           }}
                           className={`rounded-[22px] border-3 p-5 transition-all ${
                             isUnavailable
@@ -802,8 +815,11 @@ export default function RenewPage() {
                           </div>
 
                           {!isUnavailable && isSelected && (
-                            <div className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20">
-                              <p className="text-[12px] font-black uppercase tracking-wider text-[#0b2a82] mb-3">Select Session Time</p>
+                            <div id={`session-times-${p.id}`} className="mt-4 pt-4 border-t-2 border-[#0b2a82]/20 scroll-mt-28">
+                              <div className="mb-3 rounded-xl border-2 border-[#0b2a82] bg-[#fff6cf] px-3.5 py-3">
+                                <p className="text-[13px] font-black text-[#0b2a82]">Step 2: Choose one available session time</p>
+                                <p className="mt-1 text-[12px] font-semibold leading-snug text-[#3d5a99]">Tap a time below. Your choice will show a checkmark and the word SELECTED.</p>
+                              </div>
                               <div className="grid gap-2.5 sm:grid-cols-2">
                                 {p.classes.map((cls) => {
                                   const displayName = cls.name;
@@ -822,12 +838,13 @@ export default function RenewPage() {
                                       key={`${cls.name}-${cls.time}`}
                                       type="button"
                                       disabled={isDisabled}
+                                      aria-pressed={isClassSelected}
                                       onClick={(e) => { e.stopPropagation(); if (!isDisabled) setSelectedClass(cls.name); }}
                                       className={`flex items-center justify-between rounded-xl border-2 p-3 text-left transition-all ${
                                         isDisabled
                                         ? "opacity-50 cursor-not-allowed border-slate-200 bg-slate-50"
                                         : isClassSelected
-                                          ? "border-[#0b2a82] bg-white shadow-[0_3px_0_#0b2a82]"
+                                          ? "border-[#0b2a82] bg-[#fff6cf] shadow-[0_3px_0_#0b2a82] ring-2 ring-[#ffd23f]"
                                           : "border-[#b6dcf5] bg-white hover:border-[#0b2a82]"
                                         }`}
                                     >
@@ -836,6 +853,7 @@ export default function RenewPage() {
                                         <p className="text-[11px] font-semibold text-[#3d5a99]">{cls.time}</p>
                                       </div>
                                       <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                        {isClassSelected && <span className="rounded-full bg-[#0b2a82] px-2.5 py-1 text-[10px] font-black tracking-wide text-white">✓ SELECTED</span>}
                                         {isClosedByAdmin ? (
                                           <span className="rounded-full bg-rose-100 border border-rose-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-800">
                                             🔒 Closed
@@ -848,6 +866,15 @@ export default function RenewPage() {
                                   );
                                 })}
                               </div>
+                              {selectedClass ? (
+                                <p className="mt-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 px-3.5 py-2.5 text-[12px] font-extrabold text-emerald-900" role="status">
+                                  ✓ Session selected: {p.classes.find((cls) => cls.name === selectedClass)?.name} ({p.classes.find((cls) => cls.name === selectedClass)?.time})
+                                </p>
+                              ) : (
+                                <p className="mt-3 rounded-xl border-2 border-amber-400 bg-amber-50 px-3.5 py-2.5 text-[12px] font-extrabold text-amber-900" role="status">
+                                  No session time selected yet. Choose one above to continue.
+                                </p>
+                              )}
 
                               {"notes" in p && Array.isArray((p as any).notes) && (
                                 <div className="mt-4 rounded-2xl bg-pink-50 border-2 border-pink-200 p-4 text-[12.5px] text-pink-950 space-y-1.5 shadow-sm">
@@ -961,7 +988,11 @@ export default function RenewPage() {
                     onClick={() => setStep(2)}
                     className="vp-btn"
                   >
-                    Continue to Consents →
+                    {selectedProgram && !selectedClass
+                      ? "Choose a Session Time ↑"
+                      : requiresUniformDay && !uniformDayAcknowledged
+                      ? "Acknowledge Uniform Day Below ↓"
+                      : "Continue to Consents →"}
                   </button>
                 </div>
               </m.div>
