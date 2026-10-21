@@ -288,6 +288,8 @@ export async function POST(request: Request) {
       rawPromoCode === "A1JesusLovesMe2026:”" ||
       rawPromoCode === 'A1JesusLovesMe2026:"';
     const isPriorityReservation = cleanPromoCode.toUpperCase() === "A1RENEWAL2026";
+    // Trailblazer-at-Creative-Explorer-pioneer-price promo
+    const isTrailblazerCreativePioneer = cleanPromoCode.toUpperCase() === "TRAILBLAZER2CREATIVE";
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")
       : new Date(Date.now() + 60 * 60 * 1000);
@@ -295,6 +297,11 @@ export async function POST(request: Request) {
     // Auto-detect pioneer status if not explicitly passed
     let isPioneer = Boolean(data.isPioneer);
     let customRate = data.customRate ? Number(data.customRate) : undefined;
+    // TRAILBLAZER2CREATIVE: force customRate to 4820 (Creative Explorer pioneer price)
+    if (isTrailblazerCreativePioneer && !customRate) {
+      customRate = 4820;
+      isPioneer = true;
+    }
     const parentEmailClean = (parentInfo?.email || "").toLowerCase().trim();
     if (!isPioneer && parentEmailClean) {
       const pioneerCheck = await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmailClean));
@@ -342,6 +349,8 @@ export async function POST(request: Request) {
       customRate: isScholar ? 0 : (customRate || null),
       notes: isScholar
         ? "Scholar Registration (Promo code: A1JesusLovesMe2026 — 100% tuition sponsored, no payment needed)"
+        : isTrailblazerCreativePioneer
+        ? "Special Rate (Promo code: TRAILBLAZER2CREATIVE — Trailblazer slot at Creative Explorer Pioneer Price ₱4,820)"
         : "",
       submittedAt: new Date(),
       ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}`, adventureStartDate } : {}),
@@ -349,8 +358,8 @@ export async function POST(request: Request) {
       approvedBy: isScholar ? "system (scholar code: A1JesusLovesMe2026)" : null,
       confirmationEmailSent: false,
       leadId: leadId || null,
-      promoCode: isScholar ? "A1JesusLovesMe2026" : isPriorityReservation ? "A1RENEWAL2026" : null,
-      isPromoRegistration: isScholar || isPriorityReservation,
+      promoCode: isScholar ? "A1JesusLovesMe2026" : isPriorityReservation ? "A1RENEWAL2026" : isTrailblazerCreativePioneer ? "TRAILBLAZER2CREATIVE" : null,
+      isPromoRegistration: isScholar || isPriorityReservation || isTrailblazerCreativePioneer,
       isScholar,
     };
 

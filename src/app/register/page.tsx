@@ -167,6 +167,7 @@ export default function RegisterPage() {
   // Promo code state
   const [promoCode, setPromoCode] = useState<string>(draft?.promoCode ?? "");
   const [promoAccepted, setPromoAccepted] = useState<boolean>(draft?.promoAccepted ?? false);
+  const [promoCustomRate, setPromoCustomRate] = useState<number | null>(null);
   const [promoError, setPromoError] = useState<string>("");
   const [validatingPromo, setValidatingPromo] = useState<boolean>(false);
 
@@ -501,13 +502,17 @@ export default function RegisterPage() {
       if (data.valid) {
         setPromoAccepted(true);
         if (data.promoCode) setPromoCode(data.promoCode);
+        if (data.isCustomRate && data.customRate) setPromoCustomRate(Number(data.customRate));
+        else setPromoCustomRate(null);
         setPromoError("");
       } else {
         setPromoAccepted(false);
+        setPromoCustomRate(null);
         setPromoError(data.error || "This code is not valid.");
       }
     } catch {
       setPromoAccepted(false);
+      setPromoCustomRate(null);
       setPromoError("This code is not valid.");
     } finally {
       setValidatingPromo(false);
@@ -679,11 +684,12 @@ export default function RegisterPage() {
           // Send promo code as-is (case-sensitive) — A1JesusLovesMe2026 is case-sensitive on the server
           promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
-          isNewFamily: isPioneer ? false : isNewFamily,
-          welcomeKitOrdered: isPioneer ? false : welcomeKitOrdered,
+          isNewFamily: (isPioneer || promoCustomRate) ? false : isNewFamily,
+          welcomeKitOrdered: (isPioneer || promoCustomRate) ? false : welcomeKitOrdered,
           // Pioneer pricing — pass flag and customRate so server stores it
-          isPioneer: isPioneer || undefined,
-          customRate: (isPioneer && selectedProgram && pioneerPrices[selectedProgram]) ? pioneerPrices[selectedProgram] : undefined,
+          // promoCustomRate overrides the rate (e.g. TRAILBLAZER2CREATIVE: brave-explorer at ₱4,820)
+          isPioneer: isPioneer || Boolean(promoCustomRate) || undefined,
+          customRate: promoCustomRate ? promoCustomRate : (isPioneer && selectedProgram && pioneerPrices[selectedProgram]) ? pioneerPrices[selectedProgram] : undefined,
         }),
       });
       const data = await res.json();

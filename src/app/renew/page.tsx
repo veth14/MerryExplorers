@@ -153,6 +153,45 @@ export default function RenewPage() {
   // Duplicate registration tracking
   const [duplicateRegId, setDuplicateRegId] = useState<string | null>(null);
 
+  // Promo code state
+  const [promoCode, setPromoCode] = useState("");
+  const [promoAccepted, setPromoAccepted] = useState(false);
+  const [promoCustomRate, setPromoCustomRate] = useState<number | null>(null);
+  const [promoError, setPromoError] = useState("");
+  const [validatingPromo, setValidatingPromo] = useState(false);
+
+  async function applyPromoCode() {
+    const trimmed = promoCode.trim();
+    if (!trimmed) { setPromoError("Please enter your promo code."); return; }
+    setValidatingPromo(true);
+    setPromoError("");
+    try {
+      const res = await fetch("/api/promos/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: trimmed }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setPromoAccepted(true);
+        if (data.promoCode) setPromoCode(data.promoCode);
+        if (data.isCustomRate && data.customRate) setPromoCustomRate(Number(data.customRate));
+        else setPromoCustomRate(null);
+        setPromoError("");
+      } else {
+        setPromoAccepted(false);
+        setPromoCustomRate(null);
+        setPromoError(data.error || "This code is not valid.");
+      }
+    } catch {
+      setPromoAccepted(false);
+      setPromoCustomRate(null);
+      setPromoError("This code is not valid.");
+    } finally {
+      setValidatingPromo(false);
+    }
+  }
+
   useEffect(() => { setMounted(true); }, []);
 
   // Fetch prefill data from URL param
@@ -246,12 +285,15 @@ export default function RenewPage() {
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
 
   // Effective pricing: Pioneer families receive their set pioneer prices
+  // promoCustomRate overrides the effective rate when a custom-rate promo (e.g. TRAILBLAZER2CREATIVE) is applied
   const configuredPioneerRate = prog && isPioneer
     ? Number(pioneerPrices[prog.id]) || FALLBACK_PIONEER_RATES[prog.id]
     : 0;
-  const effectiveRate = prog ? configuredPioneerRate || prog.rate : 0;
+  const effectiveRate = promoCustomRate
+    ? promoCustomRate
+    : prog ? configuredPioneerRate || prog.rate : 0;
   const effectiveDownpayment = prog
-    ? (configuredPioneerRate ? Math.round(effectiveRate * 0.6) : prog.downpayment)
+    ? (configuredPioneerRate || promoCustomRate ? Math.round(effectiveRate * 0.6) : prog.downpayment)
     : 0;
   const effectiveBalance = effectiveRate - effectiveDownpayment;
 
@@ -286,8 +328,10 @@ export default function RenewPage() {
           signatureBase64,
           isRenewal: true,
           isNewFamily: false,
-          isPioneer,
-          customRate: effectiveRate,
+          isPioneer: isPioneer || Boolean(promoCustomRate),
+          customRate: promoCustomRate ? promoCustomRate : effectiveRate,
+          promoCode: promoAccepted ? promoCode.trim() : undefined,
+          isPromoRegistration: promoAccepted,
           amountDue,
           uniformOrdered,
           lanyardOrdered,
@@ -867,6 +911,48 @@ export default function RenewPage() {
                     </label>
                   </div>
                 )}
+
+                {/* Promo Code Section */}
+                <div className="mt-6 rounded-[22px] bg-[#f2faff] border-3 border-[#b6dcf5] p-5 shadow-sm">
+                  <h3 className="vp-h3 text-[15px] text-[#0b2a82] mb-1">🏷️ Promo Code</h3>
+                  <p className="text-[12.5px] font-medium text-[#3d5a99] mb-3">Have a special code? Enter it here to unlock a discounted rate.</p>
+                  {promoAccepted ? (
+                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 border-2 border-emerald-400 px-4 py-3 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-600 font-black text-[15px]">✓</span>
+                        <div>
+                          <p className="text-[13px] font-black text-emerald-800">{promoCode} Applied!</p>
+                          {promoCustomRate && (
+                            <p className="text-[12px] font-bold text-emerald-700">Rate overridden to ₱{promoCustomRate.toLocaleString()}</p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setPromoAccepted(false); setPromoCode(""); setPromoCustomRate(null); setPromoError(""); }}
+                        className="text-[12px] font-black text-red-500 hover:text-red-700 transition-colors"
+                      >Remove</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoCode}
+                        onChange={e => { setPromoCode(e.target.value); setPromoError(""); }}
+                        onKeyDown={e => e.key === "Enter" && applyPromoCode()}
+                        placeholder="Enter promo code"
+                        className="flex-1 rounded-xl border-2 border-[#b6dcf5] bg-white px-4 py-3 text-[13px] font-bold text-[#0b2a82] placeholder:text-[#b6dcf5] placeholder:font-normal focus:border-[#0b2a82] focus:outline-none transition-colors"
+                      />
+                      <button
+                        onClick={applyPromoCode}
+                        disabled={validatingPromo || !promoCode.trim()}
+                        className="rounded-xl border-2 border-[#0b2a82] bg-gradient-to-b from-[#ffe066] to-[#ffd23f] px-5 py-3 text-[13px] font-extrabold text-[#0b2a82] shadow-[0_4px_0_#0b2a82] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:-translate-y-0.5"
+                      >
+                        {validatingPromo ? "…" : "Apply"}
+                      </button>
+                    </div>
+                  )}
+                  {promoError && <p className="mt-2 text-[12px] font-bold text-red-600">{promoError}</p>}
+                </div>
 
                 <div className="mt-8 flex justify-between items-center">
                   <button onClick={() => setStep(0)} className="vp-btn ghost small">← Back</button>

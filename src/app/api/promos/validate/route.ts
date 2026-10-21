@@ -48,6 +48,18 @@ export async function POST(request: Request) {
       });
     }
 
+    // Trailblazer → Creative Explorer pioneer price override
+    // Allows one pioneer family registering for brave-explorer to pay ₱4,820 (Creative Explorer pioneer rate).
+    if (cleanCode.toUpperCase() === "TRAILBLAZER2CREATIVE") {
+      return NextResponse.json({
+        valid: true,
+        isCustomRate: true,
+        customRate: 4820,
+        promoCode: "TRAILBLAZER2CREATIVE",
+        message: "Special rate applied — Trailblazer slot at Creative Explorer Pioneer Price (₱4,820).",
+      });
+    }
+
     return NextResponse.json({ valid: false, error: "This code is not valid." }, { status: 400 });
   } catch (error: any) {
     console.error("[validate-promo POST]", error);
