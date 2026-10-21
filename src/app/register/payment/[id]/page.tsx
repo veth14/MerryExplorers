@@ -348,35 +348,77 @@ export default function PaymentPage() {
       <main className="vp-main">
 
         {/* Hero title */}
-        <div className="text-center flex flex-col items-center gap-2 -mb-2">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
-            <span>💳</span> {isBalanceMode ? "BALANCE PAYMENT" : "REGISTRATION PAYMENT"}
-          </div>
-          <h1 className="vp-title text-[32px] sm:text-[42px]">
-            {isBalanceMode ? "Pay Remaining Balance" : "Finalize Your Slot"}
-          </h1>
-          <p className="vp-sub text-[15px] max-w-md">
-            {isBalanceMode
-              ? <>Submit your receipt below for the remaining balance on <strong>{prog?.name}</strong>.</>
-              : <>Submit your receipt below to confirm registration for <strong>2026 Adventure 2</strong>.</>}
-          </p>
+        <div className="text-center flex flex-col items-center gap-2 mb-2">
+          {success ? (
+            <>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900 mb-1">
+                <span>🎉</span> {isBalanceMode ? "BALANCE PAYMENT SUBMITTED" : "REGISTRATION PAYMENT SUBMITTED"}
+              </div>
+              <h1 className="vp-title text-[32px] sm:text-[42px]">
+                {isBalanceMode ? "Balance Submitted!" : "Payment Submitted!"}
+              </h1>
+              <p className="vp-sub text-[15px] max-w-lg">
+                {isBalanceMode
+                  ? <>Your balance payment receipt for <strong>{prog?.name}</strong> has been received.</>
+                  : <>Thank you! Your receipt has been received to confirm registration for <strong>2026 Adventure 2</strong>.</>}
+              </p>
+            </>
+          ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
+            <>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900 mb-1">
+                <span>🎓</span> SCHOLARSHIP CONFIRMED
+              </div>
+              <h1 className="vp-title text-[32px] sm:text-[42px]">
+                Scholar Slot Confirmed!
+              </h1>
+              <p className="vp-sub text-[15px] max-w-lg">
+                Welcome to Merry Explorers! Your child&apos;s slot is 100% tuition sponsored.
+              </p>
+            </>
+          ) : regData?.status === "early-bird" ? (
+            <>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border-2 border-amber-500 shadow-[0_4px_0_#d97706] text-[12px] font-black text-amber-950 mb-1">
+                <span>🐣</span> EARLY BIRD SECURED
+              </div>
+              <h1 className="vp-title text-[32px] sm:text-[42px]">
+                Early Bird Slot Secured!
+              </h1>
+              <p className="vp-sub text-[15px] max-w-lg">
+                Your slot is guaranteed and no upfront payment is needed right now.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+                <span>💳</span> {isBalanceMode ? "BALANCE PAYMENT" : "REGISTRATION PAYMENT"}
+              </div>
+              <h1 className="vp-title text-[32px] sm:text-[42px]">
+                {isBalanceMode ? "Pay Remaining Balance" : "Finalize Your Slot"}
+              </h1>
+              <p className="vp-sub text-[15px] max-w-md">
+                {isBalanceMode
+                  ? <>Submit your receipt below for the remaining balance on <strong>{prog?.name}</strong>.</>
+                  : <>Submit your receipt below to confirm registration for <strong>2026 Adventure 2</strong>.</>}
+              </p>
+            </>
+          )}
         </div>
 
         {loading ? (
-          <div className="vp-card text-center py-16">
+          <div className="vp-card text-center py-16 max-w-2xl mx-auto w-full">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-[#ffe066] to-[#ffb82e] border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-3xl mx-auto mb-4 animate-bounce">
               ⏳
             </div>
             <p className="text-[18px] font-extrabold text-[#0b2a82]">Loading registration payment details…</p>
           </div>
         ) : success ? (
-          <div className="vp-card text-center py-12">
+          <div className="vp-card text-center py-12 max-w-2xl mx-auto w-full">
             <div className="vp-tape" />
             <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
               🎉
             </div>
-            <h2 className="vp-h2 text-[28px] mb-2">Payment Submitted!</h2>
-            <p className="vp-sub max-w-md mx-auto text-[15px] mb-8 leading-relaxed">
+            <h2 className="vp-h2 text-[26px] mb-3 text-[#0b2a82]">Receipt Successfully Recorded!</h2>
+            <p className="vp-sub max-w-lg mx-auto text-[15px] mb-8 leading-relaxed">
               {isBalanceMode
                 ? "Your balance payment receipt has been submitted. Our administrative team will verify it and update your remaining balance."
                 : "Your receipt has been successfully recorded! Our administrative team will verify your payment shortly. An email confirmation has been sent to your email."}
@@ -387,7 +429,7 @@ export default function PaymentPage() {
             </div>
           </div>
         ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
-          <div className="vp-card text-center py-12">
+          <div className="vp-card text-center py-12 max-w-2xl mx-auto w-full">
             <div className="vp-tape" />
             <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
               🎓
@@ -410,7 +452,7 @@ export default function PaymentPage() {
             </div>
           </div>
         ) : regData?.status === "early-bird" ? (
-          <div className="vp-card text-center py-12">
+          <div className="vp-card text-center py-12 max-w-2xl mx-auto w-full">
             <div className="vp-tape" />
             <div className="w-20 h-20 rounded-full bg-amber-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
               🐣
@@ -431,7 +473,7 @@ export default function PaymentPage() {
             </div>
           </div>
         ) : showErrorScreen || !prog ? (
-          <div className="vp-card text-center py-12">
+          <div className="vp-card text-center py-12 max-w-2xl mx-auto w-full">
             <div className="vp-tape" />
             <div className="w-20 h-20 rounded-full bg-red-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
               ⚠️
@@ -797,7 +839,7 @@ export default function PaymentPage() {
           </div>
         )}
 
-        <p className="text-center text-[13px] text-[#3d5a99] font-medium -mt-2">
+        <p className="text-center text-[13px] text-[#3d5a99] font-medium mt-3">
           Need help? Ask <strong className="text-[#0b2a82]">Teacher Angel</strong> onsite.
         </p>
         <DreamBanner />
@@ -894,6 +936,7 @@ export default function PaymentPage() {
           background: repeating-linear-gradient(45deg, ${SUN} 0 9px, ${SUN_LIGHT} 9px 18px);
           border: 2px solid rgba(11,42,130,0.25);
           border-radius: 4px;
+          pointer-events: none;
         }
         .vp-btn {
           display: inline-flex;
