@@ -17,6 +17,7 @@ const NAV_COLS = [
       { label: "Contact Information", href: "/contact" },
       { label: "Our Location", href: "/location" },
       { label: "Send an Inquiry", href: "/inquire" },
+      { label: "Adventure Calendar", href: "/calendar" },
     ],
   },
   {
