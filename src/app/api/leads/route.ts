@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
-import { isPlausiblePersonName } from "@/lib/person-name-validation";
+import { isPlausiblePersonName, formatPersonName } from "@/lib/person-name-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +116,13 @@ export async function POST(request: Request) {
                 { status: 400 }
             );
         }
+
+        // Auto-format names into proper Title Case
+        if (parentInfo?.name) parentInfo.name = formatPersonName(parentInfo.name);
+        if (childInfo?.firstName) childInfo.firstName = formatPersonName(childInfo.firstName);
+        if (childInfo?.lastName) childInfo.lastName = formatPersonName(childInfo.lastName);
+        if (childInfo?.nickname) childInfo.nickname = formatPersonName(childInfo.nickname);
+        if (emergencyContact?.name) emergencyContact.name = formatPersonName(emergencyContact.name);
 
         if (
             !isPlausiblePersonName(parentInfo?.name, true) ||

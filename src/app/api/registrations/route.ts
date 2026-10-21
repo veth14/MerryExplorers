@@ -9,7 +9,7 @@ import nodemailer from "nodemailer";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 import { activeRegistrationSlotQuery, countUniqueActiveRegistrationSlots } from "@/lib/registration-slots";
-import { isPlausiblePersonName } from "@/lib/person-name-validation";
+import { isPlausiblePersonName, formatPersonName } from "@/lib/person-name-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +126,13 @@ export async function POST(request: Request) {
     if (!program || !classTime || !parentInfo?.email || !parentInfo?.name || !childInfo?.firstName || (program !== "brave-explorer" && !signatureBase64)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    // Automatically format names into clean Title Case (prevents ALL CAPS or all-lowercase)
+    if (parentInfo?.name) parentInfo.name = formatPersonName(parentInfo.name);
+    if (childInfo?.firstName) childInfo.firstName = formatPersonName(childInfo.firstName);
+    if (childInfo?.lastName) childInfo.lastName = formatPersonName(childInfo.lastName);
+    if (childInfo?.nickname) childInfo.nickname = formatPersonName(childInfo.nickname);
+    if (emergencyContact?.name) emergencyContact.name = formatPersonName(emergencyContact.name);
 
     if (!isPlausiblePersonName(parentInfo.name, true)) {
       return NextResponse.json({ error: "Please enter the parent or guardian’s real full name." }, { status: 400 });

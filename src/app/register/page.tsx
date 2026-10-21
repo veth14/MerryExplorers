@@ -7,7 +7,7 @@ import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 import { getTargetRegistrationAdventureNumber } from "@/lib/adventure-cycle";
-import { isPlausiblePersonName } from "@/lib/person-name-validation";
+import { isPlausiblePersonName, formatPersonName } from "@/lib/person-name-validation";
 import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import Tesseract from "tesseract.js";
@@ -633,6 +633,23 @@ export default function RegisterPage() {
 
   async function handleDetailsContinue() {
     setSavingLead(true);
+    const formattedChild = {
+      ...childInfo,
+      firstName: formatPersonName(childInfo.firstName),
+      lastName: formatPersonName(childInfo.lastName),
+      nickname: formatPersonName(childInfo.nickname),
+    };
+    const formattedParent = {
+      ...parentInfo,
+      name: formatPersonName(parentInfo.name),
+    };
+    const formattedEmergency = {
+      ...emergencyContact,
+      name: formatPersonName(emergencyContact.name),
+    };
+    setChildInfo(formattedChild);
+    setParentInfo(formattedParent);
+    setEmergencyContact(formattedEmergency);
     try {
       await syncLeadProgress(1, { stepName: "Step 1: Choosing Program" });
     } finally {
@@ -675,9 +692,20 @@ export default function RegisterPage() {
         body: JSON.stringify({
           program: selectedProgram,
           classTime: selectedClass,
-          parentInfo,
-          childInfo,
-          emergencyContact,
+          parentInfo: {
+            ...parentInfo,
+            name: formatPersonName(parentInfo.name),
+          },
+          childInfo: {
+            ...childInfo,
+            firstName: formatPersonName(childInfo.firstName),
+            lastName: formatPersonName(childInfo.lastName),
+            nickname: formatPersonName(childInfo.nickname),
+          },
+          emergencyContact: {
+            ...emergencyContact,
+            name: formatPersonName(emergencyContact.name),
+          },
           photoConsent,
           signatureBase64,
           leadId: leadIdRef.current || leadId,
@@ -883,13 +911,13 @@ export default function RegisterPage() {
                   <h3 className="vp-h3 text-[16px] text-[#0b2a82]">🧒 Child Information</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FieldRow label="First Name *">
-                      <input className={inputCls} value={childInfo.firstName} onChange={e => setChildInfo((p: any) => ({ ...p, firstName: e.target.value }))} placeholder="e.g. Sofia" />
+                      <input className={inputCls} value={childInfo.firstName} onChange={e => setChildInfo((p: any) => ({ ...p, firstName: e.target.value }))} onBlur={e => setChildInfo((p: any) => ({ ...p, firstName: formatPersonName(e.target.value) }))} placeholder="e.g. Sofia" />
                     </FieldRow>
                     <FieldRow label="Last Name *">
-                      <input className={inputCls} value={childInfo.lastName} onChange={e => setChildInfo((p: any) => ({ ...p, lastName: e.target.value }))} placeholder="e.g. Reyes" />
+                      <input className={inputCls} value={childInfo.lastName} onChange={e => setChildInfo((p: any) => ({ ...p, lastName: e.target.value }))} onBlur={e => setChildInfo((p: any) => ({ ...p, lastName: formatPersonName(e.target.value) }))} placeholder="e.g. Reyes" />
                     </FieldRow>
                     <FieldRow label="Nickname">
-                      <input className={inputCls} value={childInfo.nickname} onChange={e => setChildInfo((p: any) => ({ ...p, nickname: e.target.value }))} placeholder="What do you call them?" />
+                      <input className={inputCls} value={childInfo.nickname} onChange={e => setChildInfo((p: any) => ({ ...p, nickname: e.target.value }))} onBlur={e => setChildInfo((p: any) => ({ ...p, nickname: formatPersonName(e.target.value) }))} placeholder="What do you call them?" />
                     </FieldRow>
                     <FieldRow label="Date of Birth *">
                       <input type="date" className={inputCls} value={childInfo.dateOfBirth} onChange={e => setChildInfo((p: any) => ({ ...p, dateOfBirth: e.target.value }))} />
@@ -923,7 +951,7 @@ export default function RegisterPage() {
                   <h3 className="vp-h3 text-[16px] text-[#0b2a82]">👨‍👩‍👧 Parent / Guardian</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FieldRow label="Full Name *">
-                      <input className={inputCls} value={parentInfo.name} onChange={e => setParentInfo((p: any) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
+                      <input className={inputCls} value={parentInfo.name} onChange={e => setParentInfo((p: any) => ({ ...p, name: e.target.value }))} onBlur={e => setParentInfo((p: any) => ({ ...p, name: formatPersonName(e.target.value) }))} placeholder="Full name" />
                     </FieldRow>
                     <FieldRow label="Relationship *">
                       <select className={inputCls} value={parentInfo.relationship} onChange={e => setParentInfo((p: any) => ({ ...p, relationship: e.target.value }))}>
@@ -950,7 +978,7 @@ export default function RegisterPage() {
                   <h3 className="vp-h3 text-[16px] text-[#0b2a82]">🚨 Emergency Contact</h3>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <FieldRow label="Full Name *">
-                      <input className={inputCls} value={emergencyContact.name} onChange={e => setEmergencyContact((p: any) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
+                      <input className={inputCls} value={emergencyContact.name} onChange={e => setEmergencyContact((p: any) => ({ ...p, name: e.target.value }))} onBlur={e => setEmergencyContact((p: any) => ({ ...p, name: formatPersonName(e.target.value) }))} placeholder="Full name" />
                     </FieldRow>
                     <FieldRow label="Phone *">
                       <input type="tel" className={inputCls} value={emergencyContact.phone} onChange={e => setEmergencyContact((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />

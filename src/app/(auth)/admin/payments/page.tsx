@@ -20,6 +20,7 @@ import { allocateBalancePayment } from "@/lib/balance-payment";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { readReceipt, type ReceiptData } from "@/lib/receipt-ocr";
 import { useAuth } from "@/lib/auth-context";
+import { formatPersonName } from "@/lib/person-name-validation";
 
 type Payment = {
   id: string;
@@ -3236,10 +3237,10 @@ function AdminPaymentsPageInner() {
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>
-                          {acc.fullName || acc.email}
+                          {acc.fullName ? formatPersonName(acc.fullName) : acc.email}
                         </div>
                         <div style={{ fontSize: "12px", color: "#475569", marginTop: "2px", fontWeight: 600 }}>
-                          🎓 {acc.childName || "Student not set"}{acc.program ? <span style={{ color: "#94a3b8", fontWeight: 500 }}> · {acc.program}</span> : null}
+                          🎓 {acc.childName ? formatPersonName(acc.childName) : "Student not set"}{acc.program ? <span style={{ color: "#94a3b8", fontWeight: 500 }}> · {acc.program}</span> : null}
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "5px" }}>
                           {isTestAccount(acc) && (
@@ -3467,9 +3468,9 @@ function AdminPaymentsPageInner() {
                         {getInitials(acc.fullName || acc.email || "?")}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>{acc.fullName || acc.email || "—"}</div>
+                        <div style={{ fontWeight: 800, fontSize: "14px", color: "#002f76", lineHeight: 1.2 }}>{acc.fullName ? formatPersonName(acc.fullName) : acc.email || "—"}</div>
                         <div style={{ fontSize: "12px", color: "#475569", marginTop: "2px", fontWeight: 600 }}>
-                          🎓 {childFull || "Student not set"}<span style={{ color: "#94a3b8", fontWeight: 500 }}> · {programName}</span>
+                          🎓 {childFull ? formatPersonName(childFull) : "Student not set"}<span style={{ color: "#94a3b8", fontWeight: 500 }}> · {programName}</span>
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "5px" }}>
                           {isTestAccount(acc) && <span style={tagStyle("#fef3c7", "#92400e")}>🧪 TESTING ACCOUNT</span>}

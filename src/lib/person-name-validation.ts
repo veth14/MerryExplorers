@@ -55,3 +55,34 @@ export function isPlausiblePersonName(value: unknown, requireFullName = false): 
 
   return true;
 }
+
+const ROMAN_NUMERALS = new Set(["ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]);
+
+/**
+ * Automatically formats person names into proper Title Case.
+ * - Converts ALL CAPS (e.g. "MARIA CLARISSE ANN TOLENTINO") -> "Maria Clarisse Ann Tolentino"
+ * - Converts all lowercase (e.g. "maria clarisse") -> "Maria Clarisse"
+ * - Preserves Roman numerals (e.g. "Juan Dela Cruz III" -> "Juan Dela Cruz III")
+ * - Handles hyphens and apostrophes (e.g. "VILLARIN-SUAVERDEZ" -> "Villarin-Suaverdez", "O'CONNOR" -> "O'Connor")
+ * - Preserves intentional mixed case (e.g. "McDonald", "DeLaCruz")
+ */
+export function formatPersonName(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (!trimmed) return "";
+
+  return trimmed.replace(/[\p{L}\p{M}]+/gu, (word) => {
+    const lower = word.toLowerCase();
+    if (ROMAN_NUMERALS.has(lower)) {
+      return lower.toUpperCase();
+    }
+    // If the word is already mixed case (e.g. McDonald, DeLaCruz), keep it
+    const isAllCaps = word === word.toUpperCase() && word.length > 1;
+    const isAllLower = word === word.toLowerCase();
+    if (isAllCaps || isAllLower) {
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }
+    return word;
+  });
+}
+
