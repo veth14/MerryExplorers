@@ -11,6 +11,7 @@ import {
   getManilaDateStr,
   addMonths,
   deduplicateCalendarEvents,
+  openCalendarEvent,
 } from "@/lib/calendar-events";
 
 interface PublicCalendarViewProps {
@@ -718,16 +719,15 @@ export function PublicCalendarView({
                           </div>
                         )}
 
-                        {/* Add to Google Calendar CTA */}
+                        {/* Add to Calendar CTA */}
                         <div className="pt-1 flex justify-end">
-                          <a
-                            href={gcalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95"
+                          <button
+                            type="button"
+                            onClick={() => openCalendarEvent(e)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95 cursor-pointer"
                           >
-                            <span>📅</span> Add to Google Calendar
-                          </a>
+                            <span>📅</span> Add to Calendar
+                          </button>
                         </div>
                       </div>
                     );

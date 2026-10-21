@@ -10,6 +10,7 @@ import {
   CalendarEventType,
   EVENT_TYPE_META,
   getManilaDateStr,
+  openCalendarEvent,
 } from "@/lib/calendar-events";
 
 const EVENT_IMAGES: Record<string, string> = {
@@ -217,14 +218,13 @@ function EventDetailModal({
 
           {/* Footer CTAs */}
           <div className="shrink-0 px-6 sm:px-8 pb-8 sm:pb-6 pt-4 border-t border-[#edf2f7] flex flex-col sm:flex-row items-center gap-3">
-            <a
-              href={gcalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#0033A0] hover:bg-[#002270] text-white text-[13.5px] font-black shadow-md hover:shadow-lg transition-all active:scale-95"
+            <button
+              type="button"
+              onClick={() => openCalendarEvent(event)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#0033A0] hover:bg-[#002270] text-white text-[13.5px] font-black shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
             >
-              <span>📅</span> Add to Google Calendar
-            </a>
+              <span>📅</span> Add to Calendar
+            </button>
             <button
               onClick={onClose}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border-2 border-[#e2e8f0] bg-white hover:bg-[#f0f5ff] text-[#002f76] text-[13.5px] font-bold transition-all active:scale-95 cursor-pointer"
@@ -333,15 +333,16 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
 
           {/* Action Buttons */}
           <div className="pt-6 mt-4 border-t border-[#edf2f7] flex items-center justify-between gap-3 flex-wrap">
-            <a
-              href={gcalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[12px] font-bold border border-[#bfdbfe] shadow-xs hover:shadow-sm transition-all active:scale-95"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openCalendarEvent(event);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[12px] font-bold border border-[#bfdbfe] shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
             >
-              <span>📅</span> Add to Google Calendar
-            </a>
+              <span>📅</span> Add to Calendar
+            </button>
 
             <button
               type="button"
@@ -436,15 +437,16 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
           </div>
 
           <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between gap-2">
-            <a
-              href={gcalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openCalendarEvent(event);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95 cursor-pointer"
             >
-              <span>📅</span> Add to GCal
-            </a>
+              <span>📅</span> Add to Calendar
+            </button>
 
             <button
               type="button"

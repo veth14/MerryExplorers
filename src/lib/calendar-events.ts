@@ -358,3 +358,116 @@ export function programShortName(key: string): string {
   };
   return map[key] ?? key;
 }
+
+// ─── Native App & Web Calendar Handlers ────────────────────────────────────────
+
+/**
+ * Generates web Google Calendar template URL (ideal for desktop browsers).
+ */
+export function buildGoogleCalendarUrl(event: CalendarEvent): string {
+  const [y, m, d] = event.startDate.split("-").map(Number);
+  const startYmd = `${y}${String(m).padStart(2, "0")}${String(d).padStart(2, "0")}`;
+
+  let endYmd: string;
+  if (event.endDate && event.endDate > event.startDate) {
+    const [ey, em, ed] = event.endDate.split("-").map(Number);
+    const endDateObj = new Date(ey, em - 1, ed + 1);
+    endYmd = `${endDateObj.getFullYear()}${String(endDateObj.getMonth() + 1).padStart(2, "0")}${String(endDateObj.getDate()).padStart(2, "0")}`;
+  } else {
+    const nextDay = new Date(y, m - 1, d + 1);
+    endYmd = `${nextDay.getFullYear()}${String(nextDay.getMonth() + 1).padStart(2, "0")}${String(nextDay.getDate()).padStart(2, "0")}`;
+  }
+
+  const title = encodeURIComponent(event.title);
+  const details = encodeURIComponent(
+    [
+      EVENT_TYPE_META[event.type]?.label ? `Category: ${EVENT_TYPE_META[event.type].label}` : "",
+      event.description || event.notes || "",
+      "Merry Explorers Playgroup & Learning Center",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+  );
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startYmd}/${endYmd}&details=${details}&location=${encodeURIComponent("Merry Explorers, Caloocan")}`;
+}
+
+/**
+ * Builds the URL for downloading a single-event .ics file.
+ * On iOS devices, navigating to this endpoint prompts the native Apple Calendar app sheet.
+ */
+export function buildSingleEventIcsUrl(event: CalendarEvent): string {
+  const params = new URLSearchParams({
+    title: event.title,
+    startDate: event.startDate,
+    type: event.type,
+  });
+  if (event.endDate) params.set("endDate", event.endDate);
+  const desc = event.description || event.notes || "";
+  if (desc) params.set("description", desc);
+  return `/api/calendar-events/single-ics?${params.toString()}`;
+}
+
+/**
+ * Builds the Android intent URI.
+ * In Android browsers, tapping this launches the default calendar app (Google Calendar or Samsung Calendar).
+ */
+export function buildAndroidCalendarIntent(event: CalendarEvent): string {
+  const [sy, sm, sd] = event.startDate.split("-").map(Number);
+  const beginTime = Date.UTC(sy, sm - 1, sd, 0, 0, 0);
+
+  const endDay = event.endDate && event.endDate >= event.startDate ? event.endDate : event.startDate;
+  const [ey, em, ed] = endDay.split("-").map(Number);
+  const endTime = Date.UTC(ey, em - 1, ed, 23, 59, 59);
+
+  const title = encodeURIComponent(event.title);
+  const description = encodeURIComponent(
+    [
+      EVENT_TYPE_META[event.type]?.label ? `Category: ${EVENT_TYPE_META[event.type].label}` : "",
+      event.description || event.notes || "",
+      "Merry Explorers Playgroup & Learning Center",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+  );
+  const location = encodeURIComponent("Merry Explorers Playgroup & Learning Center, North Caloocan");
+
+  return `intent://#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event;S.title=${title};S.description=${description};S.eventLocation=${location};l.beginTime=${beginTime};l.endTime=${endTime};B.allDay=true;end`;
+}
+
+/**
+ * Detects device and opens calendar:
+ * - On iOS (iPhone/iPad): opens Apple Calendar native sheet via .ics
+ * - On Android: opens native Calendar app via Android intent with fallback
+ * - On Desktop: opens Google Calendar in a new tab
+ */
+export function openCalendarEvent(event: CalendarEvent): void {
+  if (typeof window === "undefined") return;
+
+  const ua = navigator.userAgent || "";
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+
+  if (isIOS) {
+    window.location.href = buildSingleEventIcsUrl(event);
+    return;
+  }
+
+  if (isAndroid) {
+    const intentUrl = buildAndroidCalendarIntent(event);
+    const prevTime = Date.now();
+    window.location.href = intentUrl;
+
+    setTimeout(() => {
+      if (document.visibilityState === "visible" && Date.now() - prevTime < 2500) {
+        window.open(buildGoogleCalendarUrl(event), "_blank");
+      }
+    }, 1200);
+    return;
+  }
+
+  // Desktop default
+  window.open(buildGoogleCalendarUrl(event), "_blank", "noopener,noreferrer");
+}
+
