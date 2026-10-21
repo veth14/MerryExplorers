@@ -74,11 +74,15 @@ export async function POST(
     const adventureStart = getRegistrationAdventureStart(renewalSettings?.programs || [], registration, getManilaTodayIso());
     const student = getStudentSessionInfo(registration, parentAccount, adventureStart);
     const terms = calcRegistrationTerms(pricingRegistration, student, amountPaid, fallbackTotal);
+    const prevAdventureBal = typeof registration.previousAdventureBalance === "number"
+      ? registration.previousAdventureBalance
+      : 0;
+    const sessionBalance = terms.balance ?? Math.max(0, (terms.due ?? fallbackTotal) - amountPaid);
     const total = terms.due ?? fallbackTotal;
-    const balance = terms.balance ?? Math.max(0, total - amountPaid);
+    const balance = sessionBalance + prevAdventureBal;
     const interest = Number(terms.interest) || 0;
     const weeksOfInterest = Number(terms.mondays) || 0;
-    const totalPayable = terms.totalPayable ?? balance;
+    const totalPayable = (terms.totalPayable ?? sessionBalance) + prevAdventureBal;
     if (balance === 0) {
       return NextResponse.json({ error: "This registration has no remaining balance to remind about." }, { status: 409 });
     }
@@ -127,6 +131,10 @@ export async function POST(
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr><td style="padding:5px 0;color:#78350f;font-size:13px">Total Rate${isPioneer ? " · Pioneer Family Rate" : ""}</td><td style="padding:5px 0;color:#78350f;font-size:14px;font-weight:700;text-align:right">₱${total.toLocaleString()}</td></tr>
                     <tr><td style="padding:5px 0;color:#78350f;font-size:13px">Verified Amount Paid</td><td style="padding:5px 0;color:#16a34a;font-size:14px;font-weight:700;text-align:right">₱${amountPaid.toLocaleString()} ✓</td></tr>
+                    ${prevAdventureBal > 0 ? `
+                    <tr><td style="padding:5px 0;color:#78350f;font-size:13px">Current Session Remaining</td><td style="padding:5px 0;color:#78350f;font-size:14px;font-weight:700;text-align:right">₱${sessionBalance.toLocaleString()}</td></tr>
+                    <tr><td style="padding:5px 0;color:#b91c1c;font-size:13px;font-weight:700">Previous Adventure Unpaid Balance</td><td style="padding:5px 0;color:#b91c1c;font-size:14px;font-weight:700;text-align:right">+ ₱${prevAdventureBal.toLocaleString()}</td></tr>
+                    ` : ""}
                     <tr><td style="padding:8px 0 4px;color:#92400e;font-size:13px;font-weight:700;border-top:1px solid #fde68a">Remaining Balance</td><td style="padding:8px 0 4px;color:#b45309;font-size:14px;font-weight:800;text-align:right;border-top:1px solid #fde68a">₱${balance.toLocaleString()}</td></tr>
                     ${interest > 0 ? `<tr><td style="padding:5px 0;color:#92400e;font-size:13px">Overdue Interest (${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% weekly${weeksOfInterest ? ` · ${weeksOfInterest} week${weeksOfInterest === 1 ? "" : "s"}` : ""})</td><td style="padding:5px 0;color:#c2410c;font-size:14px;font-weight:700;text-align:right">₱${interest.toLocaleString()}</td></tr>` : ""}
                     <tr><td style="padding:10px 0 4px;color:#92400e;font-size:14px;font-weight:800;border-top:1px solid #fde68a">Total Due Now</td><td style="padding:10px 0 4px;color:#b45309;font-size:16px;font-weight:800;text-align:right;border-top:1px solid #fde68a">₱${totalPayable.toLocaleString()}</td></tr>

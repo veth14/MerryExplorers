@@ -20,8 +20,19 @@ export const EMPTY_RECEIPT: ReceiptData = { reference: "", amount: null, date: n
 // OCR mixes up some characters inside long numbers, so repair the common cases.
 function fixOcrDigits(token: string): string {
     // GoTyme / InstaPay references start with "ITO" and the "I" is often read as "1", "l" or "|"
-    const ito = token.match(/^[1IL|]TO(\d{12,20})$/);
+    const ito = token.match(/^[1IL|]TO(\d{12,20})$/i);
     if (ito) return "ITO" + ito[1];
+
+    // PNB / BancNet InstaPay references start with MBS (or MB5/M8S)
+    // Structure: MBS + YYYYMMDD (8 digits) + Sender BIC (e.g. PNBMPHMM, 8 chars) + Channel (e.g. TODB, 4 chars) + Sequence (8-22 digits)
+    const mbs = token.match(/^(?:MBS|MB5|M8S)([0-9OIL]{8})([A-Z0-9]{8,12})([0-9OIL|]{8,22})$/i);
+    if (mbs) {
+        const datePart = mbs[1].replace(/O/gi, "0").replace(/[IL|]/gi, "1");
+        const bankPart = mbs[2].toUpperCase().replace(/0/g, "O");
+        const seqPart = mbs[3].replace(/O/gi, "0").replace(/[IL|]/gi, "1");
+        return "MBS" + datePart + bankPart + seqPart;
+    }
+
     // a reference made of numbers only, where O / I / L were read instead of 0 / 1
     if (/^[0-9OIL|]{9,}$/.test(token) && (token.match(/\d/g) || []).length >= 6) {
         return token.replace(/O/g, "0").replace(/[IL|]/g, "1");
@@ -30,18 +41,50 @@ function fixOcrDigits(token: string): string {
 }
 
 const cleanRef = (raw: string) => fixOcrDigits(raw.replace(/[\s\-]+/g, "").toUpperCase());
-const validRef = (t: string) => t.length >= 8 && t.length <= 24 && (t.match(/\d/g) || []).length >= 6;
+const validRef = (t: string) => t.length >= 8 && t.length <= 45 && (t.match(/\d/g) || []).length >= 6;
 
 export function parseReference(text: string): string {
-    // 1) The value printed next to a "Reference No." / "Ref No." / "Trace ID" label.
-    //    A reference may be printed in groups ("8045 821 854 512"), so a few short digit groups are allowed,
-    //    but only when they are separated by a single space (so a date after the number is not swallowed).
-    const labelled =
-        /\b(ref(?:erence)?\.?\s*(?:no\.?|number|num\.?|id|#)?|trace\s*(?:no\.?|number|id)|confirmation\s*(?:no\.?|number|code))\s*[:#.\-]*\s*([A-Z0-9|]{3,24}(?:[ \-]\d{3,5}){0,4})/gi;
+    // 0) Specific known shapes that might be multi-line (e.g. PNB InstaPay MBS format wrapped across lines)
+    const mbsMatch = text.match(/\b(MB[S58][0-9OIL]{8}[A-Z]{8,12}(?:[\s\r\n]*[0-9OIL|]{3,22})+)/i);
+    if (mbsMatch) {
+        const value = cleanRef(mbsMatch[1]);
+        if (validRef(value)) return value;
+    }
+
+    // 1) The value printed next to a "Reference No." / "Ref No." / "Trace ID" / "Confirmation No." label.
+    //    Supports multi-token references and wrapped reference lines (like PNB receipts where the 38-char ref wraps).
+    const labelRe =
+        /\b(ref(?:erence)?\.?\s*(?:no\.?|number|num\.?|id|#)?|trace\s*(?:no\.?|number|id)|confirmation\s*(?:no\.?|number|code))\s*[:#.\-]*\s*([A-Z0-9|]{3,45}(?:[ \t\-]+[A-Z0-9|]{3,20}){0,4})/gi;
     let best = "";
     let bestRank = 0;
-    for (const m of text.matchAll(labelled)) {
-        const value = cleanRef(m[2]);
+    for (const m of text.matchAll(labelRe)) {
+        let rawVal = m[2];
+        const matchEndIndex = (m.index ?? 0) + m[0].length;
+        const remainder = text.slice(matchEndIndex);
+
+        // Check if the next line is a wrapped continuation of the reference number (like PNB receipts)
+        const nextLines = remainder.split(/\r?\n/);
+        for (let i = 0; i < nextLines.length; i++) {
+            const line = nextLines[i].trim();
+            if (!line) continue;
+            // Stop if the next line looks like a separate labelled field, currency, or metadata
+            if (
+                /:|[₱$]|\b(php|invoice|date|time|amount|total|fee|source|dest|bank|status|purpose|account|payment)\b/i.test(
+                    line
+                )
+            ) {
+                break;
+            }
+            // Continuation line must look like an ID segment (alphanumeric/digits without spaces)
+            const cleanLine = line.replace(/[\s\-]+/g, "");
+            if (/^[A-Z0-9|]{3,20}$/i.test(cleanLine) && (rawVal + cleanLine).length <= 45) {
+                rawVal += cleanLine;
+                break;
+            }
+            break;
+        }
+
+        const value = cleanRef(rawVal);
         if (!validRef(value)) continue; // e.g. the short GoTyme "Trace ID 257010"
         const rank = /^ref/i.test(m[1]) ? 2 : 1; // "Reference" beats "Trace ID"
         if (rank > bestRank) {
@@ -54,6 +97,7 @@ export function parseReference(text: string): string {
     // 2) No label was read: look for the known shapes of reference numbers.
     const shapes = [
         /\b([1IL]TO\d{12,20})\b/i, // GoTyme / InstaPay
+        /\b(MB[S58][0-9OIL]{8}[A-Z]{8,12}[0-9OIL|]{8,22})\b/i, // PNB / InstaPay MBS
         /\b([A-Z]{2}\d{16,20})\b/, // MariBank (BC + 18 digits)
         /\b(\d{4}\s\d{3}\s\d{3}\s\d{3})\b/, // GCash printed in groups
         /\b(\d{13})\b/, // GCash
@@ -151,6 +195,19 @@ export function guessMethod(text: string): ReceiptMethod | null {
     const t = text.toLowerCase();
     // GCash is the receiving side on these layouts (InstaPay to "G-Xchange", GCash "Express Send")
     if (/g-?xchange|sent via gcash|express send/.test(t)) return "gcash";
+
+    // If destination / recipient section is clearly marked, prioritize the destination bank
+    const destMatch = t.match(/\b(?:destination|transferred to|transfer to|receiver|payee|recipient)\b[\s\S]{1,200}/i);
+    if (destMatch) {
+        const destText = destMatch[0];
+        const destMari = /mari\s?bank/.test(destText);
+        const destBpi = /\bbpi\b|bank of the philippine islands/.test(destText);
+        const destGcash = /gcash|g-?xchange/.test(destText);
+        if (destMari && !destBpi && !destGcash) return "mari-bank";
+        if (destBpi && !destMari && !destGcash) return "bpi";
+        if (destGcash && !destMari && !destBpi) return "gcash";
+    }
+
     const mari = /mari\s?bank/.test(t);
     const bpi = /\bbpi\b|bank of the philippine islands/.test(t);
     if (mari && !bpi) return "mari-bank";

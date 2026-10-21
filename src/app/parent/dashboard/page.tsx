@@ -12,6 +12,7 @@ import WaiverGate from "@/components/WaiverGate";
 import VirtualOnboardingModal from "@/components/VirtualOnboardingModal";
 import VirtualDashboard from "@/components/VirtualDashboard";
 import TrailblazerDashboard from "@/components/TrailblazerDashboard";
+import { parseReference } from "@/lib/receipt-ocr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -914,25 +915,7 @@ export default function ParentDashboardPage() {
     setOcrDone(false);
     try {
       const result = await Tesseract.recognize(imageDataUrl, "eng");
-      const text = result.data.text;
-
-      const patterns = [
-        /\b(ITO\d{12,20})\b/i,
-        /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i,
-        /\b(\d{13})\b/,
-        /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i,
-        /\b(\d{10,20})\b/,
-      ];
-
-      let extractedRef = "";
-      for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match && match[1]) {
-          extractedRef = match[1].replace(/\s+/g, "");
-          break;
-        }
-      }
-
+      const extractedRef = parseReference(result.data.text);
       if (extractedRef) setDpReferenceNumber(extractedRef);
     } catch {
       // OCR failed silently

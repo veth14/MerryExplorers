@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Fredoka } from "next/font/google";
 import { getSessionBalance } from "@/lib/session-balance";
+import { parseReference } from "@/lib/receipt-ocr";
 
 const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -396,17 +397,8 @@ export default function VirtualDashboard(p: Props) {
         try {
             const Tesseract = (await import("tesseract.js")).default;
             const text = (await Tesseract.recognize(img, "eng")).data.text;
-            const patterns = [
-                /\b(ITO\d{12,20})\b/i,
-                /\b([A-Z0-9]{4}\s+[A-Z0-9]{4}\s+[A-Z0-9]{4})\b/i,
-                /\b(\d{13})\b/,
-                /(?:ref\.?\s*no\.?|reference\s*(?:id|number)?|trace\s*id)\s*[:\-]?\s*([A-Z0-9]{8,20})\b/i,
-                /\b(\d{10,20})\b/,
-            ];
-            for (const re of patterns) {
-                const m = text.match(re);
-                if (m?.[1]) { setRef(m[1].replace(/\s+/g, "")); break; }
-            }
+            const extracted = parseReference(text);
+            if (extracted) setRef(extracted);
         } catch { /* OCR is a helper only */ }
         setOcrLoading(false);
         setOcrDone(true);

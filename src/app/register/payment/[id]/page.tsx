@@ -30,6 +30,8 @@ type RegData = {
     total: number | null;
     paid: number;
     balance: number;
+    sessionBalance?: number | null;
+    previousAdventureBalance?: number;
     interest: number;
     weeksOfInterest: number;
     totalPayable: number | null;
@@ -472,6 +474,12 @@ export default function PaymentPage() {
                 <div className="space-y-1.5 bg-white/15 rounded-xl p-3.5 text-[13px] border border-white/20">
                   <div className="flex justify-between"><span className="text-white/80">Total Rate</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.total || 0).toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-white/80">Verified Amount Paid</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.paid || 0).toLocaleString()}</span></div>
+                  {Number(regData?.balanceInfo?.previousAdventureBalance) > 0 && (
+                    <>
+                      <div className="flex justify-between"><span className="text-white/80">Current Session Remaining</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.sessionBalance || 0).toLocaleString()}</span></div>
+                      <div className="flex justify-between text-amber-200"><span className="font-bold">Previous Adventure Unpaid</span><span className="font-extrabold">+ ₱{Number(regData?.balanceInfo?.previousAdventureBalance).toLocaleString()}</span></div>
+                    </>
+                  )}
                   <div className="flex justify-between border-t border-white/30 pt-2"><span className="text-white/80">Remaining Balance</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.balance || 0).toLocaleString()}</span></div>
                   {Number(regData?.balanceInfo?.interest) > 0 && <div className="flex justify-between"><span className="text-white/80">Overdue Interest ({regData?.balanceInfo?.weeksOfInterest} week{regData?.balanceInfo?.weeksOfInterest === 1 ? "" : "s"})</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.interest || 0).toLocaleString()}</span></div>}
                   {regData?.balanceInfo?.dueDate && <div className="border-t border-white/30 pt-2 text-[11px] text-white/75">Balance due date: {new Date(`${regData.balanceInfo.dueDate}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}. Overdue balances accrue 4% weekly interest.</div>}

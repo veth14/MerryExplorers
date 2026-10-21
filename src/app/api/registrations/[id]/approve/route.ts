@@ -237,13 +237,19 @@ export async function POST(
         ? registration.balancePayments.reduce((sum: number, payment: any) => sum + (Number(payment.amountPaid) || 0), 0)
         : 0;
       const amountPaid = (Number(registration.amountPaid) || 0) + balancePaid;
-      const remainingBalance = Math.max(0, totalRate - amountPaid);
-      const isFullyPaid = remainingBalance <= 0;
+      // previousAdventureBalance = unpaid carried over from the previous Adventure cycle (e.g. Adventure 1)
+      const prevAdventureBal = typeof registration.previousAdventureBalance === "number"
+        ? registration.previousAdventureBalance
+        : 0;
+      const sessionBalance = Math.max(0, totalRate - amountPaid);
+      const totalRemaining = sessionBalance + prevAdventureBal;
+      const isFullyPaid = totalRemaining <= 0;
 
       await transporter.sendMail({
         from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
         to: parentInfo.email,
-        subject: `🎉 ${childInfo.firstName} is Officially Registered at Merry Explorers!`,
+        subject: `🎉 ${childInfo.firstName} is Officially Registered at Merry Explorers!${adventureNumber !== null ? ` (Adventure ${adventureNumber})` : ""}`,
+
         html: `
           <!DOCTYPE html>
           <html>
@@ -257,7 +263,7 @@ export async function POST(
                     <tr>
                       <td style="background-color: #ffd84d; padding: 14px 20px; text-align: center;">
                         <p style="margin: 0; color: #0033A0; font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">
-                          🎉 WELCOME TO THE MERRY EXPLORERS FAMILY 🎉
+                          🎉 WELCOME TO THE MERRY EXPLORERS FAMILY${adventureNumber !== null ? ` — ADVENTURE ${adventureNumber}` : ""} 🎉
                         </p>
                       </td>
                     </tr>
@@ -283,7 +289,7 @@ export async function POST(
                         <p style="color: #0033A0; font-size: 16px; font-weight: 700; margin: 0 0 26px 0; text-align: center;">${childInfo.firstName} is officially an Explorer!</p>
 
                         <p style="color: #475569; font-size: 16px; line-height: 1.7; margin: 0 0 26px 0;">
-                          Hi <strong>${parentInfo.name}</strong>! We're thrilled to confirm that your payment has been verified and <strong>${childInfo.firstName}</strong> is now officially registered at Merry Explorers. 🎉
+                          Hi <strong>${parentInfo.name}</strong>! We're thrilled to confirm that your payment has been verified and <strong>${childInfo.firstName}</strong> is now officially registered at Merry Explorers${adventureNumber !== null ? ` for <strong>Adventure ${adventureNumber}</strong>` : ""}. 🎉
                         </p>
 
                         <!-- Registration details card -->
@@ -291,6 +297,7 @@ export async function POST(
                           <p style="margin: 0 0 14px 0; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">📋 Registration Details</p>
                           <table width="100%" cellpadding="0" cellspacing="0">
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600; width: 40%;">Explorer</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${childInfo.firstName} ${childInfo.lastName}</td></tr>
+                            ${adventureNumber !== null ? `<tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Adventure</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">Adventure ${adventureNumber}</td></tr>` : ""}
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Program</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${programName}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Class</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${classTimeDisplay}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Schedule</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${schedule}</td></tr>
@@ -305,10 +312,11 @@ export async function POST(
                           <table width="100%" cellpadding="0" cellspacing="0">
                             <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Total Rate${isPioneerRegistration ? " · Pioneer Family Rate" : ""}</td><td style="padding: 5px 0; color: #78350f; font-size: 14px; font-weight: 700; text-align: right;">₱${totalRate.toLocaleString()}</td></tr>
                             <tr><td style="padding: 5px 0; color: #78350f; font-size: 13px;">Amount Paid</td><td style="padding: 5px 0; color: #16a34a; font-size: 14px; font-weight: 700; text-align: right;">₱${amountPaid.toLocaleString()} ✓</td></tr>
+                            ${prevAdventureBal > 0 ? `<tr><td style="padding: 5px 0; color: #dc2626; font-size: 13px;">Previous Adventure Unpaid Balance</td><td style="padding: 5px 0; color: #dc2626; font-size: 14px; font-weight: 700; text-align: right;">+ ₱${prevAdventureBal.toLocaleString()}</td></tr>` : ""}
                             <tr>
                               <td style="padding: 10px 0 4px 0; color: #92400e; font-size: 13px; font-weight: 700; border-top: 1px solid #fde68a;">Remaining Balance</td>
                               <td style="padding: 10px 0 4px 0; color: ${isFullyPaid ? "#16a34a" : "#b45309"}; font-size: 15px; font-weight: 800; text-align: right; border-top: 1px solid #fde68a;">
-                                ${isFullyPaid ? "₱0 (Fully Paid)" : `₱${remainingBalance.toLocaleString()}`}
+                                ${isFullyPaid ? "₱0 (Fully Paid)" : `₱${totalRemaining.toLocaleString()}`}
                               </td>
                             </tr>
                           </table>

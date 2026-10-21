@@ -60,14 +60,22 @@ export async function GET(
     const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
       + (registration.uniformOrdered ? 650 : 0);
     const terms = calcRegistrationTerms(pricingRegistration, student, paidVerified, fallbackTotal);
-    const balanceInfo = isRegistrationVerified(registration.status) && terms.balance != null
+    const prevAdventureBal = typeof registration.previousAdventureBalance === "number"
+      ? registration.previousAdventureBalance
+      : 0;
+    const sessionBalance = terms.balance;
+    const totalBalance = sessionBalance != null ? sessionBalance + prevAdventureBal : (prevAdventureBal > 0 ? prevAdventureBal : null);
+    const totalPayable = terms.totalPayable != null ? terms.totalPayable + prevAdventureBal : totalBalance;
+    const balanceInfo = isRegistrationVerified(registration.status) && totalBalance != null
       ? {
           total: terms.due,
           paid: paidVerified,
-          balance: terms.balance,
+          sessionBalance,
+          previousAdventureBalance: prevAdventureBal,
+          balance: totalBalance,
           interest: terms.interest,
           weeksOfInterest: terms.mondays,
-          totalPayable: terms.totalPayable,
+          totalPayable,
           dueDate: terms.dueDate,
         }
       : null;

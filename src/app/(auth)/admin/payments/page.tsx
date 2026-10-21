@@ -1408,11 +1408,24 @@ function AdminPaymentsPageInner() {
 
   // Account balance per registration, shown on every row so the admin sees where the student stands
   const regSummary = useMemo(() => {
-    const map = new Map<string, { due: number | null; balance: number | null; interest: number; totalPayable: number | null; paid: number }>();
+    const map = new Map<string, { due: number | null; balance: number | null; sessionBalance?: number | null; prevBalance?: number; interest: number; totalPayable: number | null; paid: number }>();
     registrations.forEach((r) => {
       try {
         const t: any = regInfo(r).terms;
-        if (t) map.set(r.id, { due: t.due ?? null, balance: t.balance ?? null, interest: t.interest || 0, totalPayable: t.totalPayable ?? null, paid: t.paidVerified || 0 });
+        const prevBal = typeof r.previousAdventureBalance === "number" ? r.previousAdventureBalance : 0;
+        if (t) {
+          const totalBal = t.balance != null ? t.balance + prevBal : (prevBal > 0 ? prevBal : null);
+          const totalPayable = t.totalPayable != null ? t.totalPayable + prevBal : totalBal;
+          map.set(r.id, {
+            due: t.due ?? null,
+            balance: totalBal,
+            sessionBalance: t.balance ?? null,
+            prevBalance: prevBal,
+            interest: t.interest || 0,
+            totalPayable,
+            paid: t.paidVerified || 0,
+          });
+        }
       } catch {
         // a registration with odd data should never break the whole list
       }
@@ -1851,6 +1864,8 @@ function AdminPaymentsPageInner() {
     items: { key: string; label: string; amount: number }[];
     paidVerified: number;
     balance: number | null;
+    sessionBalance?: number | null;
+    previousAdventureBalance?: number;
     reservation: number | null;
     balanceShare: number | null;
     dueDate: string | null;
@@ -1876,12 +1891,25 @@ function AdminPaymentsPageInner() {
 
     // Registrations: shared rules (program + Welcome Kit / Uniform Set, 60/40 split, weekly 4% interest)
     if (type === "registration") {
-      const reg = registrations.find((x) => x.id === detail.uid);
+      const reg = registrations.find((x) => x.id === detail.uid) || allRegistrations.find((x) => x.id === detail.uid);
       const email = (reg?.parentInfo?.email || acc.email || "").toLowerCase();
       const parentAcc = allAccounts.find((a) => (a.email || "").toLowerCase() === email);
       // CHANGED: sessions are never counted before the Adventure's own start date
       const student = getStudentSessionInfo(reg, parentAcc, reg ? advStartOf(reg) : undefined);
-      return calcRegistrationTerms(reg, student, paidVerified, payment.amountDue ?? reg?.amountDue);
+      const baseTerms = calcRegistrationTerms(reg, student, paidVerified, payment.amountDue ?? reg?.amountDue);
+      if (!baseTerms) return null;
+      const prevBal = typeof reg?.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
+      const sessionBal = baseTerms.balance;
+      const totalBal = sessionBal != null ? sessionBal + prevBal : (prevBal > 0 ? prevBal : null);
+      const totalPayable = baseTerms.totalPayable != null ? baseTerms.totalPayable + prevBal : totalBal;
+
+      return {
+        ...baseTerms,
+        sessionBalance: sessionBal,
+        previousAdventureBalance: prevBal,
+        balance: totalBal,
+        totalPayable,
+      };
     }
 
     // Renewal downpayments / session payments
@@ -1890,6 +1918,8 @@ function AdminPaymentsPageInner() {
     const balance = due != null ? Math.max(0, due - paidVerified) : null;
     return {
       due, items: [], paidVerified, balance,
+      sessionBalance: balance,
+      previousAdventureBalance: 0,
       reservation: null, balanceShare: null, dueDate: null, interestStart: null,
       mondays: 0, interest: 0, totalPayable: balance,
     };
@@ -1930,6 +1960,12 @@ function AdminPaymentsPageInner() {
       ...(bd?.items || []).map((it) => `${it.label}: ${fmtCurrency(it.amount)}`),
       `Total amount due: ${bd?.due != null ? fmtCurrency(bd.due) : "not set"}`,
       `Verified paid to date: ${fmtCurrency(bd?.paidVerified)}`,
+      ...(bd?.sessionBalance != null && bd.previousAdventureBalance && bd.previousAdventureBalance > 0
+        ? [
+          `Current session balance: ${fmtCurrency(bd.sessionBalance)}`,
+          `Previous Adventure unpaid balance: ${fmtCurrency(bd.previousAdventureBalance)}`,
+        ]
+        : []),
       `Remaining balance: ${bd?.balance != null ? fmtCurrency(bd.balance) : "-"}`,
       ...(bd?.reservation != null
         ? [
@@ -2008,7 +2044,8 @@ function AdminPaymentsPageInner() {
         const bd = calcBreakdown();
         // status of this registration, so the due date can say "set after approval" while it is pending
         const detailStatus = type === "registration" ? registrations.find((x) => x.id === detail.uid)?.status : undefined;
-        const requiresPreviousBalance = status === "pending" && type === "registration" && !isBalanceRow(payment) && (advThis ?? 1) >= 2;
+        const isMultiAdvReg = type === "registration" && !isBalanceRow(payment) && (advThis ?? 1) >= 2;
+        const requiresPreviousBalance = status === "pending" && isMultiAdvReg;
         const previousBalanceNumber = Number(approvalPreviousBalance);
         const hasValidPreviousBalance = approvalPreviousBalance.trim() !== "" && Number.isFinite(previousBalanceNumber) && previousBalanceNumber >= 0 && Math.abs(Math.round(previousBalanceNumber * 100) - previousBalanceNumber * 100) <= 0.000001;
         const isLink = !!payment.receiptBase64 && payment.receiptBase64.startsWith("http");
@@ -2030,6 +2067,9 @@ function AdminPaymentsPageInner() {
           ["Payment type", typeLabel],
           ["Payment no.", seq && seqTotal ? seqText : "—"],
           ["Adventure", advThis != null ? advNumBadge(advThis, tl.curNum).label : "Not assigned"],
+          ...(bd?.previousAdventureBalance && bd.previousAdventureBalance > 0
+            ? [["Previous adventure unpaid", fmtCurrency(bd.previousAdventureBalance)]] as [string, string][]
+            : []),
           ["Payment method", (payment.paymentMethod || "—").toUpperCase()],
           ["Reference no.", payment.referenceNumber || "—"],
           ["Date submitted", fmtDateTime(payment.submittedAt)],
@@ -2110,7 +2150,15 @@ function AdminPaymentsPageInner() {
                     <div style={tileLabel}>Remaining balance</div>
                     <div style={{ ...tileValue, color: bd?.balance === 0 ? "#15803d" : "#b45309" }}>{bd?.balance != null ? (bd.balance === 0 ? "✓ Fully paid" : fmtCurrency(bd.balance)) : "—"}</div>
                     <div style={tileSub}>
-                      {showInterest && bd && bd.interest > 0 ? `${fmtCurrency(bd.totalPayable ?? 0)} with interest` : "no overdue interest"}
+                      {bd?.previousAdventureBalance && bd.previousAdventureBalance > 0 ? (
+                        <span style={{ color: "#b45309", fontWeight: 700 }}>
+                          incl. {fmtCurrency(bd.previousAdventureBalance)} prev. adv.
+                        </span>
+                      ) : showInterest && bd && bd.interest > 0 ? (
+                        `${fmtCurrency(bd.totalPayable ?? 0)} with interest`
+                      ) : (
+                        "no overdue interest"
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2181,6 +2229,44 @@ function AdminPaymentsPageInner() {
                     </div>
                   </div>
                 )}
+
+                {isMultiAdvReg && status === "verified" && (
+                  <div style={{ marginTop: "12px", padding: "12px 14px", borderRadius: "12px", background: "#fff7ed", border: "1px solid #fed7aa", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                    <div style={{ flex: "1 1 300px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: "#9a3412", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>🧾 Previous Adventure Unpaid Balance (Adventure {(advThis ?? 2) - 1})</span>
+                        {approvalPreviousBalanceSaved && <span style={{ background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "12px", fontSize: "10px", fontWeight: 800 }}>✓ Recorded</span>}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#9a3412", marginTop: "3px" }}>
+                        Carried over from the manual record. This is factored into the total remaining balance.
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input
+                        id="approval-previous-adventure-balance-verified"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={approvalPreviousBalance}
+                        onChange={(event) => {
+                          setApprovalPreviousBalance(event.target.value);
+                          setApprovalPreviousBalanceSaved(false);
+                        }}
+                        placeholder="0"
+                        style={{ width: "110px", boxSizing: "border-box", padding: "7px 10px", border: "1px solid #fdba74", borderRadius: "8px", background: "white", color: "#334155", fontSize: "13px", fontWeight: 700 }}
+                      />
+                      <button
+                        type="button"
+                        disabled={savingApprovalPreviousBalance || !hasValidPreviousBalance}
+                        onClick={() => void saveApprovalPreviousBalance()}
+                        style={{ padding: "7px 12px", borderRadius: "8px", border: "none", background: "#0050d5", color: "white", fontSize: "11px", fontWeight: 800, cursor: savingApprovalPreviousBalance || !hasValidPreviousBalance ? "not-allowed" : "pointer", opacity: savingApprovalPreviousBalance || !hasValidPreviousBalance ? 0.55 : 1 }}
+                      >
+                        {savingApprovalPreviousBalance ? "Saving…" : approvalPreviousBalanceSaved ? "Saved" : "Update"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ padding: "24px", display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
@@ -2203,6 +2289,18 @@ function AdminPaymentsPageInner() {
                         <span style={{ color: "#94a3b8" }}>{k}</span><span>{v}</span>
                       </div>
                     ))}
+                    {bd?.sessionBalance != null && bd.previousAdventureBalance != null && bd.previousAdventureBalance > 0 && (
+                      <>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", color: "#334155", fontWeight: 600 }}>
+                          <span style={{ color: "#94a3b8" }}>Adventure {advThis || 2} session balance</span>
+                          <span>{fmtCurrency(bd.sessionBalance)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", color: "#b91c1c", fontWeight: 700 }}>
+                          <span>Previous Adventure unpaid balance</span>
+                          <span>+ {fmtCurrency(bd.previousAdventureBalance)}</span>
+                        </div>
+                      </>
+                    )}
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 0", marginTop: "6px", borderTop: "1px dashed #e2e8f0", fontWeight: 800, fontSize: "15px" }}>
                       <span style={{ color: "#002f76" }}>Remaining balance</span>
                       <span style={{ color: bd?.balance === 0 ? "#15803d" : "#b45309" }}>{bd?.balance != null ? fmtCurrency(bd.balance) : "—"}</span>
@@ -3076,7 +3174,10 @@ function AdminPaymentsPageInner() {
                   balanceLine = `⏳ ${fmtCurrency(pendingAmt)} awaiting verification (not counted yet)`;
                 } else if (type === "registration" && g.status !== "rejected" && summary && summary.balance != null) {
                   if (summary.balance === 0) { balanceLine = "✓ Account fully paid"; balanceColor = "#15803d"; }
-                  else balanceLine = `Balance now ${fmtCurrency(summary.balance)}${summary.interest > 0 ? ` + ${fmtCurrency(summary.interest)} interest` : ""}`;
+                  else {
+                    const prevText = summary.prevBalance && summary.prevBalance > 0 ? ` (incl. ${fmtCurrency(summary.prevBalance)} prev. adv.)` : "";
+                    balanceLine = `Balance now ${fmtCurrency(summary.balance)}${summary.interest > 0 ? ` + ${fmtCurrency(summary.interest)} interest` : ""}${prevText}`;
+                  }
                 }
 
                 return (
@@ -3304,7 +3405,10 @@ function AdminPaymentsPageInner() {
                   balanceLine = `⏳ ${fmtCurrency(amtPaid)} awaiting verification (not counted yet)`;
                 } else if (state === "renewed" && summary && summary.balance != null) {
                   if (summary.balance === 0) { balanceLine = "✓ Account fully paid"; balanceColor = "#15803d"; }
-                  else balanceLine = `Balance now ${fmtCurrency(summary.balance)}${summary.interest > 0 ? ` + ${fmtCurrency(summary.interest)} interest` : ""}`;
+                  else {
+                    const prevText = summary.prevBalance && summary.prevBalance > 0 ? ` (incl. ${fmtCurrency(summary.prevBalance)} prev. adv.)` : "";
+                    balanceLine = `Balance now ${fmtCurrency(summary.balance)}${summary.interest > 0 ? ` + ${fmtCurrency(summary.interest)} interest` : ""}${prevText}`;
+                  }
                 }
 
                 return (
