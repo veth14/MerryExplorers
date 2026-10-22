@@ -1227,7 +1227,7 @@ export default function ClockPage() {
                             </svg>
                           </div>
                           <span className="text-emerald-300 tracking-wide font-black">
-                            FACE VERIFIED
+                            {isActive ? "READY TO CLOCK OUT" : "READY TO CLOCK IN"}
                           </span>
                         </>
                       ) : (
@@ -1361,7 +1361,7 @@ export default function ClockPage() {
                   {cameraStatus === "active" && isCameraCovered
                     ? "Camera Feed Blocked or Dark"
                     : faceDetected
-                      ? "Face Verified"
+                      ? "Identity Confirmed"
                       : faceStatus === "loading"
                         ? "Initializing Face ID Engine…"
                         : faceStatus === "detecting"
@@ -1374,7 +1374,7 @@ export default function ClockPage() {
                   {cameraStatus === "active" && isCameraCovered
                     ? "Uncover camera or adjust lighting"
                     : faceDetected
-                      ? "Identity confirmed"
+                      ? "Face matched successfully"
                       : faceStatus === "detecting"
                         ? "Look directly at camera to verify"
                         : "Enable camera to proceed with attendance"}
