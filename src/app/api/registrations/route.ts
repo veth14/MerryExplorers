@@ -120,6 +120,7 @@ export async function POST(request: Request) {
       leadId, // NEW — sent by the register page after the Details step
       isRenewal,
       promoCode,
+      selfDeclaredPreviousAdventure,
     } = data;
 
     // Validate required fields
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
     const submittedPromoCode = String(promoCode || "").trim().replace(/^[“"']+|[”"':]+$/g, "");
     if (submittedPromoCode.toUpperCase() === "A1RENEWAL2026" && Date.now() > new Date("2026-10-16T13:00:00+08:00").getTime()) {
       return NextResponse.json({
-        error: "A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time). If you already registered, open your existing payment page to renew your reservation for 1 hour if a slot is available.",
+        error: "A1RENEWAL2026 expired on October 16, 2026 at 1:00 PM (Manila time). If you already registered, open your existing payment page to renew your reservation for 24 hours if a slot is available.",
       }, { status: 410 });
     }
 
@@ -299,7 +300,7 @@ export async function POST(request: Request) {
     const isTrailblazerCreativePioneer = cleanPromoCode.toUpperCase() === "TRAILBLAZER2CREATIVE";
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")
-      : new Date(Date.now() + 60 * 60 * 1000);
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     // Auto-detect pioneer status if not explicitly passed
     let isPioneer = Boolean(data.isPioneer);
@@ -325,9 +326,11 @@ export async function POST(request: Request) {
       }
     }
 
+    const isNoUniformProgram = ["ballet", "saturday-playdate", "virtual-session", "virtual-tutorial"].includes(program);
+
     // Existing students remain returning families when a parent registers with a new email.
     const existingStudent = await isReturningFamilyRecord(db, { childInfo, parentInfo });
-    const isReturningFamily = Boolean(isPioneer || isRenewal || data.isNewFamily === false || existingStudent);
+    const isReturningFamily = Boolean(isPioneer || isRenewal || data.isNewFamily === false || existingStudent || selfDeclaredPreviousAdventure);
 
     const newRegistration = {
       status: isScholar ? "approved" : "reserved",
@@ -348,9 +351,9 @@ export async function POST(request: Request) {
       signatureUrl,
       signaturePublicId,
       photoConsent,
-      uniformOrdered: uniformOrdered || false,
-      lanyardOrdered: lanyardOrdered || false,
-      welcomeKitOrdered: isReturningFamily ? false : (welcomeKitOrdered || false),
+      uniformOrdered: isNoUniformProgram ? false : (uniformOrdered || false),
+      lanyardOrdered: isNoUniformProgram ? false : (lanyardOrdered || false),
+      welcomeKitOrdered: (isReturningFamily || isNoUniformProgram) ? false : (welcomeKitOrdered || false),
       isNewFamily: !isReturningFamily,
       isPioneer,
       customRate: isScholar ? 0 : (customRate || null),
@@ -368,6 +371,7 @@ export async function POST(request: Request) {
       promoCode: isScholar ? "A1JesusLovesMe2026" : isPriorityReservation ? "A1RENEWAL2026" : isTrailblazerCreativePioneer ? "TRAILBLAZER2CREATIVE" : null,
       isPromoRegistration: isScholar || isPriorityReservation || isTrailblazerCreativePioneer,
       isScholar,
+      selfDeclaredPreviousAdventure: Boolean(selfDeclaredPreviousAdventure),
     };
 
     const result = await db.collection("student_registrations").insertOne(newRegistration);

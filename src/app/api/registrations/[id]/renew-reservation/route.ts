@@ -7,7 +7,7 @@ import { activeRegistrationSlotQuery, countUniqueActiveRegistrationSlots } from 
 
 export const dynamic = "force-dynamic";
 
-const HOLD_DURATION_MS = 60 * 60 * 1000;
+const HOLD_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(
   _request: Request,

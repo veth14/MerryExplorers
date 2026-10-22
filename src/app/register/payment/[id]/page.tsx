@@ -117,8 +117,25 @@ export default function PaymentPage() {
   const [ocrDone, setOcrDone] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
   const [renewingReservation, setRenewingReservation] = useState(false);
+  const [disclaimerAcknowledged, setDisclaimerAcknowledged] = useState(false);
+  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check sessionStorage on mount — show modal if not yet acknowledged for this registration
+  useEffect(() => {
+    if (!id) return;
+    const key = `disclaimer_ack_${id}`;
+    const already = sessionStorage.getItem(key) === "true";
+    setDisclaimerAcknowledged(already);
+    if (!already) setShowDisclaimerModal(true);
+  }, [id]);
+
+  function handleAcknowledgeDisclaimer() {
+    if (id) sessionStorage.setItem(`disclaimer_ack_${id}`, "true");
+    setDisclaimerAcknowledged(true);
+    setShowDisclaimerModal(false);
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -341,6 +358,77 @@ export default function PaymentPage() {
     <div className="vp-root min-h-screen relative overflow-x-hidden">
       <PortalScene />
 
+      {/* ── Disclaimer Modal ─────────────────────────────────────────────── */}
+      {showDisclaimerModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          style={{ background: "rgba(11,42,130,0.70)", backdropFilter: "blur(6px)" }}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-[28px] bg-white border-4 border-[#0b2a82] shadow-[0_0_0_6px_#fff,0_20px_0_rgba(11,42,130,0.25)] overflow-hidden"
+            style={{ animation: "vp-modal-in 0.28s cubic-bezier(.34,1.56,.64,1) both" }}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#0b2a82] to-[#1f7ae0] px-6 py-5 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#ffd23f] border-3 border-white/30 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                📋
+              </div>
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/70">Before You Proceed</p>
+                <h2 className="text-[18px] font-black text-white leading-tight">Important Payment Notice</h2>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4 text-[13px] text-[#27407f] leading-relaxed">
+              <div className="rounded-[18px] bg-[#fffbea] border-2 border-[#ffd23f] p-4 space-y-3">
+                <p className="font-extrabold text-[#0b2a82] text-[14px] flex items-center gap-2">
+                  <span>📌</span> Slot Reservation Notice
+                </p>
+                <p>
+                  Reaching this page means your slot has already been{" "}
+                  <strong>reserved for 24 hours</strong>. Kindly complete your payment within the given reservation period to confirm your registration.
+                </p>
+                <p>
+                  Having trouble uploading your proof of payment or have questions? You may send your payment receipt to our official{" "}
+                  <strong>Facebook page</strong>, and we will complete the registration of your little one. 💛
+                </p>
+                {isPioneer && (
+                  <p className="rounded-xl bg-emerald-50 border border-emerald-300 px-3.5 py-2.5 font-bold text-emerald-900 text-[12.5px]">
+                    ⭐ <strong>For Pioneer Families:</strong> You may still proceed with your payment using your exclusive Pioneer Family rate to secure your slot.
+                  </p>
+                )}
+              </div>
+
+              <p className="text-[12px] font-semibold text-[#3d5a99] text-center">
+                Please read the notice above carefully before proceeding.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6">
+              <button
+                onClick={handleAcknowledgeDisclaimer}
+                className="w-full vp-btn text-[15px]"
+                style={{ minHeight: 52 }}
+              >
+                ✅ I Understand — Proceed to Payment
+              </button>
+            </div>
+
+            {/* Washi tape decoration */}
+            <div className="vp-tape" style={{ top: -14, left: "50%", marginLeft: -46 }} />
+          </div>
+
+          <style>{`
+            @keyframes vp-modal-in {
+              from { opacity: 0; transform: scale(0.88) translateY(24px); }
+              to   { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* ── Universal Floating Pill Header ── */}
       <SiteHeader />
 
@@ -483,7 +571,7 @@ export default function PaymentPage() {
             </h2>
             {reservationIsExpired ? (
               <>
-                <p className="vp-sub mb-6">If your class still has an available slot, you can renew this reservation and get 1 hour to submit payment.</p>
+                <p className="vp-sub mb-6">If your class still has an available slot, you can renew this reservation and get 24 hours to submit payment.</p>
                 {regData?.parentEmail && (
                   <p className="mx-auto mb-4 max-w-md rounded-2xl border-2 border-[#b6dcf5] bg-[#f2faff] px-4 py-3 text-sm font-semibold text-[#0b2a82]">
                     Email used for this registration: <strong className="break-all">{regData.parentEmail}</strong>
@@ -491,7 +579,7 @@ export default function PaymentPage() {
                 )}
                 {error && <div className="vp-error mb-4">❌ {error}</div>}
                 <button onClick={handleRenewReservation} disabled={renewingReservation} className="vp-btn disabled:opacity-60">
-                  {renewingReservation ? "Checking availability…" : "Renew Reservation for 1 Hour"}
+                  {renewingReservation ? "Checking availability…" : "Renew Reservation for 24 Hours"}
                 </button>
               </>
             ) : (
@@ -836,6 +924,26 @@ export default function PaymentPage() {
             >
               {submitting ? "Submitting Payment..." : "Submit Payment Receipt 🎉"}
             </button>
+
+            {/* Payment Disclaimer Note */}
+            {!isBalanceMode && (
+              <div className="mt-5 rounded-[20px] bg-[#fffbea] border-2 border-[#ffd23f] p-5 text-[12.5px] text-[#3d2c00] leading-relaxed space-y-3 shadow-sm">
+                <p className="font-extrabold text-[#0b2a82] text-[13px] flex items-center gap-2">
+                  <span>📌</span> Important Notice
+                </p>
+                <p>
+                  <strong>Disclaimer:</strong> Please note that reaching this page means your slot has already been reserved for <strong>24 hours</strong>. Kindly complete your payment within the given reservation period to confirm your registration.
+                </p>
+                <p>
+                  Having trouble uploading your proof of payment or have questions? You may send your payment receipt to our official <strong>Facebook page</strong>, and we will complete the registration of your little one. 💛
+                </p>
+                {isPioneer && (
+                  <p className="rounded-xl bg-emerald-50 border border-emerald-300 px-3.5 py-2.5 font-bold text-emerald-900 text-[12px]">
+                    ⭐ <strong>For Pioneer Families:</strong> You may still proceed with your payment using your exclusive Pioneer Family rate to secure your slot.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

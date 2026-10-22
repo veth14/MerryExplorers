@@ -134,26 +134,42 @@ export async function PATCH(
     }
 
     const body = await request.json().catch(() => ({}));
-    if (typeof body.isNewFamily !== "boolean") {
-      return NextResponse.json({ error: "Choose whether this is a new or returning family." }, { status: 400 });
+    const updateFields: Record<string, any> = {};
+
+    if (typeof body.isNewFamily === "boolean") {
+      updateFields.isNewFamily = body.isNewFamily;
+      updateFields.familyTypeOverride = body.isNewFamily;
+      if (!body.isNewFamily) {
+        updateFields.welcomeKitOrdered = false;
+      }
+    }
+
+    if (typeof body.selfDeclaredPreviousAdventure === "boolean") {
+      updateFields.selfDeclaredPreviousAdventure = body.selfDeclaredPreviousAdventure;
+      if (body.selfDeclaredPreviousAdventure) {
+        updateFields.isNewFamily = false;
+        updateFields.familyTypeOverride = false;
+        updateFields.welcomeKitOrdered = false;
+      }
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });
     }
 
     const { db } = await connectToDatabase();
     const result = await db.collection("student_registrations").updateOne(
       { _id: new ObjectId(id) },
-      {
-        $set: {
-          isNewFamily: body.isNewFamily,
-          familyTypeOverride: body.isNewFamily,
-          ...(body.isNewFamily ? {} : { welcomeKitOrdered: false }),
-        },
-      }
+      { $set: updateFields }
     );
     if (!result.matchedCount) {
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, isNewFamily: body.isNewFamily });
+    return NextResponse.json({
+      success: true,
+      ...updateFields,
+    });
   } catch (error: any) {
     console.error("[registrations PATCH family type] Error:", error);
     return NextResponse.json({ error: "Failed to update family type" }, { status: 500 });

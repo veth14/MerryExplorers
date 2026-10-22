@@ -46,6 +46,7 @@ interface Registration {
   reservedUntil?: string;
   paymentPortalOpen?: boolean;
   paymentPortalOpenedAt?: string;
+  selfDeclaredPreviousAdventure?: boolean;
 }
 
 const PROGRAM_NAMES: Record<string, string> = {
@@ -520,6 +521,11 @@ function DetailModal({
                     ⭐ Pioneer Family
                   </span>
                 )}
+                {reg.selfDeclaredPreviousAdventure && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-800 shadow-sm">
+                    🎒 Continuing Student (Self-Declared)
+                  </span>
+                )}
                 {isTestRegistration(reg) && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2.5 py-0.5 text-[11px] font-extrabold text-slate-700 shadow-sm">
                     🧪 Test Account
@@ -787,6 +793,37 @@ function DetailModal({
               <InfoRow label="Program Waiver" value="Digitally Signed ✓" highlight="green" />
               <InfoRow label="Uniform Kit" value={reg.uniformOrdered ? "Yes — ₱650" : "Not ordered"} />
               <InfoRow label="Confirmation Email" value={reg.confirmationEmailSent ? "✅ Sent" : "Not sent yet"} highlight={reg.confirmationEmailSent ? "green" : undefined} />
+              <div className="pt-2.5 mt-2 border-t border-slate-100 space-y-2">
+                <InfoRow
+                  label="Continuing Family (Self-Declared)"
+                  value={reg.selfDeclaredPreviousAdventure ? "Yes — continuing from previous Adventure" : "No (Standard enrollment)"}
+                  highlight={reg.selfDeclaredPreviousAdventure ? "blue" : undefined}
+                />
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-500 font-medium">Continuing status:</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nextVal = !reg.selfDeclaredPreviousAdventure;
+                      try {
+                        const res = await fetch(`/api/registrations/${reg.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ selfDeclaredPreviousAdventure: nextVal }),
+                        });
+                        if (res.ok) {
+                          onRefreshRegistrations();
+                        }
+                      } catch (e) {
+                        console.error(e);
+                      }
+                    }}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    {reg.selfDeclaredPreviousAdventure ? "Remove Continuing Flag" : "Mark as Continuing Student"}
+                  </button>
+                </div>
+              </div>
             </SectionCard>
 
             {/* Signature */}
@@ -2433,6 +2470,14 @@ export default function AdminRegistrationsPage() {
                             <span className="mt-1 inline-flex rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-[#0033A0]">
                               {adventureLabel(reg)}
                             </span>
+                            {reg.selfDeclaredPreviousAdventure && (
+                              <span
+                                className="mt-1 ml-1.5 inline-flex items-center gap-0.5 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-800"
+                                title="Parent self-declared current enrollment in previous Adventure"
+                              >
+                                🎒 Continuing
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>

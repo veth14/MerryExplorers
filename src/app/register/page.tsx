@@ -186,6 +186,9 @@ export default function RegisterPage() {
   // Uniform day acknowledgment
   const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState<boolean>(draft?.uniformDayAcknowledged ?? false);
 
+  // Previous adventure self-declaration
+  const [selfDeclaredPreviousAdventure, setSelfDeclaredPreviousAdventure] = useState<boolean>(draft?.selfDeclaredPreviousAdventure ?? false);
+
   // Auto Prefill
   const [prefilledFamilyName, setPrefilledFamilyName] = useState<string>("");
   const [prefillLoading, setPrefillLoading] = useState<boolean>(false);
@@ -459,13 +462,14 @@ export default function RegisterPage() {
       promoCode, promoAccepted,
       uniformDayAcknowledged,
       dataPrivacyConsent,
+      selfDeclaredPreviousAdventure,
     });
   }, [
     step, selectedProgram, selectedClass,
     childInfo, parentInfo, emergencyContact,
     photoConsent, waiverRead, signatureBase64,
     isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
-    leadId, promoCode, promoAccepted, uniformDayAcknowledged, dataPrivacyConsent,
+    leadId, promoCode, promoAccepted, uniformDayAcknowledged, dataPrivacyConsent, selfDeclaredPreviousAdventure,
   ]);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
@@ -718,6 +722,7 @@ export default function RegisterPage() {
           // promoCustomRate overrides the rate (e.g. TRAILBLAZER2CREATIVE: brave-explorer at ₱4,820)
           isPioneer: isPioneer || Boolean(promoCustomRate) || undefined,
           customRate: promoCustomRate ? promoCustomRate : (isPioneer && selectedProgram && pioneerPrices[selectedProgram]) ? pioneerPrices[selectedProgram] : undefined,
+          selfDeclaredPreviousAdventure: selfDeclaredPreviousAdventure || false,
         }),
       });
       const data = await res.json();
@@ -1496,6 +1501,44 @@ export default function RegisterPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Previous Adventure Self-Declaration (for adventure programs only, shown after program is selected) */}
+                {selectedProgram && !["ballet", "saturday-playdate", "virtual-session"].includes(selectedProgram) && (() => {
+                  const progSetting = renewalSettings[PROGRAM_SLOTS[selectedProgram as ProgramId]?.name] || renewalSettings[selectedProgram];
+                  const registeringAdventureNum = progSetting?.registrationAdventure ?? progSetting?.currentAdventure ?? 2;
+                  const currentAdventureNum = progSetting?.currentAdventure ?? Math.max(1, registeringAdventureNum - 1);
+                  return (
+                    <div className="mt-5 rounded-[22px] bg-[#eef5ff] border-3 border-[#1f7ae0] p-5 shadow-[0_4px_0_rgba(31,122,224,0.18)] space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🎒</span>
+                        <p className="text-[13.5px] font-black text-[#0b2a82]">
+                          Are you currently registered in Adventure {currentAdventureNum}?
+                        </p>
+                      </div>
+                      <p className="text-[12px] font-medium text-[#3d5a99] leading-relaxed">
+                        If your child is <strong>currently registered in Adventure {currentAdventureNum}</strong> of this program (even if registered under another email or guardian), please check the box below so our team links your registration to your ongoing student record.
+                      </p>
+                      <label className="flex items-start gap-3 cursor-pointer pt-1 group">
+                        <input
+                          type="checkbox"
+                          id="self-declared-previous-adventure"
+                          checked={selfDeclaredPreviousAdventure}
+                          onChange={(e) => setSelfDeclaredPreviousAdventure(e.target.checked)}
+                          className="mt-1 h-5 w-5 rounded-md border-2 border-[#1f7ae0] accent-[#1f7ae0] cursor-pointer"
+                        />
+                        <span className="text-[13px] font-bold text-[#0b2a82] leading-snug">
+                          I am currently registered in Adventure {currentAdventureNum} (Registering for Adventure {registeringAdventureNum})
+                        </span>
+                      </label>
+                      {selfDeclaredPreviousAdventure && (
+                        <div className="rounded-xl bg-blue-50 border border-[#1f7ae0]/40 px-3.5 py-2.5 text-[12px] font-bold text-[#0b2a82] flex items-start gap-2">
+                          <span className="text-base shrink-0">✅</span>
+                          <span>Continuing Student recorded! We will link your Adventure {currentAdventureNum} profile and waive new-family kit fees.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Uniform Day Acknowledgment (only for weekday explorer programs with Wed/Fri uniform) */}
                 {requiresUniformDay && (
