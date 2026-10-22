@@ -47,6 +47,7 @@ interface Registration {
   paymentPortalOpen?: boolean;
   paymentPortalOpenedAt?: string;
   selfDeclaredPreviousAdventure?: boolean;
+  detectedPreviousAdventure?: number;
 }
 
 const PROGRAM_NAMES: Record<string, string> = {
@@ -522,8 +523,8 @@ function DetailModal({
                   </span>
                 )}
                 {reg.selfDeclaredPreviousAdventure && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-800 shadow-sm">
-                    🎒 Continuing Student (Self-Declared)
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-300 px-2.5 py-0.5 text-[11px] font-extrabold text-blue-800 shadow-sm">
+                    🎒 Continuing Student {reg.detectedPreviousAdventure ? `(Adventure ${reg.detectedPreviousAdventure})` : "(Self-Declared)"}
                   </span>
                 )}
                 {isTestRegistration(reg) && (
@@ -795,9 +796,15 @@ function DetailModal({
               <InfoRow label="Confirmation Email" value={reg.confirmationEmailSent ? "✅ Sent" : "Not sent yet"} highlight={reg.confirmationEmailSent ? "green" : undefined} />
               <div className="pt-2.5 mt-2 border-t border-slate-100 space-y-2">
                 <InfoRow
-                  label="Continuing Family (Self-Declared)"
-                  value={reg.selfDeclaredPreviousAdventure ? "Yes — continuing from previous Adventure" : "No (Standard enrollment)"}
-                  highlight={reg.selfDeclaredPreviousAdventure ? "blue" : undefined}
+                  label="Continuing Family Status"
+                  value={
+                    reg.detectedPreviousAdventure
+                      ? `Yes — verified from Adventure ${reg.detectedPreviousAdventure}`
+                      : reg.selfDeclaredPreviousAdventure
+                      ? "Yes — continuing from previous Adventure"
+                      : "No (Standard enrollment)"
+                  }
+                  highlight={reg.selfDeclaredPreviousAdventure || reg.detectedPreviousAdventure ? "blue" : undefined}
                 />
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px] text-slate-500 font-medium">Continuing status:</span>
@@ -2472,10 +2479,10 @@ export default function AdminRegistrationsPage() {
                             </span>
                             {reg.selfDeclaredPreviousAdventure && (
                               <span
-                                className="mt-1 ml-1.5 inline-flex items-center gap-0.5 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-800"
-                                title="Parent self-declared current enrollment in previous Adventure"
+                                className="mt-1 ml-1.5 inline-flex items-center gap-0.5 rounded-md border border-blue-300 bg-blue-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-800"
+                                title={reg.detectedPreviousAdventure ? `Verified continuing student from Adventure ${reg.detectedPreviousAdventure}` : "Parent declared continuing from previous Adventure"}
                               >
-                                🎒 Continuing
+                                🎒 Continuing {reg.detectedPreviousAdventure ? `(Adv ${reg.detectedPreviousAdventure})` : ""}
                               </span>
                             )}
                           </div>

@@ -6,7 +6,7 @@ import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumbe
 import { BALLET, PROGRAM_SLOTS } from "@/data/landing";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
-import { isReturningFamilyRecord } from "@/lib/returning-family";
+import { isReturningFamilyRecord, findReturningFamilyMatch } from "@/lib/returning-family";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 import { activeRegistrationSlotQuery, countUniqueActiveRegistrationSlots } from "@/lib/registration-slots";
 import { isPlausiblePersonName, formatPersonName } from "@/lib/person-name-validation";
@@ -329,7 +329,8 @@ export async function POST(request: Request) {
     const isNoUniformProgram = ["ballet", "saturday-playdate", "virtual-session", "virtual-tutorial"].includes(program);
 
     // Existing students remain returning families when a parent registers with a new email.
-    const existingStudent = await isReturningFamilyRecord(db, { childInfo, parentInfo });
+    const returningMatch = await findReturningFamilyMatch(db, { childInfo, parentInfo });
+    const existingStudent = returningMatch.isReturning;
     const isReturningFamily = Boolean(isPioneer || isRenewal || data.isNewFamily === false || existingStudent || selfDeclaredPreviousAdventure);
 
     const newRegistration = {
@@ -371,7 +372,9 @@ export async function POST(request: Request) {
       promoCode: isScholar ? "A1JesusLovesMe2026" : isPriorityReservation ? "A1RENEWAL2026" : isTrailblazerCreativePioneer ? "TRAILBLAZER2CREATIVE" : null,
       isPromoRegistration: isScholar || isPriorityReservation || isTrailblazerCreativePioneer,
       isScholar,
-      selfDeclaredPreviousAdventure: Boolean(selfDeclaredPreviousAdventure),
+      selfDeclaredPreviousAdventure: Boolean(selfDeclaredPreviousAdventure || returningMatch.isReturning),
+      detectedPreviousAdventure: returningMatch.previousAdventureNumber || null,
+      previousProgram: returningMatch.previousProgram || null,
     };
 
     const result = await db.collection("student_registrations").insertOne(newRegistration);

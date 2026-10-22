@@ -65,12 +65,32 @@ export async function GET(request: Request) {
     const adventureSettings = renewalSettingsDoc?.programs || [];
 
     // 1. Families (excluding test accounts)
-    const allFamilies = await db.collection("renewal_families").find({}).toArray();
+    const [allFamilies, pioneerDocs] = await Promise.all([
+      db.collection("renewal_families").find({}).toArray(),
+      db.collection("pioneer_families").find({}).toArray(),
+    ]);
     const families = allFamilies.filter((f) => !isTestAccount(f.parentEmail, f.parentName));
+
+    const emailToPioneerMap = new Map<string, any>();
+    for (const p of pioneerDocs) {
+      if (p.email) emailToPioneerMap.set(p.email.toLowerCase().trim(), p);
+      if (p.email2) emailToPioneerMap.set(p.email2.toLowerCase().trim(), p);
+    }
 
     const familyMap = new Map<string, any>();
     for (const f of families) {
       familyMap.set(familyKey(f.parentEmail, f.childName), f);
+      if (f.registrationId) {
+        familyMap.set(`reg___${f.registrationId}`, f);
+      }
+      if (f.secondaryEmail) {
+        familyMap.set(familyKey(f.secondaryEmail, f.childName), f);
+      }
+      const pioneer = emailToPioneerMap.get((f.parentEmail || "").toLowerCase().trim());
+      if (pioneer) {
+        if (pioneer.email) familyMap.set(familyKey(pioneer.email, f.childName), f);
+        if (pioneer.email2) familyMap.set(familyKey(pioneer.email2, f.childName), f);
+      }
     }
 
     // Pricing context (shared with PATCH so both use identical tuition rules)
@@ -82,6 +102,10 @@ export async function GET(request: Request) {
         { isPromoRegistration: true },
         { "parentInfo.isRenewal": true },
         { renewalPeriod: period },
+        { selfDeclaredPreviousAdventure: true },
+        { familyId: { $exists: true, $ne: null } },
+        { adventureNumber: 2 },
+        { period: /adventure-2/i },
       ],
     };
     if (program && program !== "all") regQuery.program = program;
@@ -101,8 +125,26 @@ export async function GET(request: Request) {
 
     const buildRecord = (r: any) => {
       const childFull = `${r.childInfo?.firstName || ""} ${r.childInfo?.lastName || ""}`.trim();
-      const parentEmail = (r.parentInfo?.email || "").toLowerCase();
-      const matchedFamily = familyMap.get(familyKey(parentEmail, childFull));
+      const parentEmail = (r.parentInfo?.email || "").toLowerCase().trim();
+      const regId = r._id?.toString();
+
+      let matchedFamily = (regId && familyMap.get(`reg___${regId}`)) ||
+                          familyMap.get(familyKey(parentEmail, childFull));
+
+      if (!matchedFamily) {
+        const rFirst = (r.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
+        const rLast = (r.childInfo?.lastName || "").toLowerCase().trim();
+        for (const f of families) {
+          const fChild = (f.childName || "").toLowerCase().trim();
+          if (rFirst && fChild.includes(rFirst) && (!rLast || fChild.includes(rLast))) {
+            const pioneer = emailToPioneerMap.get(parentEmail);
+            if (pioneer || f.parentEmail?.toLowerCase() === parentEmail || f.secondaryEmail?.toLowerCase() === parentEmail) {
+              matchedFamily = f;
+              break;
+            }
+          }
+        }
+      }
 
       // Financials (shared logic with PATCH)
       const { totalTuition, expectedDownpayment, isPioneer: isPioneerRecord } = computeTuition(

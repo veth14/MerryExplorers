@@ -569,11 +569,34 @@ export default function AdminStudentsPage() {
         upcomingAdventure = adv2;
         previousAdventure = undefined;
       } else if (adv2 && !adv1) {
-        // Brand new student registered only for Adventure 2:
-        // Do NOT input anything into Current Adventure! Leave it empty!
-        currentAdventure = undefined;
-        upcomingAdventure = adv2;
-        previousAdventure = undefined;
+        // Check if student is an ongoing/continuing explorer from Adventure 1 (e.g. from renewal_families, pioneer cohort, or detected previous adventure)
+        const prevProg = (adv2 as any).previousProgram || (latest as any).previousProgram || (adv2 as any).previousProgramName;
+        const prevAdvNum = (adv2 as any).previousAdventureNumber || (latest as any).previousAdventureNumber || (adv2 as any).detectedPreviousAdventure;
+        const isContinuing = Boolean(prevProg || prevAdvNum === 1 || adv2.isPioneer || (adv2 as any).selfDeclaredPreviousAdventure);
+
+        if (isContinuing) {
+          const progSlug = prevProg
+            ? (prevProg.toLowerCase().includes("everyday") ? "everyday-curious" : prevProg.toLowerCase().includes("creative") ? "creative-explorer" : prevProg.toLowerCase().includes("brave") ? "brave-explorer" : "curious-explorer")
+            : adv2.program;
+          currentAdventure = {
+            ...adv2,
+            id: `${adv2.id}_adv1`,
+            adventureNumber: 1,
+            program: progSlug,
+            programName: prevProg || adv2.programName || "Adventure 1",
+            classTime: "Completed Adventure 1",
+            enrolledAt: adv2.enrolledAt,
+            status: "approved",
+          };
+          upcomingAdventure = adv2;
+          previousAdventure = undefined;
+        } else {
+          // Brand new student registered only for Adventure 2:
+          // Do NOT input anything into Current Adventure! Leave it empty!
+          currentAdventure = undefined;
+          upcomingAdventure = adv2;
+          previousAdventure = undefined;
+        }
       } else {
         // Enrolled in Adventure 1, has not registered for Adventure 2 yet
         currentAdventure = adv1;

@@ -62,8 +62,15 @@ export async function GET(request: Request) {
       );
     });
 
-    // Load pioneer families to link isPioneer flag dynamically
-    const pioneerDocs = await db.collection("pioneer_families").find({}).toArray();
+    // Load pioneer families to link isPioneer flag dynamically and link alternate emails
+    const [pioneerDocs, activeRegistrations] = await Promise.all([
+      db.collection("pioneer_families").find({}).toArray(),
+      db.collection("student_registrations").find({
+        status: { $in: ["approved", "active", "reserved"] },
+        $or: [{ adventureNumber: 2 }, { period: /adventure-2/i }],
+      }).toArray(),
+    ]);
+
     const pioneerEmails = new Set(pioneerDocs.flatMap((p) => [p.email, p.email2].map((email) => (email || "").toLowerCase().trim()).filter(Boolean)));
     const pioneerChildFirsts = new Set(
       pioneerDocs
@@ -71,19 +78,59 @@ export async function GET(request: Request) {
         .filter(Boolean)
     );
 
+    const emailToPioneerMap = new Map<string, any>();
+    for (const p of pioneerDocs) {
+      if (p.email) emailToPioneerMap.set(p.email.toLowerCase().trim(), p);
+      if (p.email2) emailToPioneerMap.set(p.email2.toLowerCase().trim(), p);
+    }
+
     return NextResponse.json({
       success: true,
       data: families.map((f) => {
         const emailLower = (f.parentEmail || "").toLowerCase().trim();
+        const secondaryLower = (f.secondaryEmail || "").toLowerCase().trim();
         const childFirst = (f.childName || "").toLowerCase().trim().split(/\s+/)[0];
+        const childLast = (f.childName || "").toLowerCase().trim().split(/\s+/).slice(-1)[0];
+        const pioneer = emailToPioneerMap.get(emailLower) || (secondaryLower ? emailToPioneerMap.get(secondaryLower) : null);
         const isPioneer = Boolean(
           f.isPioneer ||
           pioneerEmails.has(emailLower) ||
+          (secondaryLower && pioneerEmails.has(secondaryLower)) ||
           (childFirst && pioneerChildFirsts.has(childFirst))
         );
+
+        // Check if an approved/paid registration exists for this family
+        let effectiveStatus = f.renewalStatus || "not_yet_submitted";
+        let linkedRegistrationId = f.registrationId || null;
+
+        if (effectiveStatus === "not_yet_submitted" || !linkedRegistrationId) {
+          const matchedReg = activeRegistrations.find((r: any) => {
+            if (linkedRegistrationId && r._id.toString() === linkedRegistrationId) return true;
+            const regEmail = (r.parentInfo?.email || "").toLowerCase().trim();
+            const rFirst = (r.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
+            const rLast = (r.childInfo?.lastName || "").toLowerCase().trim();
+
+            const emailMatches =
+              regEmail === emailLower ||
+              (secondaryLower && regEmail === secondaryLower) ||
+              (pioneer && (regEmail === pioneer.email?.toLowerCase().trim() || regEmail === pioneer.email2?.toLowerCase().trim()));
+
+            const nameMatches = Boolean(rFirst && childFirst && rFirst === childFirst && (!rLast || !childLast || rLast === childLast));
+
+            return emailMatches && nameMatches;
+          });
+
+          if (matchedReg) {
+            linkedRegistrationId = matchedReg._id.toString();
+            effectiveStatus = (matchedReg.status === "approved" || Number(matchedReg.amountPaid) > 0) ? "confirmed" : "reserved";
+          }
+        }
+
         return {
           ...f,
           _id: f._id.toString(),
+          registrationId: linkedRegistrationId,
+          renewalStatus: effectiveStatus,
           isPioneer,
         };
       }),

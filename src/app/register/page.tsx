@@ -186,8 +186,11 @@ export default function RegisterPage() {
   // Uniform day acknowledgment
   const [uniformDayAcknowledged, setUniformDayAcknowledged] = useState<boolean>(draft?.uniformDayAcknowledged ?? false);
 
-  // Previous adventure self-declaration
+  // Previous adventure self-declaration & auto-detection
   const [selfDeclaredPreviousAdventure, setSelfDeclaredPreviousAdventure] = useState<boolean>(draft?.selfDeclaredPreviousAdventure ?? false);
+  const [detectedPreviousAdventure, setDetectedPreviousAdventure] = useState<number | null>(draft?.detectedPreviousAdventure ?? null);
+  const [detectedChildName, setDetectedChildName] = useState<string>(draft?.detectedChildName ?? "");
+  const [detectedProgram, setDetectedProgram] = useState<string>(draft?.detectedProgram ?? "");
 
   // Auto Prefill
   const [prefilledFamilyName, setPrefilledFamilyName] = useState<string>("");
@@ -239,6 +242,11 @@ export default function RegisterPage() {
               }));
             }
             setIsNewFamily(false);
+            setSelfDeclaredPreviousAdventure(true);
+            setDetectedPreviousAdventure(1);
+            if (data.previousProgram) {
+              setDetectedProgram(data.previousProgram);
+            }
             if (data.promoCode) {
               setPromoCode(data.promoCode);
               setPromoAccepted(true);
@@ -249,6 +257,7 @@ export default function RegisterPage() {
             }
             const displayName = data.childInfo?.firstName || data.childName || "Explorer";
             setPrefilledFamilyName(displayName);
+            setDetectedChildName(displayName);
           }
         })
         .catch((err) => {
@@ -314,29 +323,43 @@ export default function RegisterPage() {
     return () => clearTimeout(timer);
   }, [parentInfo?.email, pioneerFamiliesList]);
 
-  // Proactive duplicate check: when both email + child first name are filled, check for existing registration
+  // Proactive duplicate & returning student check
   useEffect(() => {
     const email = (parentInfo?.email || "").toLowerCase().trim();
     const firstName = (childInfo?.firstName || "").trim();
     const lastName = (childInfo?.lastName || "").trim();
-    if (!email || !firstName) {
+    const parentName = (parentInfo?.name || "").trim();
+    const parentPhone = (parentInfo?.phone || "").trim();
+
+    if (!firstName || (!email && !lastName && !parentPhone && !parentName)) {
       setDuplicateRegId(null);
       setDuplicateChildName("");
       setDuplicateRegSubmittedAt(null);
       setDuplicateRegExpired(false);
       setDuplicateRegPromoCode(null);
+      setDetectedPreviousAdventure(null);
+      setDetectedChildName("");
+      setDetectedProgram("");
       return;
     }
     const timer = setTimeout(async () => {
       try {
-        const parentName = (parentInfo?.name || "").trim();
-        const parentPhone = (parentInfo?.phone || "").trim();
         const dateOfBirth = (childInfo?.dateOfBirth || "").trim();
         const res = await fetch(`/api/registrations/check-duplicate?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&dateOfBirth=${encodeURIComponent(dateOfBirth)}&parentName=${encodeURIComponent(parentName)}&parentPhone=${encodeURIComponent(parentPhone)}&program=${encodeURIComponent(selectedProgram || "curious-explorer")}`);
         const d = await res.json();
         if (d.isReturningFamily) {
           setIsNewFamily(false);
           setWelcomeKitOrdered(false);
+          setSelfDeclaredPreviousAdventure(true);
+          setDetectedPreviousAdventure(d.previousAdventureNumber ?? 1);
+          setDetectedChildName(d.matchedChildName || firstName);
+          if (d.previousProgram) {
+            setDetectedProgram(d.previousProgram);
+          }
+        } else {
+          setDetectedPreviousAdventure(null);
+          setDetectedChildName("");
+          setDetectedProgram("");
         }
         if (d.exists && d.registrationId) {
           setDuplicateRegId(d.registrationId);
@@ -352,7 +375,7 @@ export default function RegisterPage() {
           setDuplicateRegPromoCode(null);
         }
       } catch { /* ignore */ }
-    }, 900);
+    }, 600);
     return () => clearTimeout(timer);
   }, [parentInfo?.email, parentInfo?.name, parentInfo?.phone, childInfo?.firstName, childInfo?.lastName, childInfo?.dateOfBirth, selectedProgram]);
 
@@ -463,6 +486,9 @@ export default function RegisterPage() {
       uniformDayAcknowledged,
       dataPrivacyConsent,
       selfDeclaredPreviousAdventure,
+      detectedPreviousAdventure,
+      detectedChildName,
+      detectedProgram,
     });
   }, [
     step, selectedProgram, selectedClass,
@@ -470,6 +496,7 @@ export default function RegisterPage() {
     photoConsent, waiverRead, signatureBase64,
     isNewFamily, uniformOrdered, lanyardOrdered, welcomeKitOrdered, paymentType, amountPaid, referenceNumber,
     leadId, promoCode, promoAccepted, uniformDayAcknowledged, dataPrivacyConsent, selfDeclaredPreviousAdventure,
+    detectedPreviousAdventure, detectedChildName, detectedProgram,
   ]);
 
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
@@ -716,13 +743,14 @@ export default function RegisterPage() {
           // Send promo code as-is (case-sensitive) — A1JesusLovesMe2026 is case-sensitive on the server
           promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
-          isNewFamily: (isPioneer || promoCustomRate) ? false : isNewFamily,
-          welcomeKitOrdered: (isPioneer || promoCustomRate) ? false : welcomeKitOrdered,
+          isNewFamily: (isPioneer || promoCustomRate || detectedPreviousAdventure || selfDeclaredPreviousAdventure) ? false : isNewFamily,
+          welcomeKitOrdered: (isPioneer || promoCustomRate || detectedPreviousAdventure || selfDeclaredPreviousAdventure) ? false : welcomeKitOrdered,
           // Pioneer pricing — pass flag and customRate so server stores it
           // promoCustomRate overrides the rate (e.g. TRAILBLAZER2CREATIVE: brave-explorer at ₱4,820)
           isPioneer: isPioneer || Boolean(promoCustomRate) || undefined,
           customRate: promoCustomRate ? promoCustomRate : (isPioneer && selectedProgram && pioneerPrices[selectedProgram]) ? pioneerPrices[selectedProgram] : undefined,
-          selfDeclaredPreviousAdventure: selfDeclaredPreviousAdventure || false,
+          selfDeclaredPreviousAdventure: Boolean(selfDeclaredPreviousAdventure || detectedPreviousAdventure),
+          detectedPreviousAdventure: detectedPreviousAdventure || undefined,
         }),
       });
       const data = await res.json();
@@ -907,6 +935,25 @@ export default function RegisterPage() {
                     <div>
                       <p className="font-black text-[14px] text-[#0b2a82]">Welcome back, {prefilledFamilyName}! 🌈</p>
                       <p className="text-[12px] font-medium text-[#3d5a99]">We&apos;ve filled in your Adventure 1 details automatically. Feel free to review or modify anything below.</p>
+                    </div>
+                  </div>
+                )}
+
+                {detectedPreviousAdventure && !prefilledFamilyName && (
+                  <div className="mb-5 rounded-[22px] bg-[#eef5ff] border-3 border-[#1f7ae0] p-4 flex items-center gap-3 shadow-[0_4px_0_rgba(31,122,224,0.18)]">
+                    <span className="text-2xl shrink-0">🎒</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-black text-[14px] text-[#0b2a82]">
+                          Welcome back, {detectedChildName || childInfo.firstName}! 🌟
+                        </p>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#1f7ae0] text-white">
+                          Adventure {detectedPreviousAdventure} Student
+                        </span>
+                      </div>
+                      <p className="text-[12px] font-medium text-[#3d5a99] mt-0.5">
+                        We found your previous registration in <strong>Adventure {detectedPreviousAdventure}</strong>. We&apos;ve automatically marked your continuing student status and waived the new-family welcome kit fee!
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1502,11 +1549,39 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Previous Adventure Self-Declaration (for adventure programs only, shown after program is selected) */}
+                {/* Previous Adventure Tracking (Auto-detected or Self-Declaration) */}
                 {selectedProgram && !["ballet", "saturday-playdate", "virtual-session"].includes(selectedProgram) && (() => {
                   const progSetting = renewalSettings[PROGRAM_SLOTS[selectedProgram as ProgramId]?.name] || renewalSettings[selectedProgram];
                   const registeringAdventureNum = progSetting?.registrationAdventure ?? progSetting?.currentAdventure ?? 2;
                   const currentAdventureNum = progSetting?.currentAdventure ?? Math.max(1, registeringAdventureNum - 1);
+
+                  if (detectedPreviousAdventure) {
+                    return (
+                      <div className="mt-5 rounded-[22px] bg-gradient-to-br from-[#eef5ff] to-[#e1f0ff] border-3 border-[#1f7ae0] p-5 shadow-[0_4px_0_rgba(31,122,224,0.18)] space-y-3">
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl shrink-0 mt-0.5">🎒</span>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-[14px] font-black text-[#0b2a82]">
+                                Verified: Currently Registered in Adventure {detectedPreviousAdventure}
+                              </p>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-[#1f7ae0] text-white">
+                                Auto-Detected
+                              </span>
+                            </div>
+                            <p className="text-[12px] font-medium text-[#3d5a99] mt-1 leading-relaxed">
+                              We verified that <strong>{detectedChildName || childInfo.firstName || "your child"}</strong> is an active student from Adventure {detectedPreviousAdventure}.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-blue-50 border border-[#1f7ae0]/40 px-3.5 py-2.5 text-[12px] font-bold text-[#0b2a82] flex items-start gap-2">
+                          <span className="text-base shrink-0">✅</span>
+                          <span>Continuing Student profile linked! Registering for Adventure {registeringAdventureNum} with new-family welcome kit fees waived.</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="mt-5 rounded-[22px] bg-[#eef5ff] border-3 border-[#1f7ae0] p-5 shadow-[0_4px_0_rgba(31,122,224,0.18)] space-y-3">
                       <div className="flex items-center gap-2">
