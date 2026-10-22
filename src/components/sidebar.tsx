@@ -382,7 +382,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { signOut, user, userProfile } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>("HR & People");
+  const [expandedGroup, setExpandedGroup] = useState<string | null>("Students & Enrollment");
 
   const displayName = userProfile?.fullName || user?.email || "Admin User";
   const initials =
@@ -390,10 +390,22 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       .map((w: string) => w[0].toUpperCase()).join("") || "AU";
 
   const adminGroups = [
-    { title: "HR & People", items: ["Teachers", "Accounts", "Parents", "Payroll"] },
-    { title: "Time & Attendance", items: ["Calendar", "Attendance", "Leave Requests"] },
-    { title: "Programs & Finance", items: ["Programs", "Registrations", "Renewals", "Students & Families", "Payments", "Pioneer Families", "Virtual Sessions", "Discovery Day"] },
-    { title: "Content & Logs", items: ["Inquiries", "Reports", "Announcements", "Gallery", "Photo Albums", "Audit Log"] },
+    {
+      title: "Students & Enrollment",
+      items: ["Registrations", "Renewals", "Payments", "Students & Families", "Parents", "Pioneer Families"],
+    },
+    {
+      title: "Programs & Calendar",
+      items: ["Programs", "Calendar", "Discovery Day", "Virtual Sessions"],
+    },
+    {
+      title: "Staff & HR",
+      items: ["Teachers", "Attendance", "Leave Requests", "Payroll", "Accounts"],
+    },
+    {
+      title: "Content & System",
+      items: ["Inquiries", "Announcements", "Gallery", "Photo Albums", "Reports", "Audit Log"],
+    },
   ].map((g) => ({
     ...g,
     items: g.items
@@ -451,10 +463,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       {/* ── Nav ── */}
       <nav className="flex-1 px-3 pb-3 flex flex-col gap-5 overflow-y-auto">
 
-        {/* Executive Assistant — My Teacher View */}
+        {/* Executive Assistant — Teacher Tools */}
         {isExecPartner && (
           <div>
-            <SectionLabel>My Teacher View</SectionLabel>
+            <SectionLabel>Teacher Tools</SectionLabel>
             <div className="space-y-0.5">
               {teacherLinks.map((item) => (
                 <NavItem

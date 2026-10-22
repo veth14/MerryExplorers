@@ -193,6 +193,22 @@ function DiscoveryDayIcon() {
   );
 }
 
+function RenewalsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+    </svg>
+  );
+}
+
+function StarIcon({ active }: { active?: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <path strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+    </svg>
+  );
+}
+
 // ─── Nav item ─────────────────────────────────────────────────────────────────
 function NavItem({
   href, label, icon, isActive, onClick, size = "md",
@@ -312,7 +328,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   const pathname = usePathname();
   const { signOut, userProfile } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>("HR & People");
+  const [expandedGroup, setExpandedGroup] = useState<string | null>("Students & Enrollment");
 
   const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive assistant";
   const isDeveloper = (userProfile?.role || "").toLowerCase() === "developer";
@@ -324,43 +340,43 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   // Admin groups for executive assistant & developer view — mirrors sidebar.tsx exactly
   const adminGroups = [
     {
-      title: "HR & People",
+      title: "Students & Enrollment",
       items: [
-        { label: "Teachers", href: "/admin/teachers", icon: <UsersIcon /> },
-        { label: "Accounts", href: "/admin/users", icon: <UsersIcon /> },
+        { label: "Registrations", href: "/admin/registrations", icon: <RegistrationsIcon /> },
+        { label: "Renewals", href: "/admin/renewals", icon: <RenewalsIcon /> },
+        { label: "Payments", href: "/admin/payments", icon: <CreditCardIcon /> },
+        { label: "Students & Families", href: "/admin/students", icon: <StudentsIcon /> },
         { label: "Parents", href: "/admin/parents", icon: <UsersIcon /> },
-        { label: "Payroll", href: "/admin/payroll", icon: <PayrollIcon /> },
+        { label: "Pioneer Families", href: "/admin/pioneer-families", icon: <StarIcon /> },
       ],
     },
     {
-      title: "Time & Attendance",
-      items: [
-        { label: "Calendar", href: "/admin/calendar", icon: <CalendarIcon /> },
-        { label: "Attendance", href: "/admin/attendance", icon: <AttendanceIcon /> },
-        { label: "Leave Requests", href: "/admin/leaves", icon: <LeaveIcon /> },
-      ],
-    },
-    {
-      title: "Programs & Finance",
+      title: "Programs & Calendar",
       items: [
         { label: "Programs", href: "/admin/programs", icon: <DiscoveryDayIcon /> },
-        { label: "Registrations", href: "/admin/registrations", icon: <RegistrationsIcon /> },
-        { label: "Renewals", href: "/admin/renewals", icon: <RegistrationsIcon /> },
-        { label: "Students & Families", href: "/admin/students", icon: <StudentsIcon /> },
-        { label: "Payments", href: "/admin/payments", icon: <CreditCardIcon /> },
-        { label: "Pioneer Families", href: "/admin/pioneer-families", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-[17px] h-[17px]"><path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" /></svg> },
-        { label: "Virtual Sessions", href: "/admin/virtual-sessions", icon: <VideoIcon /> },
+        { label: "Calendar", href: "/admin/calendar", icon: <CalendarIcon /> },
         { label: "Discovery Day", href: "/admin/discovery-day", icon: <DiscoveryDayIcon /> },
+        { label: "Virtual Sessions", href: "/admin/virtual-sessions", icon: <VideoIcon /> },
       ],
     },
     {
-      title: "Content & Logs",
+      title: "Staff & HR",
+      items: [
+        { label: "Teachers", href: "/admin/teachers", icon: <UsersIcon /> },
+        { label: "Attendance", href: "/admin/attendance", icon: <AttendanceIcon /> },
+        { label: "Leave Requests", href: "/admin/leaves", icon: <LeaveIcon /> },
+        { label: "Payroll", href: "/admin/payroll", icon: <PayrollIcon /> },
+        { label: "Accounts", href: "/admin/users", icon: <UsersIcon /> },
+      ],
+    },
+    {
+      title: "Content & System",
       items: [
         { label: "Inquiries", href: "/admin/inquiries", icon: <InquiriesIcon /> },
-        { label: "Reports", href: "/admin/reports", icon: <ReportsIcon /> },
         { label: "Announcements", href: "/admin/announcements", icon: <AnnouncementsIcon /> },
         { label: "Gallery", href: "/admin/gallery", icon: <GalleryIcon /> },
         { label: "Photo Albums", href: "/admin/photo-albums", icon: <GalleryIcon /> },
+        { label: "Reports", href: "/admin/reports", icon: <ReportsIcon /> },
         { label: "Audit Log", href: "/admin/audit-log", icon: <AuditIcon /> },
       ],
     },
@@ -439,7 +455,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
           <div>
             {/* Section separator */}
             <div className="mx-0 mb-4 h-px bg-gradient-to-r from-[#002f76]/12 via-[#ffb800]/25 to-transparent" />
-            <SectionLabel>Admin View</SectionLabel>
+            <SectionLabel>Admin Tools</SectionLabel>
             <div className="space-y-px">
               {/* Dashboard standalone */}
               <NavItem
