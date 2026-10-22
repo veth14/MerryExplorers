@@ -6,6 +6,8 @@ import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
 import { uploadAttendanceLog } from "@/lib/supabase";
 import type { BreakEntry, ActivityEntry } from "@/data/teacher-dashboard";
+import { useFaceDetection } from "@/lib/use-face-detection";
+import { FaceOverlay } from "@/components/clock/face-overlay";
 
 // ── State types ──────────────────────────────────────────────────────────────
 type ClockState = "ready" | "clocked-in" | "on-break";
@@ -70,6 +72,7 @@ export default function ClockPage() {
   const [suspendReason, setSuspendReason] = useState<string | null>(null);
   const [isExempt, setIsExempt] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [shutterFlash, setShutterFlash] = useState(false);
 
   // Auth
   const { user, userProfile } = useAuth();
@@ -183,6 +186,18 @@ export default function ClockPage() {
   // Camera state
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [isCameraCovered, setIsCameraCovered] = useState(false);
+
+  // Face detection state
+  const { status: faceStatus, faceLandmarks, faceDetected, faceScore, startDetection, stopDetection } = useFaceDetection();
+  const faceDetectedRef = useRef(faceDetected);
+  faceDetectedRef.current = faceDetected;
+
+  // Immediately clear any blocked state if a human face is recognized
+  useEffect(() => {
+    if (faceDetected) {
+      setIsCameraCovered(false);
+    }
+  }, [faceDetected]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // The currently active stream (may be null if startCamera is in flight).
   const streamRef = useRef<MediaStream | null>(null);
@@ -270,7 +285,7 @@ export default function ClockPage() {
     streamRef.current = stream;
     allStreamsRef.current.add(stream);
     setCameraStatus("active");
-  }, []);
+  }, [stopDetection]);
 
   // Single source of truth for tearing down the camera. Both the manual
   // "Turn Off Camera" button, the unmount cleanup, and the route-change
@@ -295,14 +310,21 @@ export default function ClockPage() {
     lastFrameDataRef.current = null;
     setCameraStatus("idle");
     setIsCameraCovered(false);
-  }, []);
+    // Stop face detection too
+    stopDetection();
+  }, [stopDetection]);
 
   // Attach stream to video once both are ready (fixes race condition)
+  // Also kick off face detection when the video is live.
   useEffect(() => {
     if (cameraStatus === "active" && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
+      startDetection(videoRef.current);
     }
-  }, [cameraStatus]);
+    return () => {
+      stopDetection();
+    };
+  }, [cameraStatus, startDetection, stopDetection]);
 
   // ── Poll track.readyState every 500 ms ──────────────────────────────────
   // Browsers don't always fire "ended"/"mute" events on hardware kill switches,
@@ -342,18 +364,17 @@ export default function ClockPage() {
 
     const SAMPLE_SIZE = 64;
     const CENTER_OFFSET = Math.floor(SAMPLE_SIZE / 2) - 8; // 16×16 center crop
-
-    // Brightness thresholds
-    const BRIGHTNESS_THRESHOLD = 8;  // avg brightness below this → very dark feed
-    const NOISE_THRESHOLD = 5;       // per-channel value below this → treat as black
-
-    // Motion-variance thresholds
-    // A covered lens shows almost no inter-frame pixel change.
-    // A live face always has breathing / micro-movements.
-    const MIN_DIFF_PIXELS = 60;      // fewer than this many changed pixels → static
-    const VARIANCE_THRESHOLD = 15;   // avg change magnitude below this → static
+    const BRIGHTNESS_THRESHOLD = 5;  // avg brightness below this → black / physically covered lens
+    const NOISE_THRESHOLD = 4;       // per-channel noise floor
 
     const id = setInterval(() => {
+      // 1. If a human face is actively recognized by MediaPipe, camera is 100% operational
+      if (faceDetectedRef.current) {
+        coveredFrameCount.current = 0;
+        setIsCameraCovered(false);
+        return;
+      }
+
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (!video || !canvas) return;
@@ -365,7 +386,7 @@ export default function ClockPage() {
       canvas.height = SAMPLE_SIZE;
       ctx.drawImage(video, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
 
-      // ── Check 1: center-crop brightness ──────────────────────────────
+      // 2. Check center crop brightness (hardware shutter closed / tape / black covering)
       const centerData = ctx.getImageData(CENTER_OFFSET, CENTER_OFFSET, 16, 16).data;
       let totalBrightness = 0;
       let isBlack = true;
@@ -383,43 +404,13 @@ export default function ClockPage() {
       const avgBrightness = totalBrightness / (centerData.length / 4);
       const isDark = avgBrightness < BRIGHTNESS_THRESHOLD;
 
-      // ── Check 2: motion-variance (full 64×64) ────────────────────────
-      const fullData = ctx.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data;
-      let isStaticFeed = false;
-
-      if (lastFrameDataRef.current !== null) {
-        let diffCount = 0;
-        let totalDiff = 0;
-
-        for (let i = 0; i < fullData.length; i += 4) {
-          const diff =
-            Math.abs(fullData[i] - lastFrameDataRef.current[i]) +
-            Math.abs(fullData[i + 1] - lastFrameDataRef.current[i + 1]) +
-            Math.abs(fullData[i + 2] - lastFrameDataRef.current[i + 2]);
-
-          if (diff > 6) {
-            diffCount++;
-            totalDiff += diff;
-          }
-        }
-
-        const avgDiff = diffCount > 0 ? totalDiff / diffCount : 0;
-
-        // Feed is considered static if too few pixels changed OR changes are tiny
-        isStaticFeed =
-          diffCount < MIN_DIFF_PIXELS || avgDiff < VARIANCE_THRESHOLD;
-      }
-
-      lastFrameDataRef.current = new Uint8ClampedArray(fullData);
-
-      // ── Check 3: debounce ─────────────────────────────────────────────
-      // Require COVERED_FRAMES_REQUIRED consecutive "blocked" results before
-      // flipping the flag — avoids false-positives from a momentary stillness.
-      const looksBlocked = isBlack || isDark || isStaticFeed;
+      // Only flag as covered if the lens is truly blacked out / shutter closed
+      const looksBlocked = isBlack || isDark;
 
       if (looksBlocked) {
         coveredFrameCount.current += 1;
-        if (coveredFrameCount.current >= COVERED_FRAMES_REQUIRED) {
+        // Require 6 consecutive blocked readings (1.5 seconds) to avoid false flicker
+        if (coveredFrameCount.current >= 6) {
           setIsCameraCovered(true);
         }
       } else {
@@ -502,6 +493,10 @@ export default function ClockPage() {
     const ctx = snap.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0);
+
+    // Trigger satisfying shutter flash confirmation
+    setShutterFlash(true);
+    window.setTimeout(() => setShutterFlash(false), 220);
 
     return new Promise<Blob | null>((resolve) => {
       snap.toBlob((blob) => resolve(blob), "image/jpeg", 0.88);
@@ -885,8 +880,8 @@ export default function ClockPage() {
   const lastClockOutTime =
     activities.filter((a) => a.action === "clock-out").pop()?.time;
 
-  // Camera is considered truly ready when active AND feed is not covered/frozen
-  const cameraReady = cameraStatus === "active" && !isCameraCovered;
+  // Camera is considered truly ready when active AND feed is not covered/frozen AND a face is detected
+  const cameraReady = cameraStatus === "active" && !isCameraCovered && faceDetected;
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -966,12 +961,12 @@ export default function ClockPage() {
                 <button
                   onClick={openClockOutModal}
                   disabled={!cameraReady || isProcessing}
-                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all flex items-center justify-center gap-2 ${cameraReady && !isProcessing
-                    ? "bg-[#ffb800] text-[#002f76] shadow-[0_6px_18px_-4px_rgba(255,184,0,0.5)] hover:bg-[#ffb800]/90 active:translate-y-px"
+                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all duration-300 flex items-center justify-center gap-2 ${cameraReady && !isProcessing
+                    ? "bg-[#ffb800] text-[#002f76] shadow-[0_8px_24px_-4px_rgba(255,184,0,0.6)] ring-4 ring-[#ffb800]/35 scale-[1.01] hover:bg-[#ffb800]/95 active:translate-y-px"
                     : "bg-[#f0f4f9] text-[#9aa3b2] cursor-not-allowed border border-[#e2e8f0]"
                     }`}
                 >
-                  {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9aa3b2] border-t-transparent" />}
+                  {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#002f76] border-t-transparent" />}
                   {isProcessing ? "Processing..." : "Clock Out"}
                 </button>
               )}
@@ -988,12 +983,12 @@ export default function ClockPage() {
                 <button
                   onClick={handleClockIn}
                   disabled={!cameraReady || isProcessing}
-                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all flex items-center justify-center gap-2 ${cameraReady && !isProcessing
-                    ? "bg-[#0050d5] text-white shadow-[0_6px_18px_-4px_rgba(0,80,213,0.5)] hover:bg-[#0046b8] active:translate-y-px"
+                  className={`w-full rounded-full py-4 text-[15px] font-extrabold transition-all duration-300 flex items-center justify-center gap-2 ${cameraReady && !isProcessing
+                    ? "bg-[#0050d5] text-white shadow-[0_8px_24px_-4px_rgba(0,80,213,0.55)] ring-4 ring-[#0050d5]/35 scale-[1.01] hover:bg-[#0046b8] active:translate-y-px"
                     : "bg-[#f0f4f9] text-[#9aa3b2] cursor-not-allowed border border-[#e2e8f0]"
                     }`}
                 >
-                  {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9aa3b2] border-t-transparent" />}
+                  {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
                   {isProcessing ? "Processing..." : "Clock In"}
                 </button>
               )}
@@ -1028,30 +1023,51 @@ export default function ClockPage() {
           {/* ─── Live camera / face verification panel ─── */}
           <div className="flex-1 flex flex-col">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-headline text-[16px] font-extrabold text-[#002f76]">
-                Face Verification
-              </h3>
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0050d5]/10 text-[#0050d5]">
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path d="M9 3H5a2 2 0 0 0-2 2v4m16-6h-4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4m16 6h-4a2 2 0 0 0 2-2v-4" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </div>
+                <h3 className="font-headline text-[15px] font-extrabold text-[#002f76]">
+                  Biometric Verification
+                </h3>
+              </div>
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest ${cameraReady
-                  ? "bg-[#fff0f0] text-[#ef4444]"
-                  : "bg-[#f0f4f9] text-[#9aa3b2]"
-                  }`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10.5px] font-black uppercase tracking-wider transition-colors duration-300 ${
+                  cameraStatus === "active"
+                    ? faceDetected
+                      ? "bg-[#e8f9f0] text-[#15803d] border border-[#2da05b]/25 shadow-xs"
+                      : "bg-[#f0f9ff] text-[#0369a1] border border-[#38bdf8]/25 shadow-xs"
+                    : "bg-[#f0f4f9] text-[#9aa3b2] border border-transparent"
+                }`}
               >
-                {cameraReady && (
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ef4444]" />
+                {cameraStatus === "active" && (
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      faceDetected
+                        ? "bg-[#15803d] shadow-[0_0_6px_#22c55e]"
+                        : "bg-[#0284c7] animate-ping"
+                    }`}
+                  />
                 )}
-                {cameraReady ? "Live Camera" : "Camera Off"}
+                {cameraStatus === "active"
+                  ? faceDetected
+                    ? "Face Verified"
+                    : "Scanning"
+                  : "Camera Off"}
               </span>
             </div>
 
             {/* Camera viewport */}
-            <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[1rem] border-2 border-[#c5d6ff] bg-gradient-to-br from-[#f0f5ff] to-[#e8effe]">
+            <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[1.25rem] border-2 border-[#d0e0ff] bg-slate-900 shadow-[0_4px_20px_rgba(0,47,118,0.08)]">
               {/* Loading */}
               {cameraStatus === "loading" && (
                 <div className="flex flex-col items-center gap-3">
-                  <span className="h-8 w-8 animate-spin rounded-full border-3 border-[#0050d5]/30 border-t-[#0050d5]" />
-                  <p className="text-[13px] font-bold text-[#5a6e8c]">
-                    Accessing camera…
+                  <span className="h-8 w-8 animate-spin rounded-full border-3 border-sky-400/30 border-t-sky-400" />
+                  <p className="text-[13px] font-bold text-white/90">
+                    Initializing camera…
                   </p>
                 </div>
               )}
@@ -1077,7 +1093,7 @@ export default function ClockPage() {
                   <p className="text-[13px] font-bold text-[#ef4444]">
                     Camera access denied
                   </p>
-                  <p className="text-[12px] font-medium text-[#5a6e8c]">
+                  <p className="text-[12px] font-medium text-white/70">
                     Please allow camera access in your browser settings and
                     reload the page.
                   </p>
@@ -1095,23 +1111,22 @@ export default function ClockPage() {
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-10 w-10 text-[#9aa3b2]"
+                    className="h-10 w-10 text-white/50"
                   >
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                     <line x1="12" x2="12" y1="9" y2="13" />
                     <line x1="12" x2="12.01" y1="17" y2="17" />
                   </svg>
-                  <p className="text-[13px] font-bold text-[#5a6e8c]">
+                  <p className="text-[13px] font-bold text-white">
                     Camera not available
                   </p>
-                  <p className="text-[12px] font-medium text-[#9aa3b2]">
-                    No camera was detected or the hardware switch is off. Please
-                    re-enable your camera and{" "}
+                  <p className="text-[12px] font-medium text-white/70">
+                    No camera detected or hardware switch is off.{" "}
                     <button
                       onClick={startCamera}
-                      className="underline text-[#0050d5] font-bold"
+                      className="underline text-sky-400 font-bold"
                     >
-                      try again
+                      Try again
                     </button>
                     .
                   </p>
@@ -1123,7 +1138,7 @@ export default function ClockPage() {
                 <div className="flex flex-col items-center gap-3">
                   <button
                     onClick={startCamera}
-                    className="flex items-center gap-2 rounded-full bg-[#0050d5] px-5 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#0046b8]"
+                    className="group flex items-center gap-2.5 rounded-full bg-gradient-to-r from-[#0050d5] to-[#0040ab] px-6 py-3 text-[13.5px] font-extrabold text-white shadow-[0_6px_20px_rgba(0,80,213,0.35)] transition-all hover:scale-105 active:scale-95"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -1140,7 +1155,7 @@ export default function ClockPage() {
                     </svg>
                     Enable Camera
                   </button>
-                  <p className="text-[12px] font-medium text-[#9aa3b2]">
+                  <p className="text-[12px] font-medium text-white/60">
                     Camera is currently off
                   </p>
                 </div>
@@ -1149,6 +1164,7 @@ export default function ClockPage() {
               {/* Live video feed (mirrored for selfie view) */}
               {cameraStatus === "active" && (
                 <>
+                  {/* Hidden canvas for pixel-level covered/frozen detection */}
                   <canvas ref={canvasRef} className="hidden" />
                   <video
                     ref={videoRef}
@@ -1158,12 +1174,85 @@ export default function ClockPage() {
                     className="absolute inset-0 h-full w-full object-cover"
                     style={{ transform: "scaleX(-1)" }}
                   />
+
+                  {/* High-Tech Apple Face ID Biometric Overlay (Splines, Nodes, Sweeping Laser, Reticles) */}
+                  <FaceOverlay
+                    faceLandmarks={faceLandmarks}
+                    faceDetected={faceDetected}
+                    mirrored={true}
+                  />
+
+                  {/* Cinematic Viewport Inner Vignette & Edge Shadow */}
+                  <div className="pointer-events-none absolute inset-0 z-15 rounded-[1.25rem] shadow-[inset_0_0_36px_rgba(0,0,0,0.5)] border border-white/10" />
+
+                  {/* Floating Glassmorphic Pill: Top Left */}
+                  {!isCameraCovered && (
+                    <div className="pointer-events-none absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur-md px-2.5 py-1 border border-white/15 text-[10.5px] font-bold text-white shadow-sm font-mono tracking-wider">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          faceDetected
+                            ? "bg-emerald-400 shadow-[0_0_6px_#34d399]"
+                            : "bg-sky-400 animate-ping"
+                        }`}
+                      />
+                      <span>{faceDetected ? "LOCKED" : "LIVE"}</span>
+                    </div>
+                  )}
+
+                  {/* Floating Glassmorphic Pill: Top Right */}
+                  {!isCameraCovered && (
+                    <div className="pointer-events-none absolute top-3.5 right-3.5 z-20 flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur-md px-3 py-1 border border-white/15 text-[10.5px] font-extrabold text-white shadow-sm font-mono tracking-wider transition-colors duration-200">
+                      <span
+                        className={
+                          faceDetected
+                            ? faceScore >= 88
+                              ? "text-emerald-300"
+                              : "text-amber-300"
+                            : "text-sky-300"
+                        }
+                      >
+                        {faceDetected ? `${faceScore.toFixed(1)}% MATCH` : "SCANNING"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Floating Glassmorphic Status Chip: Bottom Center */}
+                  {!isCameraCovered && (
+                    <div className="pointer-events-none absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md px-4 py-1.5 border border-white/20 text-[12px] font-extrabold text-white shadow-lg transition-all duration-300 whitespace-nowrap">
+                      {faceDetected ? (
+                        <>
+                          <div className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_8px_#10b981]">
+                            <svg className="h-2.5 w-2.5 stroke-current stroke-[3.5]" viewBox="0 0 24 24" fill="none">
+                              <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                          <span className="text-emerald-300 tracking-wide font-black">
+                            FACE VERIFIED
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
+                          <span className="text-white/90">
+                            Position face in frame
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
+              {/* Shutter Flash Animation overlay */}
+              <div
+                className={`pointer-events-none absolute inset-0 z-40 bg-white transition-opacity duration-200 ${
+                  shutterFlash ? "opacity-95" : "opacity-0"
+                }`}
+              />
+
               {/* Camera covered / frozen overlay */}
               {cameraStatus === "active" && isCameraCovered && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center">
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/80 px-6 text-center backdrop-blur-xs">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
@@ -1172,7 +1261,7 @@ export default function ClockPage() {
                     strokeWidth={2.5}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-8 w-8 text-white"
+                    className="h-8 w-8 text-rose-400"
                   >
                     <circle cx="12" cy="12" r="10" />
                     <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
@@ -1187,15 +1276,14 @@ export default function ClockPage() {
                 </div>
               )}
 
-              {/* Face guide overlay (visible only when feed is clean) */}
-              {cameraReady && (
-                <>
-                  <div className="pointer-events-none absolute inset-6 rounded-[50%] border-2 border-[#0050d5]/40" />
-                  <span className="pointer-events-none absolute left-3 top-3 h-5 w-5 rounded-tl-[8px] border-l-2 border-t-2 border-[#0050d5]" />
-                  <span className="pointer-events-none absolute right-3 top-3 h-5 w-5 rounded-tr-[8px] border-r-2 border-t-2 border-[#0050d5]" />
-                  <span className="pointer-events-none absolute bottom-3 left-3 h-5 w-5 rounded-bl-[8px] border-b-2 border-l-2 border-[#0050d5]" />
-                  <span className="pointer-events-none absolute bottom-3 right-3 h-5 w-5 rounded-br-[8px] border-b-2 border-r-2 border-[#0050d5]" />
-                </>
+              {/* Face detection model loading pulse */}
+              {cameraStatus === "active" && faceStatus === "loading" && (
+                <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-2.5 bg-black/40 backdrop-blur-xs">
+                  <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-emerald-400" />
+                  <p className="text-[11.5px] font-bold text-white/90 tracking-wide">
+                    Loading Face ID Model…
+                  </p>
+                </div>
               )}
             </div>
 
@@ -1203,17 +1291,17 @@ export default function ClockPage() {
             {cameraStatus === "active" && (
               <button
                 onClick={stopCamera}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-[10px] border border-[#e2e8f0] px-4 py-2 text-[12.5px] font-bold text-[#5a6e8c] transition-colors hover:bg-[#f0f4f9]"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-[11px] border border-[#e2e8f0] bg-white px-4 py-2 text-[12.5px] font-bold text-[#5a6e8c] shadow-2xs transition-all hover:bg-[#f8fafd] hover:text-[#002f76]"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-4 w-4"
+                  className="h-3.5 w-3.5 text-[#9aa3b2]"
                 >
                   <path d="M16.5 10a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" />
                   <line x1="2" x2="2.01" y1="12" y2="12" />
@@ -1224,53 +1312,74 @@ export default function ClockPage() {
               </button>
             )}
 
-            <p className="mt-4 text-[13px] font-medium leading-relaxed text-[#5a6e8c]">
-              Position your face within the frame to verify attendance
-              automatically upon clicking.
-            </p>
-
+            {/* Status card below camera */}
             <div
-              className={`mt-4 flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-[12.5px] font-bold ${cameraReady
-                ? "bg-[#f0f5ff] text-[#0050d5]"
-                : cameraStatus === "active" && isCameraCovered
-                  ? "bg-[#fff0f0] text-[#ef4444]"
-                  : "bg-[#f0f5ff] text-[#0050d5]"
-                }`}
+              className={`mt-4 flex items-center gap-3 rounded-[12px] p-3 text-[12.5px] font-bold transition-all duration-300 border ${
+                cameraStatus === "active" && isCameraCovered
+                  ? "bg-rose-50 border-rose-200 text-rose-700"
+                  : faceDetected
+                    ? "bg-[#e8f9f0] border-emerald-200/80 text-[#15803d] shadow-[0_4px_12px_rgba(34,197,94,0.1)]"
+                    : faceStatus === "detecting"
+                      ? "bg-sky-50 border-sky-200 text-sky-800"
+                      : "bg-[#f0f5ff] border-[#d8e5ff] text-[#0050d5]"
+              }`}
             >
-              {cameraStatus === "active" && isCameraCovered ? (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                </svg>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M9 12l2 2 4-4" />
-                  <circle cx="12" cy="12" r="10" />
-                </svg>
-              )}
-              {cameraReady
-                ? "Face Verification Active"
-                : cameraStatus === "active" && isCameraCovered
-                  ? "Camera Feed is Blocked or Frozen"
-                  : "Camera Required for Verification"}
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                  cameraStatus === "active" && isCameraCovered
+                    ? "bg-rose-100 text-rose-600"
+                    : faceDetected
+                      ? "bg-emerald-500 text-white shadow-[0_0_8px_#22c55e]"
+                      : faceStatus === "detecting"
+                        ? "bg-sky-100 text-sky-600"
+                        : "bg-[#0050d5]/10 text-[#0050d5]"
+                }`}
+              >
+                {cameraStatus === "active" && isCameraCovered ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                  </svg>
+                ) : faceDetected ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : faceStatus === "detecting" ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 animate-pulse">
+                    <path d="M9 3H5a2 2 0 0 0-2 2v4" /><path d="M15 3h4a2 2 0 0 1 2 2v4" /><path d="M9 21H5a2 2 0 0 1-2-2v-4" /><path d="M15 21h4a2 2 0 0 0 2-2v-4" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                ) : faceStatus === "loading" ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-extrabold text-[12.5px] leading-tight">
+                  {cameraStatus === "active" && isCameraCovered
+                    ? "Camera Feed Blocked or Dark"
+                    : faceDetected
+                      ? "Face Verified"
+                      : faceStatus === "loading"
+                        ? "Initializing Face ID Engine…"
+                        : faceStatus === "detecting"
+                          ? "Scanning Facial Features…"
+                          : faceStatus === "error"
+                            ? "Face Detection Unavailable"
+                            : "Camera Required"}
+                </p>
+                <p className="text-[11px] font-medium opacity-80 leading-normal mt-0.5 truncate">
+                  {cameraStatus === "active" && isCameraCovered
+                    ? "Uncover camera or adjust lighting"
+                    : faceDetected
+                      ? "Identity confirmed"
+                      : faceStatus === "detecting"
+                        ? "Look directly at camera to verify"
+                        : "Enable camera to proceed with attendance"}
+                </p>
+              </div>
             </div>
           </div>
         </section>
