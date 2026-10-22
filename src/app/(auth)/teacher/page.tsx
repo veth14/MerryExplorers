@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -131,52 +132,53 @@ export default function TeacherDashboardPage() {
     avgIn: "–"
   });
 
-  useEffect(() => {
-    if (!user?.uid) return;
-    async function fetchAll() {
-      try {
-        const [annRes, shiftRes] = await Promise.all([
-          fetch("/api/announcements"),
-          fetch(`/api/attendance?uid=${user!.uid}`),
-        ]);
-        const [annJson, shiftJson] = await Promise.all([annRes.json(), shiftRes.json()]);
-        
-        if (annJson.success) {
+  useSWR(
+    user?.uid ? ["/api/teacher-dashboard", user.uid] : null,
+    async () => {
+      const [annRes, shiftRes] = await Promise.all([
+        fetch("/api/announcements"),
+        fetch(`/api/attendance?uid=${user!.uid}`),
+      ]);
+      const [annJson, shiftJson] = await Promise.all([annRes.json(), shiftRes.json()]);
+      return { annJson, shiftJson };
+    },
+    {
+      dedupingInterval: 30_000,
+      revalidateOnFocus: true,
+      onSuccess: async ({ annJson, shiftJson }) => {
+        if (annJson?.success) {
           const annData: Announcement[] = annJson.data;
           setAnnouncements(annData);
 
-          // Fetch which announcements this teacher has already read
-          const visibleIds = annData.map(a => a.id).filter(Boolean);
+          const visibleIds = annData.map((a) => a.id).filter(Boolean);
           if (visibleIds.length > 0 && user?.uid) {
             try {
               const readRes = await fetch(`/api/announcements/read?uid=${user!.uid}&ids=${visibleIds.join(",")}`);
               const readJson = await readRes.json();
-              if (readJson.success) {
+              if (readJson?.success) {
                 setReadIds(new Set(readJson.readIds as string[]));
               }
             } catch {
-              // non-fatal, just no unread tracking
+              // non-fatal
             }
           }
         }
-        
-        if (shiftJson.success && Array.isArray(shiftJson.data)) {
+
+        if (shiftJson?.success && Array.isArray(shiftJson.data)) {
           const records: ShiftRecord[] = shiftJson.data;
-          
-          // Find today's shift
+
           const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
           const today = new Date(todayStr);
           const yyyy = today.getFullYear();
-          const mm = String(today.getMonth() + 1).padStart(2, '0');
-          const dd = String(today.getDate()).padStart(2, '0');
+          const mm = String(today.getMonth() + 1).padStart(2, "0");
+          const dd = String(today.getDate()).padStart(2, "0");
           const todayDateStr = `${yyyy}-${mm}-${dd}`;
-          
-          const todaysRecord = records.find(r => r.dateStr === todayDateStr);
+
+          const todaysRecord = records.find((r) => r.dateStr === todayDateStr);
           if (todaysRecord) setTodayShift(todaysRecord);
 
-          // Calculate weekly stats — use dateStr (YYYY-MM-DD in PH time) to avoid UTC shift bugs
           const nowPH = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-          const dayOfWeek = nowPH.getDay(); // 0=Sun
+          const dayOfWeek = nowPH.getDay();
           const startOfWeekDate = new Date(nowPH);
           startOfWeekDate.setDate(nowPH.getDate() - dayOfWeek);
           startOfWeekDate.setHours(0, 0, 0, 0);
@@ -193,11 +195,9 @@ export default function TeacherDashboardPage() {
             return r.dateStr >= toDateStr(startOfWeekDate) && r.dateStr <= toDateStr(nowPH);
           });
 
-          // Shifts count
           const completedThisWeek = thisWeekRecords.filter((r) => r.status === "Completed");
           const shiftCountStr = `${completedThisWeek.length}`;
 
-          // Hours
           let totalMs = 0;
           for (const r of completedThisWeek) {
             if (r.clockInTime && r.clockOutTime) {
@@ -208,11 +208,10 @@ export default function TeacherDashboardPage() {
               totalMs += ms;
             }
           }
-          const hoursStr = totalMs > 0 
+          const hoursStr = totalMs > 0
             ? `${Math.floor(totalMs / 3600000)}h ${Math.floor((totalMs % 3600000) / 60000)}m`
             : "0h 0m";
 
-          // Avg In & On-Time Rate
           let avgInStr = "–";
           let onTimeStr = "–";
 
@@ -221,22 +220,20 @@ export default function TeacherDashboardPage() {
             let onTimeCount = 0;
 
             for (const r of thisWeekRecords) {
-              // Parse clockInTime in PH timezone to get correct local hour/minute
-              const phStr = new Date(r.clockInTime).toLocaleString("en-US", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false });
-              const [hStr, minStr] = phStr.split(":");
-              const h = parseInt(hStr, 10);
-              const mn = parseInt(minStr, 10);
-              const m = h * 60 + mn;
-              totalMins += m;
-              if (m <= 8 * 60) onTimeCount++; // on time if clocked in by 8:00 AM
+              const d = new Date(r.clockInTime);
+              const mins = d.getHours() * 60 + d.getMinutes();
+              totalMins += mins;
+              if (mins <= (8 * 60 + 30)) {
+                onTimeCount++;
+              }
             }
 
-            const avg = Math.floor(totalMins / thisWeekRecords.length);
-            const ah = Math.floor(avg / 60);
-            const am = avg % 60;
-            const period = ah >= 12 ? "PM" : "AM";
-            const h12 = ah % 12 || 12;
-            avgInStr = `${h12}:${am.toString().padStart(2, "0")} ${period}`;
+            const avgMins = Math.round(totalMins / thisWeekRecords.length);
+            const avgH = Math.floor(avgMins / 60);
+            const avgM = avgMins % 60;
+            const ampm = avgH >= 12 ? "PM" : "AM";
+            const dispH = avgH % 12 || 12;
+            avgInStr = `${dispH}:${String(avgM).padStart(2, "0")} ${ampm}`;
 
             const rate = Math.round((onTimeCount / thisWeekRecords.length) * 100);
             onTimeStr = `${rate}%`;
@@ -246,18 +243,19 @@ export default function TeacherDashboardPage() {
             hours: hoursStr,
             shifts: shiftCountStr,
             onTime: onTimeStr,
-            avgIn: avgInStr
+            avgIn: avgInStr,
           });
         }
-      } catch (err) {
-        console.error("Failed to fetch dashboard data:", err);
-      } finally {
         setLoadingAnn(false);
         setLoadingShift(false);
-      }
+      },
+      onError: (err) => {
+        console.error("Failed to fetch dashboard data:", err);
+        setLoadingAnn(false);
+        setLoadingShift(false);
+      },
     }
-    fetchAll();
-  }, [user]);
+  );
 
   const firstName = userProfile?.fullName?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Teacher";
   const isClocked = todayShift?.status === "In Progress";

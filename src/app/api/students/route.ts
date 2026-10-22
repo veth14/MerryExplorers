@@ -17,8 +17,10 @@ function normalizeIdentity(value?: string) {
 
 // GET /api/students — Admin only: Fetches all students & aggregated parents across all programs
 export async function GET(request: Request) {
+  const t0 = Date.now();
   const auth = await requireAdmin(request);
   if ("response" in auth) return auth.response;
+  const tAuth = Date.now();
 
   try {
     const { db } = await connectToDatabase();
@@ -256,10 +258,14 @@ export async function GET(request: Request) {
 
     const parentsList = Array.from(parentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
+    console.log(`[perf] GET /api/students — auth:${tAuth - t0}ms db+compute:${Date.now() - tAuth}ms total:${Date.now() - t0}ms count:${formattedStudents.length}`);
+
     return NextResponse.json({
       success: true,
       data: formattedStudents,
       parents: parentsList,
+    }, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" },
     });
   } catch (error: any) {
     console.error("[students GET]", error);

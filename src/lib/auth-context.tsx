@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { mutate } from "swr";
 
 import { UserAccount } from "@/data/users";
 
@@ -146,6 +147,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
     document.cookie = `session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     document.cookie = `role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    // Clear SWR in-memory cache to ensure zero data leakage between user sessions
+    try {
+      mutate(() => true, undefined, { revalidate: false });
+    } catch { /* ignore */ }
     window.location.href = destination;
   };
 

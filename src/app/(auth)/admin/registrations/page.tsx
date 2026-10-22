@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import useSWR from "swr";
 import { m, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { AppShell } from "@/components/app-shell";
@@ -1448,37 +1449,74 @@ export default function AdminRegistrationsPage() {
   const [toast, setToast] = useState("");
   const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      setLoading(false);
-      return;
+  // ── SWR data fetching ───────────────────────────────────────────────────────
+  // auth-context.tsx patches window.fetch to inject the Bearer token, so SWR
+  // calls automatically include the Authorization header.
+  const {
+    data: registrationsData,
+    isLoading: registrationsLoading,
+    mutate: mutateRegistrations,
+  } = useSWR(
+    user ? "/api/registrations" : null, // don't fetch until signed in
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.success ? (json.data as Registration[]) : [];
+    },
+    {
+      dedupingInterval: 30_000,      // same URL won't re-fetch within 30s
+      revalidateOnFocus: false,      // don't re-fetch on tab switch
+      shouldRetryOnError: false,
+      onSuccess: (data) => { setLoading(false); setRegistrations(data); },
+      onError: () => setLoading(false),
     }
-    fetchRegistrations();
-    fetchLeads();
-  }, [authLoading, user?.uid]);
+  );
 
+  const {
+    data: leadsData,
+    isLoading: leadsLoading,
+    mutate: mutateLeads,
+  } = useSWR(
+    user ? "/api/leads" : null,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.success ? (json.data as Lead[]) : [];
+    },
+    {
+      dedupingInterval: 30_000,
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      onSuccess: (data) => setLeads(data),
+    }
+  );
+
+  // Auto-dismiss toasts
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 3500);
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Keep loading state in sync
+  useEffect(() => {
+    if (!authLoading && !user) setLoading(false);
+  }, [authLoading, user]);
+
+  // fetchRegistrations used by adventure summary & actions — re-validates SWR cache
   async function fetchRegistrations(): Promise<Registration[]> {
     try {
-      if (!user) return [];
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/registrations", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setRegistrations(data.data);
-        return data.data as Registration[];
+      const fresh = await mutateRegistrations();
+      if (fresh) {
+        setRegistrations(fresh);
+        return fresh;
       }
-      return [];
-    } catch { return []; }
-    finally { setLoading(false); }
+      return registrations;
+    } catch {
+      return registrations;
+    }
   }
 
   async function handleGenerateAdventureSummary() {
@@ -1814,13 +1852,8 @@ export default function AdminRegistrationsPage() {
 
   async function fetchLeads() {
     try {
-      if (!user) return;
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/leads", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      const data = await res.json();
-      if (data.success) setLeads(data.data);
+      const fresh = await mutateLeads();
+      if (fresh) setLeads(fresh);
     } catch { /* ignore */ }
   }
 
@@ -2425,8 +2458,12 @@ export default function AdminRegistrationsPage() {
           </div>
         ) : (
           /* ── REGISTRATIONS TABLE ── */
-          loading ? (
-            <div className="flex h-64 items-center justify-center text-[#64748b] animate-pulse">Loading registrations...</div>
+          loading && registrations.length === 0 ? (
+            <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 bg-white shadow-sm p-4 space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="skeleton-shimmer h-12 w-full rounded-xl" />
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-64 flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white/70 text-center p-8">
               <span className="text-4xl mb-3">📋</span>

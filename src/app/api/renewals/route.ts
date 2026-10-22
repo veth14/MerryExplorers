@@ -49,10 +49,12 @@ const isTestAccount = (email: string, name?: string) => {
 // GET /api/renewals
 // ---------------------------------------------------------------------------
 export async function GET(request: Request) {
+  const t0 = Date.now();
   try {
     if (!(await isAdmin(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tAuth = Date.now();
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "adventure-1-renewal";
@@ -353,6 +355,8 @@ export async function GET(request: Request) {
     // Strip internal fields
     const publicRecords = records.map(({ _dedupeKey, _submittedMs, ...rest }) => rest);
 
+    console.log(`[perf] GET /api/renewals — auth:${tAuth - t0}ms db+compute:${Date.now() - tAuth}ms total:${Date.now() - t0}ms`);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -381,6 +385,8 @@ export async function GET(request: Request) {
         },
         slotOverview,
       },
+    }, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" },
     });
   } catch (error: any) {
     console.error("[renewals GET]", error);

@@ -39,25 +39,21 @@ export async function GET(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // 1. Fetch Accounts (Teachers, Executives, Developers, etc. - exclude Admin/Owner)
-    const accounts = await db.collection("accounts").find({
-      role: { $nin: ["admin", "owner", "parent", "Parent"] }
-    }).toArray();
-
-    // 3. Determine the required attendance date range.
-    // For normal employees, we only need [startDateStr, endDateStr].
-    // But for weekly evaluations, we must evaluate full Sun-Sat weeks that END within the cutoff.
-    // So we must fetch attendance starting from the Sunday of the earliest Saturday in the cutoff.
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-    const days = eachDayInRange(start, end);
-
-    const queryStartDateStr = startDateStr;
-
-    // 2. Fetch Attendance for the expanded period
-    const attendanceRecords = await db.collection("attendance").find({
-      dateStr: { $gte: queryStartDateStr, $lte: endDateStr }
-    }).toArray();
+    // Fetch accounts, attendance, exemptions, and suspended days in parallel (0 N+1 queries, scoped to cutoff)
+    const [accounts, attendanceRecords, exemptDocs, suspendedDocs] = await Promise.all([
+      db.collection("accounts").find({
+        role: { $nin: ["admin", "owner", "parent", "Parent"] }
+      }).toArray(),
+      db.collection("attendance").find({
+        dateStr: { $gte: startDateStr, $lte: endDateStr }
+      }).toArray(),
+      db.collection("daily_exemptions").find({
+        dateStr: { $gte: startDateStr, $lte: endDateStr }
+      }).toArray(),
+      db.collection("suspended_days").find({
+        dateStr: { $gte: startDateStr, $lte: endDateStr }
+      }).toArray(),
+    ]);
 
     // Group attendance by teacherUid -> dateStr -> record
     const attendanceMap = new Map<string, Map<string, any>>();
@@ -66,6 +62,26 @@ export async function GET(request: Request) {
       if (!attendanceMap.has(uid)) attendanceMap.set(uid, new Map());
       attendanceMap.get(uid)!.set(rec.dateStr, rec);
     }
+
+    // Map suspended/holiday days
+    const suspendedDayMap = new Map<string, "suspension" | "holiday">();
+    for (const d of suspendedDocs) {
+      suspendedDayMap.set(d.dateStr, d.type === "holiday" ? "holiday" : "suspension");
+    }
+
+    // Map daily exemptions by teacherUid -> Set of dateStr
+    const exemptionsByTeacher = new Map<string, Set<string>>();
+    for (const d of exemptDocs) {
+      const teacherUid = d.teacherUid;
+      if (!exemptionsByTeacher.has(teacherUid)) {
+        exemptionsByTeacher.set(teacherUid, new Set());
+      }
+      exemptionsByTeacher.get(teacherUid)!.add(d.dateStr);
+    }
+
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    const days = eachDayInRange(start, end);
 
     const records = [];
     let totalGross = 0;
@@ -80,23 +96,13 @@ export async function GET(request: Request) {
       const rateForLate = monthlyRate > 0 ? monthlyRate / (22 * 8) : dailyRate / 8;
       const accountWorkDays = new Set(acc.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
       const empAttendance = attendanceMap.get(uid) || new Map();
+      const exemptDates = exemptionsByTeacher.get(uid) || new Set<string>();
 
       let totalHours = 0;
       let daysPresent = 0;
       let totalScheduledWorkDays = 0; // Work days in the cutoff for this employee
       let totalLateDeduction = 0;
       const noTimeLog: boolean = acc.noTimeLog ?? false;
-
-      // Fetch daily exemptions for this employee so we can skip late deductions on exempt days
-      const exemptDocs = await db.collection("daily_exemptions").find({ teacherUid: uid }).toArray();
-      const exemptDates = new Set(exemptDocs.map((d: any) => d.dateStr));
-
-      // Fetch suspended/holiday days — keyed by dateStr with their type
-      const suspendedDocs = await db.collection("suspended_days").find({}).toArray();
-      const suspendedDayMap = new Map<string, "suspension" | "holiday">();
-      for (const d of suspendedDocs) {
-        suspendedDayMap.set(d.dateStr, d.type === "holiday" ? "holiday" : "suspension");
-      }
 
       for (const day of days) {
         const dow = day.getDay();
@@ -261,7 +267,7 @@ export async function GET(request: Request) {
       totalNet: parseFloat(totalNet.toFixed(2)),
       records
     }, {
-      headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" }
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" }
     });
 
   } catch (error: any) {

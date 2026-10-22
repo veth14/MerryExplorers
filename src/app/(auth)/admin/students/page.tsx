@@ -4,13 +4,25 @@ import { useEffect, useState, useMemo } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import useSWR from "swr";
 import { AppShell } from "@/components/app-shell";
 import { ClassCapacityTracker } from "@/components/admin/ClassCapacityTracker";
 import { useAuth } from "@/lib/auth-context";
-import { StudentEditModal } from "@/components/admin/StudentEditModal";
-import { ParentAccountCreateModal } from "@/components/admin/ParentAccountCreateModal";
-import { ExplorerDetailModal } from "@/components/admin/ExplorerDetailModal";
 import { PROGRAM_SLOTS } from "@/data/landing";
+
+const StudentEditModal = dynamic(
+  () => import("@/components/admin/StudentEditModal").then((m) => m.StudentEditModal),
+  { ssr: false }
+);
+const ParentAccountCreateModal = dynamic(
+  () => import("@/components/admin/ParentAccountCreateModal").then((m) => m.ParentAccountCreateModal),
+  { ssr: false }
+);
+const ExplorerDetailModal = dynamic(
+  () => import("@/components/admin/ExplorerDetailModal").then((m) => m.ExplorerDetailModal),
+  { ssr: false }
+);
 
 interface Student {
   id: string;
@@ -475,43 +487,45 @@ export default function AdminStudentsPage() {
     }
   }
 
+  // SWR data fetching with 30s deduping interval
+  const {
+    mutate: mutateStudents,
+  } = useSWR(
+    userId ? "/api/students" : null,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to load directory (HTTP ${res.status}).`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to load directory.");
+      return data;
+    },
+    {
+      dedupingInterval: 30_000,
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      onSuccess: (data) => {
+        setStudents(data.data || []);
+        if (data.parents) setParents(data.parents);
+        setLoading(false);
+      },
+      onError: (err) => {
+        setLoadError(err.message || "Failed to load directory.");
+        setLoading(false);
+      },
+    }
+  );
+
   const loadData = () => {
     setLoading(true);
     setLoadError("");
-
-    fetch("/api/students", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to load directory (HTTP ${res.status}).`);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (data.success) {
-          setStudents(data.data || []);
-          if (data.parents) {
-            setParents(data.parents);
-          }
-        } else {
-          throw new Error(data.error || "Failed to load directory.");
-        }
-      })
-      .catch((err) => {
-        setLoadError(err.message || "Failed to load directory.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    mutateStudents().finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!userId) {
+    if (!authLoading && !userId) {
       setLoadError("Your sign-in session could not be verified. Sign out and sign in again.");
       setLoading(false);
-      return;
     }
-    loadData();
   }, [authLoading, userId]);
 
   // Handle edit save success
@@ -1076,10 +1090,11 @@ export default function AdminStudentsPage() {
       </div>
 
       {/* ── Content View ── */}
-      {loading ? (
-        <div style={{ background: "white", borderRadius: "20px", padding: "80px 24px", textAlign: "center", color: "#94a3b8", fontSize: "15px", fontWeight: "600", border: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
-          <div>Loading student & family records…</div>
+      {loading && students.length === 0 ? (
+        <div style={{ background: "white", borderRadius: "20px", padding: "24px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "12px" }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton-shimmer" style={{ height: "48px", borderRadius: "12px" }} />
+          ))}
         </div>
       ) : loadError ? (
         <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "20px", padding: "32px 24px", textAlign: "center", color: "#9a3412" }}>

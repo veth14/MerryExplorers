@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -163,36 +164,50 @@ export default function RenewalsPage() {
     return fetch(input, { ...init, headers });
   };
 
-  // Fetch renewals & families
-  const fetchData = async () => {
-    try {
-      setLoading(true);
+  // Fetch renewals & families with SWR (dedupes within 30s)
+  const {
+    mutate: mutateRenewals,
+  } = useSWR(
+    selectedPeriod ? [`/api/renewals`, selectedPeriod] : null,
+    async () => {
       const [pRes, rRes, fRes] = await Promise.all([
         adminFetch("/api/renewals/periods"),
         adminFetch(`/api/renewals?period=${selectedPeriod}`),
         adminFetch(`/api/renewals/families?period=${selectedPeriod}`),
       ]);
-
       const [pData, rData, fData] = await Promise.all([pRes.json(), rRes.json(), fRes.json()]);
+      return { pData, rData, fData };
+    },
+    {
+      dedupingInterval: 30_000,
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      onSuccess: ({ pData, rData, fData }) => {
+        if (pData?.success) setPeriods(pData.data);
+        if (rData?.success) {
+          setRenewalRecords(rData.data.records);
+          setStats(rData.data.stats);
+        } else {
+          console.error("Renewals API error:", rData?.error);
+        }
+        if (fData?.success) setFamilies(fData.data);
+        setLoading(false);
+      },
+      onError: (err) => {
+        console.error("Failed to load renewals data:", err);
+        setLoading(false);
+      },
+    }
+  );
 
-      if (pData.success) setPeriods(pData.data);
-      if (rData.success) {
-        setRenewalRecords(rData.data.records);
-        setStats(rData.data.stats);
-      } else {
-        console.error("Renewals API error:", rData.error || rRes.status);
-      }
-      if (fData.success) setFamilies(fData.data);
-    } catch (err) {
-      console.error("Failed to load renewals data:", err);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      await mutateRenewals();
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-  }, [selectedPeriod]);
 
   const [mounted, setMounted] = useState(false);
 

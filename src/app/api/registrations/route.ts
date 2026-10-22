@@ -21,8 +21,10 @@ cloudinary.config({
 
 // GET /api/registrations — Admin only, lists all registrations
 export async function GET(request: Request) {
+  const t0 = Date.now();
   const deny = await requireInternalAuth(request);
   if (deny) return deny;
+  const tAuth = Date.now();
 
   try {
     const { db } = await connectToDatabase();
@@ -30,16 +32,41 @@ export async function GET(request: Request) {
     const status = url.searchParams.get("status");
 
     const query = status && status !== "all" ? { status } : {};
-    const registrations = await db
-      .collection("student_registrations")
-      .find(query)
-      .sort({ submittedAt: -1 })
-      .toArray();
 
-    const knownStudents = await db.collection("students").find({}, { projection: { childInfo: 1, parentInfo: 1, registrationId: 1 } }).toArray();
-    const existingRenewalFamilies = await db.collection("renewal_families").find({
-      renewalStatus: { $in: ["submitted", "reserved", "confirmed", "paid"] },
-    }).toArray();
+    // Run all 3 DB reads in parallel instead of sequentially
+    const [registrations, knownStudents, existingRenewalFamilies] = await Promise.all([
+      db
+        .collection("student_registrations")
+        .find(query, {
+          projection: {
+            status: 1, program: 1, classTime: 1, submittedAt: 1,
+            adventureNumber: 1, period: 1, adventureStartDate: 1,
+            parentInfo: 1, childInfo: 1, emergencyContact: 1,
+            paymentMethod: 1, paymentType: 1, amountDue: 1, amountPaid: 1,
+            creditBalance: 1, previousAdventureBalance: 1, referenceNumber: 1,
+            receiptUrl: 1, signatureUrl: 1, photoConsent: 1,
+            uniformOrdered: 1, welcomeKitOrdered: 1, isPioneer: 1,
+            customRate: 1, isNewFamily: 1, familyTypeOverride: 1,
+            reservedUntil: 1, paymentDeadline: 1, approvedAt: 1, approvedBy: 1,
+            rejectionReason: 1, confirmationEmailSent: 1, earlyBirdAt: 1, earlyBirdBy: 1,
+            paymentPortalOpen: 1, paymentPortalOpenedAt: 1,
+            selfDeclaredPreviousAdventure: 1, detectedPreviousAdventure: 1,
+            unmatchedFamily: 1, familyId: 1,
+          },
+        })
+        .sort({ submittedAt: -1 })
+        .toArray(),
+      db.collection("students").find({}, {
+        projection: { "childInfo.firstName": 1, "childInfo.lastName": 1, "parentInfo.name": 1, "parentInfo.phone": 1, registrationId: 1 },
+      }).toArray(),
+      db.collection("renewal_families").find({
+        renewalStatus: { $in: ["submitted", "reserved", "confirmed", "paid"] },
+      }, {
+        projection: { parentName: 1, phone: 1, parentEmail: 1 },
+      }).toArray(),
+    ]);
+    const tDb = Date.now();
+
     const familyIdentityKeys = (parentInfo: any, childInfo: any) => {
       const parentName = String(parentInfo?.name || "").trim().toLowerCase().replace(/\s+/g, " ");
       const phone = String(parentInfo?.phone || "").replace(/\D/g, "");
@@ -88,7 +115,15 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ success: true, data: formatted });
+    const tTotal = Date.now();
+    console.log(`[perf] GET /api/registrations — auth:${tAuth - t0}ms db:${tDb - tAuth}ms total:${tTotal - t0}ms count:${registrations.length}`);
+
+    return NextResponse.json({ success: true, data: formatted }, {
+      headers: {
+        // private = browser-only cache, safe for authenticated responses (no CDN sharing)
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+      },
+    });
   } catch (error: any) {
     console.error("[registrations GET]", error);
     return NextResponse.json({ error: "Failed to fetch registrations" }, { status: 500 });

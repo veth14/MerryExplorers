@@ -127,6 +127,23 @@ html.menu-open {
   animation: me-spin 26s linear infinite;
 }
 
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-container-low) 25%,
+    var(--surface-container-high) 50%,
+    var(--surface-container-low) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
 body {
   color: var(--on-background);
   font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
