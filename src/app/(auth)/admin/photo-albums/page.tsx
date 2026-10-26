@@ -93,6 +93,34 @@ function getTrailblazerExpiry(now = new Date()): Date {
   return new Date(utcMs);
 }
 
+// Identifies testing accounts associated with Developer Ian Angelo Valmores
+function isTestingAccount(item: any): boolean {
+  if (!item) return false;
+  const target = "ian angelo valmores";
+  const names = [
+    item.childFirstName ? `${item.childFirstName} ${item.childLastName || ""}` : "",
+    item.childName,
+    item.childInfo ? `${item.childInfo.firstName || ""} ${item.childInfo.lastName || ""} ${item.childInfo.nickname || ""}` : "",
+    item.parentInfo?.name,
+    item.parentInfo?.email,
+    item.parentName,
+    item.parentEmail,
+    item.name,
+    item.email,
+    typeof item === "string" ? item : "",
+  ];
+
+  return names.some(
+    (n) =>
+      typeof n === "string" &&
+      (n.toLowerCase().replace(/[^a-z0-9]/g, "").includes("ianangelovalmores") ||
+        n.toLowerCase().includes("ian angelo valmores") ||
+        n.toLowerCase().includes("valmores") ||
+        n.toLowerCase().includes("vianangelo") ||
+        n.toLowerCase().includes("valmores.ianangelo"))
+  );
+}
+
 function fmtExpiry(d: Date) {
   return (
     d.toLocaleDateString("en-US", {
@@ -239,6 +267,7 @@ function AlbumCard({
   const accent = programDef?.accent || "#0033A0";
   const accentSoft = programDef?.accentSoft || "#e1ecff";
   const shortName = album.programName.includes(":") ? album.programName.split(":")[1].trim() : album.programName;
+  const isTesting = isTestingAccount(album);
 
   return (
     <m.div
@@ -247,8 +276,22 @@ function AlbumCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       onClick={() => onView?.(album)}
-      className="rounded-[1.5rem] bg-white border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-[#0033A0]/30 transition-all cursor-pointer"
+      className={`rounded-[1.5rem] bg-white border shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer relative ${
+        isTesting
+          ? "border-amber-400 bg-amber-50/20 hover:border-amber-500"
+          : "border-slate-100 hover:border-[#0033A0]/30"
+      }`}
     >
+      {/* Police Hazard Bar on top if testing */}
+      {isTesting && (
+        <div
+          className="absolute top-0 left-0 right-0 h-1.5 z-10 pointer-events-none"
+          style={{
+            background: "repeating-linear-gradient(45deg, #facc15 0px, #facc15 8px, #000000 8px, #000000 16px)"
+          }}
+        />
+      )}
+
       {/* Photo strip */}
       <div className="flex h-24 overflow-hidden bg-slate-50">
         {album.photos.slice(0, 4).map((p, i) => (
@@ -269,12 +312,31 @@ function AlbumCard({
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-2 mb-2.5">
           <div>
-            <p className="font-headline text-[15px] font-extrabold text-[#0f172a]">
-              {album.childFirstName}
-              {album.childNickname && album.childNickname !== album.childFirstName && (
-                <span className="text-[#64748b] font-semibold text-[13px]"> "{album.childNickname}"</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="font-headline text-[15px] font-extrabold text-[#0f172a]">
+                {isTesting ? (
+                  <span className="line-through decoration-red-600 decoration-[2.5px] opacity-75">{album.childFirstName}</span>
+                ) : (
+                  album.childFirstName
+                )}
+                {album.childNickname && album.childNickname !== album.childFirstName && (
+                  <span className={`${isTesting ? "line-through decoration-red-600 decoration-[1.5px] opacity-60" : "text-[#64748b]"} font-semibold text-[13px]`}>
+                    {" "}
+                    "{album.childNickname}"
+                  </span>
+                )}
+              </p>
+              {isTesting && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-[#facc15] text-black border border-black shadow-xs select-none"
+                  style={{
+                    backgroundImage: "repeating-linear-gradient(-45deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 4px, transparent 4px, transparent 8px)"
+                  }}
+                >
+                  <span>🚧</span> TESTING
+                </span>
               )}
-            </p>
+            </div>
             <p className="text-[11px] font-bold text-[#64748b] mt-0.5 uppercase tracking-wide">
               {fmtDate(album.sessionDate)}
             </p>
@@ -367,6 +429,7 @@ function ViewAlbumPanel({ album, onClose }: { album: PhotoAlbum; onClose: () => 
   const accent = programDef?.accent || "#0033A0";
   const accentSoft = programDef?.accentSoft || "#e1ecff";
   const shortName = album.programName.includes(":") ? album.programName.split(":")[1].trim() : album.programName;
+  const isTesting = isTestingAccount(album);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -391,16 +454,37 @@ function ViewAlbumPanel({ album, onClose }: { album: PhotoAlbum; onClose: () => 
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FFC107]/20 text-[20px] font-black text-[#0033A0]">
-              {album.childFirstName[0]?.toUpperCase()}
+            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[20px] font-black ${
+              isTesting ? "bg-amber-400 text-black border-2 border-black" : "bg-[#FFC107]/20 text-[#0033A0]"
+            }`}>
+              {isTesting ? "🚨" : album.childFirstName[0]?.toUpperCase()}
             </div>
             <div>
-              <p className="font-headline text-[18px] font-extrabold text-[#0f172a]">
-                {album.childFirstName}
-                {album.childNickname && album.childNickname !== album.childFirstName && (
-                  <span className="text-[#64748b] font-medium text-[15px]"> "{album.childNickname}"</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-headline text-[18px] font-extrabold text-[#0f172a]">
+                  {isTesting ? (
+                    <span className="line-through decoration-red-600 decoration-[2.5px] opacity-75">{album.childFirstName}</span>
+                  ) : (
+                    album.childFirstName
+                  )}
+                  {album.childNickname && album.childNickname !== album.childFirstName && (
+                    <span className={`${isTesting ? "line-through decoration-red-600 decoration-[1.5px] opacity-60" : "text-[#64748b]"} font-medium text-[15px]`}>
+                      {" "}
+                      "{album.childNickname}"
+                    </span>
+                  )}
+                </p>
+                {isTesting && (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[#facc15] text-black border border-black shadow-xs select-none"
+                    style={{
+                      backgroundImage: "repeating-linear-gradient(-45deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 5px, transparent 5px, transparent 10px)"
+                    }}
+                  >
+                    <span>🚧</span> POLICE LINE: TESTING ACCOUNT <span>🚧</span>
+                  </span>
                 )}
-              </p>
+              </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 <span
                   className="rounded-full px-2.5 py-1 text-[11px] font-bold border"
@@ -906,6 +990,7 @@ function CreatePanel({
                 {filtered.map((s) => {
                   const p = getStudentProgram(s.program);
                   const isSelected = selectedStudent?.id === s.id;
+                  const isTesting = isTestingAccount(s);
 
                   const shortName = p?.name?.includes(":") ? p.name.split(":")[1].trim() : p?.name;
                   const c = (p as any)?.classes?.find((x: any) => x.name === s.classTime);
@@ -915,23 +1000,87 @@ function CreatePanel({
                     <button
                       key={s.id}
                       onClick={() => setSelectedStudent(s)}
-                      className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${isSelected ? "bg-[#0033A0] text-white" : "bg-slate-50 hover:bg-slate-100"
-                        }`}
+                      className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all relative overflow-hidden ${
+                        isSelected
+                          ? isTesting
+                            ? "bg-[#0033A0] text-white ring-2 ring-[#facc15]"
+                            : "bg-[#0033A0] text-white"
+                          : isTesting
+                            ? "bg-amber-50/80 hover:bg-amber-100/90 border-2 border-dashed border-amber-400"
+                            : "bg-slate-50 hover:bg-slate-100"
+                      }`}
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFC107]/20 text-[14px] font-black text-[#0033A0]">
-                        {s.childInfo.firstName[0]?.toUpperCase()}
+                      {/* Police caution tape hazard bar across top of testing row */}
+                      {isTesting && (
+                        <div
+                          className="absolute top-0 left-0 right-0 h-1.5 pointer-events-none"
+                          style={{
+                            background: "repeating-linear-gradient(45deg, #facc15 0px, #facc15 8px, #000000 8px, #000000 16px)"
+                          }}
+                        />
+                      )}
+
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-black ${
+                        isTesting
+                          ? "bg-amber-400 text-black border border-black/40 shadow-xs"
+                          : "bg-[#FFC107]/20 text-[#0033A0]"
+                      }`}>
+                        {isTesting ? "🚨" : s.childInfo.firstName[0]?.toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-[14px] font-bold truncate ${isSelected ? "text-white" : "text-[#0f172a]"}`}>
-                          {s.childInfo.firstName} {s.childInfo.lastName}
-                          {s.childInfo.nickname && <span className="opacity-60 font-medium"> "{s.childInfo.nickname}"</span>}
-                        </p>
-                        <p className={`text-[11px] truncate ${isSelected ? "text-white/70" : "text-[#94a3b8]"}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-[14px] font-bold truncate ${
+                            isSelected
+                              ? "text-white"
+                              : isTesting
+                                ? "text-[#0f172a]"
+                                : "text-[#0f172a]"
+                          }`}>
+                            {isTesting ? (
+                              <span className="line-through decoration-red-600 decoration-[2.5px] opacity-75">
+                                {s.childInfo.firstName} {s.childInfo.lastName}
+                              </span>
+                            ) : (
+                              <>
+                                {s.childInfo.firstName} {s.childInfo.lastName}
+                              </>
+                            )}
+                            {s.childInfo.nickname && (
+                              <span className={`${isTesting ? "line-through decoration-red-600 decoration-[1.5px] opacity-60" : "opacity-60"} font-medium`}>
+                                {" "}
+                                "{s.childInfo.nickname}"
+                              </span>
+                            )}
+                          </p>
+
+                          {/* Police Caution Tape Badge */}
+                          {isTesting && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-black uppercase tracking-wider bg-[#facc15] text-black border border-black shadow-xs select-none"
+                              style={{
+                                backgroundImage: "repeating-linear-gradient(-45deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 5px, transparent 5px, transparent 10px)"
+                              }}
+                            >
+                              <span>🚧</span>
+                              <span>POLICE LINE: TESTING ACCOUNT</span>
+                              <span>🚧</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <p className={`text-[11px] truncate ${isSelected ? "text-white/70" : isTesting ? "text-amber-900/80 font-medium" : "text-[#94a3b8]"}`}>
                           {shortName} · {s.classTime}{timeStr}
                         </p>
-                        {duplicateNameCounts[`${s.childInfo.firstName} ${s.childInfo.lastName}`.trim().toLowerCase()] > 1 && (
-                          <p className={`text-[10px] truncate ${isSelected ? "text-white/70" : "text-[#64748b]"}`}>
-                            Parent: {s.parentInfo?.name || "Name unavailable"}
+                        {(isTesting || duplicateNameCounts[`${s.childInfo.firstName} ${s.childInfo.lastName}`.trim().toLowerCase()] > 1) && (
+                          <p className={`text-[10px] truncate ${isSelected ? "text-white/70" : isTesting ? "text-amber-950 font-semibold" : "text-[#64748b]"}`}>
+                            Parent:{" "}
+                            {isTesting ? (
+                              <span className="line-through decoration-red-600 decoration-[1.5px]">
+                                {s.parentInfo?.name || "Ian Angelo Valmores"}
+                              </span>
+                            ) : (
+                              s.parentInfo?.name || "Name unavailable"
+                            )}
                             {s.parentInfo?.email ? ` · ${s.parentInfo.email}` : ""}
                           </p>
                         )}
@@ -944,6 +1093,25 @@ function CreatePanel({
 
               {selectedStudent && (
                 <div className="rounded-xl bg-[#f0f6ff] border border-[#dbeafe] p-4 space-y-3">
+                  {isTestingAccount(selectedStudent) && (
+                    <div
+                      className="rounded-xl border-2 border-black bg-[#facc15] p-3 text-black shadow-sm"
+                      style={{
+                        backgroundImage: "repeating-linear-gradient(-45deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 8px, transparent 8px, transparent 16px)"
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">🚨</span>
+                        <span className="font-black uppercase tracking-wider text-[11px] bg-black text-[#facc15] px-2 py-0.5 rounded">
+                          POLICE LINE · TESTING ACCOUNT
+                        </span>
+                      </div>
+                      <p className="text-[12px] font-bold leading-snug">
+                        Testing Account: <span className="line-through decoration-red-600 decoration-2 font-black">{selectedStudent.childInfo.firstName} {selectedStudent.childInfo.lastName}</span> (Developer Ian Angelo Valmores). Use for testing photo uploads only.
+                      </p>
+                    </div>
+                  )}
+
                   <p className="text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60">Selected student details</p>
                   <div className="grid grid-cols-2 gap-3 text-[13px]">
                     <div>
@@ -1405,8 +1573,21 @@ function EditPanel({
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-[#0033A0]/50">Photo Albums</p>
-            <h2 className="font-headline text-[20px] font-extrabold text-[#0f172a]">
-              Edit {album.childFirstName}'s Album
+            <h2 className="font-headline text-[20px] font-extrabold text-[#0f172a] flex items-center gap-2 flex-wrap">
+              <span>
+                Edit{" "}
+                {isTestingAccount(album) ? (
+                  <span className="line-through decoration-red-600 decoration-2">{album.childFirstName}</span>
+                ) : (
+                  album.childFirstName
+                )}
+                &apos;s Album
+              </span>
+              {isTestingAccount(album) && (
+                <span className="text-[10px] font-black uppercase tracking-wider bg-[#facc15] text-black px-2 py-0.5 rounded border border-black shadow-xs">
+                  🚧 TESTING ACCOUNT
+                </span>
+              )}
             </h2>
           </div>
           <button
