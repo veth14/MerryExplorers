@@ -142,7 +142,7 @@ export default function RegisterPage() {
     favoriteSong: "", favoriteColor: "", favoriteCharacter: "", healthProfile: ""
   });
   const [parentInfo, setParentInfo] = useState(draft?.parentInfo ?? {
-    name: "", email: "", phone: "", relationship: "",
+    name: "", email: "", phone: "", relationship: "", facebook: "",
   });
   const [emergencyContact, setEmergencyContact] = useState(draft?.emergencyContact ?? {
     name: "", phone: "", relationship: "",
@@ -231,6 +231,7 @@ export default function RegisterPage() {
                 email: data.parentInfo.email || prev.email,
                 phone: data.parentInfo.phone || prev.phone,
                 relationship: data.parentInfo.relationship || prev.relationship || "Mother",
+                facebook: data.parentInfo.facebook || prev.facebook,
               }));
             }
             if (data.emergencyContact) {
@@ -559,6 +560,7 @@ export default function RegisterPage() {
     ...(!parentInfo.relationship ? ["Parent/Guardian Relationship"] : []),
     ...(!parentInfo.email ? ["Parent/Guardian Email"] : []),
     ...(!parentInfo.phone ? ["Parent/Guardian Phone"] : []),
+    ...(!parentInfo.facebook ? ["Facebook Name or Link"] : []),
     ...(!emergencyContact.name ? ["Emergency Contact Name"] : []),
     ...(!emergencyContact.phone ? ["Emergency Contact Phone"] : []),
     ...(!emergencyContact.relationship ? ["Emergency Contact Relationship"] : []),
@@ -1021,6 +1023,15 @@ export default function RegisterPage() {
                     </FieldRow>
                     <FieldRow label="Phone Number *">
                       <input type="tel" className={inputCls} value={parentInfo.phone} onChange={e => setParentInfo((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
+                    </FieldRow>
+                    <FieldRow label="Facebook Name or Link *">
+                      <input
+                        className={inputCls}
+                        value={parentInfo.facebook}
+                        onChange={e => setParentInfo((p: any) => ({ ...p, facebook: e.target.value }))}
+                        placeholder="e.g. Maria Santos or facebook.com/maria.santos"
+                      />
+                      <p className="mt-1 text-[11px] font-semibold text-[#3d5a99]">So we can reach you on Facebook if needed.</p>
                     </FieldRow>
                   </div>
                 </div>
@@ -1782,6 +1793,7 @@ export default function RegisterPage() {
                       ["Relationship", parentInfo.relationship],
                       ["Email", parentInfo.email],
                       ["Phone", parentInfo.phone],
+                      ["Facebook", parentInfo.facebook || "—"],
                     ],
                   },
                   {
