@@ -18,7 +18,7 @@ interface Registration {
   adventureNumber?: number | null;
   period?: string;
   adventureStartDate?: string | null;
-  parentInfo: { name: string; email: string; phone: string; relationship: string };
+  parentInfo: { name: string; email: string; phone: string; relationship: string; facebook?: string };
   childInfo: { firstName: string; lastName: string; nickname?: string; dateOfBirth: string; gender: string; allergies?: string; specialNeeds?: string; favoriteSong?: string; favoriteColor?: string; favoriteCharacter?: string; healthProfile?: string; };
   emergencyContact: { name: string; phone: string; relationship: string };
   paymentMethod: string;
@@ -226,6 +226,7 @@ interface Lead {
     email?: string;
     phone?: string;
     relationship?: string;
+    facebook?: string;
   };
   emergencyContact?: {
     name?: string;
@@ -440,7 +441,7 @@ function DetailModal({
   <section class="section"><h2>Explorer & Session</h2><table class="table">${row("Student", studentName)}${row("Adventure", adventureLabel(reg))}${row("Adventure start date", formatAdventureDate(reg.adventureStartDate) || "Not scheduled")}${row("Nickname", reg.childInfo.nickname || "—")}${row("Date of Birth", reg.childInfo.dateOfBirth)}${row("Gender", reg.childInfo.gender)}${row("Program", getProgramLabel(reg.program))}${row("Session days", schedule?.schedule || "—")}${row("Session", reg.classTime)}${row("Session time", chosenSession?.time || "—")}${row("Registration date", submittedDate)}${row("Registration reference", reg.id)}</table></section>
   <section class="section"><h2>Adventure Timeline</h2><table class="table">${timelineSummaryRows || row("History", "No other registrations found for this Explorer.")}</table></section>
   ${availabilitySection}
-  <section class="section"><h2>Parent / Guardian</h2><table class="table">${row("Name", reg.parentInfo.name)}${row("Relationship", reg.parentInfo.relationship)}${row("Email", reg.parentInfo.email)}${row("Phone", reg.parentInfo.phone)}</table></section>
+  <section class="section"><h2>Parent / Guardian</h2><table class="table">${row("Name", reg.parentInfo.name)}${row("Relationship", reg.parentInfo.relationship)}${row("Email", reg.parentInfo.email)}${row("Phone", reg.parentInfo.phone)}${reg.parentInfo.facebook ? row("Facebook", reg.parentInfo.facebook) : ""}</table></section>
   <section class="section"><h2>Emergency Contact</h2><table class="table">${row("Name", reg.emergencyContact?.name)}${row("Relationship", reg.emergencyContact?.relationship)}${row("Phone", reg.emergencyContact?.phone)}</table></section>
   <section class="section"><h2>Payment Summary</h2><table class="table">${row("Program fee", `${money(effectiveProgramRate)}${isPioneer ? " (Pioneer Family Rate)" : ""}`)}${row("Initial amount due", money(reg.amountDue || requiredDownpayment))}${row("Amount paid (receipt)", money(totalPaid))}${prevAdventureBal > 0 ? row("Deducted for previous adventure", `-${money(paidToPrevious)} (Adv 1 cleared)`) : ""}${prevAdventureBal > 0 ? row("Applied to current session", money(appliedToCurrentSession)) : ""}${row("Remaining balance", money(totalRemainingBalance))}${row("Payment method", reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) || "—")}${row("Reference number", reg.referenceNumber || "—")}</table></section>
   <section class="section"><h2>Additional Information</h2><table class="table">${row("Uniform kit", reg.uniformOrdered ? "Ordered" : "Not ordered")}${row("Photo consent", reg.photoConsent === "yes" ? "Allowed" : "Not allowed")}${row("Health profile", reg.childInfo.healthProfile || "None noted")}${row("Allergies", reg.childInfo.allergies || "None noted")}${row("Special needs", reg.childInfo.specialNeeds || "None noted")}</table></section>
@@ -780,6 +781,23 @@ function DetailModal({
               <InfoRow label="Relationship" value={reg.parentInfo.relationship} />
               <InfoRow label="Email" value={reg.parentInfo.email} />
               <InfoRow label="Phone" value={reg.parentInfo.phone} />
+              {(reg.parentInfo as any).facebook && (
+                <div className="flex items-start justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
+                  <span className="text-[12px] font-semibold text-[#94a3b8] shrink-0 pt-0.5 w-[38%]">Facebook</span>
+                  <span className="text-[13px] font-bold text-right break-all min-w-0 text-[#1e293b]">
+                    {(() => {
+                      const fb = (reg.parentInfo as any).facebook as string;
+                      try {
+                        const url = new URL(fb.startsWith("http") ? fb : `https://${fb}`);
+                        if (url.hostname.includes("facebook.com") || url.hostname.includes("fb.com")) {
+                          return <a href={url.href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{fb}</a>;
+                        }
+                      } catch { /* plain name */ }
+                      return fb;
+                    })()}
+                  </span>
+                </div>
+              )}
             </SectionCard>
 
             {/* Emergency */}
@@ -1142,8 +1160,25 @@ function LeadDetailModal({
                 Parent: <span className="text-[#1e293b] font-bold">{lead.parentInfo?.name || "Not provided"}</span>
                 {lead.parentInfo?.relationship ? ` (${lead.parentInfo.relationship})` : ""}
               </p>
-              <div className="mt-1 flex items-center gap-2 text-[11px] text-[#94a3b8]">
-                <span>Last active: {lead.updatedAt ? new Date(lead.updatedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "Recently"}</span>
+              <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+                <span className="text-[11px] text-[#94a3b8]">Last active: {lead.updatedAt ? new Date(lead.updatedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "Recently"}</span>
+                {lead.parentInfo?.facebook && (() => {
+                  const fb = lead.parentInfo!.facebook as string;
+                  let href: string | null = null;
+                  try {
+                    const url = new URL(fb.startsWith("http") ? fb : `https://${fb}`);
+                    if (url.hostname.includes("facebook.com") || url.hostname.includes("fb.com")) href = url.href;
+                  } catch { /* plain name */ }
+                  const chip = (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1877F2]/30 bg-[#e7f0fd] px-2.5 py-0.5">
+                      <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#1877F2"/><path d="M27 13h-3c-1.1 0-2 .9-2 2v2h5l-.7 5H22v13h-5V22h-3v-5h3v-2c0-3.3 2.7-6 6-6h4v4z" fill="white"/></svg>
+                      <span className="text-[11px] font-bold text-[#1877F2] max-w-[160px] truncate">{fb}</span>
+                    </span>
+                  );
+                  return href
+                    ? <a href={href} target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">{chip}</a>
+                    : chip;
+                })()}
               </div>
             </div>
           </div>
@@ -1334,6 +1369,23 @@ function LeadDetailModal({
               <InfoRow label="Relationship" value={lead.parentInfo?.relationship || "—"} />
               <InfoRow label="Email" value={lead.parentInfo?.email || "—"} />
               <InfoRow label="Phone" value={lead.parentInfo?.phone || "—"} />
+              {lead.parentInfo?.facebook && (
+                <div className="flex items-start justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
+                  <span className="text-[12px] font-semibold text-[#94a3b8] shrink-0 pt-0.5 w-[38%]">Facebook</span>
+                  <span className="text-[13px] font-bold text-right break-all min-w-0 text-[#1e293b]">
+                    {(() => {
+                      const fb = lead.parentInfo!.facebook as string;
+                      try {
+                        const url = new URL(fb.startsWith("http") ? fb : `https://${fb}`);
+                        if (url.hostname.includes("facebook.com") || url.hostname.includes("fb.com")) {
+                          return <a href={url.href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{fb}</a>;
+                        }
+                      } catch { /* plain name */ }
+                      return fb;
+                    })()}
+                  </span>
+                </div>
+              )}
               {lead.emergencyContact?.name && (
                 <>
                   <InfoRow label="Emergency Contact" value={lead.emergencyContact.name} />
