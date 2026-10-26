@@ -141,8 +141,9 @@ export default function RegisterPage() {
     firstName: "", lastName: "", nickname: "", dateOfBirth: "", gender: "",
     favoriteSong: "", favoriteColor: "", favoriteCharacter: "", healthProfile: ""
   });
-  const [parentInfo, setParentInfo] = useState(draft?.parentInfo ?? {
+  const [parentInfo, setParentInfo] = useState({
     name: "", email: "", phone: "", relationship: "", facebook: "",
+    ...(draft?.parentInfo ?? {}),
   });
   const [emergencyContact, setEmergencyContact] = useState(draft?.emergencyContact ?? {
     name: "", phone: "", relationship: "",
@@ -1024,15 +1025,75 @@ export default function RegisterPage() {
                     <FieldRow label="Phone Number *">
                       <input type="tel" className={inputCls} value={parentInfo.phone} onChange={e => setParentInfo((p: any) => ({ ...p, phone: e.target.value }))} placeholder="09XX XXX XXXX" />
                     </FieldRow>
+                    <div className="sm:col-span-2">
                     <FieldRow label="Facebook Name or Link *">
-                      <input
-                        className={inputCls}
-                        value={parentInfo.facebook}
-                        onChange={e => setParentInfo((p: any) => ({ ...p, facebook: e.target.value }))}
-                        placeholder="e.g. Maria Santos or facebook.com/maria.santos"
-                      />
-                      <p className="mt-1 text-[11px] font-semibold text-[#3d5a99]">So we can reach you on Facebook if needed.</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className={inputCls}
+                          value={parentInfo.facebook}
+                          onChange={e => setParentInfo((p: any) => ({ ...p, facebook: e.target.value }))}
+                          placeholder="e.g. Maria Santos or facebook.com/maria.santos"
+                        />
+                        {/* Live Facebook preview — right side */}
+                        {(() => {
+                          const raw = (parentInfo.facebook || "").trim();
+                          if (!raw) return null;
+                          // Try to extract a slug from a URL
+                          let slug: string | null = null;
+                          let profileUrl: string | null = null;
+                          try {
+                            const normalized = raw.startsWith("http") ? raw : `https://${raw}`;
+                            const url = new URL(normalized);
+                            if (url.hostname.includes("facebook.com") || url.hostname.includes("fb.com")) {
+                              const parts = url.pathname.replace(/^\//, "").split("/").filter(Boolean);
+                              if (parts.length > 0 && parts[0] !== "profile.php") {
+                                slug = parts[0];
+                                profileUrl = `https://www.facebook.com/${slug}`;
+                              } else if (url.searchParams.get("id")) {
+                                slug = `ID ${url.searchParams.get("id")}`;
+                                profileUrl = `https://www.facebook.com/profile.php?id=${url.searchParams.get("id")}`;
+                              }
+                            }
+                          } catch { /* not a URL */ }
+
+                          if (profileUrl && slug) {
+                            return (
+                              <a
+                                href={profileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Open facebook.com/${slug}`}
+                                className="shrink-0 flex items-center gap-2 rounded-xl border-2 border-[#1877F2]/30 bg-[#e7f0fd] px-3 py-2.5 transition-all hover:border-[#1877F2] hover:bg-[#d0e4fc] group"
+                              >
+                                <svg className="w-6 h-6 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="20" cy="20" r="20" fill="#1877F2"/>
+                                  <path d="M27 13h-3c-1.1 0-2 .9-2 2v2h5l-.7 5H22v13h-5V22h-3v-5h3v-2c0-3.3 2.7-6 6-6h4v4z" fill="white"/>
+                                </svg>
+                                <div className="flex flex-col leading-tight">
+                                  <span className="text-[11px] font-black text-[#1877F2] group-hover:underline max-w-[120px] truncate">{slug}</span>
+                                  <span className="text-[9px] font-semibold text-[#1877F2]/70">Verify ↗</span>
+                                </div>
+                              </a>
+                            );
+                          }
+
+                          // Plain name — compact badge
+                          return (
+                            <div className="shrink-0 flex items-center gap-1.5 rounded-xl border-2 border-[#b6dcf5] bg-white px-3 py-2.5">
+                              <svg className="w-5 h-5 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" r="20" fill="#1877F2"/>
+                                <path d="M27 13h-3c-1.1 0-2 .9-2 2v2h5l-.7 5H22v13h-5V22h-3v-5h3v-2c0-3.3 2.7-6 6-6h4v4z" fill="white"/>
+                              </svg>
+                              <span className="text-[11px] font-bold text-[#0b2a82] max-w-[100px] truncate">{raw}</span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      {!parentInfo.facebook?.trim() && (
+                        <p className="mt-1 text-[11px] font-semibold text-[#3d5a99]">Enter your Facebook name or profile link so we can reach you.</p>
+                      )}
                     </FieldRow>
+                    </div>
                   </div>
                 </div>
 
