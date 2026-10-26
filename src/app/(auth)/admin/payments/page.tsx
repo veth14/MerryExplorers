@@ -15,6 +15,7 @@ import {
   RESERVATION_RATE,
   WEEKLY_INTEREST_RATE,
   BALANCE_DUE_SESSION,
+  FALLBACK_PIONEER_RATES,
 } from "@/lib/payment-terms";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
@@ -648,6 +649,8 @@ function AdminPaymentsPageInner() {
   const [settingsOk, setSettingsOk] = useState(false);
   const [today, setToday] = useState(manilaToday());
   const [renewalIds, setRenewalIds] = useState<Set<string>>(new Set());
+  const [pioneerEmails, setPioneerEmails] = useState<Set<string>>(new Set());
+  const [pioneerPrices, setPioneerPrices] = useState<Record<string, number>>({});
   const [renewalsFeed, setRenewalsFeed] = useState<"loading" | "ok" | "empty" | "failed">("loading");
   const [activeFilter, setActiveFilter] = useState("all");
   const [nextFilter, setNextFilter] = useState("all");
@@ -731,8 +734,21 @@ function AdminPaymentsPageInner() {
       fetch("/api/accounts").then((res) => res.json()),
       fetch("/api/registrations?status=all").then((res) => res.json()),
       fetch("/api/renewal-settings").then((res) => res.json()).catch(() => ({ programs: [] })),
+      fetch("/api/pioneer-families").then((res) => res.json()).catch(() => ({ families: [], pioneerPrices: {} })),
     ])
-      .then(([accountsData, regData, settingsData]) => {
+      .then(([accountsData, regData, settingsData, pioneerData]) => {
+        if (pioneerData) {
+          const list: any[] = Array.isArray(pioneerData.families) ? pioneerData.families : [];
+          const emails = new Set<string>();
+          list.forEach((f) => {
+            if (f.email) emails.add(String(f.email).toLowerCase().trim());
+            if (f.email2) emails.add(String(f.email2).toLowerCase().trim());
+          });
+          setPioneerEmails(emails);
+          if (pioneerData.pioneerPrices && typeof pioneerData.pioneerPrices === "object") {
+            setPioneerPrices(pioneerData.pioneerPrices);
+          }
+        }
         if (Array.isArray(accountsData)) {
           setAllAccounts(
             accountsData.filter(
@@ -1390,23 +1406,39 @@ function AdminPaymentsPageInner() {
     );
   }, [allRegistrations, parentFilter, regCtx, manualAdventureMode, tl.curNum]);
 
+  function enrichRegWithPioneer(raw: any) {
+    if (!raw) return raw;
+    const email = (raw.parentInfo?.email || "").toLowerCase().trim();
+    const isPioneer = Boolean(raw.isPioneer || (email && pioneerEmails.has(email)));
+    if (!isPioneer) return raw;
+    const pPrice = pioneerPrices[raw.program] || (FALLBACK_PIONEER_RATES as any)[raw.program];
+    return {
+      ...raw,
+      isPioneer: true,
+      customRate: raw.customRate || pPrice || undefined,
+      isNewFamily: false,
+      welcomeKitOrdered: false,
+    };
+  }
+
   // Same rules as the details modal (calcRegistrationTerms) so the numbers always match.
   // `asOf` = the date interest is calculated up to. Omit it for "today" (list rows, details modal);
   // the Encode Payment form passes the "Date paid" so a payment made last Sunday isn't charged
   // for a Monday that only arrived afterwards.
-  function regInfo(reg: any, asOf?: Date) {
+  function regInfo(rawReg: any, asOf?: Date) {
+    const reg = enrichRegWithPioneer(rawReg);
     const email = (reg?.parentInfo?.email || "").toLowerCase();
     const parentAcc = allAccounts.find((a) => (a.email || "").toLowerCase() === email);
     // CHANGED: sessions are never counted before the Adventure's own start date
     const student = getStudentSessionInfo(reg, parentAcc, advStartOf(reg));
-    const paidVerified = isRegistrationVerified(reg.status) ? reg.amountPaid || reg.amountDue || 0 : 0;
+    const paidVerified = isRegistrationVerified(reg?.status) ? reg?.amountPaid || reg?.amountDue || 0 : 0;
     const prevBal = typeof reg?.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
     const paidToPrev = Math.min(paidVerified, prevBal);
     const appliedToSession = Math.max(0, paidVerified - paidToPrev);
-    const terms = calcRegistrationTerms(reg, student, appliedToSession, reg.amountDue, asOf);
+    const terms = calcRegistrationTerms(reg, student, appliedToSession, reg?.amountDue, asOf);
     // first payment = the one parents make on the "Secure Your Slot" page
-    const isInitial = reg.status === "reserved" || reg.status === "early-bird";
-    const prog = (PROGRAM_SLOTS as any)[reg.program] ?? null;
+    const isInitial = reg?.status === "reserved" || reg?.status === "early-bird";
+    const prog = (PROGRAM_SLOTS as any)[reg?.program] ?? null;
     return { terms, paidVerified, paidToPrev, appliedToSession, isInitial, prog };
   }
 
@@ -1901,7 +1933,8 @@ function AdminPaymentsPageInner() {
 
     // Registrations: shared rules (program + Welcome Kit / Uniform Set, 60/40 split, weekly 4% interest)
     if (type === "registration") {
-      const reg = registrations.find((x) => x.id === detail.uid) || allRegistrations.find((x) => x.id === detail.uid);
+      const rawReg = registrations.find((x) => x.id === detail.uid) || allRegistrations.find((x) => x.id === detail.uid);
+      const reg = enrichRegWithPioneer(rawReg);
       const email = (reg?.parentInfo?.email || acc.email || "").toLowerCase();
       const parentAcc = allAccounts.find((a) => (a.email || "").toLowerCase() === email);
       // CHANGED: sessions are never counted before the Adventure's own start date

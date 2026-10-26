@@ -6,8 +6,9 @@ import { ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
-import { calcRegistrationTerms, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
+import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
 import { allocateBalancePayment } from "@/lib/balance-payment";
+import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
 
@@ -120,13 +121,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
 
         // ── compute the balance on the server with the SAME rules as the UI ──
-        const parentEmail = String(reg.parentInfo?.email || "").trim();
-        const parentAcc = parentEmail
-            ? await db.collection("accounts").findOne({ email: { $regex: `^${escapeRegex(parentEmail)}$`, $options: "i" } })
-            : null;
-        const student = getStudentSessionInfo(reg, parentAcc);
+        // Always cross-check pioneer status from the DB so families added to the pioneer
+        // list after their initial registration still get the correct discounted rate.
+        const parentEmail = String(reg.parentInfo?.email || "").trim().toLowerCase();
+        const escapedEmail = parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const [parentAcc, pioneerFamily, pioneerSettings] = await Promise.all([
+            parentEmail
+                ? db.collection("accounts").findOne({ email: { $regex: `^${escapedEmail}$`, $options: "i" } })
+                : Promise.resolve(null),
+            parentEmail
+                ? db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail))
+                : Promise.resolve(null),
+            db.collection("settings").findOne({ _key: "pioneer_settings_v1" }),
+        ]);
+        const isPioneer = Boolean(reg.isPioneer || pioneerFamily);
+        const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[reg.program]) || FALLBACK_PIONEER_RATES[reg.program];
+        const pricedReg = {
+            ...reg,
+            isPioneer,
+            ...(isPioneer && pioneerRate ? { customRate: pioneerRate } : {}),
+        };
+        const student = getStudentSessionInfo(pricedReg, parentAcc);
         const paidVerified = isRegistrationVerified(reg.status) ? reg.amountPaid || reg.amountDue || 0 : 0;
-        const terms = calcRegistrationTerms(reg, student, paidVerified, reg.amountDue);
+        const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue);
 
         // The admin's screen showed a "total payable". If it no longer matches (interest ticked over, or
         // another payment was just saved) refuse instead of applying money against numbers they never saw.

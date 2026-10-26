@@ -114,8 +114,16 @@ export async function POST(
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
     }
 
+    const parentEmail = (registration.parentInfo?.email || "").toLowerCase().trim();
+    const pioneerFamily = parentEmail
+      ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail))
+      : null;
+    const isPioneerRegistration = Boolean(registration.isPioneer || pioneerFamily);
+    const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
+    const currentPioneerRate = Number(pioneerSettings?.pioneerPrices?.[registration.program]) || FALLBACK_PIONEER_RATES[registration.program];
+
     const inferredReturningFamily = Boolean(
-      registration.isPioneer || registration.parentInfo?.isRenewal || await isReturningFamilyRecord(db, registration, id)
+      isPioneerRegistration || registration.parentInfo?.isRenewal || await isReturningFamilyRecord(db, registration, id)
     );
     if (inferredReturningFamily) {
       registration.isNewFamily = false;
@@ -162,6 +170,12 @@ export async function POST(
             confirmationEmailSent: false,
             ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}` } : {}),
             ...(adventureStartDate ? { adventureStartDate } : {}),
+            ...(isPioneerRegistration ? {
+              isPioneer: true,
+              isNewFamily: false,
+              welcomeKitOrdered: false,
+              ...(currentPioneerRate && !registration.customRate ? { customRate: currentPioneerRate } : {}),
+            } : {}),
           },
         }
       );
@@ -173,6 +187,7 @@ export async function POST(
         parentInfo,
         emergencyContact: emergencyContact || {},
         program,
+        isPioneer: isPioneerRegistration,
         classTime,
         adventureNumber,
         adventureStartDate,
@@ -215,14 +230,7 @@ export async function POST(
       const schedule = PROGRAM_SCHEDULES[program] || "";
       const classTimeDisplay = formatClassTime(program, classTime);
       const startDateDisplay = formatStartDate(adventureStartDate);
-      const parentEmail = (parentInfo?.email || "").toLowerCase().trim();
       const parentEmailRegex = new RegExp(`^${parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
-      const pioneerFamily = parentEmail
-        ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail))
-        : null;
-      const isPioneerRegistration = Boolean(registration.isPioneer || pioneerFamily);
-      const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
-      const currentPioneerRate = Number(pioneerSettings?.pioneerPrices?.[program]) || FALLBACK_PIONEER_RATES[program];
       const pricingRegistration = {
         ...registration,
         isPioneer: isPioneerRegistration,

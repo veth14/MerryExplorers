@@ -6,6 +6,70 @@ import { requireAdmin } from "@/lib/auth-guard";
 export const dynamic = "force-dynamic";
 
 const PIONEER_SETTINGS_KEY = "pioneer_settings_v1";
+import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
+
+async function syncPioneerRegistrations(db: any, emails: string[], isPioneer: boolean) {
+  const cleanEmails = emails.map(e => (e || "").trim().toLowerCase()).filter(Boolean);
+  if (!cleanEmails.length) return;
+  const emailRegexes = cleanEmails.map(e => new RegExp(`^${e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"));
+
+  if (!isPioneer) {
+    await Promise.all([
+      db.collection("renewal_families").updateMany(
+        { parentEmail: { $in: emailRegexes } },
+        { $set: { isPioneer: false } }
+      ),
+      db.collection("student_registrations").updateMany(
+        { "parentInfo.email": { $in: emailRegexes } },
+        { $set: { isPioneer: false } }
+      ),
+      db.collection("students").updateMany(
+        { "parentInfo.email": { $in: emailRegexes } },
+        { $set: { isPioneer: false } }
+      ),
+    ]);
+    return;
+  }
+
+  const pioneerSettings = await db.collection("settings").findOne({ _key: PIONEER_SETTINGS_KEY });
+  const pioneerPrices: Record<string, number> = pioneerSettings?.pioneerPrices || {};
+
+  await Promise.all([
+    db.collection("renewal_families").updateMany(
+      { parentEmail: { $in: emailRegexes } },
+      { $set: { isPioneer: true } }
+    ),
+    db.collection("students").updateMany(
+      { "parentInfo.email": { $in: emailRegexes } },
+      { $set: { isPioneer: true } }
+    ),
+    db.collection("student_registrations").updateMany(
+      { "parentInfo.email": { $in: emailRegexes } },
+      {
+        $set: {
+          isPioneer: true,
+          isNewFamily: false,
+          welcomeKitOrdered: false,
+        }
+      }
+    ),
+  ]);
+
+  const matchingRegs = await db.collection("student_registrations").find({
+    "parentInfo.email": { $in: emailRegexes },
+    $or: [{ customRate: { $exists: false } }, { customRate: null }, { customRate: 0 }]
+  }).toArray();
+
+  for (const r of matchingRegs) {
+    const rate = pioneerPrices[r.program] || (FALLBACK_PIONEER_RATES as any)[r.program];
+    if (rate) {
+      await db.collection("student_registrations").updateOne(
+        { _id: r._id },
+        { $set: { customRate: rate } }
+      );
+    }
+  }
+}
 
 // GET - returns all pioneer families + per-program pioneer prices
 export async function GET() {
@@ -79,19 +143,14 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
+
     if (id && ObjectId.isValid(id)) {
       await db.collection("pioneer_families").updateOne({ _id: new ObjectId(id) }, { $set: doc });
-      await db.collection("renewal_families").updateMany(
-        { parentEmail: { $regex: new RegExp(`^${doc.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
-        { $set: { isPioneer: true } }
-      );
+      await syncPioneerRegistrations(db, [doc.email, doc.email2], true);
       return NextResponse.json({ ok: true, id });
     }
     const result = await db.collection("pioneer_families").insertOne({ ...doc, createdAt: new Date().toISOString() });
-    await db.collection("renewal_families").updateMany(
-      { parentEmail: { $regex: new RegExp(`^${doc.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
-      { $set: { isPioneer: true } }
-    );
+    await syncPioneerRegistrations(db, [doc.email, doc.email2], true);
     return NextResponse.json({ ok: true, id: result.insertedId.toString() });
   } catch (err) {
     console.error("[pioneer-families POST]", err);
@@ -110,11 +169,8 @@ export async function DELETE(req: NextRequest) {
     const { db } = await connectToDatabase();
     const existing = await db.collection("pioneer_families").findOne({ _id: new ObjectId(id) });
     await db.collection("pioneer_families").deleteOne({ _id: new ObjectId(id) });
-    if (existing?.email) {
-      await db.collection("renewal_families").updateMany(
-        { parentEmail: { $regex: new RegExp(`^${existing.email.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
-        { $set: { isPioneer: false } }
-      );
+    if (existing?.email || existing?.email2) {
+      await syncPioneerRegistrations(db, [existing.email, existing.email2], false);
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

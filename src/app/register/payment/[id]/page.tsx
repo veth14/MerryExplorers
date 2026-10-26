@@ -436,61 +436,63 @@ export default function PaymentPage() {
       <main className="vp-main">
 
         {/* Hero title */}
-        <div className="text-center flex flex-col items-center gap-2 mb-2">
-          {success ? (
-            <>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900 mb-1">
-                <span>🎉</span> {isBalanceMode ? "BALANCE PAYMENT SUBMITTED" : "REGISTRATION PAYMENT SUBMITTED"}
-              </div>
-              <h1 className="vp-title text-[32px] sm:text-[42px]">
-                {isBalanceMode ? "Balance Submitted!" : "Payment Submitted!"}
-              </h1>
-              <p className="vp-sub text-[15px] max-w-lg">
-                {isBalanceMode
-                  ? <>Your balance payment receipt for <strong>{prog?.name}</strong> has been received.</>
-                  : <>Thank you! Your receipt has been received to confirm registration for <strong>2026 Adventure 2</strong>.</>}
-              </p>
-            </>
-          ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
-            <>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900 mb-1">
-                <span>🎓</span> SCHOLARSHIP CONFIRMED
-              </div>
-              <h1 className="vp-title text-[32px] sm:text-[42px]">
-                Scholar Slot Confirmed!
-              </h1>
-              <p className="vp-sub text-[15px] max-w-lg">
-                Welcome to Merry Explorers! Your child&apos;s slot is 100% tuition sponsored.
-              </p>
-            </>
-          ) : regData?.status === "early-bird" ? (
-            <>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border-2 border-amber-500 shadow-[0_4px_0_#d97706] text-[12px] font-black text-amber-950 mb-1">
-                <span>🐣</span> EARLY BIRD SECURED
-              </div>
-              <h1 className="vp-title text-[32px] sm:text-[42px]">
-                Early Bird Slot Secured!
-              </h1>
-              <p className="vp-sub text-[15px] max-w-lg">
-                Your slot is guaranteed and no upfront payment is needed right now.
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
-                <span>💳</span> {isBalanceMode ? "BALANCE PAYMENT" : "REGISTRATION PAYMENT"}
-              </div>
-              <h1 className="vp-title text-[32px] sm:text-[42px]">
-                {isBalanceMode ? "Pay Remaining Balance" : "Finalize Your Slot"}
-              </h1>
-              <p className="vp-sub text-[15px] max-w-md">
-                {isBalanceMode
-                  ? <>Submit your receipt below for the remaining balance on <strong>{prog?.name}</strong>.</>
-                  : <>Submit your receipt below to confirm registration for <strong>2026 Adventure 2</strong>.</>}
-              </p>
-            </>
-          )}
-        </div>
+        {!loading && !showErrorScreen && (
+          <div className="text-center flex flex-col items-center gap-2 mb-2">
+            {success ? (
+              <>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900 mb-1">
+                  <span>🎉</span> {isBalanceMode ? "BALANCE PAYMENT SUBMITTED" : "REGISTRATION PAYMENT SUBMITTED"}
+                </div>
+                <h1 className="vp-title text-[32px] sm:text-[42px]">
+                  {isBalanceMode ? "Balance Submitted!" : "Payment Submitted!"}
+                </h1>
+                <p className="vp-sub text-[15px] max-w-xl mx-auto text-balance">
+                  {isBalanceMode
+                    ? <>Your balance payment receipt for <strong className="whitespace-nowrap">{prog?.name || "Adventure 2"}</strong> has been received.</>
+                    : <>Thank you! Your receipt has been received to confirm registration for <strong className="whitespace-nowrap">{prog?.name ? `${prog.name} (Adventure 2)` : "2026 Adventure 2"}</strong>.</>}
+                </p>
+              </>
+            ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
+              <>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border-2 border-emerald-600 shadow-[0_4px_0_#059669] text-[12px] font-black text-emerald-900 mb-1">
+                  <span>🎓</span> SCHOLARSHIP CONFIRMED
+                </div>
+                <h1 className="vp-title text-[32px] sm:text-[42px]">
+                  Scholar Slot Confirmed!
+                </h1>
+                <p className="vp-sub text-[15px] max-w-lg mx-auto text-balance">
+                  Welcome to Merry Explorers! Your child&apos;s slot is 100% tuition sponsored.
+                </p>
+              </>
+            ) : regData?.status === "early-bird" ? (
+              <>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border-2 border-amber-500 shadow-[0_4px_0_#d97706] text-[12px] font-black text-amber-950 mb-1">
+                  <span>🐣</span> EARLY BIRD SECURED
+                </div>
+                <h1 className="vp-title text-[32px] sm:text-[42px]">
+                  Early Bird Slot Secured!
+                </h1>
+                <p className="vp-sub text-[15px] max-w-lg mx-auto text-balance">
+                  Your slot is guaranteed and no upfront payment is needed right now.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+                  <span>💳</span> {isBalanceMode ? "BALANCE PAYMENT" : "REGISTRATION PAYMENT"}
+                </div>
+                <h1 className="vp-title text-[32px] sm:text-[42px]">
+                  {isBalanceMode ? "Pay Remaining Balance" : "Finalize Your Slot"}
+                </h1>
+                <p className="vp-sub text-[15px] max-w-md mx-auto text-balance">
+                  {isBalanceMode
+                    ? <>Submit your receipt below for the remaining balance on <strong className="whitespace-nowrap">{prog?.name || "Adventure 2"}</strong>.</>
+                    : <>Submit your receipt below to confirm registration for <strong className="whitespace-nowrap">{prog?.name ? `${prog.name} (Adventure 2)` : "2026 Adventure 2"}</strong>.</>}
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="vp-card text-center py-16 max-w-2xl mx-auto w-full">
@@ -506,10 +508,10 @@ export default function PaymentPage() {
               🎉
             </div>
             <h2 className="vp-h2 text-[26px] mb-3 text-[#0b2a82]">Receipt Successfully Recorded!</h2>
-            <p className="vp-sub max-w-lg mx-auto text-[15px] mb-8 leading-relaxed">
+            <p className="vp-sub max-w-md mx-auto text-[15px] mb-8 leading-relaxed text-balance">
               {isBalanceMode
-                ? "Your balance payment receipt has been submitted. Our administrative team will verify it and update your remaining balance."
-                : "Your receipt has been successfully recorded! Our administrative team will verify your payment shortly. An email confirmation has been sent to your email."}
+                ? "Our administrative team will review your receipt and update your balance shortly."
+                : "Our administrative team will review and verify your payment shortly. An email confirmation has been sent to your inbox."}
             </p>
             <div className="flex justify-center gap-3">
               {!isBalanceMode && <Link href="/parent/dashboard" className="vp-btn">Go to Parent Dashboard 🚀</Link>}
@@ -967,15 +969,15 @@ export default function PaymentPage() {
           width: 100%;
           max-width: 900px;
           margin: 0 auto;
-          padding: 120px 20px 100px;
+          padding: 145px 20px 100px;
           display: flex;
           flex-direction: column;
           gap: 24px;
         }
         @media(max-width: 640px) {
-          .vp-main { padding-top: 100px; }
+          .vp-main { padding-top: 120px; }
         }
-        .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; }
+        .vp-sub { margin: 4px 0 0; font-size: 14px; color: ${TEXT_2}; font-weight: 500; line-height: 1.5; text-wrap: balance; }
         .vp-h2 { margin: 0; font-size: 22px; font-weight: 800; color: ${NAVY}; }
         .vp-h3 { margin: 0 0 10px; font-size: 16px; font-weight: 800; color: ${NAVY}; display: flex; align-items: center; gap: 8px; }
         .vp-title {

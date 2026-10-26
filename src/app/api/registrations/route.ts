@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumber, getRegistrationAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
 import { BALLET, PROGRAM_SLOTS } from "@/data/landing";
+import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
 import { isReturningFamilyRecord, findReturningFamilyMatch } from "@/lib/returning-family";
@@ -33,8 +34,8 @@ export async function GET(request: Request) {
 
     const query = status && status !== "all" ? { status } : {};
 
-    // Run all 3 DB reads in parallel instead of sequentially
-    const [registrations, knownStudents, existingRenewalFamilies] = await Promise.all([
+    // Run all DB reads in parallel instead of sequentially
+    const [registrations, knownStudents, existingRenewalFamilies, pioneerDocs, pioneerSettingsDoc] = await Promise.all([
       db
         .collection("student_registrations")
         .find(query, {
@@ -64,8 +65,17 @@ export async function GET(request: Request) {
       }, {
         projection: { parentName: 1, phone: 1, parentEmail: 1 },
       }).toArray(),
+      db.collection("pioneer_families").find({}).toArray(),
+      db.collection("settings").findOne({ _key: "pioneer_settings_v1" }),
     ]);
     const tDb = Date.now();
+
+    const pioneerEmailMap = new Map<string, any>();
+    for (const p of pioneerDocs) {
+      if (p.email) pioneerEmailMap.set(String(p.email).toLowerCase().trim(), p);
+      if (p.email2) pioneerEmailMap.set(String(p.email2).toLowerCase().trim(), p);
+    }
+    const pioneerPrices: Record<string, number> = pioneerSettingsDoc?.pioneerPrices || {};
 
     const familyIdentityKeys = (parentInfo: any, childInfo: any) => {
       const parentName = String(parentInfo?.name || "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -105,11 +115,22 @@ export async function GET(request: Request) {
         const sameParent = (parentName && parentName === familyParentName) || (parentPhone && parentPhone === familyPhone);
         return Boolean(sameParent);
       });
-      const inferredReturningFamily = r.isNewFamily === false || Boolean(r.isPioneer || r.parentInfo?.isRenewal) || hasDifferentStudentRegistration || hasPriorFamilyRegistration || hasRenewalFamilyMatch;
+      const parentEmailClean = String(r.parentInfo?.email || "").toLowerCase().trim();
+      const isPioneerFromList = Boolean(parentEmailClean && pioneerEmailMap.has(parentEmailClean));
+      const isPioneer = Boolean(r.isPioneer || isPioneerFromList);
+      const configuredPioneerPrice = pioneerPrices[r.program] || (FALLBACK_PIONEER_RATES as any)[r.program];
+      const customRate = isPioneer
+        ? (r.customRate || configuredPioneerPrice || null)
+        : (r.customRate || null);
+
+      const inferredReturningFamily = r.isNewFamily === false || Boolean(isPioneer || r.parentInfo?.isRenewal) || hasDifferentStudentRegistration || hasPriorFamilyRegistration || hasRenewalFamilyMatch;
       const isNewFamily = typeof r.familyTypeOverride === "boolean" ? r.familyTypeOverride : !inferredReturningFamily;
       return {
         ...r,
+        isPioneer,
+        customRate,
         isNewFamily,
+        welcomeKitOrdered: isPioneer ? false : r.welcomeKitOrdered,
         id: r._id.toString(),
         _id: undefined,
       };
