@@ -227,44 +227,22 @@ export async function POST(request: Request) {
       ? []
       : getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
 
-    // Check slot availability
-    const programConfig: Record<string, { classes: Record<string, number> }> = {
-      "curious-explorer": {
-        classes: {
-          "Morning Session": 4, "Morning Class": 4,
-          "Afternoon Session": 4, "Afternoon Class": 4,
-        },
-      },
-      "everyday-curious": {
-        classes: {
-          "Mid-Day Session": 5, "Afternoon Session": 5, "Afternoon Class": 5,
-        },
-      },
-      "creative-explorer": {
-        classes: {
-          "Morning Session": 5, "Morning Class": 5,
-          "Mid-Day Session": 5, "Mid-Day Class": 5,
-          "Afternoon Session": 5, "Afternoon Class": 5,
-        },
-      },
-      "brave-explorer": {
-        classes: {
-          "Afternoon Session": 6, "Afternoon Class": 6,
-        },
-      },
-      "saturday-playdate": {
-        classes: {
-          "Morning Session": 10, "Morning Class": 10,
-        },
-      },
-      "ballet": {
-        classes: {
-          "Baby Ballet (Morning)": 6,
-          "Baby Ballet (Afternoon)": 6,
-          "Basic Ballet": 8,
-        },
-      },
-    };
+    // Build slot config dynamically from PROGRAM_SLOTS + DB classSlots overrides.
+    // This means changing max slots in the Programs UI is immediately enforced here too.
+    const dbClassSlots: Record<string, Record<string, { maxSlots?: number }>> =
+      renewalSettingsDoc?.classSlots && typeof renewalSettingsDoc.classSlots === "object"
+        ? renewalSettingsDoc.classSlots
+        : {};
+
+    const programConfig: Record<string, { classes: Record<string, number> }> = {};
+    for (const [progId, config] of Object.entries(PROGRAM_SLOTS)) {
+      const classes: Record<string, number> = {};
+      for (const cls of (config as any).classes) {
+        const dbOverride = dbClassSlots[progId]?.[cls.name];
+        classes[cls.name] = typeof dbOverride?.maxSlots === "number" ? dbOverride.maxSlots : cls.maxSlots;
+      }
+      programConfig[progId] = { classes };
+    }
 
     // Check if the specific class or program is closed by admin
     if (adventureSetting?.registrationOpen === false) {

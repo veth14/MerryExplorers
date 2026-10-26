@@ -12,13 +12,21 @@ export async function GET() {
     const { db } = await connectToDatabase();
     const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const settings = settingsDoc?.programs || [];
+    // classSlots override: { [programId]: { [className]: { time?, maxSlots? } } }
+    const classSlots: Record<string, Record<string, { time?: string; maxSlots?: number }>> =
+      settingsDoc?.classSlots && typeof settingsDoc.classSlots === "object" ? settingsDoc.classSlots : {};
     const now = new Date();
 
-    const result: Record<string, Record<string, { maxSlots: number; taken: number; available: number; closed?: boolean }>> = {};
+    const result: Record<string, Record<string, { maxSlots: number; taken: number; available: number; closed?: boolean; time?: string }>> = {};
 
     for (const [programId, config] of Object.entries(PROGRAM_SLOTS)) {
       result[programId] = {};
       for (const cls of config.classes) {
+        // Apply DB override if present, fall back to hardcoded defaults
+        const override = classSlots[programId]?.[cls.name] ?? {};
+        const effectiveMaxSlots = typeof override.maxSlots === "number" ? override.maxSlots : cls.maxSlots;
+        const effectiveTime = typeof override.time === "string" && override.time ? override.time : cls.time;
+
         const adventureSetting = getProgramAdventureSetting(programId, settings);
         const adventureNumber = adventureSetting ? getTargetRegistrationAdventureNumber(programId, settings, now) : null;
         const adventureStartDate = adventureSetting ? getRegistrationAdventureStartDate(programId, settings, now) : null;
@@ -33,10 +41,11 @@ export async function GET() {
 
         const isClassClosed = Array.isArray((adventureSetting as any)?.closedClasses) && (adventureSetting as any).closedClasses.includes(cls.name);
         result[programId][cls.name] = {
-          maxSlots: cls.maxSlots,
+          maxSlots: effectiveMaxSlots,
           taken,
-          available: isClassClosed ? 0 : Math.max(0, cls.maxSlots - taken),
+          available: isClassClosed ? 0 : Math.max(0, effectiveMaxSlots - taken),
           closed: isClassClosed,
+          time: effectiveTime,
         };
       }
     }
@@ -47,3 +56,4 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch slots" }, { status: 500 });
   }
 }
+

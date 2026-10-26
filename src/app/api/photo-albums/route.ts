@@ -327,20 +327,34 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Album not found" }, { status: 404 });
     }
 
-    // Delete all photos from Cloudinary
+    // Delete from MongoDB immediately — don't make the user wait for Cloudinary.
+    await db.collection("student_photo_albums").deleteOne({ _id: new ObjectId(id) });
+
+    // Then clean up Cloudinary assets in parallel (fire-and-forget is fine here;
+    // a failed Cloudinary delete does NOT affect the user-facing result).
     if (Array.isArray(album.photos)) {
-      for (const photo of album.photos) {
-        if (photo.cloudinaryPublicId) {
-          try {
-            await cloudinary.uploader.destroy(photo.cloudinaryPublicId);
-          } catch (e) {
-            console.warn("Cloudinary delete failed for", photo.cloudinaryPublicId);
-          }
+      const publicIds = album.photos
+        .map((p: any) => p.cloudinaryPublicId)
+        .filter(Boolean) as string[];
+
+      if (publicIds.length > 0) {
+        // Cloudinary's delete_resources accepts up to 100 IDs in a single API call.
+        // For albums > 100 photos we chunk, but MAX_PHOTOS is 30 so one call covers it.
+        const CHUNK = 100;
+        const chunks: string[][] = [];
+        for (let i = 0; i < publicIds.length; i += CHUNK) {
+          chunks.push(publicIds.slice(i, i + CHUNK));
         }
+        // Intentionally not awaited — runs after response is sent.
+        Promise.allSettled(
+          chunks.map((chunk) =>
+            cloudinary.api.delete_resources(chunk).catch((e) =>
+              console.warn("[photo-albums DELETE] Cloudinary bulk delete failed:", e?.message)
+            )
+          )
+        );
       }
     }
-
-    await db.collection("student_photo_albums").deleteOne({ _id: new ObjectId(id) });
 
     // Audit log
     if (actorUid) {

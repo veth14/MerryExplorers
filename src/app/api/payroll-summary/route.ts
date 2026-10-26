@@ -39,8 +39,8 @@ export async function GET(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    // Fetch accounts, attendance, exemptions, and suspended days in parallel (0 N+1 queries, scoped to cutoff)
-    const [accounts, attendanceRecords, exemptDocs, suspendedDocs] = await Promise.all([
+    // Fetch accounts, attendance, exemptions, suspended days, and schedules in parallel (0 N+1 queries, scoped to cutoff)
+    const [accounts, attendanceRecords, exemptDocs, suspendedDocs, scheduleConfigs] = await Promise.all([
       db.collection("accounts").find({
         role: { $nin: ["admin", "owner", "parent", "Parent"] }
       }).toArray(),
@@ -53,6 +53,7 @@ export async function GET(request: Request) {
       db.collection("suspended_days").find({
         dateStr: { $gte: startDateStr, $lte: endDateStr }
       }).toArray(),
+      db.collection("attendance_schedules").find().toArray(),
     ]);
 
     // Group attendance by teacherUid -> dateStr -> record
@@ -134,15 +135,15 @@ export async function GET(request: Request) {
           // Late deduction — only if this day is NOT a flexible/exempt override AND they don't have a weekly target
           if (!acc.weeklyHoursTarget) {
             const isDayExempt = noTimeLog || exemptDates.has(dateStr);
-            const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt, acc.fullName);
+            const lateResult = computeLateDeduction(rec.clockInTime, rateForLate, isDayExempt, acc.fullName, scheduleConfigs as any);
             totalLateDeduction += lateResult.deduction;
           }
 
           // Credited hours — tracked for reference and offset calculations
           if (rec.clockOutTime && abbr !== "Sun") {
-            const scheduleTable = getScheduleTableForDate(day, acc.fullName);
+            const scheduleTable = getScheduleTableForDate(day, acc.fullName, scheduleConfigs as any);
             const schedule = scheduleTable[abbr as Exclude<DayAbbr, "Sun">];
-            const breakMins = getBreakMinutes(dow);
+            const breakMins = getBreakMinutes(dow, day, scheduleConfigs as any);
             totalHours += computeCreditedHours(
               rec.clockInTime,
               rec.clockOutTime,

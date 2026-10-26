@@ -41,6 +41,8 @@ export async function GET(request: Request) {
       .sort({ dateStr: 1 })
       .toArray();
 
+    const scheduleConfigs = await db.collection("attendance_schedules").find().toArray();
+
     const ledger = [];
     let totalDebt = 0;
     let totalCredit = 0;
@@ -51,8 +53,8 @@ export async function GET(request: Request) {
       const date = new Date(rec.clockInTime);
       const day = getDayAbbr(date);
 
-      // Check debt for short shifts (Tue/Thu/Fri = 2 hours owed, automatically)
-      const owed = getOffsetHoursOwed(date, employeeName);
+      // Check debt for short shifts (e.g. 1 hour owed for Mon-Fri from Oct 26, or 2 hours for past Tue/Thu/Fri)
+      const owed = getOffsetHoursOwed(date, employeeName, scheduleConfigs as any);
       if (owed > 0) {
         totalDebt += owed;
         ledger.push({
@@ -68,9 +70,9 @@ export async function GET(request: Request) {
 
       // Check credit for Saturday offset work
       if (day === "Sat" && rec.clockOutTime) {
-        const scheduleTable = getScheduleTableForDate(date, employeeName);
+        const scheduleTable = getScheduleTableForDate(date, employeeName, scheduleConfigs as any);
         const schedule = scheduleTable["Sat" as Exclude<DayAbbr, "Sun">];
-        const breakMins = getBreakMinutesForDate(date);
+        const breakMins = getBreakMinutesForDate(date, scheduleConfigs as any);
 
         const credited = computeCreditedHours(
           rec.clockInTime,
@@ -89,7 +91,7 @@ export async function GET(request: Request) {
             timeOut: new Date(rec.clockOutTime).toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit", hour12: true }),
             type: "credit",
             hours: credited,
-            label: `Saturday Offset Work`,
+            label: credited <= 3.5 ? "Saturday Offset (Half-Day)" : "Saturday Offset (Full-Day)",
           });
         }
       }

@@ -54,7 +54,13 @@ export async function POST(request: Request) {
         const noTimeLog = accountDoc?.noTimeLog ?? false;
 
         // Recompute using only the account's base setting, NOT the daily exemption we just removed
-        const recomputedStatus = computeTimeInStatus(record.clockInTime, noTimeLog);
+        const scheduleConfigs = await db.collection("attendance_schedules").find().toArray();
+        const recomputedStatus = computeTimeInStatus(
+          record.clockInTime,
+          noTimeLog,
+          accountDoc?.fullName,
+          scheduleConfigs as any
+        );
 
         await db.collection("attendance").updateOne(
           { teacherUid, dateStr },

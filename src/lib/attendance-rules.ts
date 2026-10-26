@@ -22,15 +22,12 @@ type DaySchedule = {
 export type ScheduleTable = Record<Exclude<DayAbbr, "Sun">, DaySchedule>;
 
 /**
- * Current company-wide schedule:
- *   Mon / Wed:       9:00 AM – 6:00 PM
- *   Tue / Thu / Fri: 11:00 AM – 6:00 PM
+ * Historical company-wide schedule (before October 26, 2026):
+ *   Mon / Wed:       9:00 AM – 6:00 PM (8 hrs credited, 0 owed)
+ *   Tue / Thu / Fri: 11:00 AM – 6:00 PM (6 hrs credited, 2 hrs owed)
  *   Sat:             10:00 AM – 3:00 PM
- *
- * NO GRACE PERIOD: graceUntil equals start, so any clock-in after the start
- * time (to the minute) is "Late".
  */
-export const SCHEDULE: ScheduleTable = {
+export const SCHEDULE_PRE_OCT_26: ScheduleTable = {
   Mon: { start: "09:00", graceUntil: "09:00", normalEnd: "18:00" },
   Tue: { start: "11:00", graceUntil: "11:00", normalEnd: "18:00" },
   Wed: { start: "09:00", graceUntil: "09:00", normalEnd: "18:00" },
@@ -40,33 +37,101 @@ export const SCHEDULE: ScheduleTable = {
 };
 
 /**
- * Hours every employee must render on a Monday–Friday work day.
- * Mon/Wed (9:00–18:00 less a 60-min break) = 8 hrs → nothing owed.
- * Tue/Thu/Fri (11:00–18:00 less a 60-min break) = 6 hrs → 2 hrs short, which
- * becomes an offset (see getOffsetHoursOwed).
+ * Default standard company-wide schedule starting October 26, 2026:
+ *   Mon – Fri: 9:00 AM – 5:00 PM (8h span - 1h break = 7 hrs credited, 1 hr owed for Saturday offset)
+ *   Sat:       10:00 AM – 3:00 PM
+ *
+ * NO GRACE PERIOD: graceUntil equals start, so any clock-in after start time is "Late".
  */
+export const SCHEDULE_OCT_26_DEFAULT: ScheduleTable = {
+  Mon: { start: "09:00", graceUntil: "09:00", normalEnd: "17:00" },
+  Tue: { start: "09:00", graceUntil: "09:00", normalEnd: "17:00" },
+  Wed: { start: "09:00", graceUntil: "09:00", normalEnd: "17:00" },
+  Thu: { start: "09:00", graceUntil: "09:00", normalEnd: "17:00" },
+  Fri: { start: "09:00", graceUntil: "09:00", normalEnd: "17:00" },
+  Sat: { start: "09:00", graceUntil: "09:00", normalEnd: "15:00" },
+};
+
+/** Export SCHEDULE as current default for backward compatibility */
+export const SCHEDULE: ScheduleTable = SCHEDULE_OCT_26_DEFAULT;
+
+/**
+ * Ian Angelo Valmores fixed shift: 9:30 AM – 6:30 PM (Mon – Thu only; Fri, Sat, Sun are OFF)
+ */
+export const IAN_WORK_DAYS: DayAbbr[] = ["Mon", "Tue", "Wed", "Thu"];
+
 export const IAN_SCHEDULE: ScheduleTable = {
   Mon: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
   Tue: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
   Wed: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
   Thu: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
-  Fri: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
-  Sat: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" },
+  Fri: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" }, // fallback
+  Sat: { start: "09:30", graceUntil: "09:30", normalEnd: "18:30" }, // fallback
 };
 
 export const REQUIRED_DAILY_HOURS = 8;
 
-export function getScheduleTableForDate(date: Date, employeeName?: string): ScheduleTable {
-  if (employeeName && employeeName.includes("Ian Angelo Valmores")) {
+export type ScheduleConfigItem = {
+  effectiveFrom: string; // "YYYY-MM-DD"
+  schedule: ScheduleTable;
+  breaks?: Partial<Record<Exclude<DayAbbr, "Sun">, number>>;
+  requiredDailyHours?: number;
+};
+
+/**
+ * Returns "YYYY-MM-DD" in Asia/Manila time zone.
+ */
+export function toManilaDateStr(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+}
+
+export function formatTime24To12(hhmm: string): string {
+  if (!hhmm || !hhmm.includes(":")) return hhmm || "";
+  const [hStr, mStr] = hhmm.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+export function formatShiftLabel(schedule: DaySchedule): string {
+  return `${formatTime24To12(schedule.start)} - ${formatTime24To12(schedule.normalEnd)}`;
+}
+
+export function getScheduleTableForDate(
+  date: Date,
+  employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
+): ScheduleTable {
+  if (employeeName && employeeName.toLowerCase().includes("ian angelo valmores")) {
     return IAN_SCHEDULE;
   }
-  return SCHEDULE;
+
+  const dateStr = toManilaDateStr(date);
+
+  // If dynamic configurations from MongoDB are supplied, use the one matching effectiveFrom <= dateStr
+  if (dynamicConfigs && dynamicConfigs.length > 0) {
+    const sorted = [...dynamicConfigs].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+    const matched = sorted.find((c) => c.effectiveFrom <= dateStr);
+    if (matched && matched.schedule) {
+      return matched.schedule;
+    }
+  }
+
+  // Built-in date-boundary: any historical attendance before Oct 26, 2026 retains the old schedule!
+  if (dateStr < "2026-10-26") {
+    return SCHEDULE_PRE_OCT_26;
+  }
+
+  return SCHEDULE_OCT_26_DEFAULT;
 }
 
 /**
  * Per-day break schedule (minutes to deduct from raw clock-in/out hours).
  *
- * MONDAY TO SATURDAY: 60 minutes
+ * MONDAY TO FRIDAY: 60 minutes
+ * SATURDAY: 45 minutes
  */
 export const BREAK_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, number> = {
   Mon: 60,
@@ -77,15 +142,30 @@ export const BREAK_SCHEDULE: Record<Exclude<DayAbbr, "Sun">, number> = {
   Sat: 45,
 };
 
-export function getBreakMinutes(dayOfWeek: number, date?: Date): number {
+export function getBreakMinutes(dayOfWeek: number, date?: Date, dynamicConfigs?: ScheduleConfigItem[]): number {
   if (dayOfWeek === 0) return 0; // Sunday
   const abbr = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[dayOfWeek] as Exclude<DayAbbr, "Sun">;
-  return BREAK_SCHEDULE[abbr] ?? 0;
+  if (date) {
+    return getBreakMinutesForDate(date, dynamicConfigs);
+  }
+  return BREAK_SCHEDULE[abbr] ?? 60;
 }
 
-export function getBreakMinutesForDate(date: Date): number {
-  const idx = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const).indexOf(getDayAbbr(date));
-  return getBreakMinutes(idx, date);
+export function getBreakMinutesForDate(date: Date, dynamicConfigs?: ScheduleConfigItem[]): number {
+  const day = getDayAbbr(date);
+  if (day === "Sun") return 0;
+  const abbr = day as Exclude<DayAbbr, "Sun">;
+
+  const dateStr = toManilaDateStr(date);
+  if (dynamicConfigs && dynamicConfigs.length > 0) {
+    const sorted = [...dynamicConfigs].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+    const matched = sorted.find((c) => c.effectiveFrom <= dateStr);
+    if (matched?.breaks?.[abbr] !== undefined) {
+      return matched.breaks[abbr]!;
+    }
+  }
+
+  return BREAK_SCHEDULE[abbr] ?? 60;
 }
 
 // ── Status types ─────────────────────────────────────────────────────────────────
@@ -102,40 +182,62 @@ export function getDayAbbr(date: Date): DayAbbr {
   return manilaLocale as DayAbbr;
 }
 
-export function getScheduleForDate(date: Date, employeeName?: string): DaySchedule | null {
+export function getScheduleForDate(
+  date: Date,
+  employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
+): DaySchedule | null {
   const day = getDayAbbr(date);
   if (day === "Sun") return null;
-  const table = getScheduleTableForDate(date, employeeName);
+
+  // Friday and Saturday are OFF for Ian Angelo Valmores
+  if (employeeName && employeeName.toLowerCase().includes("ian angelo valmores")) {
+    if (day === "Fri" || day === "Sat") return null;
+  }
+
+  const table = getScheduleTableForDate(date, employeeName, dynamicConfigs);
   return table[day as Exclude<DayAbbr, "Sun">];
 }
 
-export function getScheduledHours(date: Date, employeeName?: string): number | null {
-  const schedule = getScheduleForDate(date, employeeName);
+export function getScheduledHours(
+  date: Date,
+  employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
+): number | null {
+  const schedule = getScheduleForDate(date, employeeName, dynamicConfigs);
   if (!schedule) return null;
   const [sH, sM] = schedule.start.split(":").map(Number);
   const [eH, eM] = schedule.normalEnd.split(":").map(Number);
   const shiftMins = eH * 60 + eM - (sH * 60 + sM);
-  return Math.max(0, shiftMins - getBreakMinutesForDate(date)) / 60;
+  return Math.max(0, shiftMins - getBreakMinutesForDate(date, dynamicConfigs)) / 60;
 }
 
-export function getOffsetHoursOwed(date: Date, employeeName?: string): number {
+export function getOffsetHoursOwed(
+  date: Date,
+  employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
+): number {
   const day = getDayAbbr(date);
   if (day === "Sat" || day === "Sun") return 0;
 
-  const scheduled = getScheduledHours(date, employeeName);
+  const scheduled = getScheduledHours(date, employeeName, dynamicConfigs);
   if (scheduled === null) return 0;
   return Math.max(0, REQUIRED_DAILY_HOURS - scheduled);
 }
 
-export function isWorkDay(workDays: string[], date: Date): boolean {
+export function isWorkDay(workDays: string[], date: Date, employeeName?: string): boolean {
   const day = getDayAbbr(date);
+  if (employeeName && employeeName.toLowerCase().includes("ian angelo valmores")) {
+    return IAN_WORK_DAYS.includes(day);
+  }
   return workDays.includes(day);
 }
 
 export function computeTimeInStatus(
   clockInISO: string,
   noTimeLog: boolean,
-  employeeName?: string
+  employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
 ): TimeInStatus {
   if (noTimeLog) return "Exempt";
 
@@ -144,7 +246,7 @@ export function computeTimeInStatus(
 
   if (day === "Sun") return "Exempt";
 
-  const scheduleTable = getScheduleTableForDate(clockIn, employeeName);
+  const scheduleTable = getScheduleTableForDate(clockIn, employeeName, dynamicConfigs);
   const schedule = scheduleTable[day as Exclude<DayAbbr, "Sun">];
 
   const [graceH, graceM] = schedule.graceUntil.split(":").map(Number);
@@ -171,7 +273,7 @@ export function computeDailyStatus(
   isSuspended: boolean = false,
   dayOffType: "suspension" | "holiday" = "suspension"
 ): DailyAttendanceStatus {
-  if (!isWorkDay(account.workDays, date)) return "No Work Day";
+  if (!isWorkDay(account.workDays, date, account.fullName)) return "No Work Day";
   if (isSuspended) return dayOffType === "holiday" ? "Holiday" : "Suspended";
   if (account.weeklyHoursTarget != null) return "Exempt";
   if (account.noTimeLog) return "Exempt";
@@ -226,9 +328,13 @@ function addMinutesToTime(hhmm: string, minutes: number): string {
   return `${hh}:${mm}`;
 }
 
-export function getLateDeductionConfigForDate(date: Date, employeeName?: string): LateDeductionConfig {
+export function getLateDeductionConfigForDate(
+  date: Date,
+  employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
+): LateDeductionConfig {
   const day = getDayAbbr(date);
-  const table = getScheduleTableForDate(date, employeeName);
+  const table = getScheduleTableForDate(date, employeeName, dynamicConfigs);
   const schedule = table[day === "Sun" ? "Mon" : (day as Exclude<DayAbbr, "Sun">)];
   return {
     scheduledStart: schedule.start,
@@ -251,10 +357,15 @@ export function computeLateDeduction(
   hourlyRate: number,
   noTimeLog: boolean,
   employeeName?: string,
+  dynamicConfigs?: ScheduleConfigItem[]
 ): LateDeductionResult {
   if (noTimeLog) return { lateMinutes: 0, deduction: 0, method: "none" };
 
-  const { scheduledStart, lateThreshold } = getLateDeductionConfigForDate(new Date(clockInISO), employeeName);
+  const { scheduledStart, lateThreshold } = getLateDeductionConfigForDate(
+    new Date(clockInISO),
+    employeeName,
+    dynamicConfigs
+  );
 
   const clockIn = new Date(clockInISO);
   const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
@@ -313,9 +424,11 @@ export function computeCreditedHours(
   const effectiveStart = manilaIn < schedStart ? schedStart : manilaIn;
   const effectiveEnd = manilaOut > schedEnd ? schedEnd : manilaOut;
 
-  const creditedMs = Math.max(
-    0,
-    effectiveEnd.getTime() - effectiveStart.getTime() - breakMins * 60_000,
-  );
+  const elapsedMs = Math.max(0, effectiveEnd.getTime() - effectiveStart.getTime());
+  // Only deduct break if the employee worked more than 4 hours (240 mins)
+  // Ensures half-day shifts (e.g. 9:00 AM - 12:00 PM = 3h) are not unfairly penalized with a lunch break deduction
+  const effectiveBreakMins = elapsedMs > 240 * 60_000 ? breakMins : 0;
+
+  const creditedMs = Math.max(0, elapsedMs - effectiveBreakMins * 60_000);
   return parseFloat((creditedMs / 3_600_000).toFixed(2));
 }

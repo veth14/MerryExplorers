@@ -12,6 +12,7 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { useAuth } from "@/lib/auth-context";
 import { WeeklyView } from "@/components/attendance/weekly-view";
 import { MonthlyView } from "@/components/attendance/monthly-view";
+import { ScheduleModal } from "@/components/attendance/schedule-modal";
 
 type AttendanceRecord = {
   _id: string;
@@ -248,6 +249,11 @@ export default function AttendancePage() {
   const [exportRows, setExportRows] = useState<ExportRow[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Dynamic schedule state & modal
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [activeScheduleConfig, setActiveScheduleConfig] = useState<any>(null);
+  const [scheduleConfigs, setScheduleConfigs] = useState<any[]>([]);
+
   // Weekly navigation — start of current week (Monday)
   const [weekStart, setWeekStart] = useState(() => {
     const now = new Date();
@@ -274,9 +280,10 @@ export default function AttendancePage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [attendanceJson, accountsJson] = await Promise.all([
+      const [attendanceJson, accountsJson, scheduleJson] = await Promise.all([
         cachedFetch<any>(`dashboard:attendance:${viewDateStr}`, `/api/attendance?date=${viewDateStr}&_t=${Date.now()}`, 30_000),
         cachedFetch<any[]>("accounts:all", "/api/accounts", 60_000),
+        cachedFetch<any>(`dashboard:schedule:${viewDateStr}`, `/api/attendance/schedule?date=${viewDateStr}`, 60_000).catch(() => null),
       ]);
       if (attendanceJson?.success) {
         setRecords(attendanceJson.data);
@@ -284,6 +291,10 @@ export default function AttendancePage() {
         setSuspendType(attendanceJson.suspendType ?? null);
         setSuspendReason(attendanceJson.suspendReason ?? null);
         setExemptions(attendanceJson.exemptions ?? []);
+      }
+      if (scheduleJson?.success) {
+        setActiveScheduleConfig(scheduleJson.activeConfig || null);
+        setScheduleConfigs(scheduleJson.configs || []);
       }
       if (Array.isArray(accountsJson)) {
         setAccounts(accountsJson.filter((a) => {
@@ -1031,6 +1042,18 @@ export default function AttendancePage() {
             Export Range
           </button>
 
+          {/* Shift Settings Button (Developer & Admin) */}
+          {(userProfile?.role?.toLowerCase() === "developer" || ["admin", "executive assistant"].includes(userProfile?.role?.toLowerCase() || "")) && (
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className="flex items-center gap-2 rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-2 text-[12px] font-bold text-purple-700 hover:bg-purple-100 transition-all shadow-sm"
+              title="Configure employee shift hours and breaks dynamically"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>schedule</span>
+              Shift Settings
+            </button>
+          )}
+
           {/* Mark Day Off / Undo Button */}
           {isSuspended ? (
             <button
@@ -1404,6 +1427,20 @@ export default function AttendancePage() {
             </div>
           </div>
         </div>
+      )}
+      {showScheduleModal && (
+        <ScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          initialEffectiveDate={viewDateStr}
+          currentSchedule={activeScheduleConfig?.schedule}
+          currentBreaks={activeScheduleConfig?.breaks}
+          onSaved={async () => {
+            invalidateCache(`dashboard:attendance:${viewDateStr}`);
+            invalidateCache(`dashboard:schedule:${viewDateStr}`);
+            await fetchData();
+          }}
+        />
       )}
     </AppShell>
   );

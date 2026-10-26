@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getScheduleForDate, formatShiftLabel, computeTimeInStatus } from "@/lib/attendance-rules";
 
 type Announcement = {
   id: string;
@@ -223,7 +224,8 @@ export default function TeacherDashboardPage() {
               const d = new Date(r.clockInTime);
               const mins = d.getHours() * 60 + d.getMinutes();
               totalMins += mins;
-              if (mins <= (8 * 60 + 30)) {
+              const status = (r as any).timeInStatus || computeTimeInStatus(r.clockInTime, userProfile?.noTimeLog ?? false, userProfile?.fullName);
+              if (status === "On Time" || status === "Exempt") {
                 onTimeCount++;
               }
             }
@@ -305,7 +307,10 @@ export default function TeacherDashboardPage() {
             <div className="flex justify-between items-center mb-6 relative z-10">
               <div className="flex items-center gap-2 bg-brand-sky/30 text-brand-navy px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider">
                 <ClockIcon />
-                Morning Shift
+                {(() => {
+                  const todaySched = getScheduleForDate(new Date(), userProfile?.fullName);
+                  return todaySched ? "Standard Shift" : "Off Duty";
+                })()}
               </div>
               <div className="text-right">
                 {loadingShift ? (
@@ -335,7 +340,18 @@ export default function TeacherDashboardPage() {
             {/* Shift title + time */}
             <div className="mb-6 relative z-10">
               <h2 className="text-[32px] font-black text-brand-navy leading-tight">Today&apos;s Shift</h2>
-              <p className="text-[15px] font-bold text-brand-blue mt-1">{(userProfile as any)?.shiftTime || "08:00 AM - 05:00 PM"}</p>
+              <p className="text-[15px] font-bold text-brand-blue mt-1">
+                {(() => {
+                  const now = new Date();
+                  const todaySched = getScheduleForDate(now, userProfile?.fullName);
+                  if (!todaySched) return "Scheduled Off";
+                  const day = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Manila" });
+                  if (day === "Sat") {
+                    return "09:00 AM - 03:00 PM (or 12:00 PM Half-Day)";
+                  }
+                  return formatShiftLabel(todaySched);
+                })()}
+              </p>
             </div>
 
             {/* Info tiles */}

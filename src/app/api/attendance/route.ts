@@ -130,8 +130,14 @@ export async function POST(request: Request) {
       noTimeLog = true;
     }
 
-    // Compute whether this clock-in is on time or late
-    const timeInStatus = computeTimeInStatus(now.toISOString(), noTimeLog);
+    // Compute whether this clock-in is on time or late using dynamic schedule configs and employee rules
+    const scheduleConfigs = await db.collection("attendance_schedules").find().toArray();
+    const timeInStatus = computeTimeInStatus(
+      now.toISOString(),
+      noTimeLog,
+      accountDoc?.fullName || name,
+      scheduleConfigs as any
+    );
 
     const newRecord = {
       teacherUid,

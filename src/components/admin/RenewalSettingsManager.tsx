@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { computeAdventureBadge } from "@/lib/adventure-badge";
+import { PROGRAM_SLOTS } from "@/data/landing";
 
 // Visual metadata for programs
 export const PROGRAM_CONFIG_META: Record<string, { emoji: string; color: string; bg: string; border: string; gradient: string; short: string; badge: string }> = {
@@ -149,6 +150,9 @@ export function RenewalSettingsManager() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [rollConfirm, setRollConfirm] = useState(false);
+  // classSlots: { [programId]: { [className]: { time?, maxSlots? } } }
+  const [classSlots, setClassSlots] = useState<Record<string, Record<string, { time: string; maxSlots: number }>>>({})
+  const [slotPanelOpen, setSlotPanelOpen] = useState<Record<string, boolean>>({});
 
   function fmtDate(iso?: string | null) {
     if (!iso) return null;
@@ -168,6 +172,31 @@ export function RenewalSettingsManager() {
       const d = await res.json();
       if (typeof d.heroBadgeOverride === "string") {
         setHeroBadgeOverride(d.heroBadgeOverride);
+      }
+      // Load classSlots overrides from DB
+      if (d.classSlots && typeof d.classSlots === "object") {
+        // Seed with PROGRAM_SLOTS defaults for any missing entries
+        const seeded: Record<string, Record<string, { time: string; maxSlots: number }>> = {};
+        for (const [progId, config] of Object.entries(PROGRAM_SLOTS)) {
+          seeded[progId] = {};
+          for (const cls of (config as any).classes) {
+            seeded[progId][cls.name] = {
+              time: d.classSlots[progId]?.[cls.name]?.time ?? cls.time,
+              maxSlots: d.classSlots[progId]?.[cls.name]?.maxSlots ?? cls.maxSlots,
+            };
+          }
+        }
+        setClassSlots(seeded);
+      } else {
+        // No DB overrides yet — seed from PROGRAM_SLOTS defaults
+        const seeded: Record<string, Record<string, { time: string; maxSlots: number }>> = {};
+        for (const [progId, config] of Object.entries(PROGRAM_SLOTS)) {
+          seeded[progId] = {};
+          for (const cls of (config as any).classes) {
+            seeded[progId][cls.name] = { time: cls.time, maxSlots: cls.maxSlots };
+          }
+        }
+        setClassSlots(seeded);
       }
       if (Array.isArray(d.programs)) {
         const merged: ProgramRenewalEntry[] = DEFAULT_PROGRAMS.map((key) => {
@@ -226,6 +255,19 @@ export function RenewalSettingsManager() {
     );
   };
 
+  const updateClassSlot = (programId: string, className: string, patch: Partial<{ time: string; maxSlots: number }>) => {
+    setClassSlots((prev) => ({
+      ...prev,
+      [programId]: {
+        ...(prev[programId] ?? {}),
+        [className]: {
+          time: patch.time ?? prev[programId]?.[className]?.time ?? "",
+          maxSlots: patch.maxSlots ?? prev[programId]?.[className]?.maxSlots ?? 0,
+        },
+      },
+    }));
+  };
+
   const handleSaveAll = async () => {
     try {
       setSaving(true);
@@ -234,7 +276,7 @@ export function RenewalSettingsManager() {
       const res = await fetch("/api/renewal-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programs, heroBadgeOverride: heroBadgeOverride.trim() || null }),
+        body: JSON.stringify({ programs, heroBadgeOverride: heroBadgeOverride.trim() || null, classSlots }),
       });
       const data = await res.json();
       if (data.ok && Array.isArray(data.programs)) {
@@ -847,6 +889,82 @@ export function RenewalSettingsManager() {
                       </div>
                     </div>
                   )}
+
+                  {/* ── Class Slots Editor (all programs) ── */}
+                  {(() => {
+                    const progEntry = Object.entries(PROGRAM_SLOTS).find(([id]) => {
+                      // Map programKey (full name) to PROGRAM_SLOTS id
+                      const slot = PROGRAM_SLOTS[id as keyof typeof PROGRAM_SLOTS];
+                      return slot.name === prog.programKey;
+                    });
+                    if (!progEntry) return null;
+                    const [programId, config] = progEntry;
+                    const classes = (config as any).classes as { name: string; time: string; maxSlots: number }[];
+                    if (!classes || classes.length === 0) return null;
+                    const isOpen = slotPanelOpen[programId];
+                    return (
+                      <div className="rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 overflow-hidden">
+                        {/* Collapsible header */}
+                        <button
+                          type="button"
+                          onClick={() => setSlotPanelOpen(prev => ({ ...prev, [programId]: !prev[programId] }))}
+                          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-indigo-100/50 transition-colors"
+                        >
+                          <span className="flex items-center gap-2 text-[11.5px] font-black uppercase tracking-wider text-indigo-900">
+                            <span>📋</span>
+                            Class Slots &amp; Times
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 text-[9.5px] font-black normal-case tracking-normal">
+                              {classes.length} {classes.length === 1 ? "class" : "classes"}
+                            </span>
+                          </span>
+                          <span className={`text-indigo-400 transition-transform ${isOpen ? "rotate-180" : ""}`}>
+                            ▾
+                          </span>
+                        </button>
+
+                        {isOpen && (
+                          <div className="px-4 pb-4 space-y-2.5">
+                            <p className="text-[10.5px] text-indigo-700/70 font-medium -mt-1 pb-1">
+                              Changes apply to the public /register page, /renew page, and slot availability counts. Class names cannot be changed here (they are registration keys).
+                            </p>
+                            {classes.map((cls) => {
+                              const current = classSlots[programId]?.[cls.name] ?? { time: cls.time, maxSlots: cls.maxSlots };
+                              return (
+                                <div key={cls.name} className="rounded-xl bg-white border border-indigo-200 p-3 space-y-2">
+                                  <p className="text-[12px] font-black text-[#002f76]">{cls.name}</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">Display Time</label>
+                                      <input
+                                        type="text"
+                                        value={current.time}
+                                        onChange={(e) => updateClassSlot(programId, cls.name, { time: e.target.value })}
+                                        placeholder={cls.time}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-bold text-[#002f76] focus:border-indigo-400 focus:outline-none"
+                                      />
+                                      <p className="text-[9px] text-slate-400 mt-0.5">Default: {cls.time}</p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">Max Slots</label>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={200}
+                                        value={current.maxSlots}
+                                        onChange={(e) => updateClassSlot(programId, cls.name, { maxSlots: Math.max(1, Number(e.target.value)) })}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-bold text-[#002f76] focus:border-indigo-400 focus:outline-none"
+                                      />
+                                      <p className="text-[9px] text-slate-400 mt-0.5">Default: {cls.maxSlots} students</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Row 2: Public Registration Status & Auto-Close */}
                   <div className="rounded-2xl border-2 border-slate-100 p-4 bg-slate-50/50 space-y-3">

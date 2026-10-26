@@ -197,10 +197,14 @@ export async function GET() {
     const heroBadgeOverride = typeof doc?.heroBadgeOverride === "string" ? doc.heroBadgeOverride : null;
     const heroBadge = computeAdventureBadge(finalPrograms, heroBadgeOverride);
 
+    const classSlots: Record<string, Record<string, { time?: string; maxSlots?: number }>> =
+      doc?.classSlots && typeof doc.classSlots === "object" ? doc.classSlots : {};
+
     return NextResponse.json({
       programs: finalPrograms,
       heroBadgeOverride,
       heroBadge,
+      classSlots,
       updatedAt: changed ? new Date().toISOString() : (doc?.updatedAt ?? null),
     });
   } catch (err) {
@@ -241,6 +245,14 @@ export async function PUT(req: NextRequest) {
 
     const heroBadgeOverride = typeof body.heroBadgeOverride === "string" ? body.heroBadgeOverride : (body.heroBadgeOverride === null ? null : undefined);
 
+    // classSlots: { [programId]: { [className]: { time?, maxSlots? } } }
+    // Validate shape loosely — only persist if it's a plain object
+    const rawClassSlots = body.classSlots;
+    const classSlots: Record<string, Record<string, { time?: string; maxSlots?: number }>> | undefined =
+      rawClassSlots && typeof rawClassSlots === "object" && !Array.isArray(rawClassSlots)
+        ? rawClassSlots
+        : undefined;
+
     const updateDoc: Record<string, any> = {
       _key: SETTINGS_KEY,
       programs,
@@ -248,6 +260,9 @@ export async function PUT(req: NextRequest) {
     };
     if (heroBadgeOverride !== undefined) {
       updateDoc.heroBadgeOverride = heroBadgeOverride;
+    }
+    if (classSlots !== undefined) {
+      updateDoc.classSlots = classSlots;
     }
 
     const { db } = await connectToDatabase();
@@ -259,7 +274,7 @@ export async function PUT(req: NextRequest) {
 
     const effectiveHeroBadge = computeAdventureBadge(programs, heroBadgeOverride);
 
-    return NextResponse.json({ ok: true, programs, heroBadgeOverride, heroBadge: effectiveHeroBadge });
+    return NextResponse.json({ ok: true, programs, heroBadgeOverride, heroBadge: effectiveHeroBadge, classSlots: classSlots ?? {} });
   } catch (err) {
     console.error("[renewal-settings PUT]", err);
     return NextResponse.json({ error: "Failed to save renewal settings" }, { status: 500 });
