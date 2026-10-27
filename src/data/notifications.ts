@@ -7,6 +7,7 @@ export type AppNotification = {
   message: string;
   time: string;
   read: boolean;
+  link?: string;
 };
 
 export const notifications: any[] = [];

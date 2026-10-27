@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { parentName, email, childName, childAge, scores, finalProgram, attempted } = data;
+    const { parentName, email, childName, childAge, scores, finalProgram, attempted, answers } = data;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -24,6 +24,15 @@ export async function POST(request: Request) {
       scores,
       finalProgram,
       attempted,
+      answers: Array.isArray(answers)
+        ? answers.slice(0, 15).map((answer: any) => ({
+            questionIndex: Number.isInteger(answer.questionIndex) ? answer.questionIndex : null,
+            section: String(answer.section || "").slice(0, 30),
+            question: String(answer.question || "").slice(0, 500),
+            answer: String(answer.answer || "").slice(0, 100),
+            score: Number.isFinite(answer.score) ? answer.score : null,
+          }))
+        : [],
       status: "New",
       createdAt: new Date(),
     };
@@ -38,7 +47,7 @@ export async function POST(request: Request) {
       type: "info",
       read: false,
       createdAt: new Date(),
-      link: "/admin/inquiries", // Assuming teachers check leads here
+      link: "/admin/discovery-day",
     });
 
     // 3. Send Email to Parent
@@ -263,6 +272,7 @@ export async function GET(request: Request) {
       scores: r.scores,
       finalProgram: r.finalProgram,
       attempted: r.attempted,
+      answers: Array.isArray(r.answers) ? r.answers : [],
       status: r.status || "New",
       createdAt: r.createdAt,
     }));

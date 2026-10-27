@@ -21,15 +21,30 @@ export async function GET(request: Request) {
     const notifications = await db.collection("notifications").find(query).sort({ createdAt: -1 }).toArray();
     
     // Map _id to id and compute per-user read status from readBy array
-    const mapped = notifications.map(n => ({
-      ...n,
-      id: n._id.toString(),
-      _id: undefined,
+    const mapped = notifications.map(n => {
+      const title = String(n.title || "");
+      // Correct previously stored destinations too, so older notifications still go to the right section.
+      const link = /discovery day|quiz result/i.test(title)
+        ? "/admin/discovery-day"
+        : /payment receipt|balance payment/i.test(title)
+          ? "/admin/payments"
+          : /registration|payment uploaded/i.test(title)
+            ? "/admin/registrations"
+            : /inquiry/i.test(title)
+              ? "/admin/inquiries"
+              : n.link || "/admin";
+
+      return {
+        ...n,
+        id: n._id.toString(),
+        _id: undefined,
+        link,
       // A notification is read for this user if their uid is in readBy array
       read: userId
         ? Array.isArray(n.readBy) ? n.readBy.includes(userId) : !!n.read
         : Array.isArray(n.readBy) ? n.readBy.length > 0 : !!n.read,
-    }));
+      };
+    });
     
     return NextResponse.json({ success: true, data: mapped }, {
       headers: {

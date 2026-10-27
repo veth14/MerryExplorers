@@ -7,6 +7,7 @@ import { Fredoka } from "next/font/google";
 import { m, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
 import { EmojiPalette, EmojiMagnifyingGlass, EmojiLightbulb } from "@/components/landing/icons";
 import { SiteHeader } from "@/components/landing/site-header";
+import { DISCOVERY_DAY_QUESTIONS, type DiscoveryQuestionSection } from "@/data/discovery-day-quiz";
 
 const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -16,8 +17,9 @@ const BLUE = "#1f7ae0";
 const SUN = "#ffd23f";
 const ORANGE = "#ff8a1f";
 
-type SectionKey = "curious" | "creative" | "trailblazer";
+type SectionKey = DiscoveryQuestionSection;
 type QuizPhase = "intro" | "child-info" | "question" | "email-capture" | "result";
+type QuizAnswer = { questionIndex: number; section: SectionKey; question: string; answer: string; score: number };
 
 const SECTION_META = {
   curious: { title: "Curious Explorer", subtitle: "Discovery Club · Supported Learning", ageLabel: "Ages 1.6 – 4.11 years", accentColor: "#7DD3FC", bgCard: "#F0F9FF", Icon: EmojiMagnifyingGlass },
@@ -32,23 +34,15 @@ const Highlight = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
-const getQuestions = (name: string): { section: SectionKey; text: React.ReactNode }[] => [
-  { section: "curious", text: <>{name} is <Highlight>new to structured learning</Highlight> or classroom experiences?</> },
-  { section: "curious", text: <>{name} needs <Highlight>frequent guidance</Highlight> or encouragement to participate?</> },
-  { section: "curious", text: <>{name} needs their <Highlight>guardian nearby</Highlight> to feel secure in a new environment?</> },
-  { section: "curious", text: <>{name} needs <Highlight>more time to adjust</Highlight> before joining an activity?</> },
-  { section: "curious", text: <>{name} benefits from <Highlight>additional adult attention</Highlight> during learning activities?</> },
-  { section: "creative", text: <>{name} can enter and participate <Highlight>without needing a guardian</Highlight> beside them?</> },
-  { section: "creative", text: <>{name} can engage with a teacher <Highlight>independently?</Highlight></> },
-  { section: "creative", text: <>{name} can participate in an activity with <Highlight>minimal assistance?</Highlight></> },
-  { section: "creative", text: <>{name} can <Highlight>follow simple instructions</Highlight> during the activity?</> },
-  { section: "creative", text: <>If upset, {name} can <Highlight>calm or self-pacify</Highlight> within approx. 3 minutes?</> },
-  { section: "trailblazer", text: <>{name} can <Highlight>sit independently</Highlight> without being held?</> },
-  { section: "trailblazer", text: <>{name} can <Highlight>remain seated</Highlight> and reasonably still for approx. 3 minutes?</> },
-  { section: "trailblazer", text: <>{name} can <Highlight>grip and manipulate</Highlight> age-appropriate learning materials?</> },
-  { section: "trailblazer", text: <>{name} is <Highlight>comfortable participating</Highlight> in a classroom setup?</> },
-  { section: "trailblazer", text: <>{name} can <Highlight>stay engaged</Highlight> in a teacher-led activity for a short period?</> },
-];
+const getQuestions = (name: string) => DISCOVERY_DAY_QUESTIONS.map((question) => {
+  const prompt = question.prompt.replaceAll("{name}", name);
+  const [before, after = ""] = prompt.split(question.highlight);
+  return {
+    section: question.section,
+    prompt,
+    text: <>{before}<Highlight>{question.highlight}</Highlight>{after}</>,
+  };
+});
 
 const getOptions = (qi: number) => {
   const d = { activeBorder: NAVY, activeBg: "#dbeafe" };
@@ -220,7 +214,6 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="dq-screen">
       <m.div animate={{ y: [-6, 6, -6] }}
-        // @ts-ignore
         transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
         style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 88, height: 88, borderRadius: "50%", background: "#dbeafe", border: `3px solid ${NAVY}`, boxShadow: `0 4px 0 ${NAVY}55`, fontSize: 44, marginBottom: 8 }}>
         🧭
@@ -290,17 +283,16 @@ function QuestionScreen({ qIndex, questionText, onAnswer }: { qIndex: number; se
   );
 }
 
-function EmailCaptureScreen({ program, scores, attempted, childName, childAge, onSubmit }: { program: SectionKey; scores: Record<SectionKey, number>; attempted: SectionKey[]; childName: string; childAge: string; onSubmit: () => void }) {
+function EmailCaptureScreen({ program, scores, attempted, answers, childName, childAge, onSubmit }: { program: SectionKey; scores: Record<SectionKey, number>; attempted: SectionKey[]; answers: QuizAnswer[]; childName: string; childAge: string; onSubmit: () => void }) {
   const [pn, setPn] = useState(""); const [em, setEm] = useState(""); const [loading, setLoading] = useState(false);
   async function hs(e: React.FormEvent) {
     e.preventDefault(); if (!em) return; setLoading(true);
-    try { await fetch("/api/discovery-day-results", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parentName: pn, email: em, childName, childAge, scores, finalProgram: program, attempted }) }); }
+    try { await fetch("/api/discovery-day-results", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parentName: pn, email: em, childName, childAge, scores, finalProgram: program, attempted, answers }) }); }
     catch (err) { console.error(err); } finally { setLoading(false); onSubmit(); }
   }
   return (
     <div className="dq-screen">
       <m.div animate={{ scale: [1, 1.06, 1] }}
-        // @ts-ignore
         transition={{ duration: 2.5, repeat: Infinity }}
         style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 80, height: 80, borderRadius: "50%", background: "#dbeafe", border: `3px solid ${NAVY}`, boxShadow: `0 4px 0 ${NAVY}44`, fontSize: 38 }}>📬</m.div>
       <div style={{ textAlign: "center" }}>
@@ -328,7 +320,6 @@ function ResultScreen({ program, scores, childName, onRetake }: { program: Secti
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "24px", background: meta.bgCard }}>
           <m.div animate={{ scale: [1, 1.05, 1] }}
-            // @ts-ignore
             transition={{ duration: 2.5, repeat: Infinity }}
             style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 88, height: 88, borderRadius: "50%", background: "#fff", border: `3px solid ${meta.accentColor}`, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
             <Icon className="w-14 h-14" />
@@ -367,6 +358,7 @@ export function DiscoveryQuiz() {
   const [childAge, setChildAge] = useState("");
   const [qIndex, setQIndex] = useState(0);
   const [scores, setScores] = useState<Record<SectionKey, number>>({ curious: 0, creative: 0, trailblazer: 0 });
+  const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [locked, setLocked] = useState(false);
   const [finalProgram, setFinalProgram] = useState<SectionKey>("curious");
 
@@ -376,6 +368,14 @@ export function DiscoveryQuiz() {
   function handleAnswer(pts: number) {
     if (locked) return; setLocked(true);
     const q = questions[qIndex]; const sec = q.section;
+    const selectedOption = getOptions(qIndex).find((option) => option.value === pts);
+    setAnswers((prev) => [...prev, {
+      questionIndex: qIndex,
+      section: sec,
+      question: q.prompt,
+      answer: selectedOption?.label || "Unknown",
+      score: pts,
+    }]);
     const ns = scores[sec] + pts;
     setScores(prev => ({ ...prev, [sec]: ns }));
     setTimeout(() => {
@@ -393,6 +393,7 @@ export function DiscoveryQuiz() {
   function retake() {
     setPhase("intro"); setChildName(""); setChildAge("");
     setQIndex(0); setScores({ curious: 0, creative: 0, trailblazer: 0 });
+    setAnswers([]);
     setLocked(false); setFinalProgram("curious");
   }
 
@@ -459,7 +460,7 @@ export function DiscoveryQuiz() {
                   {phase === "intro" && <IntroScreen onStart={() => setPhase("child-info")} />}
                   {phase === "child-info" && <ChildInfoScreen childName={childName} setChildName={setChildName} childAge={childAge} setChildAge={setChildAge} onNext={() => setPhase("question")} />}
                   {phase === "question" && <QuestionScreen qIndex={qIndex} section={questions[qIndex].section} questionText={questions[qIndex].text} onAnswer={handleAnswer} />}
-                  {phase === "email-capture" && <EmailCaptureScreen program={finalProgram} scores={scores} attempted={getAttempted()} childName={childName} childAge={childAge} onSubmit={() => setPhase("result")} />}
+                  {phase === "email-capture" && <EmailCaptureScreen program={finalProgram} scores={scores} attempted={getAttempted()} answers={answers} childName={childName} childAge={childAge} onSubmit={() => setPhase("result")} />}
                   {phase === "result" && <ResultScreen program={finalProgram} scores={scores} childName={childName} onRetake={retake} />}
                 </m.div>
               </AnimatePresence>

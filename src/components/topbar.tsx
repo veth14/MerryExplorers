@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { notificationMeta, AppNotification } from "@/data/notifications";
 import { useAuth } from "@/lib/auth-context";
 
@@ -11,6 +12,7 @@ type TopbarProps = {
 };
 
 export function Topbar({ title, description, onMenuClick }: TopbarProps) {
+  const router = useRouter();
   const { user, loading } = useAuth();
   const uid = user?.uid;
   const [notifOpen, setNotifOpen] = useState(false);
@@ -101,6 +103,24 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
     } catch (err) {
       console.error("Failed to mark read:", err);
     }
+  }
+
+  async function openNotification(notification: AppNotification) {
+    await markRead(notification.id);
+    setNotifOpen(false);
+    const title = notification.title || "";
+    // Resolve known notification types in the client too, so an old or stale
+    // stored link cannot send a notification to an unrelated section.
+    const destination = /discovery day|quiz result/i.test(title)
+      ? "/admin/discovery-day"
+      : /payment receipt|balance payment/i.test(title)
+        ? "/admin/payments"
+        : /registration|payment uploaded/i.test(title)
+          ? "/admin/registrations"
+          : /inquiry/i.test(title)
+            ? "/admin/inquiries"
+            : notification.link || "/admin";
+    router.push(destination);
   }
 
   return (
@@ -203,8 +223,9 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
                   return (
                     <button
                       key={n.id}
-                      onClick={() => markRead(n.id)}
-                      className={`flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-[#f0f4f9] ${
+                      onClick={() => openNotification(n)}
+                      aria-label={`Open notification: ${n.title}`}
+                      className={`group flex w-full cursor-pointer items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-[#e8f1ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0050d5] ${
                         !n.read ? "bg-[#f0f4f9]/60" : ""
                       }`}
                     >
@@ -230,6 +251,9 @@ export function Topbar({ title, description, onMenuClick }: TopbarProps) {
                         <p className="mt-0.5 text-[11px] font-semibold text-[#4a5568] leading-snug">{n.message}</p>
                         <p className="mt-1 text-[10px] font-bold text-[#a0aec0]">{n.time}</p>
                       </div>
+                      <span className="mt-1 shrink-0 rounded-full bg-[#eaf2ff] px-2 py-1 text-[10px] font-extrabold text-[#0050d5]">
+                        View <span aria-hidden="true">→</span>
+                      </span>
                     </button>
                   );
                 })

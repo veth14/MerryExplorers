@@ -58,6 +58,7 @@ export async function POST(request: Request) {
       message: `An inquiry from ${parentName} for ${childName || "their child"} has been received.`,
       type: "info",
       read: false,
+      link: "/admin/inquiries",
       time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
       createdAt: new Date(),
     });

@@ -156,6 +156,7 @@ export async function POST(
         message: `${registration.childInfo?.firstName || "A student"} submitted a balance payment receipt for ${registration.program}.`,
         type: "info",
         read: false,
+        link: "/admin/payments",
         time: now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
         createdAt: now,
       });
@@ -252,6 +253,7 @@ export async function POST(
       message: `${registration.childInfo.firstName} ${registration.childInfo.lastName} has completed payment for ${registration.program.replace(/-/g, " ")}.`,
       type: "info",
       read: false,
+      link: "/admin/registrations",
       time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }),
       createdAt: new Date(),
     });

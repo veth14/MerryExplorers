@@ -14,6 +14,7 @@ type DiscoveryResult = {
   scores: Record<string, number>;
   finalProgram: string;
   attempted: string[];
+  answers?: { questionIndex: number | null; section: string; question: string; answer: string; score: number | null }[];
   status: ResultStatus;
   createdAt: string;
 };
@@ -32,6 +33,7 @@ const PROGRAM_STYLES: Record<string, { bg: string; text: string; border: string 
 };
 
 const ALL_STATUSES: ResultStatus[] = ["New", "Contacted", "Enrolled", "Closed"];
+const PAGE_SIZES = [5, 10, 20];
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-PH", {
@@ -87,6 +89,8 @@ export default function DiscoveryDayAdminPage() {
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [selected, setSelected] = useState<DiscoveryResult | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
 
   async function fetchResults() {
     setLoading(true);
@@ -134,6 +138,28 @@ export default function DiscoveryDayAdminPage() {
       return matchSearch && matchProgram && matchStatus;
     });
   }, [results, search, filterProgram, filterStatus]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(currentPage, pageCount);
+  const paginatedResults = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+  const firstVisibleResult = filtered.length ? (safePage - 1) * pageSize + 1 : 0;
+  const lastVisibleResult = Math.min(safePage * pageSize, filtered.length);
+  const pageWindowStart = Math.max(1, Math.min(safePage - 2, pageCount - 4));
+  const visiblePages = Array.from(
+    { length: Math.min(pageCount, 5) },
+    (_, index) => pageWindowStart + index,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterProgram, filterStatus, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
 
   const total = results.length;
   const newCount = results.filter((r) => r.status === "New").length;
@@ -193,13 +219,16 @@ export default function DiscoveryDayAdminPage() {
           />
         </section>
 
-        <div className="flex gap-4 relative items-start">
+        <div className="flex flex-col xl:flex-row gap-4 relative items-start">
           {/* Table Container matching Inquiries */}
-          <div className="flex-1 overflow-x-auto bg-white rounded-[1.5rem] p-6 shadow-sm border border-[#e4e2e1]/50">
+          <div className="w-full min-w-0 flex-1 overflow-x-auto bg-white rounded-[1.5rem] p-4 sm:p-6 shadow-sm border border-[#e4e2e1]/50">
             
             {/* Filters Row inside the table card */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-              <h2 className="text-[20px] font-extrabold text-[#002f76]">All Results</h2>
+              <div>
+                <h2 className="text-[20px] font-extrabold text-[#002f76]">All Results</h2>
+                <p className="mt-0.5 text-[12px] font-medium text-[#64748b]">Review quiz responses and follow up with families.</p>
+              </div>
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="relative">
                   <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a0aec0]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -255,7 +284,7 @@ export default function DiscoveryDayAdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f1f5f9]">
-                  {filtered.map((r) => (
+                  {paginatedResults.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => setSelected(r)}
@@ -300,11 +329,59 @@ export default function DiscoveryDayAdminPage() {
                 </tbody>
               </table>
             )}
+
+            <div className="mt-5 flex flex-col gap-3 border-t border-[#edf1f7] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-semibold text-[#64748b]">
+                <span>Showing <span className="font-extrabold text-[#002f76]">{firstVisibleResult}–{lastVisibleResult}</span> of <span className="font-extrabold text-[#002f76]">{filtered.length}</span></span>
+                <label className="flex items-center gap-2">
+                  Rows per page
+                  <select
+                    value={pageSize}
+                    onChange={(event) => setPageSize(Number(event.target.value))}
+                    className="rounded-lg border border-[#dce5f1] bg-white px-2 py-1.5 text-[12px] font-bold text-[#002f76] outline-none focus:border-[#005cc8]"
+                    aria-label="Rows per page"
+                  >
+                    {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <nav aria-label="Results pages" className="flex items-center gap-1 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={safePage === 1}
+                  className="rounded-lg border border-[#dce5f1] px-3 py-2 text-[12px] font-bold text-[#31547f] transition-colors hover:bg-[#f3f7fd] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                {visiblePages.map((page) => (
+                  <button
+                    type="button"
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    aria-current={page === safePage ? "page" : undefined}
+                    aria-label={`Page ${page}`}
+                    className={`h-9 min-w-9 rounded-lg px-2 text-[12px] font-extrabold transition-colors ${page === safePage ? "bg-[#0033a0] text-white shadow-sm" : "border border-[#dce5f1] text-[#31547f] hover:bg-[#f3f7fd]"}`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+                  disabled={safePage === pageCount}
+                  className="rounded-lg border border-[#dce5f1] px-3 py-2 text-[12px] font-bold text-[#31547f] transition-colors hover:bg-[#f3f7fd] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </nav>
+            </div>
           </div>
 
           {/* Detail Panel */}
           {selected && (
-            <div className="w-[320px] shrink-0 rounded-[1.5rem] bg-white p-6 shadow-sm border border-[#e4e2e1]/50 space-y-5 sticky top-4">
+            <div className="w-full shrink-0 rounded-[1.5rem] bg-white p-5 sm:p-6 shadow-sm border border-[#e4e2e1]/50 space-y-5 xl:sticky xl:top-4 xl:w-[360px]">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-headline text-base font-extrabold text-[#002f76] leading-tight">
                   {selected.childName ? `${selected.childName}'s` : "Child's"} Results
@@ -361,6 +438,28 @@ export default function DiscoveryDayAdminPage() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Individual quiz responses */}
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8] mb-2">Questions &amp; Answers</p>
+                {selected.answers?.length ? (
+                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {selected.answers.map((answer, index) => (
+                      <div key={`${answer.questionIndex ?? index}-${index}`} className="rounded-xl bg-[#f8fafc] p-3">
+                        <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wider text-[#94a3b8]">
+                          {answer.section.replace(/-/g, " ")}
+                        </p>
+                        <p className="text-[11px] font-semibold leading-snug text-[#334155]">{answer.question}</p>
+                        <p className="mt-1.5 text-[11px] font-extrabold text-[#0050d5]">Answer: {answer.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl bg-[#f8fafc] p-3 text-[11px] font-medium leading-snug text-[#64748b]">
+                    Individual answers weren&apos;t recorded for this older submission. New quiz submissions will show them here.
+                  </p>
+                )}
               </div>
 
               {/* Status Buttons */}
