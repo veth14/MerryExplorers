@@ -99,9 +99,11 @@ export default function Home() {
   const teamMembers = accounts
     .filter((acc) => {
       const role = (acc.role || "").toLowerCase();
-      return role.includes("teacher") || role === "executive assistant";
+      return role.includes("teacher") || role === "executive assistant" || role === "developer";
     })
     .map((acc) => {
+      const isDeveloper = (acc.role || "").toLowerCase() === "developer";
+      const fullName = acc.fullName || acc.id;
       const r = todayAttendance.find((att) => att.teacherUid === acc.id);
       
       let hoursStr = "–";
@@ -149,8 +151,8 @@ export default function Home() {
       }
 
       return {
-        name: acc.fullName || acc.id,
-        initials: (acc.fullName || acc.id).split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
+        name: isDeveloper ? `${fullName} (Developer)` : fullName,
+        initials: fullName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
         status: displayStatus as any,
         hours: hoursStr,
         color,

@@ -196,9 +196,12 @@ export function CustomDatePicker({
             <button
               key={day}
               onClick={() => handleSelect(day)}
-              className={`h-9 w-full rounded-full flex items-center justify-center text-[13px] font-bold transition-all
+              aria-label={`${day}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}`}
+              aria-pressed={isSelected}
+              className={`relative h-9 w-full rounded-full flex items-center justify-center text-[13px] font-bold transition-all
                 ${isSelected ? "bg-[#0033A0] text-white shadow-md scale-105" : ""}
-                ${!isSelected && isToday ? "bg-[#FFB800] text-white shadow-sm" : ""}
+                ${!isSelected && isToday ? "bg-amber-50 text-amber-800 hover:bg-amber-100" : ""}
+                ${isToday ? `after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full ${isSelected ? "after:bg-white" : "after:bg-amber-500"}` : ""}
                 ${!isSelected && !isToday ? "text-[#334155] hover:bg-brand-sky/60" : ""}
               `}
             >
@@ -238,11 +241,17 @@ export function CustomDatePicker({
       <button
         type="button"
         onClick={handleToggleOpen}
-        className={triggerClassName || `flex items-center justify-between gap-2.5 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap ${
-          open || selectedDate
-            ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm"
-            : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
-        }`}
+        className={triggerClassName
+          ? `flex items-center justify-between gap-2.5 whitespace-nowrap transition-all duration-200 ${triggerClassName} ${
+              open || selectedDate
+                ? "border-blue-300 bg-blue-50 text-blue-700 shadow-sm"
+                : "border-slate-200 bg-white text-[#002f76] hover:border-blue-200"
+            }`
+          : `flex items-center justify-between gap-2.5 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap ${
+              open || selectedDate
+                ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm"
+                : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
+            }`}
       >
         {displayValue}
         <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "16px" }}>

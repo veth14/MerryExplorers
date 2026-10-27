@@ -38,122 +38,91 @@ export function ReportsFilterBar({
   }, []);
 
   return (
-    <div className="flex flex-col xl:flex-row xl:items-center justify-between rounded-[2rem] bg-white px-6 py-4 shadow-lg border-2 border-brand-sky overflow-visible gap-4 w-full">
-      <div className="flex flex-wrap items-center gap-3 overflow-visible">
-        {/* Label */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "20px" }}>
-            tune
+    <section className="overflow-visible rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-[#f8faff] via-white to-white px-5 py-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#0050d5]">
+            <span className="material-symbols-outlined text-[20px]">tune</span>
           </span>
-          <span className="text-[13px] font-black text-brand-navy">Report Options:</span>
+          <div>
+            <h2 className="text-[14px] font-extrabold text-[#002f76]">Build an attendance report</h2>
+            <p className="mt-0.5 text-[11px] text-slate-500">Choose a date range and staff group, then generate the summary.</p>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#31547f]">
+          <span className="material-symbols-outlined text-[14px]">summarize</span>
+          Attendance summary
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 items-end gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(160px,0.8fr)_auto] sm:p-6">
+        <div>
+          <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500">From</label>
+          <CustomDatePicker
+            selectedDate={startDate}
+            onChange={setStartDate}
+            triggerClassName="h-[44px] w-full rounded-xl border px-3.5 text-[12px] font-bold"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500">To</label>
+          <CustomDatePicker
+            selectedDate={endDate}
+            onChange={setEndDate}
+            triggerClassName="h-[44px] w-full rounded-xl border px-3.5 text-[12px] font-bold"
+          />
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Report Type */}
-          <button
-            className="flex items-center gap-2 rounded-full border border-brand-sky bg-brand-sky/40 px-4 py-2 text-[12px] font-bold text-brand-navy hover:bg-brand-sky transition-all duration-200 whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "16px" }}>
-              summarize
-            </span>
-            Attendance Summary
-          </button>
-
-          {/* Date Range Picker */}
-          <div className="flex items-center gap-1.5">
-            <CustomDatePicker 
-              selectedDate={startDate} 
-              onChange={setStartDate} 
-            />
-            <span className="text-[11px] font-extrabold text-[#94a3b8]">to</span>
-            <CustomDatePicker 
-              selectedDate={endDate} 
-              onChange={setEndDate} 
-            />
-          </div>
-
-          <div className="w-[1px] h-6 bg-brand-sky mx-1 hidden sm:block" />
-
-          {/* Role Dropdown */}
+        <div>
+          <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500">Staff group</label>
           <div className="relative" ref={dropdownRef}>
             <button
+              type="button"
+              aria-expanded={roleOpen}
               onClick={() => setRoleOpen(!roleOpen)}
-              className={`flex items-center gap-4 rounded-full border px-4 py-2 text-[12px] font-bold transition-all duration-200 whitespace-nowrap min-w-[110px] justify-between ${
-                roleOpen
-                  ? "border-brand-blue/40 bg-brand-sky text-brand-blue shadow-sm"
-                  : "border-brand-sky bg-brand-sky/40 text-brand-navy hover:bg-brand-sky"
-              }`}
+              className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-white px-3.5 py-[11px] text-[12px] font-bold transition-colors ${roleOpen ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-200"}`}
             >
-              {selectedRole}
-              <span
-                className="material-symbols-outlined text-brand-blue transition-transform duration-200"
-                style={{
-                  fontSize: "16px",
-                  transform: roleOpen ? "rotate(180deg)" : "none",
-                }}
-              >
-                expand_more
-              </span>
+              <span className="truncate text-[#002f76]">{selectedRole}</span>
+              <span className={`material-symbols-outlined text-[17px] text-slate-400 transition-transform ${roleOpen ? "rotate-180" : ""}`}>expand_more</span>
             </button>
 
-            <div
-              className={`absolute top-[calc(100%+6px)] left-0 z-50 min-w-[160px] rounded-2xl bg-white border-2 border-brand-sky shadow-lg transition-all duration-200 origin-top ${
-                roleOpen
-                  ? "opacity-100 scale-100 translate-y-0"
-                  : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
-              }`}
-            >
-              <div className="py-1.5">
+            {roleOpen && (
+              <div className="absolute left-0 top-[calc(100%+6px)] z-50 min-w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
                 {roleOptions.map((role) => (
                   <button
+                    type="button"
                     key={role}
-                    onClick={() => {
-                      setSelectedRole(role);
-                      setRoleOpen(false);
-                    }}
-                    className={`w-full px-5 py-2 text-left text-[13px] font-bold transition-colors flex items-center gap-2 ${
-                      selectedRole === role
-                        ? "bg-brand-sky/40 text-brand-blue"
-                        : "text-[#5a6e8c] hover:bg-brand-sky/20 hover:text-brand-navy"
-                    }`}
+                    onClick={() => { setSelectedRole(role); setRoleOpen(false); }}
+                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[12px] font-bold transition-colors ${selectedRole === role ? "bg-blue-50 text-[#0033A0]" : "text-slate-600 hover:bg-slate-50"}`}
                   >
-                    {selectedRole === role ? (
-                      <span className="material-symbols-outlined text-brand-blue" style={{ fontSize: "16px" }}>check</span>
-                    ) : (
-                      <div className="w-4" />
-                    )}
                     {role}
+                    {selectedRole === role && <span className="material-symbols-outlined text-[15px]">check</span>}
                   </button>
                 ))}
               </div>
-            </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-wrap items-center gap-3 shrink-0">
-        <button
-          onClick={onExport}
-          className="flex items-center gap-2 rounded-full border border-brand-sky bg-white px-5 py-2 text-[12px] font-bold text-brand-navy hover:bg-brand-sky transition-all duration-200 shadow-sm whitespace-nowrap group"
-        >
-          <span className="material-symbols-outlined text-[#2da05b] group-hover:-translate-y-0.5 transition-transform duration-200" style={{ fontSize: "18px" }}>
-            download
-          </span>
-          Export CSV
-        </button>
-
-        <button
-          onClick={onGenerate}
-          className="flex items-center gap-2 rounded-full bg-brand-blue px-6 py-2.5 text-[13px] font-bold text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0 shrink-0"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
-            autorenew
-          </span>
-          Generate
-        </button>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-1 lg:justify-end">
+          <button
+            type="button"
+            onClick={onExport}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[12px] font-bold text-[#31547f] transition-colors hover:bg-slate-50 sm:flex-none"
+          >
+            <span className="material-symbols-outlined text-[17px] text-emerald-600">download</span>
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#0033A0] px-5 py-2.5 text-[12px] font-extrabold text-white shadow-sm transition-all hover:bg-[#002f76] hover:shadow-md sm:flex-none"
+          >
+            <span className="material-symbols-outlined text-[17px]">autorenew</span>
+            Generate report
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

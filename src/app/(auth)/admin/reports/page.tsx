@@ -57,8 +57,19 @@ function formatDate(dateStr: string) {
 }
 
 function getWeekOfMonth(dateStr: string) {
-  const [y, m, d] = dateStr.split("-").map(Number);
+  const d = Number(dateStr.split("-")[2]);
   return `W${Math.ceil(d / 7)}`;
+}
+
+function sortAttendanceNewestFirst(records: AttendanceRecord[]) {
+  return [...records].sort((a, b) => {
+    const dateOrder = b.dateStr.localeCompare(a.dateStr);
+    if (dateOrder !== 0) return dateOrder;
+
+    const aClockIn = Date.parse(a.clockInTime) || 0;
+    const bClockIn = Date.parse(b.clockInTime) || 0;
+    return bClockIn - aClockIn;
+  });
 }
 
 function calcBreakDuration(dateStr: string) {
@@ -92,8 +103,9 @@ export default function ReportsPage() {
         ]);
         const [attJson, accJson] = await Promise.all([attRes.json(), accRes.json()]);
         if (attJson.success) {
-          setRecords(attJson.data);
-          setFilteredRecords(attJson.data);
+          const newestFirst = sortAttendanceNewestFirst(attJson.data);
+          setRecords(newestFirst);
+          setFilteredRecords(newestFirst);
         }
         if (Array.isArray(accJson)) {
           const map: Record<string, AccountRecord> = {};
@@ -113,7 +125,13 @@ export default function ReportsPage() {
     let result = [...records];
     
     if (selectedRole !== "All Staff") {
-      result = result.filter(r => r.group === selectedRole || accounts[r.teacherId ?? ""]?.role === selectedRole);
+      const selected = selectedRole.toLowerCase();
+      result = result.filter((r) => {
+        const role = (accounts[r.teacherId ?? ""]?.role || "").toLowerCase();
+        const group = (r.group || "").toLowerCase();
+        if (selected === "teachers") return role.includes("teacher") || group.includes("teacher");
+        return role.includes(selected) || group.includes(selected);
+      });
     }
     
     if (startDate && endDate) {
@@ -124,10 +142,7 @@ export default function ReportsPage() {
       result = result.filter(r => r.dateStr <= endDate);
     }
     
-    // Sort descending by date
-    result.sort((a, b) => new Date(b.dateStr).getTime() - new Date(a.dateStr).getTime());
-    
-    setFilteredRecords(result);
+    setFilteredRecords(sortAttendanceNewestFirst(result));
   }
 
   function handleExportCSV() {
@@ -200,7 +215,6 @@ export default function ReportsPage() {
     const week = getWeekOfMonth(r.dateStr);
     if (!weekMap[week]) weekMap[week] = { clockIns: 0, onTime: 0 };
     weekMap[week].clockIns += 1;
-    const hour = r.clockInTime ? new Date(r.clockInTime).getHours() : 99;
     if ((r as any).timeInStatus === "On Time") weekMap[week].onTime += 1;
   }
   const trends = Object.entries(weekMap).map(([week, data]) => {
@@ -221,62 +235,67 @@ export default function ReportsPage() {
   const avgPunctuality = totalClockIns > 0 ? Math.round((onTimeCount / totalClockIns) * 100) : 0;
 
   const reportMetrics = [
-    { label: "AVG PUNCTUALITY", value: avgPunctuality.toString(), unit: "%", type: "punctuality" as const },
-    { label: "TOTAL CLOCK-INS", value: totalClockIns.toString(), type: "clockins" as const },
-    { label: "TOTAL LATES", value: lateCount.toString(), type: "attendance" as const },
+    { label: "Average punctuality", value: avgPunctuality.toString(), unit: "%", meta: `${onTimeCount} of ${totalClockIns} arrivals on time`, type: "punctuality" as const },
+    { label: "Total clock-ins", value: totalClockIns.toString(), meta: "Attendance records in this report", type: "clockins" as const },
+    { label: "Late arrivals", value: lateCount.toString(), meta: "Arrivals that missed the scheduled start", type: "attendance" as const },
   ];
 
   return (
-    <AppShell title="Reports" description="Explore key metrics and detailed data visualizations for your activities.">
-      {/* Filter Bar */}
-      <ReportsFilterBar 
-        selectedRole={selectedRole}
-        setSelectedRole={setSelectedRole}
-        startDate={startDate}
-        setStartDate={setStartDate}
-        endDate={endDate}
-        setEndDate={setEndDate}
-        onGenerate={handleGenerate}
-        onExport={handleExportCSV}
-      />
+    <AppShell title="Reports" description="Attendance performance, punctuality, and staff activity at a glance.">
+      <div id="reports-print-root" className="reports-print-root space-y-5 pb-10">
+        <style>{`@media print { body * { visibility: hidden !important; } .reports-print-root, .reports-print-root * { visibility: visible !important; } .reports-print-root { position: fixed; inset: 0; z-index: 99999; width: 100%; overflow: visible; background: white; padding: 20px; } .reports-no-print { display: none !important; } }`}</style>
 
-      {/* Metric Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {reportMetrics.map((metric) => (
-          <ReportsMetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            unit={"unit" in metric ? metric.unit : undefined}
-            type={metric.type}
+        <div className="reports-no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-[18px] text-[#0050d5]">insights</span>
+            <p className="text-[12px] font-semibold text-[#31547f]">Review attendance trends and export a report for your selected staff and dates.</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[#31547f]">{filteredRecords.length} records</span>
+        </div>
+
+        <div className="reports-no-print">
+          <ReportsFilterBar
+            selectedRole={selectedRole}
+            setSelectedRole={setSelectedRole}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            onGenerate={handleGenerate}
+            onExport={handleExportCSV}
           />
-        ))}
-      </div>
+        </div>
 
-      {/* Chart */}
-      {loading ? (
-        <Skeleton className="h-56 w-full rounded-[2rem]" />
-      ) : (
-        <ReportsChart trends={trends.length > 0 ? trends : undefined} />
-      )}
-
-      {/* Detailed Logs Table */}
-      {loading ? (
-        <div className="rounded-[2rem] bg-white border-2 border-brand-sky shadow-lg w-full p-6 flex flex-col gap-3">
-          <Skeleton className="h-6 w-44" />
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-xl" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {reportMetrics.map((metric) => (
+            <ReportsMetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              meta={metric.meta}
+              unit={"unit" in metric ? metric.unit : undefined}
+              type={metric.type}
+            />
           ))}
         </div>
-      ) : (
-        <ReportsTable logs={logs as any} />
-      )}
 
-      {/* Footer Banner */}
-      <ReportsFooterBanner />
+        {loading ? (
+          <Skeleton className="h-64 w-full rounded-3xl" />
+        ) : (
+          <ReportsChart trends={trends.length > 0 ? trends : undefined} onPrint={() => window.print()} />
+        )}
 
-      {/* Bottom spacing */}
-      <div className="h-4" />
+        {loading ? (
+          <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <Skeleton className="h-10 w-full" />
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
+          </div>
+        ) : (
+          <ReportsTable logs={logs as any} />
+        )}
+
+        <div className="reports-no-print"><ReportsFooterBanner /></div>
+      </div>
     </AppShell>
   );
 }

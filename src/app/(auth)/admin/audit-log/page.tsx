@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 type AuditEntry = {
   id: string;
@@ -183,7 +184,7 @@ export default function AuditLogPage() {
   const [actionFilter, setActionFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchLog = async () => {
     setLoading(true);
@@ -227,10 +228,11 @@ export default function AuditLogPage() {
     setCurrentPage(1);
   }, [categoryFilter, actionFilter, search]);
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedData = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (safePage - 1) * pageSize,
+    safePage * pageSize
   );
 
   return (
@@ -313,15 +315,16 @@ export default function AuditLogPage() {
         </div>
       ) : (
         <>
-          {/* Mobile card list — hidden on lg+ */}
-          <div className="flex flex-col gap-3 lg:hidden">
-            {paginatedData.map((entry) => <EntryCard key={entry.id} entry={entry} />)}
-          </div>
+          <div className="overflow-hidden rounded-3xl border-2 border-[#e2e8f0] bg-white shadow-sm">
+            {/* Mobile card list — hidden on lg+ */}
+            <div className="flex flex-col gap-3 p-3 lg:hidden">
+              {paginatedData.map((entry) => <EntryCard key={entry.id} entry={entry} />)}
+            </div>
 
-          {/* Desktop table — hidden below lg */}
-          <div className="hidden lg:block bg-white rounded-3xl border-2 border-[#e2e8f0] shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            {/* Desktop table — hidden below lg */}
+            <div className="hidden lg:block">
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b-2 border-[#f0f4f8] bg-[#f8faff]">
                     {["When", "Who", "Action", "Category", "Details"].map((h) => (
@@ -368,64 +371,22 @@ export default function AuditLogPage() {
                     );
                   })}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
+            <TablePagination
+              total={filtered.length}
+              page={safePage}
+              pageCount={totalPages}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              itemLabel="entries"
+              ariaLabel="Audit log pages"
+              context={search ? `search: “${search}”` : undefined}
+            />
           </div>
         </>
-      )}
-
-      {!loading && filtered.length > 0 && (
-        <div className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-center sm:text-left text-[12px] font-semibold text-[#5a6e8c]">
-            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} entries
-            {search && ` for "${search}"`}
-          </p>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 border-[#e2e8f0] text-[12px] font-bold text-[#002f76] hover:bg-[#f8faff] hover:border-[#a8c4f0] disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:border-[#e2e8f0] transition-colors"
-            >
-              <span className="material-symbols-outlined text-[16px]">chevron_left</span>
-              Prev
-            </button>
-            
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                // Show a limited number of page buttons to avoid overflow
-                .filter(p => p === 1 || p === totalPages || Math.abs(currentPage - p) <= 1)
-                .map((p, i, arr) => {
-                  // Add ellipsis if gap > 1
-                  const showEllipsis = i > 0 && p - arr[i - 1] > 1;
-                  return (
-                    <div key={p} className="flex items-center gap-1">
-                      {showEllipsis && <span className="text-[#a0aec0] text-[12px] font-bold px-1">...</span>}
-                      <button
-                        onClick={() => setCurrentPage(p)}
-                        className={`w-8 h-8 rounded-lg text-[12px] font-extrabold flex items-center justify-center transition-colors ${
-                          currentPage === p
-                            ? "bg-[#005cc8] text-white"
-                            : "text-[#5a6e8c] hover:bg-[#f0f5ff] hover:text-[#005cc8]"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 border-[#e2e8f0] text-[12px] font-bold text-[#002f76] hover:bg-[#f8faff] hover:border-[#a8c4f0] disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:border-[#e2e8f0] transition-colors"
-            >
-              Next
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            </button>
-          </div>
-        </div>
       )}
     </AppShell>
   );
