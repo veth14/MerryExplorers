@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { UserMetricCard } from "@/components/users/user-metric-card";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { uploadAvatar } from "@/lib/supabase";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { useAuth } from "@/lib/auth-context";
@@ -1411,6 +1412,8 @@ export default function AdminParentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
 
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
@@ -1497,6 +1500,14 @@ export default function AdminParentsPage() {
       );
     });
   }, [data, search, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const paginatedParents = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, pageSize]);
 
   return (
     <AppShell title="Parent Accounts" description="Manage parent and guardian profiles">
@@ -1614,7 +1625,7 @@ export default function AdminParentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((parent) => {
+                  paginatedParents.map((parent) => {
                     const days = parent.schedule || findProgram(parent.program)?.days || "";
                     return (
                       <tr
@@ -1700,11 +1711,17 @@ export default function AdminParentsPage() {
             </table>
           </div>
 
-          {/* Footer count */}
-          {!loading && data.length > 0 && (
-            <div className="mt-4 border-t border-[#f1f5f9] pt-4 text-[12px] font-bold text-[#94a3b8]">
-              Showing {filtered.length} of {data.length} parent{data.length === 1 ? "" : "s"}
-            </div>
+          {!loading && filtered.length > 0 && (
+            <TablePagination
+              total={filtered.length}
+              page={safePage}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              itemLabel="parents"
+              ariaLabel="Parent account pages"
+            />
           )}
         </div>
       </div>

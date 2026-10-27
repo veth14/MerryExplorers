@@ -5,8 +5,8 @@ import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
 import * as XLSX from "xlsx";
-import { RenewalSettingsManager } from "@/components/admin/RenewalSettingsManager";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
 import { auth } from "@/lib/firebase";
@@ -96,7 +96,7 @@ type Stats = {
 
 export default function RenewalsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"renewals" | "families" | "settings">("renewals");
+  const [activeTab, setActiveTab] = useState<"renewals" | "families">("renewals");
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<any[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("adventure-1-renewal");
@@ -109,12 +109,16 @@ export default function RenewalsPage() {
   const [renewalStatusFilter, setRenewalStatusFilter] = useState("all");
   const [renewalProgramFilter, setRenewalProgramFilter] = useState("all");
   const [renewalPaymentFilter, setRenewalPaymentFilter] = useState("all");
+  const [renewalsPage, setRenewalsPage] = useState(1);
+  const [renewalsPageSize, setRenewalsPageSize] = useState(10);
 
   // Families tab state
   const [families, setFamilies] = useState<Family[]>([]);
   const [familySearch, setFamilySearch] = useState("");
   const [familyStatusFilter, setFamilyStatusFilter] = useState("all");
   const [familyProgramFilter, setFamilyProgramFilter] = useState("all");
+  const [familiesPage, setFamiliesPage] = useState(1);
+  const [familiesPageSize, setFamiliesPageSize] = useState(10);
 
   // Modals
   const [addFamilyModal, setAddFamilyModal] = useState(false);
@@ -271,6 +275,21 @@ export default function RenewalsPage() {
     [filteredRenewals]
   );
 
+  const renewalsPageCount = Math.max(1, Math.ceil(activeRenewals.length / renewalsPageSize));
+  const safeRenewalsPage = Math.min(renewalsPage, renewalsPageCount);
+  const paginatedActiveRenewals = activeRenewals.slice(
+    (safeRenewalsPage - 1) * renewalsPageSize,
+    safeRenewalsPage * renewalsPageSize,
+  );
+
+  useEffect(() => {
+    setRenewalsPage(1);
+  }, [selectedPeriod, renewalSearch, renewalStatusFilter, renewalProgramFilter, renewalPaymentFilter, renewalsPageSize]);
+
+  useEffect(() => {
+    if (renewalsPage > renewalsPageCount) setRenewalsPage(renewalsPageCount);
+  }, [renewalsPage, renewalsPageCount]);
+
   // ── Link families ↔ renewal records ──────────────────────────────────
   // Parents sometimes use /register instead of /renew, so the registration isn't
   // linked to the family record, and names are typed differently
@@ -348,6 +367,21 @@ export default function RenewalsPage() {
       return matchSearch && matchStatus && matchProgram;
     });
   }, [families, familySearch, familyStatusFilter, familyProgramFilter, familyRecordMap]);
+
+  const familiesPageCount = Math.max(1, Math.ceil(filteredFamilies.length / familiesPageSize));
+  const safeFamiliesPage = Math.min(familiesPage, familiesPageCount);
+  const paginatedFamilies = filteredFamilies.slice(
+    (safeFamiliesPage - 1) * familiesPageSize,
+    safeFamiliesPage * familiesPageSize,
+  );
+
+  useEffect(() => {
+    setFamiliesPage(1);
+  }, [selectedPeriod, familySearch, familyStatusFilter, familyProgramFilter, familiesPageSize]);
+
+  useEffect(() => {
+    if (familiesPage > familiesPageCount) setFamiliesPage(familiesPageCount);
+  }, [familiesPage, familiesPageCount]);
 
   // Custom Dialog Modal State (Replaces native browser alerts/confirms)
   const [feedbackDialog, setFeedbackDialog] = useState<{
@@ -1008,15 +1042,6 @@ export default function RenewalsPage() {
           >
             <span>👨‍👩‍👧</span> Families Contact List ({filteredFamilies.length})
           </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`flex items-center gap-2 px-6 py-3 font-headline text-[15px] font-bold border-b-2 transition-all ${activeTab === "settings"
-              ? "border-[#0033A0] text-[#0033A0]"
-              : "border-transparent text-[#64748b] hover:text-[#002f76]"
-              }`}
-          >
-            <span>⚙️</span> Renewal Settings
-          </button>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════ */}
@@ -1091,7 +1116,7 @@ export default function RenewalsPage() {
                       </td>
                     </tr>
                   ) : (
-                    activeRenewals.map((r) => (
+                    paginatedActiveRenewals.map((r) => (
                       <tr key={r._id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3.5 px-4">
                           <p className="font-bold text-[#002f76]">{r.childName}</p>
@@ -1208,6 +1233,16 @@ export default function RenewalsPage() {
                   )}
                 </tbody>
               </table>
+              <TablePagination
+                total={activeRenewals.length}
+                page={safeRenewalsPage}
+                pageCount={renewalsPageCount}
+                pageSize={renewalsPageSize}
+                onPageChange={setRenewalsPage}
+                onPageSizeChange={setRenewalsPageSize}
+                itemLabel="renewals"
+                ariaLabel="Active renewal pages"
+              />
             </div>
 
             {/* ── ARCHIVE: Released / Expired Slots ── */}
@@ -1437,7 +1472,7 @@ export default function RenewalsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredFamilies.map((f) => (
+                    paginatedFamilies.map((f) => (
                       <tr
                         key={f._id}
                         onClick={() => {
@@ -1594,16 +1629,17 @@ export default function RenewalsPage() {
                   )}
                 </tbody>
               </table>
+              <TablePagination
+                total={filteredFamilies.length}
+                page={safeFamiliesPage}
+                pageCount={familiesPageCount}
+                pageSize={familiesPageSize}
+                onPageChange={setFamiliesPage}
+                onPageSizeChange={setFamiliesPageSize}
+                itemLabel="families"
+                ariaLabel="Family contact pages"
+              />
             </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════ */}
-        {/* TAB 3: RENEWAL SETTINGS                                                */}
-        {/* ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "settings" && (
-          <div className="pt-2">
-            <RenewalSettingsManager />
           </div>
         )}
 

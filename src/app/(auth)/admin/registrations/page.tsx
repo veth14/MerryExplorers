@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { m, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { AppShell } from "@/components/app-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 
@@ -1494,6 +1495,10 @@ export default function AdminRegistrationsPage() {
   const [adventureFilter, setAdventureFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [programFilter, setProgramFilter] = useState("all");
+  const [registrationPage, setRegistrationPage] = useState(1);
+  const [registrationPageSize, setRegistrationPageSize] = useState(10);
+  const [leadPage, setLeadPage] = useState(1);
+  const [leadPageSize, setLeadPageSize] = useState(10);
   const [leadSubFilter, setLeadSubFilter] = useState<"all" | "in-progress" | "contacted">("all");
   const [selected, setSelected] = useState<Registration | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -2153,6 +2158,20 @@ export default function AdminRegistrationsPage() {
     return matchStatus && matchProgram && matchAdventure && matchSearch;
   });
 
+  const registrationPageCount = Math.max(1, Math.ceil(filtered.length / registrationPageSize));
+  const safeRegistrationPage = Math.min(registrationPage, registrationPageCount);
+  const paginatedRegistrations = filtered.slice(
+    (safeRegistrationPage - 1) * registrationPageSize,
+    safeRegistrationPage * registrationPageSize,
+  );
+  useEffect(() => {
+    setRegistrationPage(1);
+  }, [filter, adventureFilter, search, programFilter, leadSubFilter, registrationPageSize]);
+
+  useEffect(() => {
+    if (registrationPage > registrationPageCount) setRegistrationPage(registrationPageCount);
+  }, [registrationPage, registrationPageCount]);
+
   const filteredLeads = prospectiveLeads.filter(l => {
     const isLeadInProgress = l.status === "in-progress" || (l as any).status === "new" || !l.status;
     const matchSubFilter =
@@ -2171,6 +2190,20 @@ export default function AdminRegistrationsPage() {
       (l.selectedProgram ? getProgramLabel(l.selectedProgram) : "").toLowerCase().includes(q);
     return matchSubFilter && matchProgram && matchSearch;
   });
+
+  const leadPageCount = Math.max(1, Math.ceil(filteredLeads.length / leadPageSize));
+  const safeLeadPage = Math.min(leadPage, leadPageCount);
+  const paginatedLeads = filteredLeads.slice(
+    (safeLeadPage - 1) * leadPageSize,
+    safeLeadPage * leadPageSize,
+  );
+  useEffect(() => {
+    setLeadPage(1);
+  }, [leadSubFilter, search, programFilter, leadPageSize]);
+
+  useEffect(() => {
+    if (leadPage > leadPageCount) setLeadPage(leadPageCount);
+  }, [leadPage, leadPageCount]);
 
   return (
     <>
@@ -2357,7 +2390,7 @@ export default function AdminRegistrationsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredLeads.map((lead, i) => {
+                    {paginatedLeads.map((lead, i) => {
                       const childTitle = [lead.childInfo?.firstName, lead.childInfo?.lastName].filter(Boolean).join(" ") || "Student (Unnamed)";
                       const stepInfo = LEAD_STEP_LABELS[lead.step] || {
                         label: lead.stepName || `Step ${lead.step}`,
@@ -2386,7 +2419,7 @@ export default function AdminRegistrationsPage() {
                               <div>
                                 <p className="font-extrabold text-[#002f76]">{childTitle}</p>
                                 {lead.childInfo?.nickname && (
-                                  <p className="text-[11px] text-[#94a3b8]">"{lead.childInfo.nickname}"</p>
+                                  <p className="text-[11px] text-[#94a3b8]">&quot;{lead.childInfo.nickname}&quot;</p>
                                 )}
                               </div>
                             </div>
@@ -2502,9 +2535,16 @@ export default function AdminRegistrationsPage() {
                     })}
                   </tbody>
                 </table>
-                <div className="px-5 py-3 bg-[#f8fafc] border-t border-slate-200 text-[12px] font-semibold text-[#94a3b8]">
-                  {`Showing ${filteredLeads.length} of ${prospectiveLeads.length} lead${prospectiveLeads.length !== 1 ? "s" : ""}`}
-                </div>
+                <TablePagination
+                  total={filteredLeads.length}
+                  page={safeLeadPage}
+                  pageCount={leadPageCount}
+                  pageSize={leadPageSize}
+                  onPageChange={setLeadPage}
+                  onPageSizeChange={setLeadPageSize}
+                  itemLabel="leads"
+                  ariaLabel="Registration lead pages"
+                />
               </div>
             )}
           </div>
@@ -2537,7 +2577,7 @@ export default function AdminRegistrationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((reg, i) => (
+                  {paginatedRegistrations.map((reg, i) => (
                     <m.tr
                       key={reg.id}
                       initial={{ opacity: 0, y: 6 }}
@@ -2613,9 +2653,17 @@ export default function AdminRegistrationsPage() {
                   ))}
                 </tbody>
               </table>
-              <div className="px-5 py-3 bg-[#f8fafc] border-t border-slate-200 text-[12px] font-semibold text-[#94a3b8]">
-                Showing {filtered.length} of {registrationsForAdventure.length} registration{registrationsForAdventure.length !== 1 ? "s" : ""} in {adventureFilter === "all" ? "all Adventures" : adventureFilter === "unassigned" ? "untagged cycles" : `Adventure ${adventureFilter}`}
-              </div>
+              <TablePagination
+                total={filtered.length}
+                page={safeRegistrationPage}
+                pageCount={registrationPageCount}
+                pageSize={registrationPageSize}
+                onPageChange={setRegistrationPage}
+                onPageSizeChange={setRegistrationPageSize}
+                itemLabel="registrations"
+                ariaLabel="Student registration pages"
+                context={adventureFilter === "all" ? "all Adventures" : adventureFilter === "unassigned" ? "untagged cycles" : `Adventure ${adventureFilter}`}
+              />
             </div>
           )
         )}

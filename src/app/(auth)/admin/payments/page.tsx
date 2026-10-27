@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { m } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
   calcRegistrationTerms,
   getStudentSessionInfo,
@@ -657,6 +658,10 @@ function AdminPaymentsPageInner() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [nextPage, setNextPage] = useState(1);
+  const [pastPage, setPastPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [urlSearch, setUrlSearch] = useState<string | null>(null); // ?search= from the Renewals page
   const searchApplied = useRef(false);
   const prevCurNum = useRef<number | null>(null);
@@ -1059,6 +1064,18 @@ function AdminPaymentsPageInner() {
     return list; // already newest first
   }, [allGroups, activeFilter, typeFilter, sortBy, search]);
 
+  const currentPageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, currentPageCount);
+  const paginatedPayments = filtered.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [view, activeFilter, typeFilter, sortBy, search, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > currentPageCount) setCurrentPage(currentPageCount);
+  }, [currentPage, currentPageCount]);
+
   // ── PAST tab: payments of Adventures that already ended, one block per Adventure ──
   const pastGroups = useMemo(() => {
     const q = search.toLowerCase();
@@ -1133,6 +1150,30 @@ function AdminPaymentsPageInner() {
           new Date(b.r.submittedAt || b.r.createdAt || 0).getTime() - new Date(a.r.submittedAt || a.r.createdAt || 0).getTime()
       );
   }, [renewalRowsAll, search, nextFilter]);
+
+  const nextPageCount = Math.max(1, Math.ceil(renewalRows.length / pageSize));
+  const safeNextPage = Math.min(nextPage, nextPageCount);
+  const paginatedRenewalRows = renewalRows.slice((safeNextPage - 1) * pageSize, safeNextPage * pageSize);
+
+  useEffect(() => {
+    setNextPage(1);
+  }, [view, search, nextFilter, pageSize]);
+
+  useEffect(() => {
+    if (nextPage > nextPageCount) setNextPage(nextPageCount);
+  }, [nextPage, nextPageCount]);
+
+  const pastPageCount = Math.max(1, Math.ceil(pastGroups.groups.length / pageSize));
+  const safePastPage = Math.min(pastPage, pastPageCount);
+  const paginatedPastGroups = pastGroups.groups.slice((safePastPage - 1) * pageSize, safePastPage * pageSize);
+
+  useEffect(() => {
+    setPastPage(1);
+  }, [view, search, pageSize]);
+
+  useEffect(() => {
+    if (pastPage > pastPageCount) setPastPage(pastPageCount);
+  }, [pastPage, pastPageCount]);
 
   // numbers on the filter pills of the Next tab
   const nextCounts = useMemo(() => {
@@ -3219,7 +3260,7 @@ function AdminPaymentsPageInner() {
                 ))}
               </div>
 
-              {filtered.map((g, idx) => {
+              {paginatedPayments.map((g, idx) => {
                 const { acc, uid, type, items } = g;
                 const focus = g.pendingItem ?? g.latest; // what opens when the row is clicked
                 const avatarGrad = AVATAR_COLORS[colorIndex((acc.email || uid).toLowerCase())];
@@ -3261,7 +3302,7 @@ function AdminPaymentsPageInner() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx, 20) * 0.025 }}
                     onClick={() => openDetail(focus)}
-                    style={{ display: "grid", gridTemplateColumns: PAY_GRID, padding: "15px 24px 15px 20px", borderLeft: `4px solid ${accent}`, borderBottom: idx < filtered.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white", cursor: "pointer" }}
+                    style={{ display: "grid", gridTemplateColumns: PAY_GRID, padding: "15px 24px 15px 20px", borderLeft: `4px solid ${accent}`, borderBottom: idx < paginatedPayments.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: "white", cursor: "pointer" }}
                   >
                     {/* Parent & student col */}
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
@@ -3412,6 +3453,16 @@ function AdminPaymentsPageInner() {
                   </m.div>
                 );
               })}
+              <TablePagination
+                total={filtered.length}
+                page={safeCurrentPage}
+                pageCount={currentPageCount}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="students"
+                ariaLabel="Payment students pages"
+              />
             </div>
           </>
         )
@@ -3450,7 +3501,7 @@ function AdminPaymentsPageInner() {
                 </div>
               </div>
             ) : (
-              renewalRows.map(({ r, acc, payment, state, hasReceipt }, idx) => {
+              paginatedRenewalRows.map(({ r, acc, payment, state, hasReceipt }, idx) => {
                 const childFull = fullChildName(r);
                 const prog = (PROGRAM_SLOTS as any)[r.program];
                 const programName = prog?.name || r.program || "—";
@@ -3678,6 +3729,16 @@ function AdminPaymentsPageInner() {
                 );
               })
             )}
+            <TablePagination
+              total={renewalRows.length}
+              page={safeNextPage}
+              pageCount={nextPageCount}
+              pageSize={pageSize}
+              onPageChange={setNextPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="registrations"
+              ariaLabel="Next adventure registration pages"
+            />
           </div>
         </>
       ) : (
@@ -3690,7 +3751,7 @@ function AdminPaymentsPageInner() {
                 : "No past payments match your search."}
             </div>
           ) : (
-            pastGroups.groups.map(({ num, items }) => {
+            paginatedPastGroups.map(({ num, items }) => {
               const range = ADVENTURES.past.find((p) => p.num === num);
               const families = new Set(items.map((i) => i.acc.email || i.uid)).size;
               return (
@@ -3746,6 +3807,16 @@ function AdminPaymentsPageInner() {
               );
             })
           )}
+          <TablePagination
+            total={pastGroups.groups.length}
+            page={safePastPage}
+            pageCount={pastPageCount}
+            pageSize={pageSize}
+            onPageChange={setPastPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="adventures"
+            ariaLabel="Past adventure pages"
+          />
         </div>
       )}
     </AppShell>

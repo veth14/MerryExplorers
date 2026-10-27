@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { AppShell } from "@/components/app-shell";
 import { ClassCapacityTracker } from "@/components/admin/ClassCapacityTracker";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS } from "@/data/landing";
 
@@ -407,6 +408,10 @@ export default function AdminStudentsPage() {
   const [programFilter, setProgramFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [explorerPage, setExplorerPage] = useState(1);
+  const [explorerPageSize, setExplorerPageSize] = useState(10);
+  const [directoryParentPage, setDirectoryParentPage] = useState(1);
+  const [directoryParentPageSize, setDirectoryParentPageSize] = useState(10);
 
   // Modals state
   const [selectedGroupForView, setSelectedGroupForView] = useState<any>(null);
@@ -709,6 +714,27 @@ export default function AdminStudentsPage() {
   const testParents = useMemo(() => {
     return filteredParents.filter((p) => isIanAngeloValmores(p));
   }, [filteredParents]);
+
+  const explorerPageCount = Math.max(1, Math.ceil(realExplorers.length / explorerPageSize));
+  const safeExplorerPage = Math.min(explorerPage, explorerPageCount);
+  const paginatedExplorers = realExplorers.slice(
+    (safeExplorerPage - 1) * explorerPageSize,
+    safeExplorerPage * explorerPageSize,
+  );
+  const parentDirectoryPageCount = Math.max(1, Math.ceil(realParents.length / directoryParentPageSize));
+  const safeParentDirectoryPage = Math.min(directoryParentPage, parentDirectoryPageCount);
+  const paginatedDirectoryParents = realParents.slice(
+    (safeParentDirectoryPage - 1) * directoryParentPageSize,
+    safeParentDirectoryPage * directoryParentPageSize,
+  );
+
+  useEffect(() => {
+    setExplorerPage(1);
+  }, [programFilter, statusFilter, search, explorerPageSize]);
+
+  useEffect(() => {
+    setDirectoryParentPage(1);
+  }, [search, directoryParentPageSize]);
 
   // Overall Stats — STRICTLY EXCLUDES IAN ANGELO VALMORES FROM KPIS
   const stats = useMemo(() => {
@@ -1730,7 +1756,7 @@ export default function AdminStudentsPage() {
               </div>
 
               {/* Real Student Rows — CLICKABLE TO OPEN STUDENT PROFILE */}
-              {realExplorers.map((group, idx) => {
+              {paginatedExplorers.map((group, idx) => {
                 const avatarGrad = AVATAR_COLORS[idx % AVATAR_COLORS.length];
                 const age = getAge(group.childInfo?.dateOfBirth);
                 const studentForModal = group.latestStudent;
@@ -1744,7 +1770,7 @@ export default function AdminStudentsPage() {
                       display: "grid",
                       gridTemplateColumns: "1.5fr 1.3fr 1.85fr 1.2fr 90px 105px",
                       padding: "14px 24px",
-                      borderBottom: idx < realExplorers.length - 1 ? "1px solid #f1f5f9" : "none",
+                      borderBottom: idx < paginatedExplorers.length - 1 ? "1px solid #f1f5f9" : "none",
                       alignItems: "start",
                       background: "white",
                       gap: "4px",
@@ -1921,6 +1947,16 @@ export default function AdminStudentsPage() {
                   </div>
                 );
               })}
+              <TablePagination
+                total={realExplorers.length}
+                page={safeExplorerPage}
+                pageCount={explorerPageCount}
+                pageSize={explorerPageSize}
+                onPageChange={setExplorerPage}
+                onPageSizeChange={(size) => { setExplorerPageSize(size); setExplorerPage(1); }}
+                itemLabel="explorers"
+                ariaLabel="Explorer directory pages"
+              />
             </div>
           )}
 
@@ -2124,7 +2160,7 @@ export default function AdminStudentsPage() {
               </div>
 
               {/* Real Parents Rows */}
-              {realParents.map((parent, idx) => {
+              {paginatedDirectoryParents.map((parent, idx) => {
                 const avatarGrad = AVATAR_COLORS[idx % AVATAR_COLORS.length];
 
                 return (
@@ -2135,7 +2171,7 @@ export default function AdminStudentsPage() {
                       display: "grid",
                       gridTemplateColumns: "1.5fr 1.4fr 1.6fr 1.2fr 130px",
                       padding: "16px 24px",
-                      borderBottom: idx < realParents.length - 1 ? "1px solid #f1f5f9" : "none",
+                      borderBottom: idx < paginatedDirectoryParents.length - 1 ? "1px solid #f1f5f9" : "none",
                       alignItems: "center",
                       background: "white",
                     }}
@@ -2302,6 +2338,16 @@ export default function AdminStudentsPage() {
                   </div>
                 );
               })}
+              <TablePagination
+                total={realParents.length}
+                page={safeParentDirectoryPage}
+                pageCount={parentDirectoryPageCount}
+                pageSize={directoryParentPageSize}
+                onPageChange={setDirectoryParentPage}
+                onPageSizeChange={(size) => { setDirectoryParentPageSize(size); setDirectoryParentPage(1); }}
+                itemLabel="parents"
+                ariaLabel="Parent directory pages"
+              />
             </div>
           )}
 

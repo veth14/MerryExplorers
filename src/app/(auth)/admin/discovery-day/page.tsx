@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 type ResultStatus = "New" | "Contacted" | "Enrolled" | "Closed";
 
@@ -33,7 +34,6 @@ const PROGRAM_STYLES: Record<string, { bg: string; text: string; border: string 
 };
 
 const ALL_STATUSES: ResultStatus[] = ["New", "Contacted", "Enrolled", "Closed"];
-const PAGE_SIZES = [5, 10, 20];
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-PH", {
@@ -90,7 +90,7 @@ export default function DiscoveryDayAdminPage() {
   const [selected, setSelected] = useState<DiscoveryResult | null>(null);
   const [updating, setUpdating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
+  const [pageSize, setPageSize] = useState(10);
 
   async function fetchResults() {
     setLoading(true);
@@ -145,14 +145,6 @@ export default function DiscoveryDayAdminPage() {
     const start = (safePage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage, pageSize]);
-  const firstVisibleResult = filtered.length ? (safePage - 1) * pageSize + 1 : 0;
-  const lastVisibleResult = Math.min(safePage * pageSize, filtered.length);
-  const pageWindowStart = Math.max(1, Math.min(safePage - 2, pageCount - 4));
-  const visiblePages = Array.from(
-    { length: Math.min(pageCount, 5) },
-    (_, index) => pageWindowStart + index,
-  );
-
   useEffect(() => {
     setCurrentPage(1);
   }, [search, filterProgram, filterStatus, pageSize]);
@@ -330,53 +322,16 @@ export default function DiscoveryDayAdminPage() {
               </table>
             )}
 
-            <div className="mt-5 flex flex-col gap-3 border-t border-[#edf1f7] pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-semibold text-[#64748b]">
-                <span>Showing <span className="font-extrabold text-[#002f76]">{firstVisibleResult}–{lastVisibleResult}</span> of <span className="font-extrabold text-[#002f76]">{filtered.length}</span></span>
-                <label className="flex items-center gap-2">
-                  Rows per page
-                  <select
-                    value={pageSize}
-                    onChange={(event) => setPageSize(Number(event.target.value))}
-                    className="rounded-lg border border-[#dce5f1] bg-white px-2 py-1.5 text-[12px] font-bold text-[#002f76] outline-none focus:border-[#005cc8]"
-                    aria-label="Rows per page"
-                  >
-                    {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <nav aria-label="Results pages" className="flex items-center gap-1 self-start sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={safePage === 1}
-                  className="rounded-lg border border-[#dce5f1] px-3 py-2 text-[12px] font-bold text-[#31547f] transition-colors hover:bg-[#f3f7fd] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                {visiblePages.map((page) => (
-                  <button
-                    type="button"
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    aria-current={page === safePage ? "page" : undefined}
-                    aria-label={`Page ${page}`}
-                    className={`h-9 min-w-9 rounded-lg px-2 text-[12px] font-extrabold transition-colors ${page === safePage ? "bg-[#0033a0] text-white shadow-sm" : "border border-[#dce5f1] text-[#31547f] hover:bg-[#f3f7fd]"}`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
-                  disabled={safePage === pageCount}
-                  className="rounded-lg border border-[#dce5f1] px-3 py-2 text-[12px] font-bold text-[#31547f] transition-colors hover:bg-[#f3f7fd] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </nav>
-            </div>
+            <TablePagination
+              total={filtered.length}
+              page={safePage}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="results"
+              ariaLabel="Discovery Day result pages"
+            />
           </div>
 
           {/* Detail Panel */}
