@@ -103,7 +103,7 @@ export const EVENT_TYPE_META: Record<
     emoji: "🌟",
   },
   main_event: {
-    label: "School Event",
+    label: "Main Event",
     color: "#7c3aed",
     bg: "#f5f3ff",
     border: "#ddd6fe",

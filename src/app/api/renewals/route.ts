@@ -63,6 +63,12 @@ export async function GET(request: Request) {
     const search = (searchParams.get("search") || "").toLowerCase().trim();
 
     const { db } = await connectToDatabase();
+    const selectedPeriod = await db.collection("renewal_periods").findOne({ slug: period });
+    const legacyAdventureMatch = period.match(/^adventure-(\d+)-renewal$/i);
+    const targetAdventure =
+      Number(selectedPeriod?.targetAdventure) ||
+      Number((String(selectedPeriod?.targetProgram || "").match(/adventure\s*(\d+)/i) || [])[1]) ||
+      (legacyAdventureMatch ? Number(legacyAdventureMatch[1]) + 1 : 2);
     const renewalSettingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const adventureSettings = renewalSettingsDoc?.programs || [];
 
@@ -99,15 +105,13 @@ export async function GET(request: Request) {
     const pricingCtx = await loadPricingContext(db);
 
     // 2. Registrations that count as renewals
+    const adventurePeriodPattern = new RegExp(`^adventure[-_ ]?${targetAdventure}$`, "i");
     const regQuery: Record<string, any> = {
       $or: [
-        { isPromoRegistration: true },
-        { "parentInfo.isRenewal": true },
         { renewalPeriod: period },
-        { selfDeclaredPreviousAdventure: true },
-        { familyId: { $exists: true, $ne: null } },
-        { adventureNumber: 2 },
-        { period: /adventure-2/i },
+        { adventureNumber: targetAdventure },
+        { period: targetAdventure },
+        { period: adventurePeriodPattern },
       ],
     };
     if (program && program !== "all") regQuery.program = program;

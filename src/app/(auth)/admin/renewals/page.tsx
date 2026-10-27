@@ -100,6 +100,7 @@ export default function RenewalsPage() {
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<any[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("adventure-1-renewal");
+  const periodSelectionInitialized = useRef(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   // Renewals tab state
@@ -127,7 +128,6 @@ export default function RenewalsPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [importPreview, setImportPreview] = useState<{ total: number; valid: number; duplicates: number }>({ total: 0, valid: 0, duplicates: 0 });
   const [importing, setImporting] = useState(false);
-  const [newPeriodModal, setNewPeriodModal] = useState(false);
 
   // Family form fields
   const [formParentName, setFormParentName] = useState("");
@@ -140,11 +140,6 @@ export default function RenewalsPage() {
   const [formNotes, setFormNotes] = useState("");
   const [familyFormError, setFamilyFormError] = useState("");
 
-  // New Period form fields
-  const [periodName, setPeriodName] = useState("");
-  const [periodTarget, setPeriodTarget] = useState("Adventure 2");
-  const [periodPrev, setPeriodPrev] = useState("Adventure 1");
-  const [periodReset, setPeriodReset] = useState(false);
 
   // Email Sending Modal state
   const [emailModalFamily, setEmailModalFamily] = useState<Family | null>(null);
@@ -177,7 +172,7 @@ export default function RenewalsPage() {
       const [pRes, rRes, fRes] = await Promise.all([
         adminFetch("/api/renewals/periods"),
         adminFetch(`/api/renewals?period=${selectedPeriod}`),
-        adminFetch(`/api/renewals/families?period=${selectedPeriod}`),
+        adminFetch("/api/renewals/families"),
       ]);
       const [pData, rData, fData] = await Promise.all([pRes.json(), rRes.json(), fRes.json()]);
       return { pData, rData, fData };
@@ -187,7 +182,16 @@ export default function RenewalsPage() {
       revalidateOnFocus: false,
       shouldRetryOnError: false,
       onSuccess: ({ pData, rData, fData }) => {
-        if (pData?.success) setPeriods(pData.data);
+        if (pData?.success) {
+          const availablePeriods = pData.data || [];
+          setPeriods(availablePeriods);
+          if (!periodSelectionInitialized.current) {
+            periodSelectionInitialized.current = true;
+            const currentIsAvailable = availablePeriods.some((period: any) => period.slug === selectedPeriod);
+            const activePeriod = availablePeriods.find((period: any) => period.isActive);
+            setSelectedPeriod(activePeriod?.slug || (currentIsAvailable ? selectedPeriod : availablePeriods[0]?.slug || "adventure-1-renewal"));
+          }
+        }
         if (rData?.success) {
           setRenewalRecords(rData.data.records);
           setStats(rData.data.stats);
@@ -708,37 +712,6 @@ export default function RenewalsPage() {
     XLSX.writeFile(wb, `MerryExplorers_Renewals_${selectedPeriod}.xlsx`);
   };
 
-  // Create New Period Submit
-  const handleCreatePeriod = async () => {
-    if (!periodName.trim()) {
-      showModalNotice("Required Field", "Please specify a name for the new renewal period.", "error");
-      return;
-    }
-    try {
-      const res = await adminFetch("/api/renewals/periods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: periodName,
-          targetProgram: periodTarget,
-          previousProgram: periodPrev,
-          resetStatuses: periodReset,
-        }),
-      });
-      const d = await res.json();
-      if (d.success) {
-        setNewPeriodModal(false);
-        setPeriodName("");
-        fetchData();
-        showModalNotice("Renewal Period Created", `"${periodName}" has been established as an active renewal cycle!`, "success");
-      } else {
-        showModalNotice("Error", d.error || "Failed to create period", "error");
-      }
-    } catch {
-      showModalNotice("Error", "Network error occurred.", "error");
-    }
-  };
-
   // ── Bulk email helpers ─────────────────────────────────────────────────
   // A record counts as "unpaid" if it hasn't met its downpayment.
   // NOTE: the API returns "—" (truthy!) when an email is missing, so check for it.
@@ -920,20 +893,34 @@ export default function RenewalsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-2xl bg-slate-50 border border-slate-200 px-3.5 py-2">
-              <span className="text-[12px] font-bold text-[#64748b]">Period:</span>
+            <div className="flex flex-col gap-1 rounded-2xl bg-slate-50 border border-slate-200 px-3.5 py-2">
+              <label htmlFor="renewal-cycle-filter" className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                View submissions for
+              </label>
               <select
+                id="renewal-cycle-filter"
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="bg-transparent text-[13px] font-bold text-[#002f76] focus:outline-none cursor-pointer"
+                aria-describedby="renewal-cycle-help"
+                className="max-w-[220px] bg-transparent text-[13px] font-bold text-[#002f76] focus:outline-none cursor-pointer"
               >
-                {periods.map((p) => (
+                {(periods.length ? periods : [{ slug: "adventure-1-renewal", name: "Adventure 1 Renewal" }]).map((p) => (
                   <option key={p.slug} value={p.slug}>
-                    {p.name}
+                    {p.name}{p.isActive ? " · Current" : ""}
                   </option>
                 ))}
               </select>
+              <span id="renewal-cycle-help" className="text-[10px] text-slate-500">
+                Filters submitted registrations by target adventure.
+              </span>
             </div>
+
+            <Link
+              href="/admin/programs#renewal-periods"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-[12.5px] font-bold text-[#0033A0] shadow-sm transition-colors hover:bg-blue-100"
+            >
+              ⚙️ Manage cycles
+            </Link>
 
             <Link
               href="/admin/renewals/email-preview"
@@ -942,12 +929,6 @@ export default function RenewalsPage() {
               <span>📧</span> Email Previews
             </Link>
 
-            <button
-              onClick={() => setNewPeriodModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-2xl bg-[#0033A0] px-4 py-2.5 text-[12.5px] font-bold text-white shadow-sm hover:bg-[#002f76] transition-colors"
-            >
-              <span>+</span> Start New Period
-            </button>
           </div>
         </div>
 
@@ -1371,6 +1352,9 @@ export default function RenewalsPage() {
         {/* ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "families" && (
           <div className="space-y-4">
+            <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[12px] text-blue-900">
+              This is the shared family contact directory. The cycle selector filters submitted renewals; family records remain available across cycles.
+            </p>
             {/* Hidden file input */}
             <input
               type="file"
@@ -1851,87 +1835,11 @@ export default function RenewalsPage() {
           </div>
         )}
 
-        {/* ── MODAL: START NEW RENEWAL PERIOD ── */}
-        {newPeriodModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-headline text-[17px] font-extrabold text-[#002f76]">
-                  Start New Renewal Period
-                </h3>
-                <button
-                  onClick={() => setNewPeriodModal(false)}
-                  className="text-slate-400 hover:text-slate-600 font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <p className="text-[12.5px] text-[#64748b]">
-                Create a new period to keep historical data intact while starting fresh notifications.
-              </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Period Name *</label>
-                  <input
-                    type="text"
-                    value={periodName}
-                    onChange={(e) => setPeriodName(e.target.value)}
-                    placeholder="e.g. Adventure 2 Renewal"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Target Program</label>
-                  <input
-                    type="text"
-                    value={periodTarget}
-                    onChange={(e) => setPeriodTarget(e.target.value)}
-                    placeholder="e.g. Adventure 2"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px]"
-                  />
-                </div>
-
-                <label className="flex items-start gap-2.5 cursor-pointer pt-1">
-                  <input
-                    type="checkbox"
-                    checked={periodReset}
-                    onChange={(e) => setPeriodReset(e.target.checked)}
-                    className="mt-0.5 rounded text-[#0033A0]"
-                  />
-                  <span className="text-[12px] text-slate-700 leading-snug">
-                    Reset existing families&apos; status to &quot;Not yet submitted&quot; for this new period (reusable contact list).
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setNewPeriodModal(false)}
-                  className="rounded-xl px-4 py-2 text-[12.5px] font-bold text-slate-500 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreatePeriod}
-                  className="rounded-xl bg-[#0033A0] hover:bg-[#002f76] text-white px-5 py-2 text-[12.5px] font-bold shadow-sm transition-colors"
-                >
-                  Create Period
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ── MODAL: SEND EMAIL TO FAMILY (Triggered by clicking row) ── */}
         {emailModalFamily && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-xl rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="relative z-10 flex w-full sm:max-w-xl max-h-[94dvh] sm:max-h-[90vh] flex-col overflow-hidden rounded-t-[2rem] rounded-b-none sm:rounded-3xl bg-white shadow-[0_-8px_40px_rgba(0,0,0,0.15)] sm:shadow-2xl border-t border-slate-100 sm:border">
+              <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-4 sm:px-7 py-4 sm:py-5">
                 <div className="flex items-center gap-2.5">
                   <span className="text-2xl">✉️</span>
                   <div>
@@ -1952,7 +1860,7 @@ export default function RenewalsPage() {
               </div>
 
               {/* Email Type Selection */}
-              <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+              <div className="shrink-0 flex gap-2 p-1 mx-4 sm:mx-7 bg-slate-100 rounded-2xl">
                 <button
                   type="button"
                   onClick={() => {
@@ -1995,6 +1903,7 @@ export default function RenewalsPage() {
               </div>
 
               {/* Email Content Preview */}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-7 py-4 space-y-4">
               {emailType === "payment_reminder" ? (
                 (() => {
                   const modalMatchingRecord = emailModalFamily
@@ -2129,10 +2038,11 @@ export default function RenewalsPage() {
                   </div>
                 </div>
               )}
+              </div>
 
               {/* Status Note */}
               {emailModalFamily.lastEmailSent && (
-                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11.5px] text-emerald-800">
+                <div className="shrink-0 flex items-center gap-2 mx-4 sm:mx-7 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11.5px] text-emerald-800">
                   <span>✓</span>
                   <span>
                     Previously sent: <strong>{emailModalFamily.lastEmailSent}</strong> on{" "}
@@ -2141,7 +2051,7 @@ export default function RenewalsPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="shrink-0 flex items-center justify-end gap-2 px-4 sm:px-7 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-5 border-t border-slate-100 bg-white">
                 <button
                   type="button"
                   onClick={() => setEmailModalFamily(null)}
