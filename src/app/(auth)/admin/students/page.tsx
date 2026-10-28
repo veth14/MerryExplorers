@@ -368,7 +368,7 @@ function NextAdventureCell({
           fontSize: "11px", fontWeight: "900", color: meta?.color || "#334155",
           lineHeight: 1.2,
         }}>
-          Adv {student.adventureNumber || 2} · {meta?.label || student.programName}
+          Adv {student.adventureNumber ?? student.upcomingAdventureNumber ?? 2} · {meta?.label || student.programName}
         </span>
       </div>
 
@@ -382,9 +382,9 @@ function NextAdventureCell({
             🕒 {student.classTime}
           </div>
         )}
-        {student.adventureStartDate && (
+        {(student.upcomingAdventureStartDate || student.adventureStartDate) && (
           <div style={{ fontSize: "10px", color: "#15803d", fontWeight: "700" }}>
-            Starts {formatRegistrationDate(student.adventureStartDate)}
+            Starts {formatRegistrationDate((student.upcomingAdventureStartDate || student.adventureStartDate) ?? undefined)}
           </div>
         )}
         <div style={{ fontSize: "9.5px", color: "#94a3b8" }}>
@@ -538,7 +538,7 @@ export default function AdminStudentsPage() {
     setStudents((prev) =>
       prev.map((s) => (s.id === updatedStudent.id ? { ...s, ...updatedStudent } : s))
     );
-    showToast(`Updated ${updatedStudent.childInfo?.firstName}'s information successfully.`);
+    showToast(`Updated ${updatedStudent.childInfo?.firstName}'s information and synced family contact details.`);
     loadData();
   };
 
@@ -575,6 +575,10 @@ export default function AdminStudentsPage() {
       const adv1 = sorted.find((r) => r !== adv2 && (r.adventureNumber === 1 || r.period?.includes("adventure-1") || (!r.adventureNumber && !r.period?.includes("adventure-2"))));
       const isNonAdv = sorted.some((r) => ["saturday-playdate", "ballet"].includes(r.program));
 
+      // Adventure 2 is considered "active" (current) when the program timeline confirms it has started.
+      // adv2.activeAdventureNumber comes from the API's getAdventureCycleTimeline() and reflects today's date.
+      const adv2IsNowActive = adv2 && (adv2 as any).activeAdventureNumber === 2;
+
       let currentAdventure: Student | undefined;
       let upcomingAdventure: Student | undefined;
       let previousAdventure: Student | undefined;
@@ -584,16 +588,49 @@ export default function AdminStudentsPage() {
         upcomingAdventure = undefined;
         previousAdventure = sorted.length > 1 ? sorted[1] : undefined;
       } else if (adv1 && adv2) {
-        currentAdventure = adv1;
-        upcomingAdventure = adv2;
-        previousAdventure = undefined;
+        if (adv2IsNowActive) {
+          // Adventure 2 has started — flip: adv2 is current, adv1 is previous
+          currentAdventure = adv2;
+          upcomingAdventure = undefined;
+          previousAdventure = adv1;
+        } else {
+          // Adventure 2 hasn't started yet — adv1 is current, adv2 is upcoming
+          currentAdventure = adv1;
+          upcomingAdventure = adv2;
+          previousAdventure = undefined;
+        }
       } else if (adv2 && !adv1) {
-        // Check if student is an ongoing/continuing explorer from Adventure 1 (e.g. from renewal_families, pioneer cohort, or detected previous adventure)
+        // Check if student is an ongoing/continuing explorer from Adventure 1
         const prevProg = (adv2 as any).previousProgram || (latest as any).previousProgram || (adv2 as any).previousProgramName;
         const prevAdvNum = (adv2 as any).previousAdventureNumber || (latest as any).previousAdventureNumber || (adv2 as any).detectedPreviousAdventure;
         const isContinuing = Boolean(prevProg || prevAdvNum === 1 || adv2.isPioneer || (adv2 as any).selfDeclaredPreviousAdventure);
 
-        if (isContinuing) {
+        if (adv2IsNowActive) {
+          // Adventure 2 has started — show it as current
+          currentAdventure = adv2;
+          upcomingAdventure = undefined;
+          if (isContinuing) {
+            // Synthesize a previous Adv 1 stub so history is visible
+            const progSlug = prevProg
+              ? (prevProg.toLowerCase().includes("everyday") ? "everyday-curious" : prevProg.toLowerCase().includes("creative") ? "creative-explorer" : prevProg.toLowerCase().includes("brave") ? "brave-explorer" : "curious-explorer")
+              : adv2.program;
+            previousAdventure = {
+              ...adv2,
+              id: `${adv2.id}_adv1`,
+              adventureNumber: 1,
+              program: progSlug,
+              programName: prevProg || adv2.programName || "Adventure 1",
+              classTime: "Completed Adventure 1",
+              enrolledAt: adv2.enrolledAt,
+              status: "approved",
+              adventureStartDate: null,
+              upcomingAdventureStartDate: null,
+            };
+          } else {
+            previousAdventure = undefined;
+          }
+        } else if (isContinuing) {
+          // Adventure 2 hasn't started yet — synthesize current Adv 1 stub, show adv2 as upcoming
           const progSlug = prevProg
             ? (prevProg.toLowerCase().includes("everyday") ? "everyday-curious" : prevProg.toLowerCase().includes("creative") ? "creative-explorer" : prevProg.toLowerCase().includes("brave") ? "brave-explorer" : "curious-explorer")
             : adv2.program;
@@ -606,21 +643,32 @@ export default function AdminStudentsPage() {
             classTime: "Completed Adventure 1",
             enrolledAt: adv2.enrolledAt,
             status: "approved",
+            // Do NOT inherit Adv 2's start dates — the fake Adv 1 has no start date of its own
+            adventureStartDate: null,
+            upcomingAdventureStartDate: null,
           };
           upcomingAdventure = adv2;
           previousAdventure = undefined;
         } else {
-          // Brand new student registered only for Adventure 2:
-          // Do NOT input anything into Current Adventure! Leave it empty!
+          // Brand new student registered only for Adventure 2 (not yet started)
           currentAdventure = undefined;
           upcomingAdventure = adv2;
           previousAdventure = undefined;
         }
       } else {
-        // Enrolled in Adventure 1, has not registered for Adventure 2 yet
-        currentAdventure = adv1;
-        upcomingAdventure = undefined;
-        previousAdventure = undefined;
+        // Enrolled in Adventure 1 only — no Adv 2 registration yet.
+        // If Adventure 2 has already started, Adv 1 is now in the past.
+        // Show current adventure as blank (not enrolled) rather than a stale Adv 1 badge.
+        const adv1IsNowPast = adv1 && (adv1 as any).activeAdventureNumber > (adv1.adventureNumber ?? 1);
+        if (adv1IsNowPast) {
+          currentAdventure = undefined;
+          upcomingAdventure = undefined;
+          previousAdventure = adv1;
+        } else {
+          currentAdventure = adv1;
+          upcomingAdventure = undefined;
+          previousAdventure = undefined;
+        }
       }
 
       const activeStatus = sorted.some((r) => ["active", "approved"].includes(r.status))
@@ -1841,7 +1889,13 @@ export default function AdminStudentsPage() {
                     <div>
                       <CurrentAdventureCell
                         student={group.currentAdventure}
-                        startDate={group.currentAdventure?.adventureStartDate}
+                        startDate={
+                          // Only show a start date for real (non-synthesized) records.
+                          // Synthesized "Completed Adventure 1" stubs have no meaningful start date.
+                          group.currentAdventure?.classTime === "Completed Adventure 1"
+                            ? undefined
+                            : group.currentAdventure?.adventureStartDate
+                        }
                       />
                     </div>
 
@@ -2052,7 +2106,11 @@ export default function AdminStudentsPage() {
                     <div>
                       <CurrentAdventureCell
                         student={group.currentAdventure}
-                        startDate={group.currentAdventure?.adventureStartDate}
+                        startDate={
+                          group.currentAdventure?.classTime === "Completed Adventure 1"
+                            ? undefined
+                            : group.currentAdventure?.adventureStartDate
+                        }
                       />
                     </div>
 

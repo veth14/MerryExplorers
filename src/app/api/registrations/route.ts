@@ -44,6 +44,7 @@ export async function GET(request: Request) {
             adventureNumber: 1, period: 1, adventureStartDate: 1,
             parentInfo: 1, childInfo: 1, emergencyContact: 1,
             paymentMethod: 1, paymentType: 1, amountDue: 1, amountPaid: 1,
+            balancePayments: 1,
             creditBalance: 1, previousAdventureBalance: 1, referenceNumber: 1,
             receiptUrl: 1, signatureUrl: 1, photoConsent: 1,
             uniformOrdered: 1, welcomeKitOrdered: 1, isPioneer: 1,
@@ -141,8 +142,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ success: true, data: formatted }, {
       headers: {
-        // private = browser-only cache, safe for authenticated responses (no CDN sharing)
-        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        // Payment ledger changes need to appear immediately after an encode/reload.
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error: any) {
@@ -238,12 +239,21 @@ export async function POST(request: Request) {
       currentAdventure?: number;
       adventureStartDate?: string | null;
       nextAdventureStart?: string | null;
+      registrationOpen?: boolean;
+      registrationAutoCloseDays?: number | null;
     }>;
     const adventureSetting = getProgramAdventureSetting(program, adventureSettings);
     const adventureNumber = adventureSetting ? getTargetRegistrationAdventureNumber(program, adventureSettings) : null;
     const adventureStartDate = adventureSetting
       ? getRegistrationAdventureStartDate(program, adventureSettings)
       : null;
+    const autoCloseDays = Number(adventureSetting?.registrationAutoCloseDays ?? 7);
+    if (!isRenewal && adventureSetting?.registrationOpen !== false && adventureStartDate && autoCloseDays > 0) {
+      const closesAt = new Date(`${adventureStartDate.slice(0, 10)}T00:00:00+08:00`).getTime() + autoCloseDays * 86400000;
+      if (Date.now() >= closesAt) {
+        return NextResponse.json({ error: `Registration for Adventure ${adventureNumber} has closed.` }, { status: 409 });
+      }
+    }
     const cycleQuery: Record<string, unknown>[] = adventureNumber === null
       ? []
       : getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);

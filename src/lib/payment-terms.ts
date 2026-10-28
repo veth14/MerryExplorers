@@ -11,6 +11,7 @@ import { getNthSessionDate } from "@/lib/sessions";
 export const RESERVATION_RATE = 0.6;
 export const WEEKLY_INTEREST_RATE = 0.04;
 export const BALANCE_DUE_SESSION = 6;
+export const LEGACY_ADVENTURE_1_START = "2026-09-28";
 export const FALLBACK_PIONEER_RATES: Record<string, number> = {
     "creative-explorer": 4820,
     "curious-explorer": 4295,
@@ -232,7 +233,18 @@ export function getRegistrationAdventureStart(
     if (ownStart) return ownStart;
     if (adventureNumber === currentNumber) return currentStart;
     if (adventureNumber === currentNumber + 1) return nextStart ?? addMonths(currentStart, 5);
-    if (adventureNumber < currentNumber) return addMonths(currentStart, -5);
+    if (adventureNumber < currentNumber) {
+        // Prefer the start date saved on the registration itself (written at approval time)
+        // over the backwards month estimate, which is only approximate.
+        const stored = registration?.adventureStartDate ? String(registration.adventureStartDate).slice(0, 10) : null;
+        if (stored) return stored;
+        // Adventure 1 actually began on Sep 28, 2026. When Adventure 2 began
+        // on Oct 26, the normal five-month estimate points to May 26 instead.
+        if (currentNumber === 2 && currentStart === "2026-10-26" && adventureNumber === 1) {
+            return LEGACY_ADVENTURE_1_START;
+        }
+        return addMonths(currentStart, -5);
+    }
     return undefined;
 }
 

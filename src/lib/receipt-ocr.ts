@@ -44,6 +44,23 @@ const cleanRef = (raw: string) => fixOcrDigits(raw.replace(/[\s\-]+/g, "").toUpp
 const validRef = (t: string) => t.length >= 8 && t.length <= 45 && (t.match(/\d/g) || []).length >= 6;
 
 export function parseReference(text: string): string {
+    // InstaPay receipts from some wallet apps use `BN-YYYYMMDD-########`.
+    // The generic labelled-reference parser needs at least 3 characters in
+    // its first token, so it misses the two-character `BN` prefix before `-`.
+    // Read this known shape first and normalize common OCR digit substitutions.
+    const bnMatch = text.match(/\b([B8]N[\s-]*[0-9OIL|]{8}[\s-]*[0-9OIL|]{8})\b/i);
+    if (bnMatch) {
+        const compact = bnMatch[1]
+            .replace(/[\s-]+/g, "")
+            .toUpperCase()
+            .replace(/^8N/, "BN")
+            .replace(/O/g, "0")
+            .replace(/[IL|]/g, "1");
+        if (/^BN\d{16}$/.test(compact)) {
+            return `BN-${compact.slice(2, 10)}-${compact.slice(10)}`;
+        }
+    }
+
     // 0) Specific known shapes that might be multi-line (e.g. PNB InstaPay MBS format wrapped across lines)
     const mbsMatch = text.match(/\b(MB[S58][0-9OIL]{8}[A-Z]{8,12}(?:[\s\r\n]*[0-9OIL|]{3,22})+)/i);
     if (mbsMatch) {

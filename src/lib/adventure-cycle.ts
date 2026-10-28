@@ -4,7 +4,9 @@ export type AdventureProgramSetting = {
   adventureStartDate?: string | null;
   nextAdventureStart?: string | null;
   registrationOpen?: boolean;
+  registrationAutoCloseDays?: number | null;
   closedClasses?: string[];
+  [key: string]: any;
 };
 
 export type AdventureCycleTimeline = {
@@ -24,7 +26,15 @@ const PROGRAM_KEYS: Record<string, string> = {
   "saturday-playdate": "Saturday Playdate",
 };
 
-export const LEGACY_ADVENTURE_2_START = "2026-10-12";
+export const LEGACY_ADVENTURE_2_START = "2026-10-26";
+export const LEGACY_ADVENTURE_2_REGISTRATION_OPEN = "2026-10-12";
+const LEGACY_ADVENTURE_1_START = "2026-09-28";
+
+function dateBefore(iso: string, days: number) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
 
 function manilaDate(value = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -54,21 +64,29 @@ export function getAdventureCycleRegistrationQuery(
   adventureNumber: number,
   adventureStartDate: string | null
 ) {
+  // Renewals open 14 days before an Adventure starts. Include registrations
+  // made during that window, but keep earlier Adventure 1 records out of Adv 2.
+  const registrationOpenDate = adventureStartDate
+    ? dateBefore(adventureStartDate, 14)
+    : adventureNumber === 2 ? LEGACY_ADVENTURE_2_REGISTRATION_OPEN : null;
+  const minimumRegistrationDate = adventureNumber > 1
+    ? registrationOpenDate || adventureStartDate
+    : adventureStartDate;
+  const submittedAtFilter = minimumRegistrationDate
+    ? { submittedAt: { $gte: new Date(`${minimumRegistrationDate}T00:00:00+08:00`) } }
+    : {};
+
   return [
     {
       adventureNumber,
-      ...(adventureNumber === 2
-        ? { submittedAt: { $gte: new Date(`${LEGACY_ADVENTURE_2_START}T00:00:00+08:00`) } }
-        : {}),
+      ...submittedAtFilter,
     },
     {
       period: `adventure-${adventureNumber}`,
-      ...(adventureNumber === 2
-        ? { submittedAt: { $gte: new Date(`${LEGACY_ADVENTURE_2_START}T00:00:00+08:00`) } }
-        : {}),
+      ...submittedAtFilter,
     },
     ...(adventureStartDate
-      ? [{ adventureNumber: { $exists: false }, submittedAt: { $gte: new Date(`${adventureStartDate}T00:00:00+08:00`) } }]
+      ? [{ adventureNumber: { $exists: false }, ...submittedAtFilter }]
       : []),
   ];
 }
@@ -111,10 +129,9 @@ export function getCurrentAdventureStartDate(
 }
 
 /**
- * The registration form can open for the upcoming adventure before its start
- * date. In that window, new reservations belong to the upcoming cycle, even
- * though the admin setting still identifies the in-session adventure as
- * current.
+ * The upcoming registration window opens 14 days before the adventure start.
+ * Registrations made in that window belong to the upcoming cycle while the
+ * admin setting still identifies the in-session adventure as current.
  */
 export function getTargetRegistrationAdventureNumber(
   program: string,
@@ -125,8 +142,10 @@ export function getTargetRegistrationAdventureNumber(
   const programSetting = getProgramAdventureSetting(program, settings);
   const master = settings.find((entry) => entry.programKey === "Discovery Club: Curious Explorer");
   const upcomingStart = datePart(programSetting?.nextAdventureStart) || datePart(master?.nextAdventureStart);
+  const today = manilaDate(now);
+  const registrationOpenDate = upcomingStart ? dateBefore(upcomingStart, 14) : null;
 
-  return upcomingStart && manilaDate(now) < upcomingStart
+  return upcomingStart && registrationOpenDate && today >= registrationOpenDate && today < upcomingStart
     ? currentNumber + 1
     : currentNumber;
 }
@@ -213,26 +232,34 @@ export function getRegistrationAdventureNumber(
 ) {
   const savedNumber = Number(registration.adventureNumber);
   const submittedDate = datePart(registration.submittedAt);
+  const currentNumber = getCurrentAdventureNumber(program, settings, now);
+  const isLegacyAdventure2Window = Boolean(
+    submittedDate && submittedDate >= LEGACY_ADVENTURE_1_START && submittedDate < LEGACY_ADVENTURE_2_START
+  );
 
-  // If a registration was submitted on or after Oct 12, 2026, it belongs to Adventure 2 (or upcoming target cycle),
-  // not Adventure 1, even if an earlier bug erroneously saved adventureNumber: 1 or period: 'adventure-1'.
-  if (savedNumber === 1 && submittedDate && submittedDate >= LEGACY_ADVENTURE_2_START) {
-    return getTargetRegistrationAdventureNumber(program, settings, registration.submittedAt ? new Date(registration.submittedAt) : now);
+  const registrationOpenDate = LEGACY_ADVENTURE_2_REGISTRATION_OPEN;
+
+  // Adventure 2 registration opened two weeks before its start. Correct old
+  // records on either side of that registration-window boundary.
+  if (isLegacyAdventure2Window && savedNumber === 1 && submittedDate && submittedDate >= registrationOpenDate) {
+    return 2;
+  }
+  // Records before the opening date are Adventure 1 even if an earlier bug
+  // tagged them as Adventure 2.
+  if (isLegacyAdventure2Window && savedNumber === 2 && submittedDate && submittedDate < registrationOpenDate) {
+    return 1;
   }
   if (Number.isInteger(savedNumber) && savedNumber > 0) return savedNumber;
 
-  const currentNumber = getCurrentAdventureNumber(program, settings, now);
   const currentStart = getCurrentAdventureStartDate(program, settings, now);
   const periodMatch = registration.period?.match(/adventure\s*[-_]?\s*(\d+)/i);
   if (periodMatch) {
     const periodNumber = Number(periodMatch[1]);
-    // Earlier code labeled every registration Adventure 2. Oct 12 is the old
-    // cycle boundary; preserve registrations made before it as Adventure 1.
-    if (periodNumber === 2 && currentNumber === 2 && submittedDate && submittedDate < LEGACY_ADVENTURE_2_START) {
+    if (periodNumber === 2 && isLegacyAdventure2Window && currentNumber === 2 && submittedDate && submittedDate < registrationOpenDate) {
       return 1;
     }
-    if (periodNumber === 1 && submittedDate && submittedDate >= LEGACY_ADVENTURE_2_START) {
-      return getTargetRegistrationAdventureNumber(program, settings, registration.submittedAt ? new Date(registration.submittedAt) : now);
+    if (periodNumber === 1 && isLegacyAdventure2Window && submittedDate && submittedDate >= registrationOpenDate) {
+      return 2;
     }
     return periodNumber;
   }

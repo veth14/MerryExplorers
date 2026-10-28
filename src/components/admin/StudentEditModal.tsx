@@ -161,6 +161,7 @@ export function StudentEditModal({ isOpen, onClose, student, onSaveSuccess }: St
       onSaveSuccess({
         ...student,
         ...payload,
+        linkedRecordsUpdated: data.linkedRecordsUpdated || 0,
       });
       onClose();
     } catch (err: any) {
@@ -431,6 +432,9 @@ export function StudentEditModal({ isOpen, onClose, student, onSaveSuccess }: St
           {/* TAB 2: PARENT & EMERGENCY */}
           {activeTab === "parent" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div style={{ borderRadius: "12px", background: "#eff6ff", border: "1px solid #bfdbfe", padding: "12px 14px", color: "#1e40af", fontSize: "12px", lineHeight: 1.5 }}>
+                Parent contact details are shared with this family. Saving updates matching student and registration records, renewal and pioneer family listings, and the parent account together.
+              </div>
               {/* Primary Parent / Guardian */}
               <div>
                 <div style={{ fontSize: "14px", fontWeight: "800", color: "#002f76", marginBottom: "12px" }}>

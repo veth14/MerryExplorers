@@ -15,6 +15,10 @@ function normalizeIdentity(value?: string) {
     .toLowerCase();
 }
 
+function exactEmailRegex(value: string) {
+  return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+}
+
 // GET /api/students — Admin only: Fetches all students & aggregated parents across all programs
 export async function GET(request: Request) {
   const t0 = Date.now();
@@ -70,15 +74,16 @@ export async function GET(request: Request) {
       const parentAcc = s.parentInfo?.email ? parentAccountMap.get(s.parentInfo.email.toLowerCase().trim()) : null;
       const registration = s.registrationId ? registrationMap.get(s.registrationId) : null;
       
-      const adventureNumber = s.adventureNumber ?? registration?.adventureNumber ?? (
-        getProgramAdventureSetting(s.program, adventureSettings)
-          ? getRegistrationAdventureNumber({
-              adventureNumber: registration?.adventureNumber,
-              period: registration?.period,
-              submittedAt: registration?.submittedAt || s.enrolledAt,
-            }, s.program, adventureSettings)
-          : null
-      );
+      // Always run getRegistrationAdventureNumber so it can correct stale DB values
+      // (e.g. adventureNumber: 2 saved by the old Oct-12 bug for pre-Oct-26 submissions).
+      const rawAdvNum = s.adventureNumber ?? registration?.adventureNumber;
+      const adventureNumber = getProgramAdventureSetting(s.program, adventureSettings)
+        ? getRegistrationAdventureNumber({
+            adventureNumber: rawAdvNum,
+            period: registration?.period ?? s.period,
+            submittedAt: registration?.submittedAt || s.enrolledAt,
+          }, s.program, adventureSettings)
+        : rawAdvNum ?? null;
       
       const timeline = getProgramAdventureSetting(s.program, adventureSettings)
         ? getAdventureCycleTimeline(s.program, adventureSettings)
@@ -127,8 +132,14 @@ export async function GET(request: Request) {
     // 5. Also bring in any registrations from student_registrations that aren't yet in students collection
     // (e.g. Everyday Explorer, Ballet, Saturday Playdate, or reserved/pending registrations)
     for (const r of allRegistrations) {
-      // Build a per-adventure key so that Adv 2 registrations are NOT suppressed when Adv 1 is already present
-      const regAdventureNumber = r.adventureNumber ?? null;
+      // Always derive the corrected adventure number (fixes stale adventureNumber: 2 DB values)
+      const regAdventureNumber = getProgramAdventureSetting(r.program, adventureSettings)
+        ? getRegistrationAdventureNumber({
+            adventureNumber: r.adventureNumber,
+            period: r.period,
+            submittedAt: r.submittedAt,
+          }, r.program, adventureSettings)
+        : r.adventureNumber ?? null;
       const childKeyForReg = `${normalizeIdentity(r.childInfo?.firstName)} ${normalizeIdentity(r.childInfo?.lastName)}|${normalizeIdentity(r.parentInfo?.email)}|adv${regAdventureNumber ?? 0}`;
       const alreadyIncluded = studentKeys.has(childKeyForReg) || formattedStudents.some((s: any) => s.registrationId === r._id.toString());
 
@@ -151,13 +162,18 @@ export async function GET(request: Request) {
           programName: r.programName || r.program,
           classTime: r.classTime || "",
           schedule: r.schedule || "",
-          // Derive adventure number from period field if not explicitly set
-          // e.g. period:'adventure-2' → 2, so we don't accidentally treat it as Adv 1
-          adventureNumber: r.adventureNumber ?? (
-            r.period?.includes('adventure-2') ? 2 :
-            r.period?.includes('adventure-1') ? 1 :
-            null
-          ),
+          // Always run the corrector so stale adventureNumber: 2 (from the old Oct-12 bug) is fixed
+          adventureNumber: getProgramAdventureSetting(r.program, adventureSettings)
+            ? getRegistrationAdventureNumber({
+                adventureNumber: r.adventureNumber,
+                period: r.period,
+                submittedAt: r.submittedAt,
+              }, r.program, adventureSettings)
+            : (r.adventureNumber ?? (
+                r.period?.includes('adventure-2') ? 2 :
+                r.period?.includes('adventure-1') ? 1 :
+                null
+              )),
           adventureStartDate: r.adventureStartDate ?? null,
           activeAdventureNumber: timeline?.activeAdventureNumber ?? null,
           upcomingAdventureNumber: timeline?.upcomingAdventureNumber ?? null,
@@ -309,9 +325,39 @@ export async function PUT(request: Request) {
       studentDoc = await db.collection("students").findOne({ registrationId: id });
     }
 
+    // Capture the old family address before changing the selected record. It is
+    // the stable link that lets this editor update siblings and family lists too.
+    const selectedRegistration = studentDoc?.registrationId && ObjectId.isValid(studentDoc.registrationId)
+      ? await db.collection("student_registrations").findOne({ _id: new ObjectId(studentDoc.registrationId) })
+      : (!studentDoc && ObjectId.isValid(id)
+        ? await db.collection("student_registrations").findOne({ _id: new ObjectId(id) })
+        : null);
+    const oldFamilyEmail = String(studentDoc?.parentInfo?.email || selectedRegistration?.parentInfo?.email || "").trim().toLowerCase();
+    const cleanParentInfo = parentInfo ? {
+      name: String(parentInfo.name || "").trim(),
+      email: String(parentInfo.email || "").trim().toLowerCase(),
+      phone: String(parentInfo.phone || "").trim(),
+      relationship: String(parentInfo.relationship || "Parent").trim(),
+      address: String(parentInfo.address || "").trim(),
+    } : null;
+    if (cleanParentInfo?.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanParentInfo.email)) {
+      return NextResponse.json({ error: "Enter a valid parent email address." }, { status: 400 });
+    }
+    if (oldFamilyEmail && cleanParentInfo?.email && oldFamilyEmail !== cleanParentInfo.email) {
+      const [existingParentAccount, existingAccount] = await Promise.all([
+        db.collection("parent_accounts").findOne({ email: exactEmailRegex(cleanParentInfo.email) }),
+        db.collection("accounts").findOne({ email: exactEmailRegex(cleanParentInfo.email) }),
+      ]);
+      if (existingParentAccount || existingAccount) {
+        return NextResponse.json({ error: "That email is already used by another account. Update that family first or choose a different email." }, { status: 409 });
+      }
+    }
+
     const updateFields: any = {};
     if (childInfo) updateFields.childInfo = childInfo;
-    if (parentInfo) updateFields.parentInfo = parentInfo;
+    if (cleanParentInfo) {
+      for (const [key, value] of Object.entries(cleanParentInfo)) updateFields[`parentInfo.${key}`] = value;
+    }
     if (emergencyContact) updateFields.emergencyContact = emergencyContact;
     if (program !== undefined) updateFields.program = program;
     if (programName !== undefined) updateFields.programName = programName;
@@ -356,7 +402,7 @@ export async function PUT(request: Request) {
           schedule: schedule !== undefined ? schedule : regDoc.schedule || "",
           adventureNumber: adventureNumber !== undefined ? Number(adventureNumber) : regDoc.adventureNumber,
           childInfo: childInfo || regDoc.childInfo,
-          parentInfo: parentInfo || regDoc.parentInfo,
+          parentInfo: cleanParentInfo ? { ...(regDoc.parentInfo || {}), ...cleanParentInfo } : regDoc.parentInfo,
           emergencyContact: emergencyContact || regDoc.emergencyContact,
           enrolledAt: regDoc.submittedAt || new Date().toISOString(),
           status: status || "active",
@@ -368,34 +414,99 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Sync accounts collection if parent has an account
-    const emailToMatch = parentInfo?.email || studentDoc?.parentInfo?.email;
-    if (emailToMatch) {
-      const cleanEmail = emailToMatch.trim().toLowerCase();
-      const accountUpdate: any = {};
-      if (parentInfo?.name) accountUpdate.fullName = parentInfo.name;
-      if (parentInfo?.phone) accountUpdate.phone = parentInfo.phone;
-      if (parentInfo?.relationship) accountUpdate.relationship = parentInfo.relationship;
-      if (childInfo?.firstName) {
-        accountUpdate.childName = `${childInfo.firstName} ${childInfo.lastName || ""}`.trim();
-        accountUpdate.childrenNames = accountUpdate.childName;
-      }
-      if (Object.keys(accountUpdate).length > 0) {
-        await db.collection("parent_accounts").updateOne(
-          { email: cleanEmail },
-          { $set: accountUpdate }
+    // Family contact details are shared across every adventure and child.
+    // Keep child-specific and emergency fields limited to the selected record.
+    const familyEmail = oldFamilyEmail || cleanParentInfo?.email || "";
+    const familyEmailRegex = familyEmail ? exactEmailRegex(familyEmail) : null;
+    const familyContactSet: Record<string, any> = cleanParentInfo ? {
+      "parentInfo.name": cleanParentInfo.name,
+      "parentInfo.email": cleanParentInfo.email,
+      "parentInfo.phone": cleanParentInfo.phone,
+      "parentInfo.relationship": cleanParentInfo.relationship,
+      "parentInfo.address": cleanParentInfo.address,
+      updatedAt: new Date(),
+    } : {};
+    let linkedRecordsUpdated = 0;
+
+    if (familyEmailRegex && cleanParentInfo) {
+      const [siblingStudents, siblingRegistrations] = await Promise.all([
+        db.collection("students").updateMany({ "parentInfo.email": familyEmailRegex }, { $set: familyContactSet }),
+        db.collection("student_registrations").updateMany({ "parentInfo.email": familyEmailRegex }, { $set: familyContactSet }),
+      ]);
+      linkedRecordsUpdated += siblingStudents.modifiedCount + siblingRegistrations.modifiedCount;
+
+      const renewalPrimaryResult = await db.collection("renewal_families").updateMany(
+        { parentEmail: familyEmailRegex },
+        { $set: {
+          parentName: cleanParentInfo.name,
+          parentEmail: cleanParentInfo.email,
+          phone: cleanParentInfo.phone,
+          updatedAt: new Date(),
+        } }
+      );
+      const renewalSecondaryResult = await db.collection("renewal_families").updateMany(
+        { secondaryEmail: familyEmailRegex },
+        { $set: {
+          parentName: cleanParentInfo.name,
+          secondaryEmail: cleanParentInfo.email,
+          phone: cleanParentInfo.phone,
+          updatedAt: new Date(),
+        } }
+      );
+      linkedRecordsUpdated += renewalPrimaryResult.modifiedCount + renewalSecondaryResult.modifiedCount;
+
+      const pioneerPrimaryResult = await db.collection("pioneer_families").updateMany(
+        { email: familyEmailRegex },
+        { $set: {
+          parentName: cleanParentInfo.name,
+          email: cleanParentInfo.email,
+          phone: cleanParentInfo.phone,
+          updatedAt: new Date().toISOString(),
+        } }
+      );
+      const pioneerSecondaryResult = await db.collection("pioneer_families").updateMany(
+        { email2: familyEmailRegex },
+        { $set: {
+          parentName: cleanParentInfo.name,
+          email2: cleanParentInfo.email,
+          phone: cleanParentInfo.phone,
+          updatedAt: new Date().toISOString(),
+        } }
+      );
+      linkedRecordsUpdated += pioneerPrimaryResult.modifiedCount + pioneerSecondaryResult.modifiedCount;
+
+      // Update matching parent accounts by their old email, and move their
+      // login address too when it changes so the parent can still sign in.
+      for (const collectionName of ["parent_accounts", "accounts"]) {
+        const accountResult = await db.collection(collectionName).updateMany(
+          { email: familyEmailRegex },
+          { $set: {
+            ...(cleanParentInfo.email ? { email: cleanParentInfo.email } : {}),
+            fullName: cleanParentInfo.name,
+            phone: cleanParentInfo.phone,
+            relationship: cleanParentInfo.relationship,
+            address: cleanParentInfo.address,
+          } }
         );
-        await db.collection("accounts").updateOne(
-          { email: cleanEmail },
-          { $set: accountUpdate }
+        linkedRecordsUpdated += accountResult.modifiedCount;
+      }
+    }
+
+    // New manually added records may not have an old family email to match.
+    if (!familyEmailRegex && cleanParentInfo?.email) {
+      for (const collectionName of ["parent_accounts", "accounts"]) {
+        await db.collection(collectionName).updateMany(
+          { email: exactEmailRegex(cleanParentInfo.email) },
+          { $set: { fullName: cleanParentInfo.name, phone: cleanParentInfo.phone, relationship: cleanParentInfo.relationship, address: cleanParentInfo.address } }
         );
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Student information updated successfully",
+      message: "Student and family contact information updated successfully",
       id: studentIdStr,
+      linkedRecordsUpdated,
     });
   } catch (error: any) {
     console.error("[students PUT]", error);

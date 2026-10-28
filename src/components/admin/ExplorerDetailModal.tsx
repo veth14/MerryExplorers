@@ -55,6 +55,7 @@ interface ExplorerGroup {
   latestStudent: any;
   currentAdventure?: any;
   upcomingAdventure?: any;
+  previousAdventure?: any;
   hasAccount?: boolean;
   isPioneer?: boolean;
   status: string;
@@ -81,7 +82,7 @@ export function ExplorerDetailModal({
 
   if (!isOpen || !group) return null;
 
-  const { childInfo, parentInfo, emergencyContact, currentAdventure, upcomingAdventure } = group;
+  const { childInfo, parentInfo, emergencyContact, currentAdventure, upcomingAdventure, previousAdventure } = group;
   const student = group.latestStudent;
   const age = getAge(childInfo?.dateOfBirth);
   const hasAccount = !!(group.hasAccount || student?.hasAccount || group.registrations?.some((r: any) => r.hasAccount));
@@ -96,6 +97,7 @@ export function ExplorerDetailModal({
 
   const currentMeta = currentAdventure ? (PROGRAM_META[currentAdventure.program] || PROGRAM_META["curious-explorer"]) : null;
   const upcomingMeta = upcomingAdventure ? (PROGRAM_META[upcomingAdventure.program] || PROGRAM_META["curious-explorer"]) : null;
+  const previousMeta = previousAdventure ? (PROGRAM_META[previousAdventure.program] || PROGRAM_META["curious-explorer"]) : null;
 
   return (
     <>
@@ -399,7 +401,18 @@ export function ExplorerDetailModal({
                     </>
                   ) : (
                     <div style={{ padding: "14px 0", textAlign: "center", color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>
-                      No prior Adventure 1 cycle. Explorer registered directly for upcoming cycle.
+                      {previousAdventure ? (
+                        <div>
+                          <div style={{ fontWeight: "700", color: "#64748b", marginBottom: "3px" }}>
+                            Not Enrolled in Current Adventure
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+                            Explorer completed previous cycle (Adv {previousAdventure.adventureNumber ?? 1}).
+                          </div>
+                        </div>
+                      ) : (
+                        "No active enrollment in current adventure cycle."
+                      )}
                     </div>
                   )}
                 </div>
@@ -507,10 +520,61 @@ export function ExplorerDetailModal({
                     </>
                   ) : (
                     <div style={{ padding: "14px 0", textAlign: "center", color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>
-                      Not yet registered for Adventure 2.
+                      Not yet registered for upcoming cycle.
                     </div>
                   )}
                 </div>
+
+                {/* Previous Adventure (Completed) Card if present */}
+                {previousAdventure && (
+                  <div
+                    style={{
+                      border: "1.5px solid #e2e8f0",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      background: "#f8fafc",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>
+                        Previous Adventure (Completed)
+                      </span>
+                      <span
+                        style={{
+                          background: "#e2e8f0",
+                          color: "#475569",
+                          padding: "2px 8px",
+                          borderRadius: "10px",
+                          fontSize: "10px",
+                          fontWeight: "800",
+                        }}
+                      >
+                        ✓ Completed
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "18px" }}>{previousMeta?.emoji || "⭐"}</span>
+                      <div>
+                        <div style={{ fontWeight: "900", fontSize: "14px", color: "#475569" }}>
+                          Adv {previousAdventure.adventureNumber ?? 1} · {previousMeta?.label || previousAdventure.programName}
+                        </div>
+                        {previousAdventure.classTime && (
+                          <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "600" }}>
+                            🕒 {previousAdventure.classTime}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: "11px", color: "#94a3b8", paddingTop: "4px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+                      Enrolled: {formatDate(previousAdventure.enrolledAt)}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

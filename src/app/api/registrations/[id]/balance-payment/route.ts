@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
-import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
+import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
@@ -125,7 +125,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         // list after their initial registration still get the correct discounted rate.
         const parentEmail = String(reg.parentInfo?.email || "").trim().toLowerCase();
         const escapedEmail = parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const [parentAcc, pioneerFamily, pioneerSettings] = await Promise.all([
+        const [parentAcc, pioneerFamily, pioneerSettings, renewalSettings] = await Promise.all([
             parentEmail
                 ? db.collection("accounts").findOne({ email: { $regex: `^${escapedEmail}$`, $options: "i" } })
                 : Promise.resolve(null),
@@ -133,6 +133,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 ? db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail))
                 : Promise.resolve(null),
             db.collection("settings").findOne({ _key: "pioneer_settings_v1" }),
+            db.collection("settings").findOne({ _key: "renewal_settings_v2" }),
         ]);
         const isPioneer = Boolean(reg.isPioneer || pioneerFamily);
         const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[reg.program]) || FALLBACK_PIONEER_RATES[reg.program];
@@ -141,7 +142,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             isPioneer,
             ...(isPioneer && pioneerRate ? { customRate: pioneerRate } : {}),
         };
-        const student = getStudentSessionInfo(pricedReg, parentAcc);
+        // Match Payment Tracking's session calculation by anchoring enrollment
+        // to the registration's Adventure start date. Without it, old approvedAt
+        // dates can move the sixth-session due date and change interest by a week.
+        const adventureStart = getRegistrationAdventureStart(
+            renewalSettings?.programs || [],
+            reg,
+            getManilaTodayIso()
+        );
+        const student = getStudentSessionInfo(pricedReg, parentAcc, adventureStart);
         const paidVerified = isRegistrationVerified(reg.status) ? reg.amountPaid || reg.amountDue || 0 : 0;
         const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue);
 

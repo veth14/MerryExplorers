@@ -17,6 +17,7 @@ import {
   WEEKLY_INTEREST_RATE,
   BALANCE_DUE_SESSION,
   FALLBACK_PIONEER_RATES,
+  LEGACY_ADVENTURE_1_START,
 } from "@/lib/payment-terms";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
@@ -419,7 +420,16 @@ function buildTimeline(programs: any[], today: string): Timeline {
   const nEnd = addDaysIso(addMonthsIso(nStart, ADVENTURE_DURATION_MONTHS), -1);
   const past: PastAdv[] =
     curNum > 1
-      ? [{ label: `Adventure ${curNum - 1}`, start: addMonthsIso(curStart, -ADVENTURE_DURATION_MONTHS), end: addDaysIso(curStart, -1), num: curNum - 1 }]
+      ? [{
+          label: `Adventure ${curNum - 1}`,
+          // Adventure 1 began on Sep 28, 2026. A five-month estimate incorrectly
+          // displayed May 26 when Adventure 2 started on Oct 26.
+          start: curNum === 2 && curStart === "2026-10-26"
+            ? LEGACY_ADVENTURE_1_START
+            : addMonthsIso(curStart, -ADVENTURE_DURATION_MONTHS),
+          end: addDaysIso(curStart, -1),
+          num: curNum - 1,
+        }]
       : [];
 
   return {
@@ -492,10 +502,14 @@ const isRenewalReg = (r: any): boolean =>
 //   3. otherwise the date it was made vs. the "registrations open" date of each Adventure (new families)
 function regAdventureNum(r: any, ctx: RegCtx): number {
   const { tl } = ctx;
-  const explicit = Math.floor(Number(r?.adventure));
+  const explicit = Math.floor(Number(r?.adventure ?? r?.adventureNumber));
+  const day = regDay(r);
+
+  // Older records made before Adventure 2 registration opened were incorrectly
+  // stamped as Adventure 2. Keep those registrations in Adventure 1.
+  if (explicit === 2 && tl.curNum === 2 && day && tl.curOpen && day < tl.curOpen) return 1;
   if (Number.isFinite(explicit) && explicit >= 2) return explicit;
 
-  const day = regDay(r);
   let n = day ? advByOpenDate(tl, day) : tl.curNum;
   if (ctx.renewalIds.has(String(r?.id)) || isRenewalReg(r)) {
     const up = day ? firstUnstartedAdv(tl, day) : tl.nextStart ? tl.curNum + 1 : tl.curNum;
@@ -681,7 +695,7 @@ function AdminPaymentsPageInner() {
 
   // ── Manual encoding state ──
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualAdventureMode, setManualAdventureMode] = useState<"current" | "next">("current");
+  const [manualAdventureMode, setManualAdventureMode] = useState<"past" | "current" | "next">("current");
   const [form, setForm] = useState({ ...EMPTY_FORM, paidOn: todayIso() });
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptName, setReceiptName] = useState("");
@@ -900,6 +914,11 @@ function AdminPaymentsPageInner() {
 
     if (n === tl.curNum) return tl.curStart;
     if (n === tl.curNum + 1) return ADVENTURES.next.start;
+    // For past adventures, prefer the registration's own stored adventureStartDate
+    // (saved at approval time) over the backwards-estimated past[] start, which
+    // is only approximate (curStart minus ADVENTURE_DURATION_MONTHS).
+    const storedStart = r?.adventureStartDate ? String(r.adventureStartDate).slice(0, 10) : null;
+    if (storedStart) return storedStart;
     return ADVENTURES.past.find((p) => p.num === n)?.start;
   };
 
@@ -1076,29 +1095,49 @@ function AdminPaymentsPageInner() {
     if (currentPage > currentPageCount) setCurrentPage(currentPageCount);
   }, [currentPage, currentPageCount]);
 
-  // ── PAST tab: payments of Adventures that already ended, one block per Adventure ──
+  // ── PAST tab: payments and unpaid registrations of Adventures that already ended ──
   const pastGroups = useMemo(() => {
     const q = search.toLowerCase();
+    // The Past Adventures table lists each registration payment once. Balance
+    // payments remain available in the payment details modal's account ledger.
     const rows = pastItems.filter(({ acc, payment }) =>
-      !q ||
-      (acc.fullName || "").toLowerCase().includes(q) ||
-      (acc.email || "").toLowerCase().includes(q) ||
-      (acc.childName || "").toLowerCase().includes(q) ||
-      (acc.program || "").toLowerCase().includes(q) ||
-      (payment.referenceNumber || "").toLowerCase().includes(q)
+      !isBalanceRow(payment) && (
+        !q ||
+        (acc.fullName || "").toLowerCase().includes(q) ||
+        (acc.email || "").toLowerCase().includes(q) ||
+        (acc.childName || "").toLowerCase().includes(q) ||
+        (acc.program || "").toLowerCase().includes(q) ||
+        (payment.referenceNumber || "").toLowerCase().includes(q)
+      )
     );
     const map = new Map<number, PaymentItem[]>();
     rows.forEach((it) => {
       if (!map.has(it.advNum)) map.set(it.advNum, []);
       map.get(it.advNum)!.push(it);
     });
-    const out = Array.from(map.entries()).map(([num, items]) => ({
+    const unpaidRegistrations = allRegistrations.filter((r) => {
+      if (tabOfNum(advOf(r), tl.curNum) !== "past" || String(r.status || "").toLowerCase() === "expired") return false;
+      if (r.receiptUrl || r.receiptBase64 || Number(r.amountPaid) > 0) return false;
+      if (isExcluded(r.childInfo?.firstName, r.childInfo?.lastName, fullChildName(r))) return false;
+      if (!q) return true;
+      return `${fullChildName(r)} ${r.parentInfo?.name || ""} ${r.parentInfo?.email || ""} ${r.program || ""}`.toLowerCase().includes(q);
+    });
+    const unpaidByAdventure = new Map<number, any[]>();
+    unpaidRegistrations.forEach((r) => {
+      const num = advOf(r);
+      if (!unpaidByAdventure.has(num)) unpaidByAdventure.set(num, []);
+      unpaidByAdventure.get(num)!.push(r);
+    });
+
+    const adventureNumbers = new Set([...map.keys(), ...unpaidByAdventure.keys()]);
+    const out = Array.from(adventureNumbers).map((num) => ({
       num,
-      items: [...items].sort((a, b) => new Date(b.payment.submittedAt || 0).getTime() - new Date(a.payment.submittedAt || 0).getTime()),
+      items: [...(map.get(num) || [])].sort((a, b) => new Date(b.payment.submittedAt || 0).getTime() - new Date(a.payment.submittedAt || 0).getTime()),
+      unpaid: unpaidByAdventure.get(num) || [],
     }));
     out.sort((a, b) => b.num - a.num);
-    return { groups: out, count: rows.length };
-  }, [pastItems, search]);
+    return { groups: out, count: rows.length, unpaidCount: unpaidRegistrations.length };
+  }, [pastItems, allRegistrations, search, tl, regAdvMap]);
 
   // ── NEXT tab: every registration for the next Adventure (new OR existing family), paid or not ──
   // Source of truth: allRegistrations, assigned to this tab by the registration itself (regAdventureNum),
@@ -1404,7 +1443,8 @@ function AdminPaymentsPageInner() {
     lastOcrRef.current = null;
     paidOnTouched.current = false;
     methodTouched.current = false;
-    setManualAdventureMode(regAdventureNum(r, regCtx) === tl.curNum + 1 ? "next" : "current");
+    const adventureNum = regAdventureNum(r, regCtx);
+    setManualAdventureMode(adventureNum < tl.curNum ? "past" : adventureNum === tl.curNum + 1 ? "next" : "current");
     setManualOpen(true);
   }
 
@@ -1417,7 +1457,7 @@ function AdminPaymentsPageInner() {
 
   const registrationOptions = useMemo(() => {
     const q = parentFilter.toLowerCase();
-    const targetAdventure = tl.curNum + (manualAdventureMode === "next" ? 1 : 0);
+    const targetAdventure = tl.curNum + (manualAdventureMode === "next" ? 1 : manualAdventureMode === "past" ? -1 : 0);
     const matching = allRegistrations
       .filter((r) => {
         const name = `${r.childInfo?.firstName ?? ""} ${r.childInfo?.lastName ?? ""} ${r.parentInfo?.name ?? ""} ${r.parentInfo?.email ?? ""}`;
@@ -2140,6 +2180,15 @@ function AdminPaymentsPageInner() {
         const typeLabel = paymentTypeLabel(type, payment);
         const advThis = advNumOfDetail(detail);
         const bd = calcBreakdown();
+        const detailRegistration = type === "registration"
+          ? allRegistrations.find((registration) => String(registration.id) === String(detail.uid))
+          : null;
+        const canEncodeBalance = Boolean(
+          detailRegistration &&
+          status === "verified" &&
+          SETTLEABLE_STATUSES.includes(detailRegistration.status) &&
+          bd?.balance != null && bd.balance > 0
+        );
         // status of this registration, so the due date can say "set after approval" while it is pending
         const detailStatus = type === "registration" ? registrations.find((x) => x.id === detail.uid)?.status : undefined;
         const isMultiAdvReg = type === "registration" && !isBalanceRow(payment) && (advThis ?? 1) >= 2;
@@ -2221,6 +2270,15 @@ function AdminPaymentsPageInner() {
                     </span>
                   )}
                   <span style={{ padding: "4px 10px", background: st.bg, color: st.color, borderRadius: "20px", fontSize: "11px", fontWeight: 800 }}>{st.label}</span>
+                  {canEncodeBalance && detailRegistration && (
+                    <button
+                      type="button"
+                      onClick={() => { setDetail(null); openManualFor(detailRegistration); }}
+                      style={{ padding: "8px 12px", borderRadius: "10px", background: "#ecfdf5", color: "#047857", fontSize: "12px", fontWeight: 800, border: "1px solid #a7f3d0", cursor: "pointer" }}
+                    >
+                      ₱ Encode balance payment
+                    </button>
+                  )}
                   <button onClick={() => copyDetails(detail)} style={{ padding: "8px 12px", borderRadius: "10px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>📋 Copy for SOA</button>
                   <button onClick={() => setDetail(null)} style={{ padding: "8px", borderRadius: "12px", color: "#64748b", fontWeight: "bold", border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
                 </div>
@@ -2636,6 +2694,7 @@ function AdminPaymentsPageInner() {
                       <span style={label}>Adventure</span>
                       <div style={{ display: "flex", gap: "8px", padding: "4px", borderRadius: "12px", background: "#f1f5f9" }}>
                         {([
+                          ...(tl.curNum > 1 ? [{ mode: "past" as const, title: `Past · Adventure ${tl.curNum - 1}` }] : []),
                           { mode: "current" as const, title: `Current · Adventure ${tl.curNum}` },
                           { mode: "next" as const, title: `Next · Adventure ${tl.curNum + 1}` },
                         ]).map(({ mode, title }) => (
@@ -2659,7 +2718,7 @@ function AdminPaymentsPageInner() {
                   )}
 
                   <div style={field}>
-                    <span style={label}>{form.type === "registration" ? `Registration · Adventure ${tl.curNum + (manualAdventureMode === "next" ? 1 : 0)}` : "Parent account"}</span>
+                    <span style={label}>{form.type === "registration" ? `Registration · Adventure ${tl.curNum + (manualAdventureMode === "next" ? 1 : manualAdventureMode === "past" ? -1 : 0)}` : "Parent account"}</span>
                     <input value={parentFilter} onChange={(e) => setParentFilter(e.target.value)} placeholder="Type to filter by name or email…" style={{ ...input, marginBottom: "6px" }} />
                     {form.type === "registration" ? (
                       <select value={form.registrationId} onChange={(e) => {
@@ -3228,7 +3287,7 @@ function AdminPaymentsPageInner() {
               ? `${filtered.length} of ${allGroups.length} students`
               : view === "next"
                 ? `${renewalRows.length} of ${renewalRowsAll.length} registrations`
-                : `${pastGroups.count} of ${pastItems.length} payments`}
+                : `${pastGroups.count} payments · ${pastGroups.unpaidCount} unpaid registrations`}
         </div>
       </div>
 
@@ -3742,18 +3801,21 @@ function AdminPaymentsPageInner() {
           </div>
         </>
       ) : (
-        /* ── Past Adventures: payments of Adventures that already ended ── */
+        /* ── Past Adventures: payments and unpaid registrations ── */
         <div style={{ background: "white", borderRadius: "20px", boxShadow: "0 4px 24px rgba(0,47,118,0.07)", border: "1px solid rgba(0,47,118,0.06)", overflow: "hidden" }}>
           {pastGroups.groups.length === 0 ? (
             <div style={{ padding: "60px 24px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
-              {pastItems.length === 0
-                ? "No payments from earlier Adventures yet. When an Adventure ends, its payments move here."
-                : "No past payments match your search."}
+              {pastItems.length === 0 && pastGroups.unpaidCount === 0
+                ? "No payments or unpaid registrations from earlier Adventures yet."
+                : "No past payments or unpaid registrations match your search."}
             </div>
           ) : (
-            paginatedPastGroups.map(({ num, items }) => {
+            paginatedPastGroups.map(({ num, items, unpaid }) => {
               const range = ADVENTURES.past.find((p) => p.num === num);
-              const families = new Set(items.map((i) => i.acc.email || i.uid)).size;
+              const families = new Set([
+                ...items.map((i) => i.acc.email || i.uid),
+                ...unpaid.map((r) => r.parentInfo?.email || r.id),
+              ]).size;
               return (
                 <div key={num}>
                   {/* Adventure header */}
@@ -3765,14 +3827,14 @@ function AdminPaymentsPageInner() {
                       <div style={{ fontWeight: 800, fontSize: "15px", color: "#002f76" }}>Adventure {num}</div>
                       <div style={{ fontSize: "11px", color: "#94a3b8" }}>
                         {range ? `${fmtDate(range.start)} — ${fmtDate(range.end)} · ` : ""}
-                        {items.length} payment{items.length !== 1 ? "s" : ""} from {families} {families !== 1 ? "families" : "family"}
+                        {items.length} payment{items.length !== 1 ? "s" : ""} · {unpaid.length} unpaid registration{unpaid.length !== 1 ? "s" : ""} from {families} {families !== 1 ? "families" : "family"}
                       </div>
                     </div>
                   </div>
 
                   {/* Column headers */}
                   <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 0.8fr 1fr", padding: "10px 24px", background: "#f8faff", borderBottom: "1px solid #e8efff" }}>
-                    {["Student & Parent", "Type", "Amount", "Status", "Date"].map((h) => (
+                    {["Student & Parent", "Type", "Amount", "Status", "Date / Action"].map((h) => (
                       <div key={h} style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px" }}>{h}</div>
                     ))}
                   </div>
@@ -3803,6 +3865,32 @@ function AdminPaymentsPageInner() {
                       </div>
                     );
                   })}
+                  {unpaid.map((r) => (
+                    <div
+                      key={`unpaid-${r.id}`}
+                      style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 0.8fr 1fr", padding: "12px 24px", borderBottom: "1px solid #f1f5f9", alignItems: "center", background: "#fffdf7" }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#002f76" }}>{fullChildName(r) || "Student name not set"}</div>
+                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>{r.parentInfo?.name || r.parentInfo?.email || "—"}</div>
+                      </div>
+                      <div><span style={tagStyle("#eff6ff", "#0050d5")}>REGISTRATION</span></div>
+                      <div style={{ fontWeight: 700, fontSize: "13px", color: "#94a3b8" }}>—</div>
+                      <div style={{ fontWeight: 800, fontSize: "11px", color: "#b45309" }}>NOT PAID</div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "6px" }}>
+                        <span style={{ fontSize: "11px", color: "#64748b" }}>
+                          {fmtDateTime(r.submittedAt || r.createdAt).split(",").slice(0, 2).join(",")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openManualFor(r)}
+                          style={{ padding: "6px 9px", border: "1px solid #a7f3d0", borderRadius: "8px", background: "#ecfdf5", color: "#047857", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
+                        >
+                          Encode payment
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             })

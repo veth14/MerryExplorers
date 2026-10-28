@@ -110,9 +110,14 @@ function clearDraft() {
 
 export default function RegisterPage() {
   const [mounted, setMounted] = useState(false);
+  const [clockNow, setClockNow] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    const updateClock = () => setClockNow(Date.now());
+    updateClock();
+    const interval = window.setInterval(updateClock, 60_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const draft = loadDraft();
@@ -396,6 +401,16 @@ export default function RegisterPage() {
 
   const [renewalSettings, setRenewalSettings] = useState<Record<string, ProgramSetting>>({});
 
+  function registrationCloseAt(setting?: ProgramSetting) {
+    if (!setting) return null;
+    const startDate = setting.registrationAdventure > setting.currentAdventure
+      ? setting.nextAdventureStart
+      : setting.adventureStartDate;
+    const closeDays = Number(setting.registrationAutoCloseDays) || 0;
+    if (!startDate || closeDays <= 0) return null;
+    return new Date(`${startDate.slice(0, 10)}T00:00:00+08:00`).getTime() + closeDays * 86400000;
+  }
+
   function checkIsRegistrationClosed(setting?: ProgramSetting): boolean {
     if (!setting) return false;
     if (setting.registrationOpen === false) return true;
@@ -403,19 +418,14 @@ export default function RegisterPage() {
     // If an open date is set for new families:
     if (setting.newFamilyRegistrationOpenDate) {
       const openDateStr = setting.newFamilyRegistrationOpenDate.slice(0, 10);
-      const todayStr = new Date().toISOString().slice(0, 10);
-      // If open date has arrived or passed, it overrides past auto-close -> NOT closed!
-      if (openDateStr <= todayStr) return false;
-      // If in the future, it is handled by isNotYetOpen ("Opens Soon" card)
-      return false;
+      const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      // Future opening dates are handled by the "Opens Soon" card. Once that
+      // date passes, the normal auto-close deadline still applies.
+      if (openDateStr > todayStr) return false;
     }
 
-    if (setting.adventureStartDate && setting.registrationAutoCloseDays) {
-      const started = new Date(setting.adventureStartDate).getTime();
-      const threshold = started + setting.registrationAutoCloseDays * 86400000;
-      if (Date.now() >= threshold) return true;
-    }
-    return false;
+    const closesAt = registrationCloseAt(setting);
+    return closesAt != null && Date.now() >= closesAt;
   }
 
   useEffect(() => {
@@ -1302,11 +1312,25 @@ export default function RegisterPage() {
                       const startDateStr = progSettings?.nextAdventureStart
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : null;
+                      const registrationDeadline = isAdvProgram ? registrationCloseAt(progSettings) : null;
+                      const registrationMinutesLeft = registrationDeadline != null && clockNow != null
+                        ? Math.max(0, Math.ceil((registrationDeadline - clockNow) / 60_000))
+                        : null;
+                      const registrationTimeLeft = registrationMinutesLeft == null || registrationMinutesLeft <= 0
+                        ? null
+                        : registrationMinutesLeft >= 1440
+                          ? `${Math.floor(registrationMinutesLeft / 1440)} day${Math.floor(registrationMinutesLeft / 1440) === 1 ? "" : "s"} ${Math.floor((registrationMinutesLeft % 1440) / 60)} hr left`
+                          : registrationMinutesLeft >= 60
+                            ? `${Math.floor(registrationMinutesLeft / 60)} hr ${registrationMinutesLeft % 60} min left`
+                            : `${registrationMinutesLeft} min left`;
+                      const registrationCloseLabel = registrationDeadline != null
+                        ? new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(registrationDeadline)
+                        : null;
 
                       // 1) New-family registration scheduled for a future date
                       const openDateRaw = progSettings?.newFamilyRegistrationOpenDate ?? null;
                       const openDateStr = openDateRaw ? openDateRaw.slice(0, 10) : "";
-                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
                       const isNotYetOpen = openDateStr ? openDateStr > todayStr : false;
 
                       if (isNotYetOpen) {
@@ -1463,6 +1487,12 @@ export default function RegisterPage() {
                                 </p>
                               ) : (
                                 <p className="text-[15px] font-black text-[#1f7ae0]">₱{p.rate.toLocaleString()}</p>
+                              )}
+                              {registrationCloseLabel && registrationMinutesLeft != null && registrationMinutesLeft > 0 && (
+                                <p className="mt-2 inline-flex flex-wrap items-center gap-x-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-900" role="status">
+                                  ⏳ Adventure {advNumber} registration closes {registrationCloseLabel} Manila time
+                                  {registrationTimeLeft ? ` · ${registrationTimeLeft}` : ""}
+                                </p>
                               )}
                             </div>
                             <div className={`h-6 w-6 rounded-full border-3 shrink-0 mt-1 transition-all flex items-center justify-center ${isSelected ? "border-[#0b2a82] bg-[#ffd23f]" : "border-[#b6dcf5] bg-white"}`}>
