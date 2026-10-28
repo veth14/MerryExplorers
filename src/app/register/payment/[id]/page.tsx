@@ -502,20 +502,25 @@ export default function PaymentPage() {
             <p className="text-[18px] font-extrabold text-[#0b2a82]">Loading registration payment details…</p>
           </div>
         ) : success ? (
-          <div className="vp-card text-center py-12 max-w-2xl mx-auto w-full">
+          <div
+            className="vp-card py-12 max-w-2xl mx-auto w-full"
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
+          >
             <div className="vp-tape" />
-            <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+            <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mb-5">
               🎉
             </div>
-            <h2 className="vp-h2 text-[26px] mb-3 text-[#0b2a82]">Receipt Successfully Recorded!</h2>
-            <p className="vp-sub max-w-md mx-auto text-[15px] mb-8 leading-relaxed text-balance">
+            <h2 className="vp-h2 text-[26px] mb-3 text-[#0b2a82]" style={{ width: "100%", textAlign: "center" }}>
+              Receipt Successfully Recorded!
+            </h2>
+            <p className="vp-sub max-w-md text-[15px] mb-8 leading-relaxed text-balance" style={{ width: "100%", textAlign: "center" }}>
               {isBalanceMode
                 ? "Our administrative team will review your receipt and update your balance shortly."
                 : "Our administrative team will review and verify your payment shortly. An email confirmation has been sent to your inbox."}
             </p>
-            <div className="flex justify-center gap-3">
-              {!isBalanceMode && <Link href="/parent/dashboard" className="vp-btn">Go to Parent Dashboard 🚀</Link>}
-              {isBalanceMode && <Link href="/" className="vp-btn">Back to Merry Explorers</Link>}
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}>
+              {!isBalanceMode && <Link href="/parent/dashboard" className="vp-btn" style={{ marginInline: "auto", textAlign: "center" }}>Go to Parent Dashboard 🚀</Link>}
+              {isBalanceMode && <Link href="/" className="vp-btn" style={{ marginInline: "auto", textAlign: "center" }}>Back to Merry Explorers</Link>}
             </div>
           </div>
         ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
