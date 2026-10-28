@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { computeAdventureBadge } from "@/lib/adventure-badge";
+import { upsertAdventureCycleHistory } from "@/lib/adventure-cycle";
 import { PROGRAM_SLOTS } from "@/data/landing";
 
 // Visual metadata for programs
@@ -76,6 +77,7 @@ export type ProgramRenewalEntry = {
   currentAdventure: number;            // which adventure number the program is currently in (e.g. 2)
   adventureStartDate?: string | null;  // when current adventure started/starts (ISO or YYYY-MM-DD)
   nextAdventureStart: string | null;  // ISO date string for next adventure (e.g. Adventure 3)
+  cycleHistory?: { adventureNumber: number; startDate: string }[];
   registrationOpen: boolean;          // whether public registration is open (true = open, false = closed)
   registrationAutoCloseDays?: number | null; // e.g. 7 (days after adventureStartDate to auto-close)
   customClosedMessage?: string;       // optional override for closed notice
@@ -206,6 +208,7 @@ export function RenewalSettingsManager() {
             currentAdventure: 1,
             adventureStartDate: null,
             nextAdventureStart: null,
+            cycleHistory: [],
             registrationOpen: true,
             registrationAutoCloseDays: 7,
             customClosedMessage: "",
@@ -251,8 +254,34 @@ export function RenewalSettingsManager() {
 
   const updateProgram = (key: string, patch: Partial<ProgramRenewalEntry>) => {
     setPrograms((prev) =>
-      prev.map((item) => (item.programKey === key ? { ...item, ...patch } : item))
+      prev.map((item) => {
+        if (item.programKey !== key) return item;
+        const updated = { ...item, ...patch };
+        if (ADVENTURE_PROGRAMS.has(key) && (patch.adventureStartDate !== undefined || patch.currentAdventure !== undefined)) {
+          updated.cycleHistory = upsertAdventureCycleHistory(
+            updated.cycleHistory,
+            updated.currentAdventure,
+            updated.adventureStartDate
+          );
+        }
+        return updated;
+      })
     );
+  };
+
+  const updateCycleHistoryDate = (key: string, adventureNumber: number, startDate: string) => {
+    setPrograms((prev) => prev.map((program) => {
+      if (program.programKey !== key) return program;
+      const normalized = startDate ? `${startDate}T00:00:00.000Z` : null;
+      const cycleHistory = startDate
+        ? upsertAdventureCycleHistory(program.cycleHistory, adventureNumber, normalized)
+        : (program.cycleHistory || []).filter((entry) => entry.adventureNumber !== adventureNumber);
+      return {
+        ...program,
+        cycleHistory,
+        ...(program.currentAdventure === adventureNumber ? { adventureStartDate: normalized } : {}),
+      };
+    }));
   };
 
   const updateClassSlot = (programId: string, className: string, patch: Partial<{ time: string; maxSlots: number }>) => {
@@ -306,10 +335,17 @@ export function RenewalSettingsManager() {
     setPrograms((prev) =>
       prev.map((p) => {
         if (!ADVENTURE_PROGRAMS.has(p.programKey)) return p;
+        const shiftedStart = p.nextAdventureStart || masterNext || p.adventureStartDate;
+        const history = upsertAdventureCycleHistory(
+          p.cycleHistory,
+          p.currentAdventure,
+          p.adventureStartDate
+        );
         return {
           ...p,
           currentAdventure: nextAdvNum,
-          adventureStartDate: p.nextAdventureStart || masterNext || p.adventureStartDate, // next → current (moves to left side)
+          adventureStartDate: shiftedStart, // next → current (moves to left side)
+          cycleHistory: upsertAdventureCycleHistory(history, nextAdvNum, shiftedStart),
           nextAdventureStart: null,                                                        // clear right side (empty)
           registrationOpen: true,
         };
@@ -753,6 +789,41 @@ export function RenewalSettingsManager() {
                           {prog.nextAdventureStart ? nextStartDateDisplay : "⚠ Not set yet — please update"}
                         </p>
                       </div>
+                    </div>
+                  )}
+
+                  {isAdventureProg && (
+                    <div className="rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-wider text-indigo-900">Adventure start history</div>
+                        <p className="mt-1 text-[10.5px] font-medium text-indigo-800/75">
+                          Past start dates are saved per cycle and used for session balance and interest calculations.
+                        </p>
+                      </div>
+                      {(prog.cycleHistory || []).filter((entry) => entry.adventureNumber < currentAdv).length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(prog.cycleHistory || [])
+                            .filter((entry) => entry.adventureNumber < currentAdv)
+                            .sort((a, b) => b.adventureNumber - a.adventureNumber)
+                            .map((entry) => (
+                              <label key={entry.adventureNumber} className="rounded-xl border border-indigo-100 bg-white p-3 space-y-1">
+                                <span className="block text-[10px] font-black uppercase tracking-wide text-slate-500">
+                                  Adventure {entry.adventureNumber} started
+                                </span>
+                                <input
+                                  type="date"
+                                  value={entry.startDate.slice(0, 10)}
+                                  onChange={(event) => updateCycleHistoryDate(prog.programKey, entry.adventureNumber, event.target.value)}
+                                  className="w-full h-8 rounded-lg border border-slate-300 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-[#0033a0] focus:outline-none"
+                                />
+                              </label>
+                            ))}
+                        </div>
+                      ) : (
+                        <p className="rounded-xl border border-indigo-100 bg-white px-3 py-2 text-[10.5px] font-semibold text-slate-500">
+                          Earlier start dates will be added here when the next Adventure cycle begins.
+                        </p>
+                      )}
                     </div>
                   )}
 

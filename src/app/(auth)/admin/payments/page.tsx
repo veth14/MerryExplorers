@@ -24,6 +24,7 @@ import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { readReceipt, type ReceiptData } from "@/lib/receipt-ocr";
 import { useAuth } from "@/lib/auth-context";
 import { formatPersonName } from "@/lib/person-name-validation";
+import { getAdventureStartFromHistory } from "@/lib/adventure-cycle";
 
 type Payment = {
   id: string;
@@ -395,7 +396,10 @@ function buildTimeline(programs: any[], today: string): Timeline {
   const issues: string[] = [];
   const n = Number(m.currentAdventure);
   let curNum = Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
-  let curStart = isoDay(m.adventureStartDate);
+  const cycleHistory = Array.isArray(m.cycleHistory) ? m.cycleHistory
+    .map((entry: any) => ({ num: Number(entry.adventureNumber), start: isoDay(entry.startDate) }))
+    .filter((entry: any) => Number.isInteger(entry.num) && entry.num > 0 && !!entry.start) : [];
+  let curStart = isoDay(m.adventureStartDate) || cycleHistory.find((entry: any) => entry.num === curNum)?.start || null;
   let nextStart = isoDay(m.nextAdventureStart);
   let curStartKnown = !!curStart;
 
@@ -418,12 +422,25 @@ function buildTimeline(programs: any[], today: string): Timeline {
   const curEnd = nextStart ? addDaysIso(nextStart, -1) : addDaysIso(addMonthsIso(curStart, ADVENTURE_DURATION_MONTHS), -1);
   const nStart = nextStart ?? addMonthsIso(curStart, ADVENTURE_DURATION_MONTHS);
   const nEnd = addDaysIso(addMonthsIso(nStart, ADVENTURE_DURATION_MONTHS), -1);
-  const past: PastAdv[] =
-    curNum > 1
+  const historicalPast: PastAdv[] = cycleHistory
+    .filter((entry: any) => entry.num < curNum)
+    .sort((a: any, b: any) => b.num - a.num)
+    .map((entry: any) => {
+      const nextCycleStart = cycleHistory.find((next: any) => next.num === entry.num + 1)?.start
+        || (entry.num + 1 === curNum ? curStart : null);
+      return {
+        label: `Adventure ${entry.num}`,
+        start: entry.start!,
+        end: addDaysIso(nextCycleStart || addMonthsIso(entry.start!, ADVENTURE_DURATION_MONTHS), -1),
+        num: entry.num,
+      };
+    });
+  const past: PastAdv[] = historicalPast.length > 0
+    ? historicalPast
+    : curNum > 1
       ? [{
           label: `Adventure ${curNum - 1}`,
-          // Adventure 1 began on Sep 28, 2026. A five-month estimate incorrectly
-          // displayed May 26 when Adventure 2 started on Oct 26.
+          // Legacy fallback for settings saved before cycle history was added.
           start: curNum === 2 && curStart === "2026-10-26"
             ? LEGACY_ADVENTURE_1_START
             : addMonthsIso(curStart, -ADVENTURE_DURATION_MONTHS),
@@ -460,16 +477,29 @@ function sessionAdvNum(tl: Timeline, day: string | null): number {
   let s = tl.curStart;
   while (day < s && n > 1) {
     n -= 1;
-    s = addMonthsIso(s, -ADVENTURE_DURATION_MONTHS);
+    s = tl.ADVENTURES.past.find((adventure) => adventure.num === n)?.start
+      || addMonthsIso(s, -ADVENTURE_DURATION_MONTHS);
   }
   return n;
 }
 
 // Adventure a registration made on `day` is for, going only by the "registrations open" dates
 function advByOpenDate(tl: Timeline, day: string): number {
-  if (tl.nextOpen && day >= tl.nextOpen) return tl.curNum + 1;
-  if (tl.curNum > 1 && tl.curOpen && day < tl.curOpen) return tl.curNum - 1;
-  return tl.curNum;
+  const cycles = [
+    ...tl.ADVENTURES.past,
+    { ...tl.ADVENTURES.current, num: tl.curNum },
+    { ...tl.ADVENTURES.next, num: tl.curNum + 1 },
+  ].sort((a, b) => a.start.localeCompare(b.start));
+  const first = cycles[0];
+  if (!first) return tl.curNum;
+
+  let selected = first;
+  for (const cycle of cycles) {
+    const opensOn = addDaysIso(cycle.start, -RENEWAL_OPEN_LEAD_DAYS);
+    if (day >= opensOn) selected = cycle;
+    else break;
+  }
+  return selected.num;
 }
 
 // For a registration that is known to be a renewal: the first Adventure that had NOT started yet on `day`
@@ -909,6 +939,8 @@ function AdminPaymentsPageInner() {
   // (Programs & Registration Control). Falls back to the master program's dates.
   const advStartOf = (r: any): string | undefined => {
     const n = advOf(r);
+    const historicalStart = getAdventureStartFromHistory(r.program, n, renewalSettings);
+    if (historicalStart) return historicalStart;
     const own = getProgramAdventureStart(renewalSettings, r.program, n, today);
     if (own) return own;
 

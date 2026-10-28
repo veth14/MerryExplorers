@@ -3,10 +3,16 @@ export type AdventureProgramSetting = {
   currentAdventure?: number;
   adventureStartDate?: string | null;
   nextAdventureStart?: string | null;
+  cycleHistory?: AdventureCycleHistoryEntry[];
   registrationOpen?: boolean;
   registrationAutoCloseDays?: number | null;
   closedClasses?: string[];
   [key: string]: any;
+};
+
+export type AdventureCycleHistoryEntry = {
+  adventureNumber: number;
+  startDate: string;
 };
 
 export type AdventureCycleTimeline = {
@@ -28,7 +34,7 @@ const PROGRAM_KEYS: Record<string, string> = {
 
 export const LEGACY_ADVENTURE_2_START = "2026-10-26";
 export const LEGACY_ADVENTURE_2_REGISTRATION_OPEN = "2026-10-12";
-const LEGACY_ADVENTURE_1_START = "2026-09-28";
+export const LEGACY_ADVENTURE_1_START = "2026-09-28";
 
 function dateBefore(iso: string, days: number) {
   const date = new Date(`${iso}T00:00:00Z`);
@@ -50,6 +56,36 @@ function datePart(value?: string | Date | null) {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : manilaDate(date);
+}
+
+export function upsertAdventureCycleHistory(
+  history: AdventureCycleHistoryEntry[] | undefined,
+  adventureNumber: number | undefined,
+  startDate?: string | null
+): AdventureCycleHistoryEntry[] {
+  const cleanHistory = (Array.isArray(history) ? history : [])
+    .filter((entry) => Number.isInteger(Number(entry?.adventureNumber)) && Number(entry.adventureNumber) > 0 && !!datePart(entry?.startDate))
+    .map((entry) => ({
+      adventureNumber: Number(entry.adventureNumber),
+      startDate: datePart(entry.startDate)!,
+    }));
+  const number = Number(adventureNumber);
+  const date = datePart(startDate);
+  if (!Number.isInteger(number) || number < 1 || !date) {
+    return cleanHistory.sort((a, b) => a.adventureNumber - b.adventureNumber);
+  }
+  const next = cleanHistory.filter((entry) => entry.adventureNumber !== number);
+  next.push({ adventureNumber: number, startDate: date });
+  return next.sort((a, b) => a.adventureNumber - b.adventureNumber);
+}
+
+export function getAdventureStartFromHistory(
+  program: string,
+  adventureNumber: number,
+  settings: AdventureProgramSetting[]
+) {
+  const programSetting = getProgramAdventureSetting(program, settings);
+  return datePart(programSetting?.cycleHistory?.find((entry) => Number(entry.adventureNumber) === adventureNumber)?.startDate);
 }
 
 export function getProgramAdventureSetting(
@@ -123,7 +159,7 @@ export function getCurrentAdventureStartDate(
   if (masterNextStart && manilaDate(now) >= masterNextStart) {
     return datePart(programSetting?.nextAdventureStart) || masterNextStart;
   }
-  return datePart(programSetting?.adventureStartDate) || (
+  return datePart(programSetting?.adventureStartDate) || getAdventureStartFromHistory(program, getCurrentAdventureNumber(program, settings, now), settings) || (
     getCurrentAdventureNumber(program, settings, now) === 2 ? LEGACY_ADVENTURE_2_START : null
   );
 }
@@ -215,6 +251,8 @@ export function getAdventureStartDateForNumber(
   now = new Date()
 ) {
   if (!adventureNumber) return null;
+  const historicalStart = getAdventureStartFromHistory(program, adventureNumber, settings);
+  if (historicalStart) return historicalStart;
   const currentNumber = getCurrentAdventureNumber(program, settings, now);
   const programSetting = getProgramAdventureSetting(program, settings);
   if (adventureNumber > currentNumber) {
@@ -262,6 +300,32 @@ export function getRegistrationAdventureNumber(
       return 2;
     }
     return periodNumber;
+  }
+
+  if (submittedDate) {
+    const programSetting = getProgramAdventureSetting(program, settings);
+    const master = settings.find((entry) => entry.programKey === "Discovery Club: Curious Explorer");
+    const cycles = new Map<number, string>();
+    for (const entry of programSetting?.cycleHistory || []) {
+      const start = datePart(entry.startDate);
+      if (start) cycles.set(Number(entry.adventureNumber), start);
+    }
+    const currentStart = getCurrentAdventureStartDate(program, settings, now);
+    if (currentStart) cycles.set(currentNumber, currentStart);
+    const nextStart = datePart(programSetting?.nextAdventureStart) || datePart(master?.nextAdventureStart);
+    if (nextStart) cycles.set(currentNumber + 1, nextStart);
+
+    const ordered = Array.from(cycles.entries())
+      .map(([number, start]) => ({ number, start, opensOn: dateBefore(start, 14) }))
+      .sort((a, b) => a.start.localeCompare(b.start));
+    if (ordered.length) {
+      let selected = ordered[0];
+      for (const cycle of ordered) {
+        if (submittedDate >= cycle.opensOn) selected = cycle;
+        else break;
+      }
+      return selected.number;
+    }
   }
 
   if (currentStart && submittedDate && submittedDate < currentStart) {

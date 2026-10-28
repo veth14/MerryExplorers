@@ -3,6 +3,8 @@
 // so the numbers always match.
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { getNthSessionDate } from "@/lib/sessions";
+import { getAdventureStartFromHistory, getRegistrationAdventureNumber as resolveRegistrationAdventureNumber, LEGACY_ADVENTURE_1_START } from "@/lib/adventure-cycle";
+export { LEGACY_ADVENTURE_1_START } from "@/lib/adventure-cycle";
 
 // Payment terms:
 //  - 60% non-refundable reservation payment upon registration
@@ -11,7 +13,6 @@ import { getNthSessionDate } from "@/lib/sessions";
 export const RESERVATION_RATE = 0.6;
 export const WEEKLY_INTEREST_RATE = 0.04;
 export const BALANCE_DUE_SESSION = 6;
-export const LEGACY_ADVENTURE_1_START = "2026-09-28";
 export const FALLBACK_PIONEER_RATES: Record<string, number> = {
     "creative-explorer": 4820,
     "curious-explorer": 4295,
@@ -197,37 +198,14 @@ export function getRegistrationAdventureStart(
     if (!currentStart && nextStart) currentStart = addMonths(nextStart, -5);
     if (!currentStart) currentStart = "2026-06-01";
 
-    const currentOpen = addDays(currentStart, -14);
-    const nextOpen = nextStart ? addDays(nextStart, -14) : null;
-    const dateInManila = (value: any): string | null => {
-        if (!value) return null;
-        const date = value instanceof Date ? value : new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
-        }).format(date);
-    };
-    const registrationDays = [dateInManila(registration?.createdAt), dateInManila(registration?.submittedAt)]
-        .filter(Boolean)
-        .sort() as string[];
-    const registeredDay = registrationDays[0];
-    let adventureNumber = Math.floor(Number(registration?.adventure));
-    if (!Number.isFinite(adventureNumber) || adventureNumber < 2) {
-        adventureNumber = registeredDay
-            ? nextOpen && registeredDay >= nextOpen
-                ? currentNumber + 1
-                : currentNumber > 1 && registeredDay < currentOpen
-                    ? currentNumber - 1
-                    : currentNumber
-            : currentNumber;
-        if (registration?.isPromoRegistration || registration?.parentInfo?.isRenewal || registration?.renewalPeriod) {
-            if (registeredDay && registeredDay < currentStart && registeredDay >= addMonths(currentStart, -5)) {
-                adventureNumber = Math.max(adventureNumber, currentNumber);
-            } else if (nextStart && registeredDay && registeredDay >= currentStart && registeredDay < nextStart) {
-                adventureNumber = Math.max(adventureNumber, currentNumber + 1);
-            }
-        }
-    }
+    const adventureNumber = resolveRegistrationAdventureNumber({
+        adventureNumber: registration?.adventureNumber ?? registration?.adventure,
+        period: registration?.period || registration?.renewalPeriod,
+        submittedAt: registration?.submittedAt || registration?.createdAt,
+    }, registration?.program, settings || [], new Date(`${todayIso}T12:00:00+08:00`));
+
+    const historicalStart = getAdventureStartFromHistory(registration?.program, adventureNumber, settings || []);
+    if (historicalStart) return historicalStart;
 
     const ownStart = getProgramAdventureStart(settings, registration?.program, adventureNumber, todayIso);
     if (ownStart) return ownStart;

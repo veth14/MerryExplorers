@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { computeAdventureBadge } from "@/lib/adventure-badge";
 import { requireAdmin } from "@/lib/auth-guard";
+import { LEGACY_ADVENTURE_1_START, LEGACY_ADVENTURE_2_START, upsertAdventureCycleHistory } from "@/lib/adventure-cycle";
 
 const SETTINGS_KEY = "renewal_settings_v2";
 
@@ -32,6 +33,7 @@ export type ProgramRenewalEntry = {
   currentAdventure: number;            // which adventure number the program is currently in (e.g. 2)
   adventureStartDate?: string | null;  // when current adventure started/starts (ISO date or YYYY-MM-DD)
   nextAdventureStart: string | null;  // ISO date string for next adventure (e.g. Adventure 3)
+  cycleHistory?: { adventureNumber: number; startDate: string }[];
   registrationOpen: boolean;          // whether public registration is open (true = open, false = closed)
   registrationAutoCloseDays?: number | null; // e.g. 7 (days after adventureStartDate to auto-close)
   customClosedMessage?: string;       // optional override for closed notice
@@ -57,6 +59,14 @@ function getManilaDateStr(): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function cycleHistoryWithCurrent(program: ProgramRenewalEntry): ProgramRenewalEntry["cycleHistory"] {
+  return upsertAdventureCycleHistory(
+    program.cycleHistory,
+    program.currentAdventure,
+    program.adventureStartDate
+  );
 }
 
 /**
@@ -92,10 +102,16 @@ function applyAutoRollover(programs: ProgramRenewalEntry[]): {
       changed = true;
       const nextAdvNum = (curiousProg.currentAdventure ?? 1) + 1;
       const shiftedStart = p.nextAdventureStart || curiousNext;
+      const previousHistory = upsertAdventureCycleHistory(
+        p.cycleHistory,
+        p.currentAdventure,
+        p.adventureStartDate
+      );
       return {
         ...p,
         currentAdventure: nextAdvNum,
         adventureStartDate: shiftedStart, // moved to left side
+        cycleHistory: upsertAdventureCycleHistory(previousHistory, nextAdvNum, shiftedStart),
         nextAdventureStart: null,          // right side is empty and ready to be set again
         registrationOpen: true,            // new adventure starts open for registration
         renewalOpenDate: null,
@@ -131,6 +147,7 @@ function defaultPrograms(): ProgramRenewalEntry[] {
     currentAdventure: 2,
     adventureStartDate: null,
     nextAdventureStart: null,
+    cycleHistory: [],
     registrationOpen: true,
     registrationAutoCloseDays: 7,
     customClosedMessage: "",
@@ -159,6 +176,7 @@ export async function GET() {
             programKey: key,
             currentAdventure: existing.currentAdventure ?? 2,
             adventureStartDate: existing.adventureStartDate ?? null,
+            cycleHistory: cycleHistoryWithCurrent(existing),
             registrationOpen: existing.registrationOpen !== false,
             registrationAutoCloseDays: existing.registrationAutoCloseDays ?? 7,
             customClosedMessage: existing.customClosedMessage ?? "",
@@ -171,6 +189,7 @@ export async function GET() {
             currentAdventure: 2,
             adventureStartDate: null,
             nextAdventureStart: null,
+            cycleHistory: [],
             registrationOpen: true,
             registrationAutoCloseDays: 7,
             customClosedMessage: "",
@@ -183,10 +202,28 @@ export async function GET() {
           };
     });
 
+    // Seed the known first two cycles for older settings that predate cycle history.
+    // Adventure 1 began on Sep 28, then Adventure 2 began on Oct 26, 2026.
+    const master = merged.find((p) => p.programKey === CURIOUS_EXPLORER_KEY);
+    if (
+      master?.currentAdventure === 2 &&
+      master.adventureStartDate?.slice(0, 10) === LEGACY_ADVENTURE_2_START
+    ) {
+      merged.forEach((program) => {
+        if (!ADVENTURE_PROGRAMS.includes(program.programKey)) return;
+        const history = upsertAdventureCycleHistory(program.cycleHistory, 1, LEGACY_ADVENTURE_1_START);
+        program.cycleHistory = upsertAdventureCycleHistory(history, program.currentAdventure, program.adventureStartDate);
+      });
+    }
+
     // Check & apply automatic rollover
     const { changed, programs: finalPrograms } = applyAutoRollover(merged);
 
-    if (changed) {
+    const historyChanged = finalPrograms.some((program) => {
+      const existing = programs.find((entry) => entry.programKey === program.programKey);
+      return JSON.stringify(existing?.cycleHistory || []) !== JSON.stringify(program.cycleHistory || []);
+    });
+    if (changed || historyChanged) {
       await db.collection("settings").updateOne(
         { _key: SETTINGS_KEY },
         { $set: { _key: SETTINGS_KEY, programs: finalPrograms, updatedAt: new Date().toISOString() } },
@@ -221,8 +258,12 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const incoming: ProgramRenewalEntry[] = body.programs ?? [];
 
+    const { db } = await connectToDatabase();
+    const existingSettings = await db.collection("settings").findOne({ _key: SETTINGS_KEY });
+    const existingPrograms: ProgramRenewalEntry[] = existingSettings?.programs ?? [];
     const programs: ProgramRenewalEntry[] = RENEWAL_PROGRAMS.map((key) => {
       const p = incoming.find((x) => x.programKey === key);
+      const old = existingPrograms.find((x) => x.programKey === key);
       const nextAdventureStart = p?.nextAdventureStart ?? null;
       const renewalOpen = p?.renewalOpen !== false;
       const registrationOpen = p?.registrationOpen !== false;
@@ -230,6 +271,11 @@ export async function PUT(req: NextRequest) {
         programKey: key,
         currentAdventure: p?.currentAdventure ?? 2,
         adventureStartDate: p?.adventureStartDate ?? null,
+        cycleHistory: upsertAdventureCycleHistory(
+          p?.cycleHistory ?? old?.cycleHistory,
+          p?.currentAdventure ?? 2,
+          p?.adventureStartDate ?? null
+        ),
         nextAdventureStart,
         registrationOpen,
         registrationAutoCloseDays: p?.registrationAutoCloseDays ?? 7,
@@ -265,7 +311,6 @@ export async function PUT(req: NextRequest) {
       updateDoc.classSlots = classSlots;
     }
 
-    const { db } = await connectToDatabase();
     await db.collection("settings").updateOne(
       { _key: SETTINGS_KEY },
       { $set: updateDoc },
