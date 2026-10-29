@@ -546,16 +546,12 @@ export default function AttendancePage() {
             totalMins += m;
             hours = fmtHM(m);
 
-            // Correctly determine if employee is late
+            // Purely dynamic late determination
             let isLate = false;
             let statusLabel = "On Time";
-            const hasAdminOverride = !!(rec as any).correctedAt;
 
             if (noTimeLog) {
               statusLabel = "Exempt";
-            } else if (hasAdminOverride && rec.timeInStatus) {
-              statusLabel = rec.timeInStatus;
-              isLate = rec.timeInStatus === "Late";
             } else if (rec.clockInTime) {
               const comp = computeTimeInStatus(rec.clockInTime, noTimeLog, name, scheduleConfigs);
               if (comp === "Late") {
@@ -684,16 +680,12 @@ export default function AttendancePage() {
             const m = workedMins(r.clockInTime, r.clockOutTime, teacherName);
             const hours = r.clockInTime && r.clockOutTime ? fmtHM(m) : (r.clockInTime ? "In Progress" : "—");
 
-            // Compute actual attendance status
+            // Purely dynamic attendance status
             let teacherStatus = "On Time";
             let isLate = false;
-            const hasAdminOverride = !!(r as any).correctedAt;
 
             if (noTimeLog) {
               teacherStatus = "Exempt (Flexible)";
-            } else if (hasAdminOverride && r.timeInStatus) {
-              teacherStatus = r.timeInStatus === "Exempt" ? "Exempt (Flexible)" : r.timeInStatus;
-              isLate = r.timeInStatus === "Late";
             } else if (r.clockInTime) {
               const comp = computeTimeInStatus(r.clockInTime, noTimeLog, teacherAcc?.fullName || teacherName, scheduleConfigs);
               if (comp === "Late") {

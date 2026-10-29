@@ -289,20 +289,14 @@ export function computeDailyStatus(
     return "Absent";
   }
 
-  // Always recompute timeInStatus from the actual clockInTime unless the admin explicitly
-  // corrected this record (correctedAt field present). This ensures:
-  //   - stale "On Time" that is actually late → correctly shown as Late
-  //   - stale "Late" that was corrected to On Time → correctly shown as On Time
-  const hasAdminOverride = !!(record as Record<string, unknown>).correctedAt;
-
-  let status: TimeInStatus;
-  if (hasAdminOverride && record.timeInStatus) {
-    status = record.timeInStatus as TimeInStatus;
-  } else {
-    status = computeTimeInStatus(record.clockInTime!, account.noTimeLog, account.fullName, dynamicConfigs);
-  }
-
-  return status as DailyAttendanceStatus;
+  // Purely dynamic status: always compute from the record's actual clockInTime
+  // against the historical or configured schedule for this day.
+  return computeTimeInStatus(
+    record.clockInTime,
+    account.noTimeLog,
+    account.fullName,
+    dynamicConfigs
+  ) as DailyAttendanceStatus;
 }
 
 // ── Human-readable helpers ────────────────────────────────────────────────────────

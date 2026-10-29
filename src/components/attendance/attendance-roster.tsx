@@ -355,7 +355,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                         };
                         setEditTimeIn(toHHMM(selectedStaff.timeIn));
                         setEditTimeOut(toHHMM(selectedStaff.timeOut));
-                        setEditStatus(selectedStaff.status === "Late" ? "On Time" : (selectedStaff.status as any) || "On Time");
+                        setEditStatus((selectedStaff.status as any) === "Late" ? "Late" : (selectedStaff.status as any) || "On Time");
                         setIsEditing(true);
                         setSaveSuccess(false);
                       }}
