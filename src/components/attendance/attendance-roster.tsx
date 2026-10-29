@@ -96,13 +96,46 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
   };
 
   const handleExport = () => {
-    const headers = ["Teacher Name", "Group", "Time In", "Time Out", "Status"];
-    const rows = filteredData.map(staff => [
-      `"${staff.name}"`,
-      `"${staff.group}"`,
-      `"${staff.timeIn === "—" ? shiftFallbackLabel : staff.timeIn}"`,
-      `"${staff.timeOut}"`,
-      `"${staff.status}"`
+    const headers = ["Teacher Name", "Group", "Time In", "Time Out", "Hours", "Status"];
+    let totalRenderedMins = 0;
+    let lateCount = 0;
+
+    const rows = filteredData.map(staff => {
+      if (staff.status === "Late") lateCount++;
+
+      let hours = "—";
+      if (staff.timeIn && staff.timeIn !== "—" && staff.timeOut && staff.timeOut !== "—") {
+        const dIn = new Date(`1970-01-01 ${staff.timeIn}`);
+        const dOut = new Date(`1970-01-01 ${staff.timeOut}`);
+        if (!isNaN(dIn.getTime()) && !isNaN(dOut.getTime())) {
+          let diffMins = Math.max(0, Math.round((dOut.getTime() - dIn.getTime()) / 60000));
+          if (diffMins > 240) diffMins -= 60;
+          diffMins = Math.min(diffMins, 480);
+          totalRenderedMins += diffMins;
+          hours = `${Math.floor(diffMins / 60)}h ${String(diffMins % 60).padStart(2, "0")}m`;
+        }
+      } else if (staff.timeIn && staff.timeIn !== "—") {
+        hours = "In Progress";
+      }
+
+      return [
+        `"${staff.name}"`,
+        `"${staff.group}"`,
+        `"${staff.timeIn === "—" ? shiftFallbackLabel : staff.timeIn}"`,
+        `"${staff.timeOut}"`,
+        `"${hours}"`,
+        `"${staff.status}"`
+      ];
+    });
+
+    const totalHoursStr = `${Math.floor(totalRenderedMins / 60)}h ${String(totalRenderedMins % 60).padStart(2, "0")}m`;
+    rows.push([
+      `"TOTAL"`,
+      `""`,
+      `""`,
+      `""`,
+      `"${totalHoursStr}"`,
+      `"${lateCount > 0 ? `${lateCount} Late` : "0 Late"}"`
     ]);
     
     const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");

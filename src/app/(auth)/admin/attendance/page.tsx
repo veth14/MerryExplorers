@@ -7,13 +7,13 @@ import { AttendanceRoster } from "@/components/attendance/attendance-roster";
 import type { StaffAttendance } from "@/data/attendance";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
-import { computeDailyStatus } from "@/lib/attendance-rules";
+import { computeDailyStatus, computeTimeInStatus, computeLateDeduction } from "@/lib/attendance-rules";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { useAuth } from "@/lib/auth-context";
 import { WeeklyView } from "@/components/attendance/weekly-view";
 import { MonthlyView } from "@/components/attendance/monthly-view";
 import { ScheduleModal } from "@/components/attendance/schedule-modal";
-import { downloadAttendanceWorkbook } from "@/lib/attendance-excel";
+import { downloadAttendanceWorkbook, parseHoursToMinutes } from "@/lib/attendance-excel";
 
 type AttendanceRecord = {
   _id: string;
@@ -80,8 +80,12 @@ const BREAK_AFTER_MINS = 240;   // only deduct the break if they stayed longer t
 const MAX_DAILY_MINS = 480;     // 8 hours maximum credited per day
 
 const workedMins = (a?: string | null, b?: string | null) => {
+  if (!a || !b) return 0;
   let m = minsBetween(a, b);
-  if (m > BREAK_AFTER_MINS) m -= BREAK_MINS;
+  const d = new Date(a);
+  const day = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Manila" });
+  const breakMins = day === "Sat" ? 45 : BREAK_MINS;
+  if (m > BREAK_AFTER_MINS) m -= breakMins;
   return Math.min(m, MAX_DAILY_MINS);
 };
 
@@ -448,9 +452,8 @@ export default function AttendancePage() {
     }
   };
 
-  // Multi-date range export — opens branded print-to-PDF window
-  // If a specific employee is chosen, builds a single-person DTR instead.
-  const handleRangeExport = async () => {
+  // Multi-date range export — supports direct Excel download or PDF/print preview
+  const handleRangeExport = async (mode: "pdf" | "excel" = "pdf") => {
     if (!exportStartDate || !exportEndDate) return;
     setExportLoading(true);
     try {
@@ -489,6 +492,7 @@ export default function AttendancePage() {
           acc?.fullName || `${acc?.firstName ?? ""} ${acc?.lastName ?? ""}`.trim() || "Unknown";
         const room = exportPosition.trim() || getPosition(acc) || "—";
         const workDays = acc?.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const noTimeLog = acc?.noTimeLog || exemptions.includes(exportTeacherUid);
 
         const days: DtrDay[] = [];
         const dtrExcel: ExportRow[] = [];
@@ -522,9 +526,43 @@ export default function AttendancePage() {
             const m = workedMins(rec.clockInTime, rec.clockOutTime);
             totalMins += m;
             hours = fmtHM(m);
-            remarks = rec.status + (rec.clockOutTime ? "" : " (no clock-out)");
+
+            // Correctly determine if employee is late
+            let isLate = false;
+            let statusLabel = "On Time";
+            if (rec.timeInStatus === "Late") {
+              if (rec.clockInTime && computeTimeInStatus(rec.clockInTime, noTimeLog, name, scheduleConfigs) === "On Time") {
+                statusLabel = "On Time";
+              } else {
+                isLate = true;
+                statusLabel = "Late";
+              }
+            } else if (rec.timeInStatus === "Exempt" || noTimeLog) {
+              statusLabel = "Exempt";
+            } else if (rec.timeInStatus === "On Time") {
+              statusLabel = "On Time";
+            } else if (rec.clockInTime) {
+              const comp = computeTimeInStatus(rec.clockInTime, noTimeLog, name, scheduleConfigs);
+              if (comp === "Late") {
+                isLate = true;
+                statusLabel = "Late";
+              } else if (comp === "Exempt") {
+                statusLabel = "Exempt";
+              } else {
+                statusLabel = "On Time";
+              }
+            }
+
+            if (isLate && rec.clockInTime) {
+              const lateRes = computeLateDeduction(rec.clockInTime, 0, noTimeLog, name);
+              if (lateRes.lateMinutes > 0) {
+                statusLabel = `Late (${lateRes.lateMinutes}m)`;
+              }
+            }
+
+            remarks = statusLabel + (rec.clockOutTime ? "" : " (no clock-out)");
             present++;
-            if (rec.status === "Late") late++;
+            if (isLate) late++;
           } else if (workDays.includes(weekday)) {
             // Only count as absent for days that already happened
             if (dStr <= todayStr) {
@@ -545,10 +583,26 @@ export default function AttendancePage() {
             timeOut,
             status: remarks,
             rowType: "normal",
-            hours,
+            hours: hours || "—",
           });
 
           cur.setDate(cur.getDate() + 1);
+        }
+
+        setExportRows(dtrExcel);
+        setExportGroups([]);
+        setShowExportModal(false);
+
+        if (mode === "excel") {
+          downloadAttendanceWorkbook({
+            rows: dtrExcel,
+            groups: [],
+            groupBy: "date",
+            isDtr: true,
+            startDate: exportStartDate,
+            endDate: exportEndDate,
+          });
+          return;
         }
 
         const html = buildDtrHtml({
@@ -563,19 +617,17 @@ export default function AttendancePage() {
         });
 
         setPrintHtml(html);
-        setExportRows(dtrExcel);
-        setExportGroups([]);
-        setShowExportModal(false);
         return;
       }
 
-      // ── ALL EMPLOYEES → original grouped report ────────────────────────────
+      // ── ALL EMPLOYEES → grouped attendance report ──────────────────────────
       type RowData = {
         dateLabel: string;
         name: string;
         group: string;
         timeIn: string;
         timeOut: string;
+        hours?: string;
         status: string;
         rowType: "normal" | "suspension" | "holiday" | "norecord";
         dateStr?: string;
@@ -594,18 +646,77 @@ export default function AttendancePage() {
 
         if (susp) {
           tableRows.push({
-            dateLabel, name: "—", group: "—", timeIn: "—", timeOut: "—",
+            dateLabel, name: "—", group: "—", timeIn: "—", timeOut: "—", hours: "—",
             status: susp.type === "holiday" ? "Holiday" : "Suspended",
             rowType: susp.type === "holiday" ? "holiday" : "suspension",
             dateStr: dStr
           });
         } else if (dayRecs.length === 0) {
-          tableRows.push({ dateLabel, name: "(No records)", group: "", timeIn: "", timeOut: "", status: "", rowType: "norecord", dateStr: dStr });
+          tableRows.push({ dateLabel, name: "(No records)", group: "", timeIn: "", timeOut: "", hours: "—", status: "", rowType: "norecord", dateStr: dStr });
         } else {
           for (const r of dayRecs) {
             const timeIn = r.clockInTime ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
             const timeOut = r.clockOutTime ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
-            tableRows.push({ dateLabel, name: getAttendanceTeacherName(r.name), group: r.group, timeIn, timeOut, status: r.status, rowType: "normal", dateStr: dStr });
+
+            const teacherName = getAttendanceTeacherName(r.name);
+            const teacherAcc = accounts.find((a) => (a.id || a._id) === r.teacherUid) ||
+              accounts.find((a) => (a.fullName || "").toLowerCase() === teacherName.toLowerCase());
+            const noTimeLog = teacherAcc?.noTimeLog || exemptions.includes(r.teacherUid);
+
+            // Compute worked minutes
+            const m = workedMins(r.clockInTime, r.clockOutTime);
+            const hours = r.clockInTime && r.clockOutTime ? fmtHM(m) : (r.clockInTime ? "In Progress" : "—");
+
+            // Compute actual attendance status
+            let teacherStatus = "On Time";
+            let isLate = false;
+            if (r.timeInStatus === "Late") {
+              if (r.clockInTime && computeTimeInStatus(r.clockInTime, noTimeLog, teacherAcc?.fullName || teacherName, scheduleConfigs) === "On Time") {
+                teacherStatus = "On Time";
+              } else {
+                isLate = true;
+                teacherStatus = "Late";
+              }
+            } else if (r.timeInStatus === "Exempt" || noTimeLog) {
+              teacherStatus = "Exempt (Flexible)";
+            } else if (r.timeInStatus === "On Time") {
+              teacherStatus = "On Time";
+            } else if (r.clockInTime) {
+              const comp = computeTimeInStatus(r.clockInTime, noTimeLog, teacherAcc?.fullName || teacherName, scheduleConfigs);
+              if (comp === "Late") {
+                isLate = true;
+                teacherStatus = "Late";
+              } else if (comp === "Exempt") {
+                teacherStatus = "Exempt (Flexible)";
+              } else {
+                teacherStatus = "On Time";
+              }
+            } else {
+              teacherStatus = "Absent";
+            }
+
+            if (isLate && r.clockInTime) {
+              const lateDeduct = computeLateDeduction(r.clockInTime, 0, noTimeLog, teacherAcc?.fullName || teacherName);
+              if (lateDeduct.lateMinutes > 0) {
+                teacherStatus = `Late (${lateDeduct.lateMinutes}m)`;
+              }
+            }
+
+            if (r.clockInTime && !r.clockOutTime) {
+              teacherStatus += " (no clock-out)";
+            }
+
+            tableRows.push({
+              dateLabel,
+              name: teacherName,
+              group: r.group,
+              timeIn,
+              timeOut,
+              hours,
+              status: teacherStatus,
+              rowType: "normal",
+              dateStr: dStr,
+            });
           }
         }
         cur.setDate(cur.getDate() + 1);
@@ -632,16 +743,21 @@ export default function AttendancePage() {
 
       // ── Generate row HTML ─────────────────────────────────────────────────
       const statusBadge = (status: string) => {
-        const map: Record<string, string> = {
-          "On Time": "background:#e8f4fd;color:#005cc8;border:1px solid #bfdbfe;",
-          "Late": "background:#fffbeb;color:#d97706;border:1px solid #fde68a;",
-          "Absent": "background:#fef2f2;color:#dc2626;border:1px solid #fecaca;",
-          "Completed": "background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;",
-          "Suspended": "background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;",
-          "Holiday": "background:#fffbeb;color:#92400e;border:1px solid #fde68a;",
-          "Exempt (Flexible)": "background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;",
-        };
-        const style = map[status] || "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
+        const sLower = status.toLowerCase();
+        let style = "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
+        if (sLower.includes("on time")) {
+          style = "background:#e8f4fd;color:#005cc8;border:1px solid #bfdbfe;";
+        } else if (sLower.includes("late")) {
+          style = "background:#fffbeb;color:#d97706;border:1px solid #fde68a;";
+        } else if (sLower.includes("absent")) {
+          style = "background:#fef2f2;color:#dc2626;border:1px solid #fecaca;";
+        } else if (sLower.includes("holiday")) {
+          style = "background:#fffbeb;color:#92400e;border:1px solid #fde68a;";
+        } else if (sLower.includes("suspend")) {
+          style = "background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;";
+        } else if (sLower.includes("exempt")) {
+          style = "background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;";
+        }
         return status
           ? `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;${style}">${status}</span>`
           : "";
@@ -656,6 +772,9 @@ export default function AttendancePage() {
 
       let tablesHtml = "";
       for (const [groupName, rows] of groupedRows.entries()) {
+        const groupMins = rows.reduce((acc, r) => acc + parseHoursToMinutes(r.hours), 0);
+        const groupLate = rows.filter((r) => r.status.toLowerCase().includes("late")).length;
+
         const rowsHtml = rows.map((r, i) => `
           <tr style="background:${rowBg(r, i)};">
             <td>${r.dateLabel}</td>
@@ -663,6 +782,7 @@ export default function AttendancePage() {
             <td style="color:#005cc8;font-weight:600;">${r.group}</td>
             <td>${r.timeIn}</td>
             <td>${r.timeOut}</td>
+            <td style="font-weight:700;color:#002f76;">${r.hours ?? "—"}</td>
             <td>${statusBadge(r.status)}</td>
           </tr>`).join("");
 
@@ -671,19 +791,31 @@ export default function AttendancePage() {
           <table>
             <thead>
               <tr>
-                <th style="width:15%">Date</th>
-                <th style="width:22%">Teacher Name</th>
-                <th style="width:18%">Group</th>
-                <th style="width:12%">Time In</th>
-                <th style="width:12%">Time Out</th>
-                <th style="width:21%">Status</th>
+                <th style="width:14%">Date</th>
+                <th style="width:20%">Teacher Name</th>
+                <th style="width:16%">Group</th>
+                <th style="width:11%">Time In</th>
+                <th style="width:11%">Time Out</th>
+                <th style="width:11%">Hours</th>
+                <th style="width:17%">Status</th>
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>
+            <tfoot>
+              <tr style="background:#f0f5ff;font-weight:800;border-top:2px solid #002f76;">
+                <td colspan="5" style="text-align:right;padding:6px 8px;font-size:10px;color:#002f76;">TOTAL HOURS</td>
+                <td style="padding:6px 8px;font-size:11px;color:#002f76;">${fmtHM(groupMins) || "0h 00m"}</td>
+                <td style="padding:6px 8px;font-size:10px;color:#d97706;">${groupLate > 0 ? `${groupLate} Late` : "0 Late"}</td>
+              </tr>
+            </tfoot>
           </table>
           <br/>
         `;
       }
+
+      const overallMins = tableRows.reduce((acc, r) => acc + parseHoursToMinutes(r.hours), 0);
+      const overallLate = tableRows.filter((r) => r.status.toLowerCase().includes("late")).length;
+      const overallOnTime = tableRows.filter((r) => r.status.toLowerCase().includes("on time")).length;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -750,10 +882,11 @@ export default function AttendancePage() {
   </div>
 
   <div class="summary">
+    <span class="badge b-total">⏱️ ${fmtHM(overallMins) || "0h 00m"} Total Hours</span>
     <span class="badge b-total">📋 ${tableRows.filter(r => r.rowType === "normal").length} Records</span>
-    <span class="badge b-on-time">✓ ${tableRows.filter(r => r.status === "On Time").length} On Time</span>
-    <span class="badge b-late">⚠ ${tableRows.filter(r => r.status === "Late").length} Late</span>
-    <span class="badge b-absent">✗ ${tableRows.filter(r => r.status === "Absent").length} Absent</span>
+    <span class="badge b-on-time">✓ ${overallOnTime} On Time</span>
+    <span class="badge b-late">⚠ ${overallLate} Late</span>
+    <span class="badge b-absent">✗ ${tableRows.filter(r => r.status.toLowerCase().includes("absent")).length} Absent</span>
     <span class="badge b-holiday">🎉 ${tableRows.filter(r => r.rowType === "holiday").length} Holidays</span>
     <span class="badge b-susp">⛔ ${tableRows.filter(r => r.rowType === "suspension").length} Suspensions</span>
   </div>
@@ -772,10 +905,23 @@ export default function AttendancePage() {
 </body>
 </html>`;
 
-      setPrintHtml(html);
       setExportRows(tableRows);
       setExportGroups([...groupedRows.entries()]);
       setShowExportModal(false);
+
+      if (mode === "excel") {
+        downloadAttendanceWorkbook({
+          rows: tableRows,
+          groups: [...groupedRows.entries()],
+          groupBy: exportGroupBy,
+          isDtr: false,
+          startDate: exportStartDate,
+          endDate: exportEndDate,
+        });
+        return;
+      }
+
+      setPrintHtml(html);
     } catch (e) {
       console.error("Export failed:", e);
     } finally {
@@ -950,7 +1096,7 @@ export default function AttendancePage() {
 
   if (printHtml) {
     const handleDownloadExcel = () => {
-      const isDtr = exportRows.some((r) => r.hours !== undefined);
+      const isDtr = exportTeacherUid !== "all";
       downloadAttendanceWorkbook({
         rows: exportRows,
         groups: exportGroups,
@@ -1412,7 +1558,7 @@ export default function AttendancePage() {
               </select>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => setShowExportModal(false)}
                 disabled={exportLoading}
@@ -1421,21 +1567,22 @@ export default function AttendancePage() {
                 Cancel
               </button>
               <button
-                onClick={handleRangeExport}
+                onClick={() => handleRangeExport("excel")}
                 disabled={exportLoading || !exportStartDate || !exportEndDate}
-                className="flex-1 rounded-xl bg-[#005cc8] hover:bg-[#004bb0] py-2.5 text-[13px] font-bold text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex-1 rounded-xl bg-[#0050d5] hover:bg-[#0042b3] py-2.5 text-[13px] font-bold text-white transition-all disabled:opacity-60 flex items-center justify-center gap-1.5 shadow-sm"
               >
-                {exportLoading ? (
-                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
-                    <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-                    {isDtrExport ? "badge" : "picture_as_pdf"}
-                  </span>
-                )}
-                {exportLoading ? "Generating..." : isDtrExport ? "Generate DTR" : "Generate PDF"}
+                <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>download</span>
+                Download Excel
+              </button>
+              <button
+                onClick={() => handleRangeExport("pdf")}
+                disabled={exportLoading || !exportStartDate || !exportEndDate}
+                className="flex-1 rounded-xl bg-[#002f76] hover:bg-[#001f52] py-2.5 text-[13px] font-bold text-white transition-all disabled:opacity-60 flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+                  {isDtrExport ? "badge" : "picture_as_pdf"}
+                </span>
+                {isDtrExport ? "PDF DTR" : "PDF Preview"}
               </button>
             </div>
           </div>
