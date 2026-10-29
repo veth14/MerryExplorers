@@ -25,6 +25,7 @@ const navItems = [
   { label: "Payments", href: "/admin/payments" },
   { label: "Pioneer Families", href: "/admin/pioneer-families" },
   { label: "Virtual Sessions", href: "/admin/virtual-sessions" },
+  { label: "Games", href: "/admin/activities" },
   { label: "Gallery", href: "/admin/gallery" },
   { label: "Photo Albums", href: "/admin/photo-albums" },
   { label: "Payroll", href: "/admin/payroll" },
@@ -231,6 +232,17 @@ function StarIcon({ active }: { active?: boolean }) {
   );
 }
 
+function GameIcon({ active }: { active?: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
+      <rect x="2" y="6" width="20" height="12" rx="3" />
+      <path d="M6 12h4m-2-2v4" />
+      <line x1="15" y1="11" x2="15.01" y2="11" strokeWidth={3} />
+      <line x1="18" y1="13" x2="18.01" y2="13" strokeWidth={3} />
+    </svg>
+  );
+}
+
 const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Dashboard: DashboardIcon,
   Teachers: TeachersIcon,
@@ -251,6 +263,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   Payments: CreditCardIcon,
   "Pioneer Families": StarIcon,
   "Virtual Sessions": VideoIcon,
+  Games: GameIcon,
   Gallery: GalleryIcon,
   "Photo Albums": GalleryIcon,
   Payroll: PayrollIcon,
@@ -396,7 +409,11 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     },
     {
       title: "Programs & Calendar",
-      items: ["Programs", "Calendar", "Discovery Day", "Virtual Sessions"],
+        items: ["Programs", "Calendar", "Discovery Day", "Virtual Sessions"],
+    },
+    {
+      title: "Games & Learning",
+      items: ["Games"],
     },
     {
       title: "Staff & HR",
@@ -433,6 +450,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { label: "History", href: "/teacher/history", icon: <HistoryIcon /> },
     { label: "Leaves", href: "/teacher/leaves", icon: <LeaveIcon /> },
     { label: "Profile", href: "/teacher/profile", icon: <ProfileIcon /> },
+    { label: "Games", href: "/teacher/activities", icon: <GameIcon /> },
   ];
 
   const sidebarContent = (
@@ -474,7 +492,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                   href={item.href}
                   label={item.label}
                   icon={item.icon}
-                  isActive={pathname === item.href}
+                  isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
                   onClick={handleNavClick}
                 />
               ))}

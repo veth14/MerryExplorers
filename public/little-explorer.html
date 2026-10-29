@@ -1,0 +1,1155 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Little Explorer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #f8fbff; --fg: #002f76; --muted: #4f6280; --panel: #ffffff; --line: #d7e2f3;
+    --accent: #0066cc; --on-accent: #ffffff; --stage: #b9e5ff; --floor: #b7e4c7;
+    --f-display: 'Fredoka', ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif;
+    --f-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c2234; --fg: #f6ead8; --muted: #b7a994; --panel: #252d44; --line: #3a4562;
+      --accent: #ffb067; --on-accent: #2a1606; --stage: #b9e5ff; --floor: #3d6e5a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c2234; --fg: #f6ead8; --muted: #b7a994; --panel: #252d44; --line: #3a4562;
+    --accent: #ffb067; --on-accent: #2a1606; --stage: #b9e5ff; --floor: #3d6e5a; color-scheme: dark;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--f-body);
+    padding: 0;
+    overflow: hidden;
+  }
+  [hidden] { display: none !important; }
+  .app { position: relative; width: 100%; height: 100%; min-height: 0; max-width: 1100px; margin-inline: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .app:fullscreen, .app:-webkit-full-screen { width: 100vw; height: 100dvh; max-width: none; margin: 0; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); border-radius: 0; background: var(--bg); }
+  .top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+  .app:fullscreen .top, .app:-webkit-full-screen .top { display: none; }
+  h1 { font: 600 1.7rem/1.1 var(--f-display); margin: 0; }
+  .hint { margin: 0; color: var(--muted); font-size: 0.875rem; }
+  .control-dock { position: absolute; z-index: 8; top: 0; left: 0; right: 0; height: 0; pointer-events: none; }
+  .control-reveal { position: absolute; top: 0; left: 50%; width: 54px; height: 13px; padding: 0; border: 0; border-radius: 0 0 10px 10px; background: rgba(0,47,118,.76); color: #fff; font: 700 12px/10px var(--f-body); cursor: pointer; transform: translateX(-50%); pointer-events: auto; box-shadow: 0 3px 9px rgba(0,47,118,.18); }
+  .control-dock:hover .control-reveal, .control-dock:focus-within .control-reveal, .control-dock.is-open .control-reveal { height: 20px; }
+  .toolbar { position: absolute; top: 20px; left: 12px; right: 12px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; border: 1px solid rgba(215,226,243,.9); border-radius: 18px; background: rgba(248,251,255,.96); box-shadow: 0 12px 32px rgba(0,47,118,.2); opacity: 1; visibility: visible; transform: none; transform-origin: top center; transition: opacity .18s ease, transform .18s ease, visibility .18s; pointer-events: auto; }
+  .control-reveal { display: none; }
+  .app:fullscreen .control-dock, .app:-webkit-full-screen .control-dock { height: 20px; pointer-events: auto; }
+  .app:fullscreen .toolbar, .app:-webkit-full-screen .toolbar { opacity: 0; visibility: hidden; transform: translateY(-12px) scale(.985); pointer-events: none; }
+  .app:fullscreen .control-dock:hover .toolbar, .app:fullscreen .control-dock:focus-within .toolbar, .app:fullscreen .control-dock.is-open .toolbar,
+  .app:-webkit-full-screen .control-dock:hover .toolbar, .app:-webkit-full-screen .control-dock:focus-within .toolbar, .app:-webkit-full-screen .control-dock.is-open .toolbar { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
+  .app:fullscreen .control-reveal, .app:-webkit-full-screen .control-reveal { display: block; opacity: 0; }
+  @media (hover: none) {
+    .app:fullscreen .control-reveal, .app:-webkit-full-screen .control-reveal { opacity: 1; }
+  }
+  .fullscreen-learning-nav { position: absolute; z-index: 7; left: 50%; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); display: none; max-width: calc(100% - 20px); align-items: center; gap: 6px; overflow-x: auto; padding: 7px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: rgba(248,251,255,.94); box-shadow: 0 12px 30px rgba(0,47,118,.25), inset 0 1px 0 #fff; transform: translateX(-50%); backdrop-filter: blur(10px); }
+  .app:fullscreen .fullscreen-learning-nav, .app:-webkit-full-screen .fullscreen-learning-nav { display: flex; }
+  .fullscreen-learning-nav button { flex: 0 0 auto; min-height: 44px; padding: 8px 13px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--fg); font: 700 .88rem/1.1 var(--f-body); white-space: nowrap; cursor: pointer; touch-action: manipulation; }
+  .fullscreen-learning-nav button.is-selected { border-color: #ffcc00; background: #003399; color: #fff; box-shadow: 0 3px 0 #00245a; }
+  .fullscreen-learning-nav button:active { transform: translateY(1px); }
+  @media (max-width: 640px) {
+    .fullscreen-learning-nav { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 16px); gap: 4px; padding: 6px; }
+    .fullscreen-learning-nav button { min-height: 48px; padding: 8px 10px; font-size: .82rem; }
+  }
+  .model-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+  .model-label { padding: 0 7px; color: var(--muted); font-size: .78rem; font-weight: 700; }
+  .model-option { font: inherit; font-size: .85rem; font-weight: 700; color: var(--fg); background: transparent; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+  .model-option[aria-pressed="true"] { color: #fff; background: var(--accent); }
+  .stage { position: relative; flex: 1; min-height: 0; background: var(--stage); border-radius: 22px; overflow: hidden; cursor: grab; }
+  .stage:active { cursor: grabbing; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .zoom-controls { position: absolute; z-index: 4; top: 12px; right: 12px; display: flex; gap: 6px; }
+  .zoom-controls button { min-width: 38px; min-height: 38px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.95); color: var(--fg); box-shadow: 0 2px 8px rgba(0,47,118,.12); font: 700 1.15rem/1 var(--f-body); cursor: pointer; touch-action: manipulation; }
+  .zoom-controls button:hover { border-color: var(--accent); background: #fff; }
+  .touch-pointer { position: absolute; z-index: 3; display: none; width: 30px; height: 30px; border: 3px solid #ffcc00; border-radius: 50%; background: rgba(255, 204, 0, .14); box-shadow: 0 0 0 3px rgba(255, 204, 0, .18), 0 2px 7px rgba(0, 47, 118, .18); transform: translate(-50%, -50%); pointer-events: none; animation: pointer-pulse 1.2s ease-in-out infinite; }
+  .callout-line { position: absolute; z-index: 5; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .callout-line path { fill: none; stroke: #ffbf00; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 2px rgba(0,47,118,.32)); }
+  .callout-line circle { fill: #fff8d5; stroke: #ffbf00; stroke-width: 4; filter: drop-shadow(0 2px 3px rgba(0,47,118,.28)); }
+  .part-popup { position: absolute; z-index: 6; top: 0; left: 0; display: flex; align-items: center; gap: 12px; width: min(330px, calc(100% - 28px)); padding: 14px 17px; border: 2px solid #ffcc00; border-radius: 22px; background: linear-gradient(145deg, #fff 10%, #fffaf0 100%); color: #002f76; box-shadow: 0 14px 0 #e6a900, 0 20px 32px rgba(0,47,118,.28), inset 0 2px 0 #fff; opacity: 0; visibility: hidden; transform: perspective(700px) rotateX(8deg) scale(.88); transform-origin: center; transition: opacity .2s ease, transform .24s cubic-bezier(.2,.85,.2,1), visibility .2s; pointer-events: none; }
+  .part-popup.is-visible { opacity: 1; visibility: visible; transform: perspective(700px) rotateX(0) scale(1); }
+  .part-popup-icon { display: grid; flex: 0 0 50px; width: 50px; height: 50px; place-items: center; border: 2px solid #ffe27a; border-radius: 17px; background: linear-gradient(145deg, #fff4bf, #ffdf67); box-shadow: inset 0 3px 5px rgba(255,255,255,.9), 0 4px 0 #e8b51e; font-size: 1.8rem; }
+  .part-popup-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+  .part-popup-name { font: 600 1.2rem/1.15 var(--f-display); }
+  .part-popup-hint { color: #4f6280; font-size: .9rem; line-height: 1.35; }
+  .part-popup-kicker { color: #a66d00; font-size: .68rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+  @keyframes pointer-pulse { 50% { scale: 1.12; } }
+  .fallback { margin: 0; padding: 24px; color: var(--muted); }
+  .toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tog { font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 9px 18px; cursor: pointer; }
+  .customize-toggle { font: inherit; font-weight: 700; color: var(--fg); background: #ffcc00; border: 1px solid #e6b800; border-radius: 999px; padding: 9px 16px; cursor: pointer; }
+  .fullscreen-toggle { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-weight: 700; color: var(--fg); background: rgba(255,255,255,.96); border: 1px solid var(--line); border-radius: 12px; padding: 9px 13px; box-shadow: 0 2px 8px rgba(0,47,118,.12); cursor: pointer; }
+  .customize-panel { position: absolute; z-index: 10; top: 66px; right: 0; width: min(100%, 760px); padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 14px 36px rgba(0,47,118,.2); }
+  .tog[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .tog:hover { border-color: var(--accent); }
+  .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 10px; }
+  .group { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .group legend { padding: 0; margin-bottom: 6px; font: 600 .95rem var(--f-display); color: var(--fg); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw { width: 32px; height: 32px; padding: 0; border-radius: 50%; background: var(--c); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+  .sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+  .sw:hover { box-shadow: 0 0 0 2px var(--muted); }
+  .sw[aria-pressed="true"]:hover { box-shadow: 0 0 0 3px var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Little Explorer</h1>
+    <p class="hint">Drag or pinch to explore. Tap a body part to learn it.</p>
+  </header>
+  <main id="stage" class="stage" aria-label="Interactive 3D child explorer. Tap a body part to learn its name.">
+    <div class="control-dock" id="control-dock">
+    <button class="control-reveal" id="control-reveal" type="button" aria-label="Show explorer controls" aria-expanded="false">⌄</button>
+    <div class="toolbar" id="explorer-toolbar" aria-label="Explorer controls">
+    <div class="model-picker" role="group" aria-label="Choose an explorer">
+      <span class="model-label">Explorer</span>
+      <button type="button" class="model-option" id="model-boy" aria-pressed="true">Boy</button>
+      <button type="button" class="model-option" id="model-girl" aria-pressed="false">Girl</button>
+    </div>
+    <div class="toggles">
+      <button type="button" class="tog" id="tog-wave" aria-pressed="false">Wave</button>
+      <button type="button" class="tog" id="tog-face" aria-pressed="false">Close-up</button>
+      <button type="button" class="tog" id="tog-spin" aria-pressed="false">Spin</button>
+      <button type="button" class="tog" id="tog-pack" aria-pressed="true">Backpack</button>
+    </div>
+    <button type="button" class="customize-toggle" id="tog-customize" aria-expanded="false" aria-controls="customize-panel">🎨 Customize</button>
+    <button type="button" class="fullscreen-toggle" id="fullscreen-toggle" aria-label="Enter fullscreen">⛶ Fullscreen</button>
+    </div>
+    </div>
+    <section class="customize-panel" id="customize-panel" aria-label="Customize the explorer" hidden>
+      <div class="groups" id="groups"></div>
+    </section>
+    <div class="zoom-controls" role="group" aria-label="Zoom controls">
+      <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+      <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+      <button type="button" id="zoom-reset">Fit</button>
+    </div>
+    <nav class="fullscreen-learning-nav" id="fullscreen-learning-nav" aria-label="Body part lesson navigation">
+      <button type="button" data-nav="previous" aria-label="Previous body part">←</button>
+      <button type="button" data-part-id="head">Face</button>
+      <button type="button" data-part-id="shoulders">Body</button>
+      <button type="button" data-part-id="knees">Legs &amp; feet</button>
+      <button type="button" data-nav="next" aria-label="Next body part">→</button>
+    </nav>
+    <div id="touch-pointer" class="touch-pointer" aria-hidden="true"></div>
+    <svg class="callout-line" id="callout-line" aria-hidden="true" hidden><path id="callout-path"></path><circle id="callout-dot" r="7"></circle></svg>
+    <div id="part-popup" class="part-popup" role="status" aria-live="polite" hidden>
+      <span class="part-popup-copy"><span class="part-popup-kicker">You found</span><strong class="part-popup-name" id="part-popup-name"></strong><span class="part-popup-hint" id="part-popup-hint"></span></span>
+      <span class="part-popup-icon" id="part-popup-icon" aria-hidden="true"></span>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function fail(msg) { stage.innerHTML = '<p class="fallback">' + msg + '</p>'; }
+  if (!window.THREE || !THREE.OrbitControls) { fail('The 3D library did not load. Check your connection and reload the page.'); return; }
+  var renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+  catch (e) { fail('This browser could not start WebGL, so the 3D figure cannot be shown.'); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? 1 : 1.5));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  stage.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(32, 1, 0.05, 100);
+  camera.position.set(2.6, 2.0, 7.6);
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  var FULL = { target: new THREE.Vector3(0, 1.35, 0), dist: 8 };
+  var FACE = { target: new THREE.Vector3(0, 2.12, 0.2), dist: 2.7 };
+  controls.target.copy(FULL.target);
+  controls.enableDamping = true; controls.dampingFactor = 0.07; controls.enablePan = false;
+  controls.enableZoom = true;
+  controls.minDistance = 1.8; controls.maxDistance = 14; controls.maxPolarAngle = Math.PI * 0.49;
+  controls.autoRotateSpeed = 2.0;
+  controls.update();
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lin(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
+  function std(hex, rough) { return new THREE.MeshStandardMaterial({ color: lin(hex), roughness: rough, metalness: 0 }); }
+  function setCol(m, hex) { m.color.set(hex).convertSRGBToLinear(); }
+
+  /* soft, even lighting: a sunny key, a warm bounce and a gentle sky fill */
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xffd9b0, 0.95));
+  var key = new THREE.DirectionalLight(0xfff3e0, 0.85);
+  key.position.set(3.5, 6, 5.5);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.left = -3; key.shadow.camera.right = 3; key.shadow.camera.top = 4; key.shadow.camera.bottom = -2;
+  key.shadow.camera.near = 1; key.shadow.camera.far = 20;
+  key.shadow.bias = -0.0005; key.shadow.radius = 4;
+  scene.add(key);
+
+  var M = {
+    skin: std('#f1c19b', 0.75), hair: std('#6a4126', 0.7),
+    eye: std('#4b2e1e', 0.25), pupil: std('#120c0a', 0.2),
+    hl: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    blush: new THREE.MeshBasicMaterial({ color: lin('#ff7f7f'), transparent: true, opacity: 0.45, depthWrite: false }),
+    mouth: std('#8a3b2e', 0.6),
+    shirt: std('#2a8fa6', 0.85), star: std('#ffcf45', 0.7), bow: std('#ee5c9a', 0.72),
+    jeans: std('#41587f', 0.85), skirt: std('#8a63d2', 0.82), shoe: std('#f7f1e6', 0.7), sole: std('#e8573f', 0.7),
+    pack: std('#e8573f', 0.75), trim: std('#f2b632', 0.75), strap: std('#b9402c', 0.8),
+    floor: std('#a8dcb6', 0.95), rim: std('#c4531d', 0.7),
+    villageGround: std('#8fcb83', 0.98), house: std('#fff1c9', 0.82), roofCoral: std('#e8573f', 0.82),
+    roofBlue: std('#4c86cf', 0.82), roofYellow: std('#f2b632', 0.82), roofPurple: std('#9671c8', 0.82), door: std('#8a5a3b', 0.9),
+    window: std('#a9e0f3', 0.35), treeBark: std('#8a5a3b', 0.92), leafGreen: std('#5eaa62', 0.94),
+    leafLight: std('#82c96d', 0.94), flower: std('#ffcf45', 0.8), path: std('#f4cd8b', 0.98),
+    signBoard: std('#ffffff', 0.78), signPost: std('#3965a2', 0.78), signTrim: std('#f2b632', 0.65), hillBlue: std('#72b9cf', 0.98), hillGreen: std('#8bcb91', 0.98),
+    mountain: std('#75b9de', 0.98), mountainLilac: std('#a99be0', 0.98), snow: std('#ffffff', 0.96), steppingStone: std('#f5d8a8', 0.96),
+    berry: std('#ed6b62', 0.85),
+    water: std('#55c5e2', 0.28), waterShine: std('#c9f5ff', 0.32),
+    cloud: std('#e3f4ff', 0.98), skyBlue: std('#8ed4f3', 0.82), sun: new THREE.MeshBasicMaterial({ color: 0xffc83d }),
+    blob: new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.22, color: 0x000000, depthWrite: false })
+  };
+
+  var SPH = new THREE.SphereGeometry(1, 40, 28);
+  function mk(geo, mat, x, y, z, sx, sy, sz) {
+    var o = new THREE.Mesh(geo, mat);
+    o.position.set(x || 0, y || 0, z || 0);
+    if (sx) { o.scale.set(sx, sy, sz); }
+    o.castShadow = true; o.receiveShadow = true;
+    return o;
+  }
+
+  var child = new THREE.Group();
+  scene.add(child);
+
+  /* ---------- body ---------- */
+  var boyPants = new THREE.Group();
+  child.add(boyPants);
+  boyPants.add(mk(SPH, M.jeans, 0, 0.82, 0, 0.37, 0.2, 0.3));
+  var boyTorso = mk(SPH, M.shirt, 0, 1.2, 0, 0.42, 0.5, 0.34);
+  child.add(boyTorso);
+  child.add(mk(new THREE.CylinderGeometry(0.12, 0.14, 0.3, 24), M.skin, 0, 1.72, 0));
+  var boyCollar = mk(new THREE.TorusGeometry(0.14, 0.035, 10, 28), M.shirt, 0, 1.66, 0);
+  boyCollar.rotation.x = Math.PI / 2;
+  child.add(boyCollar);
+
+  /* A gently tapered top gives the girl explorer a distinct, natural child silhouette. */
+  var girlTopProfile = [
+    new THREE.Vector2(0, -0.48), new THREE.Vector2(0.29, -0.48),
+    new THREE.Vector2(0.31, -0.34), new THREE.Vector2(0.27, -0.12),
+    new THREE.Vector2(0.3, 0.12), new THREE.Vector2(0.35, 0.34),
+    new THREE.Vector2(0.3, 0.48), new THREE.Vector2(0, 0.48)
+  ];
+  var girlTorso = new THREE.Mesh(new THREE.LatheGeometry(girlTopProfile, 32), M.shirt);
+  girlTorso.position.y = 1.2;
+  girlTorso.castShadow = true;
+  girlTorso.receiveShadow = true;
+  child.add(girlTorso);
+  var girlCollar = mk(new THREE.TorusGeometry(0.13, 0.03, 10, 28), M.shirt, 0, 1.66, 0);
+  girlCollar.rotation.x = Math.PI / 2;
+  child.add(girlCollar);
+  girlTorso.visible = false;
+  girlCollar.visible = false;
+  var star = new THREE.Shape(), k, r, a;
+  for (k = 0; k < 10; k++) {
+    r = k % 2 === 0 ? 0.1 : 0.045; a = Math.PI / 5 * k + Math.PI / 2;
+    if (k === 0) { star.moveTo(Math.cos(a) * r, Math.sin(a) * r); } else { star.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+  }
+  var starMesh = new THREE.Mesh(new THREE.ShapeGeometry(star), M.star);
+  starMesh.position.set(0, 1.32, 0.333);
+  child.add(starMesh);
+
+  [-1, 1].forEach(function (s) {
+    boyPants.add(mk(new THREE.CylinderGeometry(0.15, 0.14, 0.62, 24), M.jeans, 0.19 * s, 0.46, 0));
+    child.add(mk(SPH, M.shoe, 0.19 * s, 0.11, 0.07, 0.17, 0.1, 0.26));
+    child.add(mk(SPH, M.sole, 0.19 * s, 0.04, 0.07, 0.18, 0.04, 0.275));
+  });
+
+  var girlOutfit = new THREE.Group();
+  child.add(girlOutfit);
+  [-1, 1].forEach(function (s) {
+    girlOutfit.add(mk(new THREE.CylinderGeometry(0.12, 0.11, 0.57, 24), M.skin, 0.19 * s, 0.45, 0));
+    girlOutfit.add(mk(SPH, M.skin, 0.19 * s, 0.47, 0, 0.13, 0.13, 0.12));
+  });
+  girlOutfit.add(mk(new THREE.CylinderGeometry(0.31, 0.48, 0.42, 32), M.skirt, 0, 0.72, 0));
+  var skirtHem = mk(new THREE.TorusGeometry(0.46, 0.025, 10, 40), M.trim, 0, 0.51, 0);
+  skirtHem.rotation.x = Math.PI / 2;
+  girlOutfit.add(skirtHem);
+  girlOutfit.visible = false;
+
+  /* ---------- arms ---------- */
+  function makeArm(s) {
+    var sh = new THREE.Group();
+    sh.position.set(0.46 * s, 1.5, 0);
+    sh.add(mk(new THREE.CylinderGeometry(0.085, 0.075, 0.5, 20), M.skin, 0, -0.3, 0));
+    sh.add(mk(SPH, M.shirt, 0, 0, 0, 0.17, 0.16, 0.17));
+    sh.add(mk(SPH, M.skin, 0, -0.58, 0, 0.115, 0.125, 0.1));
+    child.add(sh);
+    return sh;
+  }
+  var armL = makeArm(-1), armR = makeArm(1);
+
+  /* ---------- head ---------- */
+  var headPivot = new THREE.Group();
+  headPivot.position.set(0, 2.12, 0);
+  child.add(headPivot);
+  headPivot.add(mk(SPH, M.skin, 0, 0, 0, 0.5, 0.46, 0.475));
+  headPivot.add(mk(SPH, M.skin, 0, -0.06, 0.455, 0.045, 0.04, 0.04));
+  [-1, 1].forEach(function (s) {
+    headPivot.add(mk(SPH, M.skin, 0.49 * s, -0.01, -0.01, 0.06, 0.1, 0.085));
+    var cheek = mk(SPH, M.blush, 0.29 * s, -0.1, 0.368, 0.08, 0.055, 0.03);
+    cheek.rotation.y = 0.6 * s; cheek.castShadow = false;
+    headPivot.add(cheek);
+    var brow = mk(SPH, M.hair, 0.17 * s, 0.14, 0.42, 0.07, 0.017, 0.02);
+    brow.rotation.z = -0.12 * s; brow.castShadow = false;
+    headPivot.add(brow);
+  });
+  var mouth = mk(new THREE.TorusGeometry(0.095, 0.011, 8, 24, Math.PI), M.mouth, 0, -0.115, 0.44, 1, 0.55, 1);
+  mouth.rotation.z = Math.PI; mouth.castShadow = false;
+  headPivot.add(mouth);
+
+  var eyes = [];
+  [-1, 1].forEach(function (s) {
+    var g = new THREE.Group();
+    g.position.set(0.17 * s, -0.01, 0.42);
+    g.add(mk(SPH, M.eye, 0, 0, 0, 0.065, 0.083, 0.05));
+    g.add(mk(SPH, M.pupil, 0, -0.005, 0.03, 0.04, 0.055, 0.025));
+    g.add(mk(SPH, M.hl, 0.02, 0.03, 0.05, 0.017, 0.017, 0.01));
+    headPivot.add(g);
+    eyes.push(g);
+  });
+
+  /* hair: a soft cap tilted back to leave the forehead clear, plus a little tuft */
+  var cap = mk(new THREE.SphereGeometry(1, 40, 24, 0, Math.PI * 2, 0, 1.65), M.hair, 0, 0.04, -0.02, 0.525, 0.51, 0.525);
+  cap.rotation.x = -0.45; cap.material.side = THREE.DoubleSide;
+  headPivot.add(cap);
+  headPivot.add(mk(SPH, M.hair, 0, 0.5, -0.02, 0.07, 0.09, 0.07));
+
+  var girlHair = new THREE.Group();
+  headPivot.add(girlHair);
+  [-1, 1].forEach(function (s) {
+    girlHair.add(mk(SPH, M.hair, 0.43 * s, -0.3, 0.02, 0.14, 0.34, 0.15));
+    var bow = new THREE.Group();
+    bow.position.set(0.45 * s, -0.02, 0.14);
+    bow.add(mk(SPH, M.bow, -0.055 * s, 0, 0, 0.065, 0.045, 0.035));
+    bow.add(mk(SPH, M.bow, 0.055 * s, 0, 0, 0.065, 0.045, 0.035));
+    bow.add(mk(SPH, M.star, 0, 0, 0.025, 0.025, 0.03, 0.02));
+    girlHair.add(bow);
+  });
+  var headbandPoints = [
+    new THREE.Vector3(-0.42, 0.25, 0.25), new THREE.Vector3(-0.28, 0.32, 0.37),
+    new THREE.Vector3(0, 0.35, 0.43), new THREE.Vector3(0.28, 0.32, 0.37),
+    new THREE.Vector3(0.42, 0.25, 0.25)
+  ];
+  girlHair.add(mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(headbandPoints), 24, 0.025, 8, false), M.bow));
+  girlHair.visible = false;
+
+  var girlFaceDetails = new THREE.Group();
+  headPivot.add(girlFaceDetails);
+  [-1, 1].forEach(function (s) {
+    for (var lash = 0; lash < 3; lash++) {
+      var lashMesh = mk(new THREE.CylinderGeometry(0.006, 0.012, 0.045, 6), M.hair,
+        (0.23 + lash * 0.025) * s, 0.055 + lash * 0.012, 0.46);
+      lashMesh.rotation.z = -0.35 * s;
+      girlFaceDetails.add(lashMesh);
+    }
+  });
+  girlFaceDetails.visible = false;
+
+  /* ---------- backpack ---------- */
+  var pack = new THREE.Group();
+  child.add(pack);
+  pack.add(mk(SPH, M.pack, 0, 1.22, -0.42, 0.3, 0.38, 0.19));
+  pack.add(mk(SPH, M.trim, 0, 1.0, -0.58, 0.2, 0.13, 0.08));
+  [-1, 1].forEach(function (s) {
+    var pts = [[0.2, 1.45, -0.25], [0.2, 1.6, -0.12], [0.2, 1.655, 0], [0.2, 1.58, 0.17], [0.19, 1.35, 0.3]].map(function (p) { return new THREE.Vector3(p[0] * s, p[1], p[2]); });
+    pack.add(mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.022, 8, false), M.strap));
+  });
+
+  /* Large invisible targets let small hands select body parts. */
+  var touchMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  var bodyPartTargets = [];
+  function addTouchTarget(id, x, y, z, radius) {
+    var target = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), touchMaterial);
+    target.position.set(x, y, z);
+    target.userData.bodyPartId = id;
+    target.userData.basePosition = target.position.clone();
+    child.add(target);
+    bodyPartTargets.push(target);
+  }
+  addTouchTarget('head', 0, 2.3, 0.34, 0.14);
+  addTouchTarget('hair', 0, 2.46, 0.19, 0.25);
+  addTouchTarget('eyes', -0.17, 2.11, 0.43, 0.09);
+  addTouchTarget('eyes', 0.17, 2.11, 0.43, 0.09);
+  addTouchTarget('ears', -0.5, 2.11, 0.03, 0.13);
+  addTouchTarget('ears', 0.5, 2.11, 0.03, 0.13);
+  addTouchTarget('nose', 0, 2.06, 0.46, 0.065);
+  addTouchTarget('mouth', 0, 1.98, 0.45, 0.1);
+  addTouchTarget('shoulders', -0.39, 1.52, 0.02, 0.16);
+  addTouchTarget('shoulders', 0.39, 1.52, 0.02, 0.16);
+  addTouchTarget('arms', -0.54, 1.27, 0.01, 0.22);
+  addTouchTarget('arms', 0.54, 1.27, 0.01, 0.22);
+  addTouchTarget('elbows', -0.49, 1.17, 0.03, 0.12);
+  addTouchTarget('elbows', 0.49, 1.17, 0.03, 0.12);
+  addTouchTarget('hands', -0.46, 0.92, 0.03, 0.15);
+  addTouchTarget('hands', 0.46, 0.92, 0.03, 0.15);
+  addTouchTarget('knees', -0.19, 0.47, 0.07, 0.14);
+  addTouchTarget('knees', 0.19, 0.47, 0.07, 0.14);
+  addTouchTarget('feet', -0.19, 0.1, 0.12, 0.17);
+  addTouchTarget('feet', 0.19, 0.1, 0.12, 0.17);
+
+  /* ---------- stage floor ---------- */
+  var floor = mk(new THREE.CylinderGeometry(1.7, 1.75, 0.12, 64), M.floor, 0, -0.06, 0);
+  floor.castShadow = false;
+  scene.add(floor);
+  var rim = mk(new THREE.TorusGeometry(1.73, 0.03, 10, 80), M.rim, 0, 0, 0);
+  rim.rotation.x = Math.PI / 2; rim.castShadow = false;
+  scene.add(rim);
+
+  /* ---------- 3D adventure village backdrop ---------- */
+  var village = new THREE.Group();
+  scene.add(village);
+  /* Keep the grass finite so the white sky and distant scenery stay visible. */
+  var villageGround = mk(new THREE.PlaneGeometry(48, 100), M.villageGround, 0, -0.15, -20);
+  villageGround.rotation.x = -Math.PI / 2;
+  villageGround.castShadow = false;
+  villageGround.receiveShadow = true;
+  village.add(villageGround);
+
+  var houseFootprints = [];
+  function makeHouse(x, z, roofMaterial, scale, facing) {
+    var house = new THREE.Group();
+    house.position.set(x, -0.13, z);
+    house.scale.setScalar(scale || 1);
+    house.rotation.y = facing || 0;
+    houseFootprints.push({ x: x, z: z, radius: 1.28 * (scale || 1) });
+    house.add(mk(new THREE.BoxGeometry(1.35, 1.08, 0.92), M.house, 0, 0.54, 0));
+    var roof = mk(new THREE.ConeGeometry(1.12, 0.78, 4), roofMaterial, 0, 1.42, 0);
+    roof.rotation.y = Math.PI / 4;
+    house.add(roof);
+    house.add(mk(new THREE.BoxGeometry(0.28, 0.52, 0.06), M.door, 0, 0.26, 0.48));
+    [-1, 1].forEach(function (s) {
+      house.add(mk(new THREE.BoxGeometry(0.25, 0.23, 0.06), M.window, 0.37 * s, 0.67, 0.48));
+      house.add(mk(new THREE.BoxGeometry(0.3, 0.035, 0.07), M.trim, 0.37 * s, 0.67, 0.52));
+      house.add(mk(new THREE.BoxGeometry(0.035, 0.27, 0.07), M.trim, 0.37 * s, 0.67, 0.52));
+    });
+    house.add(mk(new THREE.BoxGeometry(0.2, 0.42, 0.2), M.door, 0.43, 1.55, -0.18));
+    village.add(house);
+  }
+
+  function makeTree(x, z, scale) {
+    var tree = new THREE.Group();
+    var treeX = x, treeZ = z, treeScale = scale || 1;
+    for (var attempt = 0; attempt < 18; attempt++) {
+      var collision = null;
+      for (var houseIndex = 0; houseIndex < houseFootprints.length; houseIndex++) {
+        var houseSite = houseFootprints[houseIndex];
+        var dx = treeX - houseSite.x, dz = treeZ - houseSite.z;
+        var distance = Math.sqrt(dx * dx + dz * dz);
+        var clearance = houseSite.radius + treeScale * 1.22;
+        if (distance < clearance) { collision = { dx: dx, dz: dz, distance: distance, clearance: clearance }; break; }
+      }
+      if (!collision) break;
+      var length = collision.distance || 1;
+      var move = collision.clearance - collision.distance + 0.12;
+      treeX += (collision.distance ? collision.dx / length : 1) * move;
+      treeZ += (collision.distance ? collision.dz / length : 0) * move;
+    }
+    tree.position.set(treeX, -0.13, treeZ);
+    tree.scale.setScalar(treeScale);
+    tree.add(mk(new THREE.CylinderGeometry(0.13, 0.19, 0.82, 10), M.treeBark, 0, 0.41, 0));
+    tree.add(mk(new THREE.ConeGeometry(0.72, 1.0, 9), M.leafGreen, 0, 1.18, 0));
+    tree.add(mk(new THREE.ConeGeometry(0.55, 0.78, 9), M.leafLight, 0, 1.9, 0));
+    village.add(tree);
+  }
+
+  /* Rounded hills make a continuous landscape behind the buildings. */
+  [[-4.7, -4.8, 2.25, 1.25, 0.48, M.hillBlue], [4.8, -5.4, 2.6, 1.45, 0.55, M.hillGreen], [0, -6.4, 3.3, 1.35, 0.45, M.hillBlue]].forEach(function (h) {
+    var hill = mk(SPH, h[5], h[0], h[4], h[1], h[2], h[3], 1.2);
+    hill.castShadow = false;
+    village.add(hill);
+  });
+
+  /* A tall, layered mountain range gives the village a destination to explore. */
+  function makeMountain(x, z, width, height, material) {
+    var mountain = new THREE.Group();
+    mountain.position.set(x, -0.14, z);
+    var peak = mk(new THREE.ConeGeometry(width * 0.5, height, 7), material, 0, height * 0.5, 0);
+    peak.rotation.y = 0.2;
+    peak.castShadow = false;
+    mountain.add(peak);
+    var snowCap = mk(new THREE.ConeGeometry(width * 0.18, height * 0.3, 7), M.snow, 0, height * 0.86, width * 0.035);
+    snowCap.castShadow = false;
+    mountain.add(snowCap);
+    village.add(mountain);
+  }
+  makeMountain(-6.5, -8.5, 5.8, 5.8, M.mountain);
+  makeMountain(-3.5, -9.2, 4.6, 4.6, M.mountainLilac);
+  makeMountain(0.1, -9.8, 5.8, 6.1, M.mountain);
+  makeMountain(4.1, -9.1, 4.7, 4.8, M.mountainLilac);
+  makeMountain(7.2, -8.7, 5.4, 5.7, M.mountain);
+  for (var ridgeIndex = 0; ridgeIndex < 14; ridgeIndex++) {
+    var ridgeAngle = ridgeIndex * Math.PI * 2 / 14;
+    var ridgeRadius = ridgeIndex % 2 === 0 ? 19 : 17.2;
+    makeMountain(Math.sin(ridgeAngle) * ridgeRadius, Math.cos(ridgeAngle) * ridgeRadius,
+      ridgeIndex % 3 === 0 ? 5.2 : 4.3, ridgeIndex % 4 === 0 ? 5.8 : 4.6,
+      ridgeIndex % 2 === 0 ? M.mountain : M.mountainLilac);
+  }
+
+  /* A broad winding path leads from the village to the explorer's stage. */
+  var path = mk(new THREE.ShapeGeometry((function () {
+    var shape = new THREE.Shape();
+    shape.moveTo(-0.42, -7); shape.quadraticCurveTo(-0.15, -4.6, -0.85, -3.4);
+    shape.quadraticCurveTo(-1.35, -2.3, -0.65, -1.25); shape.lineTo(0.65, -1.25);
+    shape.quadraticCurveTo(1.25, -2.5, 0.55, -3.7); shape.quadraticCurveTo(0.15, -5.1, 0.42, -7);
+    shape.closePath(); return shape;
+  })()), M.path, 0, -0.135, -4.05);
+  path.rotation.x = -Math.PI / 2;
+  path.castShadow = false;
+  village.add(path);
+
+  /* Large homes frame the explorer, with a second row to make the village feel deep. */
+  makeHouse(-3.55, -2.75, M.roofCoral, 1.65);
+  makeHouse(3.55, -3.05, M.roofBlue, 1.65);
+  makeHouse(-1.95, -5.35, M.roofYellow, 1.25);
+  makeHouse(1.9, -5.7, M.roofPurple, 1.25);
+  /* A second ring of homes means every direction has a village, not an empty backside. */
+  var roofColors = [M.roofCoral, M.roofBlue, M.roofYellow, M.roofPurple];
+  for (var homeIndex = 0; homeIndex < 10; homeIndex++) {
+    var homeAngle = homeIndex * Math.PI * 2 / 10 + Math.PI / 10;
+    var homeRadius = 12.3 + (homeIndex % 2) * 1.1;
+    makeHouse(Math.sin(homeAngle) * homeRadius, Math.cos(homeAngle) * homeRadius,
+      roofColors[homeIndex % roofColors.length], homeIndex % 3 === 0 ? 1.45 : 1.28, homeAngle + Math.PI);
+  }
+  makeTree(-2.55, -2.6, 1.25);
+  makeTree(2.6, -2.8, 1.25);
+  makeTree(-4.8, -3.85, 1.5);
+  makeTree(4.8, -4.1, 1.5);
+  makeTree(-4.1, -6.1, 1.15);
+  makeTree(4.1, -6.4, 1.15);
+  /* Bring the forest forward so the scene surrounds the stage instead of ending at the horizon. */
+  makeTree(-4.1, -0.35, 1.15);
+  makeTree(4.1, -0.55, 1.15);
+  makeTree(-5.25, 1.35, 1.05);
+  makeTree(5.25, 1.15, 1.05);
+  makeTree(-4.65, 3.0, 0.82);
+  makeTree(4.65, 2.8, 0.82);
+  /* Forest bands wrap around the entire explorer clearing. */
+  for (var treeIndex = 0; treeIndex < 28; treeIndex++) {
+    var treeAngle = treeIndex * Math.PI * 2 / 28;
+    var treeRadius = treeIndex % 3 === 0 ? 9.4 : 7.5;
+    var treeScale = treeIndex % 4 === 0 ? 1.35 : (treeIndex % 2 === 0 ? 1.1 : 0.92);
+    makeTree(Math.sin(treeAngle) * treeRadius, Math.cos(treeAngle) * treeRadius, treeScale);
+  }
+
+  function makeBush(x, z, scale, material) {
+    var bush = new THREE.Group();
+    bush.position.set(x, -0.12, z);
+    bush.scale.setScalar(scale || 1);
+    [[-0.22, 0.22, 0.02, 0.32], [0.12, 0.28, 0, 0.4], [0.38, 0.2, -0.02, 0.28]].forEach(function (leaf) {
+      bush.add(mk(SPH, material || M.leafGreen, leaf[0], leaf[1], leaf[2], leaf[3], leaf[3] * 0.9, leaf[3]));
+    });
+    bush.add(mk(SPH, M.berry, -0.02, 0.25, 0.27, 0.065, 0.065, 0.065));
+    village.add(bush);
+  }
+  [[-3.25, 1.25, 1.05], [3.25, 1.05, 1.05], [-5.8, -1.9, 1.2], [5.8, -2.0, 1.2],
+    [-3.7, 3.1, 0.9], [3.7, 3.0, 0.9], [-6.0, 3.2, 0.85], [6.0, 3.0, 0.85]].forEach(function (b, i) {
+    makeBush(b[0], b[1], b[2], i % 2 ? M.leafLight : M.leafGreen);
+  });
+  for (var bushIndex = 0; bushIndex < 18; bushIndex++) {
+    var bushAngle = bushIndex * Math.PI * 2 / 18 + 0.12;
+    var bushRadius = bushIndex % 3 === 0 ? 4.4 : 3.75;
+    makeBush(Math.sin(bushAngle) * bushRadius, Math.cos(bushAngle) * bushRadius,
+      bushIndex % 4 === 0 ? 0.9 : 0.7, bushIndex % 2 ? M.leafLight : M.leafGreen);
+  }
+  /* Flower beds and stepping stones fill the foreground with small discovery details. */
+  function makeFlower(x, z, petalMaterial, scale) {
+    var flower = new THREE.Group();
+    flower.position.set(x, -0.15, z);
+    flower.scale.setScalar(scale || 1);
+    flower.add(mk(new THREE.CylinderGeometry(0.018, 0.026, 0.34, 7), M.leafGreen, 0, 0.17, 0));
+    flower.add(mk(SPH, M.leafLight, -0.08, 0.14, 0.01, 0.11, 0.045, 0.055));
+    flower.add(mk(SPH, M.leafGreen, 0.08, 0.22, 0.01, 0.11, 0.045, 0.055));
+    for (var petal = 0; petal < 5; petal++) {
+      var angle = petal * Math.PI * 2 / 5;
+      flower.add(mk(SPH, petalMaterial, Math.cos(angle) * 0.105, 0.37 + Math.sin(angle) * 0.06,
+        Math.sin(angle) * 0.105, 0.085, 0.07, 0.075));
+    }
+    flower.add(mk(SPH, M.flower, 0, 0.37, 0, 0.06, 0.06, 0.06));
+    village.add(flower);
+  }
+  [[-3.2, 1.65], [-3.85, 1.9], [3.2, 1.8], [3.9, 1.65], [-5.1, -0.05], [5.1, -0.25],
+    [-0.9, 1.95], [0.9, 2.05], [-1.0, 2.35], [1.0, 2.5], [-0.85, 2.75], [0.9, 2.9],
+    [-2.55, 2.25], [2.55, 2.2], [-3.25, 2.55], [3.25, 2.45]].forEach(function (p, i) {
+    makeFlower(p[0], p[1], [M.flower, M.roofCoral, M.roofPurple][i % 3], i % 4 === 0 ? 1.15 : 0.88);
+  });
+  /* A continuous flower border keeps the explorer clearing decorated from every side. */
+  var meadowShape = new THREE.Shape();
+  for (var meadowPoint = 0; meadowPoint < 10; meadowPoint++) {
+    var meadowAngle = meadowPoint * Math.PI / 5 - Math.PI / 2;
+    var meadowRadius = meadowPoint % 2 === 0 ? 0.19 : 0.105;
+    var meadowX = Math.cos(meadowAngle) * meadowRadius;
+    var meadowY = Math.sin(meadowAngle) * meadowRadius;
+    if (meadowPoint === 0) { meadowShape.moveTo(meadowX, meadowY); } else { meadowShape.lineTo(meadowX, meadowY); }
+  }
+  meadowShape.closePath();
+  var meadowFlowerGeometry = new THREE.ExtrudeGeometry(meadowShape, {
+    depth: 0.035, bevelEnabled: true, bevelSegments: 1, bevelSize: 0.012, bevelThickness: 0.01
+  });
+  for (var meadowIndex = 0; meadowIndex < 40; meadowIndex++) {
+    var meadowAngleAround = meadowIndex * Math.PI * 2 / 40;
+    var meadowRadiusAround = meadowIndex % 2 === 0 ? 2.25 : 3.2;
+    var meadowXAround = Math.sin(meadowAngleAround) * meadowRadiusAround;
+    var meadowZAround = Math.cos(meadowAngleAround) * meadowRadiusAround;
+    var flowerColor = [M.flower, M.roofCoral, M.roofPurple, M.skyBlue][meadowIndex % 4];
+    var groundFlower = new THREE.Mesh(meadowFlowerGeometry, flowerColor);
+    groundFlower.rotation.x = -Math.PI / 2;
+    groundFlower.position.set(meadowXAround, -0.13, meadowZAround);
+    groundFlower.scale.setScalar(meadowIndex % 3 === 0 ? 1.05 : 0.82);
+    groundFlower.castShadow = false;
+    village.add(groundFlower);
+    village.add(mk(SPH, M.trim, meadowXAround, -0.075, meadowZAround, 0.045, 0.045, 0.045));
+  }
+  [[-2.35, 1.7], [2.35, 1.55], [-4.9, 2.9], [4.9, 2.75], [-5.7, 0.8], [5.7, 0.65]].forEach(function (p, i) {
+    var rock = mk(new THREE.DodecahedronGeometry(0.22, 0), i % 2 ? M.path : M.steppingStone, p[0], -0.02, p[1], 1.3, 0.65, 0.85);
+    rock.rotation.y = i * 0.65;
+    village.add(rock);
+  });
+  [[-4.45, 1.1], [4.45, 1.0], [-5.2, -0.9], [5.2, -1.0]].forEach(function (p, i) {
+    village.add(mk(new THREE.CylinderGeometry(0.09, 0.12, 0.24, 9), M.house, p[0], -0.03, p[1]));
+    village.add(mk(new THREE.SphereGeometry(0.22, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      i % 2 ? M.roofCoral : M.roofPurple, p[0], 0.12, p[1], 1, 0.78, 1));
+  });
+  [[-0.34, 1.95], [0.26, 2.25], [-0.2, 2.55], [0.35, 2.85]].forEach(function (p, i) {
+    village.add(mk(new THREE.CylinderGeometry(0.13, 0.17, 0.045, 10), M.steppingStone, p[0], -0.095, p[1]));
+  });
+  function makePond(x, z, scale) {
+    var pond = new THREE.Group();
+    pond.position.set(x, -0.13, z);
+    pond.scale.set(scale || 1, 1, (scale || 1) * 0.72);
+    var water = mk(new THREE.CircleGeometry(0.72, 40), M.water, 0, 0, 0);
+    water.rotation.x = -Math.PI / 2;
+    water.castShadow = false;
+    pond.add(water);
+    var edge = new THREE.Mesh(new THREE.TorusGeometry(0.69, 0.055, 8, 40), M.steppingStone);
+    edge.rotation.x = Math.PI / 2;
+    edge.position.y = 0.015;
+    edge.castShadow = false;
+    pond.add(edge);
+    var ripple = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.018, 6, 28), M.waterShine);
+    ripple.rotation.x = Math.PI / 2;
+    ripple.position.set(0.18, 0.025, -0.08);
+    pond.add(ripple);
+    [[-0.35, -0.15], [0.34, 0.2]].forEach(function (p) {
+      var pad = mk(SPH, M.leafGreen, p[0], 0.035, p[1], 0.19, 0.035, 0.14);
+      pad.castShadow = false;
+      pond.add(pad);
+      pond.add(mk(SPH, M.flower, p[0] + 0.04, 0.08, p[1], 0.06, 0.06, 0.06));
+    });
+    village.add(pond);
+  }
+  makePond(-3.15, 1.95, 1.05);
+  makePond(3.35, 2.1, 0.94);
+
+  /* A dimensional welcome sign carries the real Merry Explorers logo. */
+  var sign = new THREE.Group();
+  sign.position.set(0, 3.55, -4.15);
+  sign.add(mk(new THREE.BoxGeometry(3.55, 1.75, 0.16), M.signBoard, 0, 0, 0));
+  [[0, 0.88, 3.72, 0.09], [0, -0.88, 3.72, 0.09]].forEach(function (edge) {
+    sign.add(mk(new THREE.BoxGeometry(edge[2], edge[3], 0.23), M.signTrim, edge[0], edge[1], 0.03));
+  });
+  [-1.82, 1.82].forEach(function (x) {
+    sign.add(mk(new THREE.BoxGeometry(0.09, 1.8, 0.23), M.signTrim, x, 0, 0.03));
+    sign.add(mk(new THREE.CylinderGeometry(0.075, 0.1, 2.9, 12), M.signPost, x, -2.3, 0));
+  });
+  scene.add(sign);
+  new THREE.TextureLoader().load('/merry_explorers_transparent.png', function (logoTexture) {
+    var logoCanvas = document.createElement('canvas');
+    logoCanvas.width = 860; logoCanvas.height = 535;
+    var logoContext = logoCanvas.getContext('2d');
+    logoContext.drawImage(logoTexture.image, 110, 255, 860, 535, 0, 0, 860, 535);
+    var croppedLogo = new THREE.CanvasTexture(logoCanvas);
+    croppedLogo.encoding = THREE.sRGBEncoding;
+    var logo = new THREE.Mesh(new THREE.PlaneGeometry(3.05, 1.65), new THREE.MeshBasicMaterial({
+      map: croppedLogo, transparent: true, depthWrite: false, side: THREE.DoubleSide
+    }));
+    logo.position.set(0, 0, 0.2);
+    sign.add(logo);
+    var backLogo = new THREE.Mesh(new THREE.PlaneGeometry(3.05, 1.65), new THREE.MeshBasicMaterial({
+      map: croppedLogo, transparent: true, depthWrite: false, side: THREE.DoubleSide
+    }));
+    backLogo.position.set(0, 0, -0.2);
+    backLogo.rotation.y = Math.PI;
+    sign.add(backLogo);
+  });
+
+  /* Sunny white sky, soft clouds, and chunky 3D stars above the village. */
+  var sun = new THREE.Group();
+  sun.position.set(-5.35, 5.05, -7.4);
+  sun.add(mk(new THREE.SphereGeometry(0.62, 28, 20), M.sun, 0, 0, 0, 1, 1, 0.34));
+  var sunHalo = new THREE.Mesh(new THREE.TorusGeometry(0.79, 0.035, 8, 48), M.signTrim);
+  sunHalo.position.z = 0.02;
+  sun.add(sunHalo);
+  for (var ray = 0; ray < 12; ray++) {
+    var rayAngle = ray * Math.PI / 6;
+    var sunRay = mk(new THREE.BoxGeometry(0.075, 0.26, 0.055), M.signTrim,
+      Math.cos(rayAngle) * 0.98, Math.sin(rayAngle) * 0.98, 0);
+    sunRay.rotation.z = rayAngle;
+    sunRay.castShadow = false;
+    sun.add(sunRay);
+  }
+  scene.add(sun);
+
+  function makeCloud(x, y, z, scale) {
+    var cloud = new THREE.Group();
+    cloud.position.set(x, y, z);
+    cloud.scale.setScalar(scale || 1);
+    [[-0.38, 0, 0.03, 0.38], [0, 0.16, 0, 0.5], [0.42, 0.02, 0.02, 0.36], [0.1, -0.06, 0.08, 0.42]].forEach(function (p) {
+      var puff = mk(SPH, M.cloud, p[0], p[1], p[2], p[3], p[3] * 0.68, p[3] * 0.48);
+      puff.castShadow = false;
+      cloud.add(puff);
+    });
+    scene.add(cloud);
+  }
+  makeCloud(-1.8, 4.95, -9.2, 0.92);
+  makeCloud(2.3, 5.25, -10.5, 0.72);
+  makeCloud(6.2, 4.75, -8.5, 1.05);
+  makeCloud(-7.2, 4.15, -8.6, 0.8);
+  for (var cloudIndex = 0; cloudIndex < 12; cloudIndex++) {
+    var cloudAngle = cloudIndex * Math.PI * 2 / 12 + 0.2;
+    var cloudRadius = 15.5 + (cloudIndex % 3) * 1.2;
+    makeCloud(Math.sin(cloudAngle) * cloudRadius, 4.6 + (cloudIndex % 4) * 0.42,
+      Math.cos(cloudAngle) * cloudRadius, cloudIndex % 3 === 0 ? 0.86 : 0.68);
+  }
+
+  function makeSkyStar(x, y, z, radius, material, rotation) {
+    var starShape = new THREE.Shape();
+    for (var point = 0; point < 10; point++) {
+      var angle = point * Math.PI / 5 - Math.PI / 2;
+      var distance = point % 2 === 0 ? radius : radius * 0.46;
+      var sx = Math.cos(angle) * distance;
+      var sy = Math.sin(angle) * distance;
+      if (point === 0) { starShape.moveTo(sx, sy); } else { starShape.lineTo(sx, sy); }
+    }
+    starShape.closePath();
+    var starGeometry = new THREE.ExtrudeGeometry(starShape, {
+      depth: 0.075, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.018, bevelThickness: 0.02
+    });
+    var starMesh = new THREE.Mesh(starGeometry, material);
+    starMesh.position.set(x, y, z);
+    starMesh.rotation.z = rotation || 0;
+    starMesh.castShadow = false;
+    scene.add(starMesh);
+  }
+  [[-7.3, 5.2, 0.32], [-3.2, 4.6, 0.2], [0.2, 5.55, 0.24], [4.5, 5.65, 0.29],
+    [7.1, 5.1, 0.25], [-6.2, 3.9, 0.19], [6.7, 3.8, 0.22], [-2.3, 4.25, 0.16],
+    [2.5, 4.35, 0.17], [0, 4.9, 0.14]].forEach(function (p, i) {
+    makeSkyStar(p[0], p[1], -7.8, p[2], i % 3 === 0 ? M.signTrim : (i % 3 === 1 ? M.skyBlue : M.roofCoral), i * 0.21);
+  });
+  for (var skyStarIndex = 0; skyStarIndex < 24; skyStarIndex++) {
+    var skyStarAngle = skyStarIndex * Math.PI * 2 / 24 + 0.08;
+    var skyStarRadius = 14.5 + (skyStarIndex % 4) * 0.8;
+    makeSkyStar(Math.sin(skyStarAngle) * skyStarRadius, 4.4 + (skyStarIndex % 5) * 0.46,
+      Math.cos(skyStarAngle) * skyStarRadius, skyStarIndex % 3 === 0 ? 0.22 : 0.15,
+      skyStarIndex % 2 ? M.signTrim : M.skyBlue, skyStarIndex * 0.17);
+  }
+
+  /* Keep the rich scenery light enough for classroom tablets; the stage still receives the explorer's shadow. */
+  village.traverse(function (object) {
+    if (object.isMesh) {
+      object.castShadow = false;
+      object.receiveShadow = object === villageGround;
+    }
+  });
+  sign.traverse(function (object) {
+    if (object.isMesh) { object.castShadow = false; object.receiveShadow = false; }
+  });
+  sun.traverse(function (object) {
+    if (object.isMesh) { object.castShadow = false; object.receiveShadow = false; }
+  });
+
+  /* ---------- theme sync ---------- */
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function applyTheme() {
+    try {
+      scene.background = new THREE.Color(cssVar('--stage'));
+      setCol(M.floor, cssVar('--floor'));
+      setCol(M.rim, cssVar('--accent'));
+    } catch (e3) {}
+  }
+  applyTheme();
+  new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq.addEventListener) { mq.addEventListener('change', applyTheme); }
+
+  function resize() {
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) { return; }
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = camera.aspect >= 0.9 ? 32 : Math.min(62, (32 / Math.max(camera.aspect, 0.5)) * 0.95);
+    camera.updateProjectionMatrix();
+  }
+  if (window.ResizeObserver) { new ResizeObserver(resize).observe(stage); }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* Tell the lesson which part the child touched in the 3D viewer. */
+  var raycaster = new THREE.Raycaster();
+  var pointer = new THREE.Vector2();
+  var pointerStart = null;
+  var calloutAnchor = new THREE.Vector3();
+  var calloutOpen = false;
+  renderer.domElement.addEventListener('pointerdown', function (event) {
+    pointerStart = { x: event.clientX, y: event.clientY };
+  });
+  renderer.domElement.addEventListener('pointerup', function (event) {
+    if (!pointerStart) return;
+    var moved = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y);
+    pointerStart = null;
+    if (moved > 10) return;
+    var rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    var hits = raycaster.intersectObjects(bodyPartTargets, false);
+    if (hits.length && window.parent !== window) {
+      calloutAnchor.copy(hits[0].point);
+      window.parent.postMessage({ type: 'little-explorer-part', id: hits[0].object.userData.bodyPartId }, window.location.origin);
+    }
+  });
+
+  /* ---------- controls UI ---------- */
+  var GROUPS = [
+    { label: 'Skin', start: 1, apply: function (h) { setCol(M.skin, h); }, colors: [
+      ['Fair', '#ffdcc2'], ['Light', '#f1c19b'], ['Tan', '#d79b6c'], ['Brown', '#a96d45'], ['Deep', '#6e4630']] },
+    { label: 'Hair', start: 1, apply: function (h) { setCol(M.hair, h); }, colors: [
+      ['Black-brown', '#2b1d15'], ['Chestnut', '#6a4126'], ['Caramel', '#b8793a'], ['Blond', '#e1bb6c'], ['Ginger', '#c0522d']] },
+    { label: 'Eyes', start: 0, apply: function (h) { setCol(M.eye, h); }, colors: [
+      ['Brown', '#4b2e1e'], ['Hazel', '#8a5a2b'], ['Green', '#3f8f5a'], ['Blue', '#3a78c2'], ['Gray', '#6f7f8c']] },
+    { label: 'Shirt', start: 0, apply: function (h) { setCol(M.shirt, h); }, colors: [
+      ['Teal', '#2a8fa6'], ['Coral', '#e8573f'], ['Sunflower', '#f2b632'], ['Green', '#6aa84f'], ['Violet', '#8a63d2']] },
+    { label: 'Pants / skirt', start: 0, apply: function (h) { setCol(M.jeans, h); setCol(M.skirt, h); }, colors: [
+      ['Denim', '#41587f'], ['Black', '#2f2f36'], ['Khaki', '#bfa97f'], ['Olive', '#68764a'], ['Violet', '#8a63d2']] }
+  ];
+  var groupsEl = document.getElementById('groups');
+  var colorGroupButtons = {};
+  GROUPS.forEach(function (g) {
+    var fs = document.createElement('fieldset'); fs.className = 'group';
+    var lg = document.createElement('legend'); lg.textContent = g.label; fs.appendChild(lg);
+    var row = document.createElement('div'); row.className = 'swatches';
+    colorGroupButtons[g.label] = [];
+    g.colors.forEach(function (c, i) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'sw'; b.title = c[0];
+      b.style.setProperty('--c', c[1]);
+      b.setAttribute('aria-label', g.label + ': ' + c[0]);
+      b.setAttribute('aria-pressed', i === g.start ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        g.apply(c[1]);
+        var all = row.querySelectorAll('.sw');
+        for (var j = 0; j < all.length; j++) { all[j].setAttribute('aria-pressed', j === i ? 'true' : 'false'); }
+      });
+      row.appendChild(b);
+      colorGroupButtons[g.label].push(b);
+    });
+    fs.appendChild(row); groupsEl.appendChild(fs);
+    g.apply(g.colors[g.start][1]);
+  });
+
+  function applyColorChoice(label, index) {
+    var buttons = colorGroupButtons[label];
+    if (buttons && buttons[index]) buttons[index].click();
+  }
+
+  var customizeToggle = document.getElementById('tog-customize');
+  var customizePanel = document.getElementById('customize-panel');
+  customizeToggle.addEventListener('click', function () {
+    var open = customizeToggle.getAttribute('aria-expanded') !== 'true';
+    customizeToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    customizePanel.hidden = !open;
+  });
+
+  var controlDock = document.getElementById('control-dock');
+  var controlReveal = document.getElementById('control-reveal');
+  controlReveal.addEventListener('click', function () {
+    var open = controlDock.classList.toggle('is-open');
+    controlReveal.setAttribute('aria-expanded', open ? 'true' : 'false');
+    controlReveal.setAttribute('aria-label', open ? 'Hide explorer controls' : 'Show explorer controls');
+    controlReveal.textContent = open ? '⌃' : '⌄';
+  });
+  document.addEventListener('pointerdown', function (event) {
+    if (!controlDock.contains(event.target)) {
+      controlDock.classList.remove('is-open');
+      controlReveal.setAttribute('aria-expanded', 'false');
+      controlReveal.setAttribute('aria-label', 'Show explorer controls');
+      controlReveal.textContent = '⌄';
+    }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      controlDock.classList.remove('is-open');
+      controlReveal.setAttribute('aria-expanded', 'false');
+      controlReveal.setAttribute('aria-label', 'Show explorer controls');
+      controlReveal.textContent = '⌄';
+    }
+  });
+
+  var appShell = document.querySelector('.app');
+  var fullscreenToggle = document.getElementById('fullscreen-toggle');
+  function syncFullscreenButton() {
+    var isFullscreen = document.fullscreenElement === appShell || document.webkitFullscreenElement === appShell;
+    fullscreenToggle.textContent = isFullscreen ? '⛶ Exit fullscreen' : '⛶ Fullscreen';
+    fullscreenToggle.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
+    fullscreenToggle.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
+    if (isFullscreen && controlDock.contains(document.activeElement) && document.activeElement.blur) {
+      controlDock.classList.remove('is-open');
+      document.activeElement.blur();
+    }
+  }
+  fullscreenToggle.addEventListener('click', function () {
+    var isFullscreen = document.fullscreenElement === appShell || document.webkitFullscreenElement === appShell;
+    var requestFullscreen = appShell.requestFullscreen || appShell.webkitRequestFullscreen;
+    var exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+    if (isFullscreen) {
+      if (exitFullscreen) exitFullscreen.call(document);
+    } else if (requestFullscreen) {
+      var requestResult = requestFullscreen.call(appShell);
+      if (requestResult && requestResult.catch) {
+        requestResult.catch(function () {
+          fullscreenToggle.setAttribute('aria-label', 'Fullscreen is unavailable in this browser');
+        });
+      }
+    }
+  });
+  document.addEventListener('fullscreenchange', syncFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
+
+  function bindToggle(id, initial, onChange) {
+    var el = document.getElementById(id);
+    el.setAttribute('aria-pressed', initial ? 'true' : 'false');
+    el.addEventListener('click', function () {
+      var on = el.getAttribute('aria-pressed') !== 'true';
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      onChange(on);
+    });
+    onChange(initial);
+  }
+  var waveTarget = 0, waveAmt = 0;
+  var focus = { active: false, goal: FULL };
+  var modelBoyButton = document.getElementById('model-boy');
+  var modelGirlButton = document.getElementById('model-girl');
+  function setExplorerModel(girl) {
+    girlOutfit.visible = girl;
+    girlHair.visible = girl;
+    girlFaceDetails.visible = girl;
+    boyPants.visible = !girl;
+    girlTorso.visible = girl;
+    girlCollar.visible = girl;
+    boyTorso.visible = !girl;
+    boyCollar.visible = !girl;
+    var headScale = girl ? 0.84 : 1;
+    headPivot.scale.setScalar(headScale);
+    bodyPartTargets.forEach(function (target) {
+      if (['head', 'hair', 'eyes', 'ears', 'nose', 'mouth'].indexOf(target.userData.bodyPartId) < 0) return;
+      var base = target.userData.basePosition;
+      target.position.set(
+        base.x * headScale,
+        2.12 + (base.y - 2.12) * headScale,
+        base.z * headScale
+      );
+      target.scale.setScalar(headScale);
+    });
+    armL.position.x = girl ? -0.42 : -0.46;
+    armR.position.x = girl ? 0.42 : 0.46;
+    modelBoyButton.setAttribute('aria-pressed', girl ? 'false' : 'true');
+    modelGirlButton.setAttribute('aria-pressed', girl ? 'true' : 'false');
+    stage.setAttribute('aria-label', 'Interactive 3D ' + (girl ? 'girl' : 'boy') + ' explorer. Tap the highlighted body part to learn its name.');
+    applyColorChoice('Hair', girl ? 2 : 1);
+    applyColorChoice('Shirt', girl ? 1 : 0);
+    applyColorChoice('Pants / skirt', girl ? 4 : 0);
+    setCol(M.mouth, girl ? '#b84a66' : '#8a3b2e');
+    document.getElementById('tog-face').setAttribute('aria-pressed', 'false');
+    focus.goal = FULL;
+    focus.active = true;
+  }
+  modelBoyButton.addEventListener('click', function () { setExplorerModel(false); });
+  modelGirlButton.addEventListener('click', function () { setExplorerModel(true); });
+  function zoomBy(factor) {
+    focus.active = false;
+    var offset = camera.position.clone().sub(controls.target);
+    var distance = THREE.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance);
+    camera.position.copy(controls.target).addScaledVector(offset.normalize(), distance);
+    controls.update();
+  }
+  document.getElementById('zoom-in').addEventListener('click', function () { zoomBy(0.8); });
+  document.getElementById('zoom-out').addEventListener('click', function () { zoomBy(1.25); });
+  document.getElementById('zoom-reset').addEventListener('click', function () {
+    document.getElementById('tog-face').setAttribute('aria-pressed', 'false');
+    focus.goal = FULL;
+    focus.active = true;
+  });
+  bindToggle('tog-wave', !calm, function (on) { waveTarget = on ? 1 : 0; });
+  bindToggle('tog-face', false, function (on) { focus.goal = on ? FACE : FULL; focus.active = true; });
+  bindToggle('tog-spin', false, function (on) { controls.autoRotate = on && !calm; });
+  bindToggle('tog-pack', true, function (on) { pack.visible = on; });
+  controls.addEventListener('start', function () { focus.active = false; });
+
+  /* ---------- animation: a cheerful wave, a slow head sway and the odd blink ---------- */
+  var clock = new THREE.Clock();
+  var nextBlink = 2.2, blinkStart = -10, mot = calm ? 0 : 1;
+  var dirV = new THREE.Vector3();
+  var pointerWorld = new THREE.Vector3();
+  var projectedCallout = new THREE.Vector3();
+  var touchPointer = document.getElementById('touch-pointer');
+  var pointerTargetId = 'head';
+  var partPopup = document.getElementById('part-popup');
+  var calloutLine = document.getElementById('callout-line');
+  var calloutPath = document.getElementById('callout-path');
+  var calloutDot = document.getElementById('callout-dot');
+  var learningNav = document.getElementById('fullscreen-learning-nav');
+  var learningPartOrder = ['head', 'hair', 'eyes', 'ears', 'nose', 'mouth', 'shoulders', 'arms', 'elbows', 'hands', 'knees', 'feet'];
+  var selectedNavPartId = 'head';
+  function updateLearningNav(id) {
+    selectedNavPartId = id;
+    var categoryPart = id === 'head' || id === 'hair' || id === 'eyes' || id === 'ears' || id === 'nose' || id === 'mouth' ? 'head' :
+      id === 'knees' || id === 'feet' ? 'knees' : 'shoulders';
+    Array.prototype.forEach.call(learningNav.querySelectorAll('[data-part-id]'), function (button) {
+      var active = button.getAttribute('data-part-id') === categoryPart;
+      button.classList.toggle('is-selected', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+  function navigateToPart(id) {
+    var target = bodyPartTargets.find(function (item) { return item.userData.bodyPartId === id; });
+    if (!target) return;
+    target.getWorldPosition(calloutAnchor);
+    window.parent.postMessage({ type: 'little-explorer-navigate', id: id }, window.location.origin);
+  }
+  Array.prototype.forEach.call(learningNav.querySelectorAll('button'), function (button) {
+    button.addEventListener('click', function () {
+      var partId = button.getAttribute('data-part-id');
+      if (partId) {
+        navigateToPart(partId);
+        return;
+      }
+      var direction = button.getAttribute('data-nav') === 'previous' ? -1 : 1;
+      var currentIndex = learningPartOrder.indexOf(selectedNavPartId);
+      var nextIndex = (currentIndex + direction + learningPartOrder.length) % learningPartOrder.length;
+      navigateToPart(learningPartOrder[nextIndex]);
+    });
+  });
+  updateLearningNav(selectedNavPartId);
+  window.addEventListener('message', function (event) {
+    if (event.origin !== window.location.origin || event.source !== window.parent) return;
+    if (event.data?.type === 'little-explorer-commentary') {
+      if (!bodyPartTargets.some(function (target) { return target.userData.bodyPartId === event.data.id; })) return;
+      document.getElementById('part-popup-icon').textContent = event.data.emoji || '✨';
+      document.getElementById('part-popup-name').textContent = event.data.name || 'Body part';
+      document.getElementById('part-popup-hint').textContent = event.data.hint || '';
+      partPopup.hidden = false;
+      calloutLine.hidden = false;
+      partPopup.classList.add('is-visible');
+      calloutOpen = true;
+      return;
+    }
+    if (event.data?.type !== 'little-explorer-point') return;
+    if (!bodyPartTargets.some(function (target) { return target.userData.bodyPartId === event.data.id; })) return;
+    pointerTargetId = event.data.id;
+    updateLearningNav(event.data.id);
+    touchPointer.style.display = 'block';
+  });
+  function tick() {
+    requestAnimationFrame(tick);
+    var dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    waveAmt += (waveTarget - waveAmt) * Math.min(1, dt * 4);
+    armL.rotation.z = -(lerp(0.12, 2.5, waveAmt) + Math.sin(t * 8) * 0.17 * waveAmt * mot);
+    armR.rotation.z = 0.12 + Math.sin(t * 1.4) * 0.015 * mot;
+    headPivot.rotation.y = Math.sin(t * 0.6) * 0.1 * mot;
+    headPivot.rotation.z = Math.sin(t * 0.9) * 0.035 * mot;
+    child.position.y = Math.abs(Math.sin(t * 2.2)) * 0.012 * mot;
+    if (!calm) {
+      if (t > nextBlink) { blinkStart = t; nextBlink = t + 2.5 + Math.random() * 3; }
+      var p = (t - blinkStart) / 0.16, s = p < 1 ? Math.sin(p * Math.PI) : 0;
+      eyes.forEach(function (e) { e.scale.y = lerp(1, 0.1, s); });
+    }
+    if (focus.active) {
+      dirV.copy(camera.position).sub(controls.target);
+      var cur = dirV.length(); dirV.normalize();
+      controls.target.lerp(focus.goal.target, Math.min(1, dt * 5));
+      var nd = cur + (focus.goal.dist - cur) * Math.min(1, dt * 5);
+      camera.position.copy(controls.target).addScaledVector(dirV, nd);
+      if (Math.abs(nd - focus.goal.dist) < 0.02 && controls.target.distanceTo(focus.goal.target) < 0.01) { focus.active = false; }
+    }
+    controls.update();
+    camera.updateMatrixWorld();
+    if (calloutOpen) {
+      var cw = stage.clientWidth, ch = stage.clientHeight;
+      projectedCallout.copy(calloutAnchor).project(camera);
+      var ax = (projectedCallout.x + 1) * 0.5 * cw;
+      var ay = (1 - projectedCallout.y) * 0.5 * ch;
+      var inView = projectedCallout.z >= -1 && projectedCallout.z <= 1 && ax >= 0 && ax <= cw && ay >= 0 && ay <= ch;
+      partPopup.style.visibility = inView ? 'visible' : 'hidden';
+      calloutLine.style.display = inView ? 'block' : 'none';
+      if (inView) {
+        var cardWidth = partPopup.offsetWidth || Math.min(330, cw - 28);
+        var cardHeight = partPopup.offsetHeight || 90;
+        var sideRoom = { right: cw - ax - 30, left: ax - 30, down: ch - ay - 30, up: ay - 30 };
+        var preferredSide;
+        if (sideRoom.right >= cardWidth || sideRoom.left >= cardWidth) {
+          preferredSide = sideRoom.right >= sideRoom.left ? 'right' : 'left';
+        } else if (sideRoom.down >= cardHeight || sideRoom.up >= cardHeight) {
+          preferredSide = sideRoom.down >= sideRoom.up ? 'down' : 'up';
+        } else {
+          preferredSide = Object.keys(sideRoom).sort(function (a, b) {
+            var needed = (a === 'left' || a === 'right') ? cardWidth : cardHeight;
+            var neededB = (b === 'left' || b === 'right') ? cardWidth : cardHeight;
+            return (sideRoom[b] / neededB) - (sideRoom[a] / needed);
+          })[0];
+        }
+        var left = preferredSide === 'right' ? ax + 30 : preferredSide === 'left' ? ax - cardWidth - 30 : ax - cardWidth / 2;
+        var top = preferredSide === 'down' ? ay + 30 : preferredSide === 'up' ? ay - cardHeight - 30 : ay - cardHeight / 2;
+        left = Math.max(14, Math.min(cw - cardWidth - 14, left));
+        top = Math.max(14, Math.min(ch - cardHeight - 14, top));
+        partPopup.style.left = left + 'px';
+        partPopup.style.top = top + 'px';
+        var edgeX = preferredSide === 'right' ? left : preferredSide === 'left' ? left + cardWidth : Math.max(left + 16, Math.min(left + cardWidth - 16, ax));
+        var edgeY = preferredSide === 'down' ? top : preferredSide === 'up' ? top + cardHeight : Math.max(top + 16, Math.min(top + cardHeight - 16, ay));
+        var bendX = (ax + edgeX) * 0.5;
+        calloutLine.setAttribute('viewBox', '0 0 ' + cw + ' ' + ch);
+        calloutPath.setAttribute('d', 'M ' + ax + ' ' + ay + ' Q ' + bendX + ' ' + ay + ' ' + edgeX + ' ' + edgeY);
+        calloutDot.setAttribute('cx', ax);
+        calloutDot.setAttribute('cy', ay);
+      }
+    }
+    var pointerTarget = bodyPartTargets.find(function (target) { return target.userData.bodyPartId === pointerTargetId; });
+    if (pointerTarget) {
+      pointerTarget.getWorldPosition(pointerWorld).project(camera);
+      var pointerVisible = pointerWorld.z >= -1 && pointerWorld.z <= 1 && Math.abs(pointerWorld.x) <= 1 && Math.abs(pointerWorld.y) <= 1;
+      touchPointer.style.display = pointerVisible ? 'block' : 'none';
+      if (pointerVisible) {
+        touchPointer.style.left = ((pointerWorld.x + 1) * 0.5 * stage.clientWidth) + 'px';
+        touchPointer.style.top = ((1 - pointerWorld.y) * 0.5 * stage.clientHeight) + 'px';
+      }
+    }
+    renderer.render(scene, camera);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>

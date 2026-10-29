@@ -18,43 +18,41 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Install before page components run their effects. On a hard refresh, data
+// requests can otherwise start before AuthProvider's passive effects and reach
+// protected API routes without the Firebase token.
+if (typeof window !== "undefined") {
+  const nativeFetch = window.fetch.bind(window);
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(
+      typeof input === "string" || input instanceof URL ? input.toString() : input.url,
+      window.location.origin
+    );
+
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/api/")) {
+      return nativeFetch(input, init);
+    }
+
+    await auth.authStateReady();
+    const currentUser = auth.currentUser;
+    if (!currentUser) return nativeFetch(input, init);
+
+    // Keep headers from both a Request input and RequestInit, then add the
+    // current token so callers do not need to coordinate with auth startup.
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
+    headers.set("Authorization", `Bearer ${await currentUser.getIdToken()}`);
+
+    return nativeFetch(input, { ...init, headers });
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  // Attach a current Firebase ID token to same-origin API calls made from a
-  // signed-in portal. Route handlers verify this token server-side.
-  useEffect(() => {
-    const nativeFetch = window.fetch.bind(window);
-
-    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(
-        typeof input === "string" || input instanceof URL ? input.toString() : input.url,
-        window.location.origin
-      );
-
-      if (url.origin !== window.location.origin || !url.pathname.startsWith("/api/")) {
-        return nativeFetch(input, init);
-      }
-
-      await auth.authStateReady();
-      const currentUser = auth.currentUser;
-      if (!currentUser) return nativeFetch(input, init);
-
-      const headers = new Headers(
-        init?.headers ?? (input instanceof Request ? input.headers : undefined)
-      );
-      headers.set("Authorization", `Bearer ${await currentUser.getIdToken()}`);
-
-      return nativeFetch(input, { ...init, headers });
-    };
-
-    return () => {
-      window.fetch = nativeFetch;
-    };
-  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {

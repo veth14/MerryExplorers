@@ -1,0 +1,11 @@
+Body-part picture assets
+
+Illustrations: original body-part flashcard artwork by Rob / Little Learning Kit.
+Source: https://littlelearningkit.com/us/picture-cards/body-parts/
+The source page describes the resource as free to use at home and in the classroom.
+
+The hand, foot, eye, ear, nose, and mouth SVGs are cropped from the page's
+public picture-card preview. The printed word labels were removed so the game
+choices show pictures only.
+
+Game answer cards use the corresponding local PNG illustrations in this folder.

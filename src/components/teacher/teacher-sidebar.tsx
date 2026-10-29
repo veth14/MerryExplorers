@@ -115,6 +115,17 @@ function BugReportIcon() {
     </svg>
   );
 }
+function GameIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[17px] w-[17px]">
+      <rect x="2" y="6" width="20" height="12" rx="3" />
+      <path d="M6 12h4m-2-2v4" />
+      <circle cx="16" cy="11" r=".75" fill="currentColor" />
+      <circle cx="18" cy="13" r=".75" fill="currentColor" />
+    </svg>
+  );
+}
+
 function GalleryIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]">
@@ -131,6 +142,7 @@ const teacherIconMap: Record<string, React.ComponentType<{ active?: boolean }>> 
   History: HistoryIcon,
   Leaves: LeaveIcon,
   Profile: ProfileIcon,
+  Games: GameIcon,
 };
 
 type TeacherSidebarProps = {
@@ -425,7 +437,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
           <div className="space-y-0.5">
             {teacherNavItems.map((item) => {
               const Icon = teacherIconMap[item.label];
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <NavItem
                   key={item.label}
