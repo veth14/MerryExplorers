@@ -288,10 +288,17 @@ export function computeDailyStatus(
     return "Absent";
   }
 
-  const status = (record.timeInStatus as TimeInStatus | undefined) ??
-    computeTimeInStatus(record.clockInTime, account.noTimeLog, account.fullName);
+  let status = record.timeInStatus as TimeInStatus | undefined;
+  // If status was marked Late, but the clockInTime evaluates to On Time (e.g. after manual correction to 9:00 AM),
+  // automatically resolve to On Time.
+  if (!status || (status === "Late" && record.clockInTime)) {
+    const recomputed = computeTimeInStatus(record.clockInTime, account.noTimeLog, account.fullName);
+    if (recomputed === "On Time") {
+      status = "On Time";
+    }
+  }
 
-  return status as DailyAttendanceStatus;
+  return (status ?? computeTimeInStatus(record.clockInTime, account.noTimeLog, account.fullName)) as DailyAttendanceStatus;
 }
 
 // ── Human-readable helpers ────────────────────────────────────────────────────────

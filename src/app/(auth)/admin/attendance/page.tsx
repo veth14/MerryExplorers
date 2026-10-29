@@ -793,7 +793,8 @@ export default function AttendancePage() {
     recordId: string,
     teacherName: string,
     clockInTime: string | null,
-    clockOutTime: string | null
+    clockOutTime: string | null,
+    timeInStatus?: string
   ) => {
     try {
       await fetch("/api/attendance", {
@@ -804,6 +805,7 @@ export default function AttendancePage() {
           action: "correct-times",
           clockInTime,
           clockOutTime,
+          timeInStatus: timeInStatus || "On Time",
           correctedBy: userProfile?.fullName || user?.email || "admin",
         }),
       });
@@ -870,6 +872,7 @@ export default function AttendancePage() {
         workDays: acc.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         noTimeLog: acc.noTimeLog || exemptions.includes(uid),
         weeklyHoursTarget: acc.weeklyHoursTarget ?? null,
+        fullName: acc.fullName,
       },
       viewDate,
       isSuspended,

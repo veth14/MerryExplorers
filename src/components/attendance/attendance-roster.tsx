@@ -2,16 +2,15 @@
 
 import { useState } from "react";
 import { StaffAttendance } from "@/data/attendance";
-import { Modal } from "@/components/ui/modal";
 import { CustomTimePicker } from "@/components/ui/custom-time-picker";
-import { getBreakMinutes, getScheduleForDate } from "@/lib/attendance-rules";
+import { getScheduleForDate } from "@/lib/attendance-rules";
 
 type AttendanceRosterProps = {
   data: StaffAttendance[];
   dateStr?: string;
   onToggleExempt?: (uid: string, currentlyExempt: boolean) => void;
   exemptLoading?: boolean;
-  onCorrectTimes?: (recordId: string, teacherName: string, clockInTime: string | null, clockOutTime: string | null) => Promise<void>;
+  onCorrectTimes?: (recordId: string, teacherName: string, clockInTime: string | null, clockOutTime: string | null, timeInStatus?: string) => Promise<void>;
 };
 
 export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading, onCorrectTimes }: AttendanceRosterProps) {
@@ -25,6 +24,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
   const [isEditing, setIsEditing] = useState(false);
   const [editTimeIn, setEditTimeIn] = useState("");
   const [editTimeOut, setEditTimeOut] = useState("");
+  const [editStatus, setEditStatus] = useState<"On Time" | "Late" | "Exempt">("On Time");
   const [isSavingTimes, setIsSavingTimes] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -292,6 +292,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                         };
                         setEditTimeIn(toHHMM(selectedStaff.timeIn));
                         setEditTimeOut(toHHMM(selectedStaff.timeOut));
+                        setEditStatus(selectedStaff.status === "Late" ? "On Time" : (selectedStaff.status as any) || "On Time");
                         setIsEditing(true);
                         setSaveSuccess(false);
                       }}
@@ -337,6 +338,40 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">
+                        Attendance Status (Internet / Inconvenience Override)
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["On Time", "Late", "Exempt"] as const).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setEditStatus(s)}
+                            className={`py-2 px-2.5 rounded-xl text-[12px] font-bold border-2 transition-all flex items-center justify-center gap-1.5 ${
+                              editStatus === s
+                                ? s === "On Time"
+                                  ? "bg-[#f0fdf4] border-[#15803d] text-[#15803d] shadow-sm font-black"
+                                  : s === "Late"
+                                  ? "bg-[#fffdf0] border-[#d97706] text-[#d97706] shadow-sm font-black"
+                                  : "bg-[#eff6ff] border-[#005cc8] text-[#005cc8] shadow-sm font-black"
+                                : "bg-white border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+                            }`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                s === "On Time" ? "bg-[#15803d]" : s === "Late" ? "bg-[#d97706]" : "bg-[#005cc8]"
+                              }`}
+                            />
+                            {s === "On Time" ? "On Time" : s}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-[#5a6e8c] mt-1.5 font-medium">
+                        💡 Selecting <strong>On Time</strong> ensures this employee is not marked late due to clock-in delays.
+                      </p>
+                    </div>
+
                     {saveSuccess && (
                       <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                         <span className="material-symbols-outlined text-green-600" style={{ fontSize: "16px" }}>check_circle</span>
@@ -363,7 +398,6 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                             const toISO = (hhmm: string) => {
                               if (!hhmm || !dateStr) return null;
                               // Build a Manila-local date string and force-interpret it as Manila time
-                              const localStr = `${dateStr}T${hhmm}:00`;
                               // Manila is UTC+8
                               const [yyyy, mm, dd] = dateStr.split("-").map(Number);
                               const [hh, min] = hhmm.split(":").map(Number);
@@ -375,6 +409,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                               selectedStaff.name,
                               editTimeIn ? toISO(editTimeIn) : null,
                               editTimeOut ? toISO(editTimeOut) : null,
+                              editStatus
                             );
                             setSaveSuccess(true);
                             setIsEditing(false);
@@ -390,6 +425,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                               ...prev,
                               timeIn: editTimeIn ? fmt(editTimeIn) : prev.timeIn,
                               timeOut: editTimeOut ? fmt(editTimeOut) : prev.timeOut,
+                              status: editStatus,
                             } : null);
                           } catch (e) {
                             console.error(e);

@@ -192,13 +192,38 @@ export async function PUT(request: Request) {
       if (photoUrl) updateDoc.$set.clockOutPhotoUrl = photoUrl;
     } else if (action === "correct-times") {
       // Admin manual override: fix clock-in and/or clock-out times.
-      // Expects { clockInTime?: ISO string, clockOutTime?: ISO string } in data.
-      const { clockInTime, clockOutTime } = data;
+      // Expects { clockInTime?: ISO string, clockOutTime?: ISO string, timeInStatus?: string } in data.
+      const { clockInTime, clockOutTime, timeInStatus } = data;
       if (clockInTime) updateDoc.$set.clockInTime = clockInTime;
       if (clockOutTime) {
         updateDoc.$set.clockOutTime = clockOutTime;
         updateDoc.$set.status = "Completed";
       }
+
+      // Handle timeInStatus:
+      // If admin explicitly specifies timeInStatus (e.g. "On Time" due to internet/technical issues), apply it.
+      // Otherwise, if clockInTime was updated, recompute status based on the employee's schedule.
+      if (timeInStatus) {
+        updateDoc.$set.timeInStatus = timeInStatus;
+      } else if (clockInTime) {
+        const scheduleConfigs = await db.collection("attendance_schedules").find().toArray();
+        const accountDoc = await db.collection("accounts").findOne({ _id: record.teacherUid as any });
+        let noTimeLog = accountDoc?.noTimeLog ?? false;
+        const dailyExemption = await db.collection("daily_exemptions").findOne({
+          teacherUid: record.teacherUid,
+          dateStr: record.dateStr,
+        });
+        if (dailyExemption) noTimeLog = true;
+
+        const recomputed = computeTimeInStatus(
+          clockInTime,
+          noTimeLog,
+          accountDoc?.fullName || record.name,
+          scheduleConfigs as any
+        );
+        updateDoc.$set.timeInStatus = recomputed;
+      }
+
       updateDoc.$set.correctedAt = now.toISOString();
       updateDoc.$set.correctedBy = data.correctedBy || "admin";
     } else if (action === "start-break") {
