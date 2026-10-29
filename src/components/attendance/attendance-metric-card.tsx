@@ -51,23 +51,23 @@ function LeaveGraphic() {
 
 const configs = {
   present: {
-    labelColor: "text-[#005cc8]",
-    borderColor: "border-[#005cc8]",
+    labelColor: "text-[#0066cc]",
+    borderColor: "border-t-[#0066cc]",
     graphic: <PresentGraphic />,
   },
   late: {
-    labelColor: "text-[#ffb800]",
-    borderColor: "border-[#ffb800]",
+    labelColor: "text-[#9a6a00]",
+    borderColor: "border-t-[#ffcc00]",
     graphic: <LateGraphic />,
   },
   absent: {
     labelColor: "text-[#ef4444]",
-    borderColor: "border-[#ef4444]",
+    borderColor: "border-t-[#ef4444]",
     graphic: <AbsentGraphic />,
   },
   leave: {
     labelColor: "text-[#2da05b]",
-    borderColor: "border-[#2da05b]",
+    borderColor: "border-t-[#2da05b]",
     graphic: <LeaveGraphic />,
   },
 };
@@ -76,15 +76,15 @@ export function AttendanceMetricCard({ label, value, type }: AttendanceMetricCar
   const cfg = configs[type];
   return (
     <article
-      className={`relative overflow-hidden rounded-[1.25rem] bg-white px-6 pb-6 pt-5 border-b-[5px] ${cfg.borderColor} shadow-[0_4px_20px_rgba(0,0,0,0.04)]`}
+      className={`relative overflow-hidden rounded-2xl border border-[#e2eaf4] border-t-4 bg-white px-5 pb-5 pt-4 shadow-sm ${cfg.borderColor}`}
     >
-      <div className="absolute right-4 top-4 w-[60px] h-[45px] opacity-80 pointer-events-none">
+      <div className="pointer-events-none absolute right-4 top-4 h-[45px] w-[60px] opacity-60">
         {cfg.graphic}
       </div>
-      <p className={`text-[11px] font-black uppercase tracking-widest ${cfg.labelColor}`}>
+      <p className={`text-[11px] font-extrabold uppercase tracking-wide ${cfg.labelColor}`}>
         {label}
       </p>
-      <p className="font-headline text-[42px] font-black leading-none tracking-tight text-[#002f76] mt-3">
+      <p className="mt-3 font-headline text-[38px] font-extrabold leading-none tabular-nums text-[#003399]">
         {value}
       </p>
     </article>

@@ -119,12 +119,12 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
   };
 
   return (
-    <div className="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] border border-[#e4e2e1]/50">
+    <div className="overflow-hidden rounded-2xl border border-[#dce7f5] bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-[#002f76] text-[22px] font-extrabold tracking-tight">Staff Roster</h2>
+          <h2 className="text-balance text-[#003399] text-[20px] font-extrabold">Staff Roster</h2>
           {dateStr && (
-            <p className="text-[13px] font-bold text-[#5a6e8c] mt-0.5">
+            <p className="mt-1 text-[13px] font-medium text-[#60738f]">
               For {new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
           )}
@@ -133,7 +133,8 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
           <div className="relative">
             <button
               onClick={() => setFilterOpen(!filterOpen)}
-              className="flex items-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-[13px] font-bold text-[#002f76] hover:bg-[#f8fafc] transition-colors"
+              aria-expanded={filterOpen}
+              className="flex items-center gap-2 rounded-xl border border-[#d7e2f0] bg-white px-4 py-2.5 text-[13px] font-bold text-[#003399] transition-colors hover:bg-[#f3f7fd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
@@ -159,7 +160,7 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
           </div>
           <button 
             onClick={handleExport}
-            className="rounded-full bg-[#005cc8] px-5 py-2 text-[13px] font-bold text-white shadow-sm hover:bg-[#004bb0] transition-colors"
+            className="rounded-xl bg-[#0066cc] px-5 py-2.5 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-[#0057ad] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc] focus-visible:ring-offset-2"
           >
             Export
           </button>
@@ -167,40 +168,40 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="w-full min-w-[680px] border-separate border-spacing-0 text-left">
           <thead>
-            <tr className="border-b border-[#f1f5f9]">
-              <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[30%]">Teacher Name</th>
-              <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[20%]">Group</th>
-              <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[15%]">Time In</th>
-              <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[15%]">Time Out</th>
-              <th className="pb-4 font-extrabold text-[11px] uppercase tracking-widest text-[#005cc8] w-[20%]">Status</th>
+            <tr className="bg-[#003399]">
+              <th className="w-[30%] rounded-l-xl px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Teacher Name</th>
+              <th className="w-[20%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Group</th>
+              <th className="w-[15%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Time In</th>
+              <th className="w-[15%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Time Out</th>
+              <th className="w-[20%] rounded-r-xl px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#f1f5f9]">
-            {filteredData.map((staff) => (
+          <tbody>
+            {filteredData.map((staff, index) => (
               <tr 
                 key={staff.id} 
                 onClick={() => setSelectedStaff(staff)}
-                className="group hover:bg-[#f8fafc] transition-colors cursor-pointer"
+                className={`group cursor-pointer transition-colors hover:bg-[#fff9e8] ${index % 2 === 1 ? "bg-[#f7f9fd]" : "bg-white"}`}
               >
-                <td className="py-4">
+                <td className="border-b border-[#eaf0f7] px-4 py-3.5">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-9 h-9 rounded-full flex shrink-0 items-center justify-center text-white text-[13px] font-bold shadow-sm"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white shadow-sm"
                       style={{ backgroundColor: staff.avatarColor }}
                     >
                       {staff.avatarInitials}
                     </div>
-                    <span className="font-bold text-[14px] text-[#002f76]">{staff.name}</span>
+                    <span className="truncate text-[13px] font-bold text-[#003399]">{staff.name}</span>
                   </div>
                 </td>
-                <td className="py-4 text-[13.5px] font-semibold text-[#005cc8]">{staff.group}</td>
-                <td className="py-4 text-[13.5px] font-bold text-[#002f76]">
+                <td className="border-b border-[#eaf0f7] px-4 py-3.5 text-[13px] font-semibold text-[#0066cc]">{staff.group}</td>
+                <td className="border-b border-[#eaf0f7] px-4 py-3.5 text-[13px] font-bold tabular-nums text-[#003399]">
                   {staff.timeIn !== "—" ? staff.timeIn : <span className="text-[#9aa3b2] font-semibold text-[12px]">{shiftFallbackLabel}</span>}
                 </td>
-                <td className="py-4 text-[13.5px] font-bold text-[#002f76]">{staff.timeOut}</td>
-                <td className="py-4">{getStatusBadge(staff.status)}</td>
+                <td className="border-b border-[#eaf0f7] px-4 py-3.5 text-[13px] font-bold tabular-nums text-[#003399]">{staff.timeOut}</td>
+                <td className="border-b border-[#eaf0f7] px-4 py-3.5">{getStatusBadge(staff.status)}</td>
               </tr>
             ))}
           </tbody>

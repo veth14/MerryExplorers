@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { WeeklyView } from "@/components/attendance/weekly-view";
 import { MonthlyView } from "@/components/attendance/monthly-view";
 import { ScheduleModal } from "@/components/attendance/schedule-modal";
+import { downloadAttendanceWorkbook } from "@/lib/attendance-excel";
 
 type AttendanceRecord = {
   _id: string;
@@ -93,6 +94,20 @@ const getPosition = (a?: AccountDoc) => {
   const room =
     a?.assignedRoom && a.assignedRoom.trim().toLowerCase() !== "unassigned" ? a.assignedRoom.trim() : "";
   return a?.dtrPosition?.trim() || room || a?.tags?.[0] || a?.role || "";
+};
+
+// Attendance can capture the email as the display name before the account
+// profile finishes loading. Treat those email fallbacks as the same teacher.
+const ATTENDANCE_TEACHER_EMAIL_NAMES: Record<string, string> = {
+  "ian.it@merryexplorers.edu": "Ian Angelo Valmores (IT)",
+  "a.villegas@merryexplorers": "Angel Villegas",
+  "a.villegas@merryexplorers.edu": "Angel Villegas",
+  "k.ebuenga@merryexplorers.edu": "Ann Kyle Ebuenga",
+};
+
+const getAttendanceTeacherName = (name: string) => {
+  const cleanedName = name.trim();
+  return ATTENDANCE_TEACHER_EMAIL_NAMES[cleanedName.toLowerCase()] || cleanedName;
 };
 
 type DtrDay = {
@@ -247,6 +262,7 @@ export default function AttendancePage() {
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const [exportRows, setExportRows] = useState<ExportRow[]>([]);
+  const [exportGroups, setExportGroups] = useState<Array<[string, ExportRow[]]>>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Dynamic schedule state & modal
@@ -548,6 +564,7 @@ export default function AttendancePage() {
 
         setPrintHtml(html);
         setExportRows(dtrExcel);
+        setExportGroups([]);
         setShowExportModal(false);
         return;
       }
@@ -588,7 +605,7 @@ export default function AttendancePage() {
           for (const r of dayRecs) {
             const timeIn = r.clockInTime ? new Date(r.clockInTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
             const timeOut = r.clockOutTime ? new Date(r.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" }) : "—";
-            tableRows.push({ dateLabel, name: r.name, group: r.group, timeIn, timeOut, status: r.status, rowType: "normal", dateStr: dStr });
+            tableRows.push({ dateLabel, name: getAttendanceTeacherName(r.name), group: r.group, timeIn, timeOut, status: r.status, rowType: "normal", dateStr: dStr });
           }
         }
         cur.setDate(cur.getDate() + 1);
@@ -757,6 +774,7 @@ export default function AttendancePage() {
 
       setPrintHtml(html);
       setExportRows(tableRows);
+      setExportGroups([...groupedRows.entries()]);
       setShowExportModal(false);
     } catch (e) {
       console.error("Export failed:", e);
@@ -928,38 +946,16 @@ export default function AttendancePage() {
   });
 
   if (printHtml) {
-    const handleDownloadExcel = async () => {
-      const XLSX = await import("xlsx");
-
-      // Single-employee DTR exports carry an "Hours" column
+    const handleDownloadExcel = () => {
       const isDtr = exportRows.some((r) => r.hours !== undefined);
-
-      const headers = isDtr
-        ? ["Date", "Employee", "Room / Group", "Time In", "Time Out", "Hours", "Remarks"]
-        : ["Date", "Teacher Name", "Group", "Time In", "Time Out", "Status"];
-
-      const data = exportRows.map((r) =>
-        isDtr
-          ? [r.dateLabel, r.name, r.group, r.timeIn, r.timeOut, r.hours ?? "", r.status]
-          : [r.dateLabel, r.name, r.group, r.timeIn, r.timeOut, r.status]
-      );
-
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-
-      // Column widths
-      ws["!cols"] = isDtr
-        ? [{ wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 28 }]
-        : [{ wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, isDtr ? "DTR" : "Attendance");
-
-      const safeName = (exportRows[0]?.name || "Employee").replace(/[^a-z0-9]+/gi, "_");
-      const fileName = isDtr
-        ? `DTR_${safeName}_${exportStartDate}_to_${exportEndDate}.xlsx`
-        : `Attendance_Report_${exportStartDate}_to_${exportEndDate}.xlsx`;
-
-      XLSX.writeFile(wb, fileName);
+      downloadAttendanceWorkbook({
+        rows: exportRows,
+        groups: exportGroups,
+        groupBy: exportGroupBy,
+        isDtr,
+        startDate: exportStartDate,
+        endDate: exportEndDate,
+      });
     };
 
     const handlePrint = () => {
@@ -1011,22 +1007,31 @@ export default function AttendancePage() {
 
   return (
     <AppShell title="Attendance" description="Track daily check-ins and monitor staff availability.">
-      {/* Header Row */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-[3px] bg-[#ffb800]" />
-          <h1 className="text-[14px] font-black uppercase tracking-[0.1em] text-[#002f76]">
-            Daily Attendance Overview
-          </h1>
-        </div>
+      {/* Attendance page heading and actions */}
+      <section className="relative overflow-hidden rounded-2xl border border-[#dce7f5] bg-white p-5 shadow-sm sm:p-6">
+        <div className="absolute inset-y-0 left-0 w-1.5 bg-[#ffcc00]" aria-hidden="true" />
+        <div className="flex flex-col gap-5 pl-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eaf2ff] text-[#003399]">
+              <span className="material-symbols-outlined" style={{ fontSize: "23px" }}>calendar_month</span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-balance text-xl font-extrabold leading-tight text-[#003399] sm:text-[22px]">
+                Daily Attendance Overview
+              </h1>
+              <p className="mt-1 text-pretty text-sm text-[#60738f]">
+                Review staff check-ins and attendance for the selected day.
+              </p>
+            </div>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-[180px]">
-            <CustomDatePicker
-              selectedDate={viewDateStr}
-              onChange={(d) => d && setViewDateStr(d)}
-              triggerClassName="flex items-center justify-between w-full rounded-xl border-2 border-[#e2e8f0] bg-white px-4 py-2 text-[12px] font-bold text-[#002f76] transition-all hover:bg-[#f8faff] focus:border-[#0050d5]"
-            />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="w-full sm:w-[180px]">
+              <CustomDatePicker
+                selectedDate={viewDateStr}
+                onChange={(d) => d && setViewDateStr(d)}
+                triggerClassName="flex w-full items-center justify-between rounded-xl border border-[#d7e2f0] bg-[#f8faff] px-3.5 py-2.5 text-[13px] font-bold text-[#003399] transition-colors hover:bg-[#eef4ff] focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20"
+              />
           </div>
 
           {/* Export Range Button */}
@@ -1036,17 +1041,17 @@ export default function AttendancePage() {
               setExportEndDate(viewDateStr);
               setShowExportModal(true);
             }}
-            className="flex items-center gap-2 rounded-xl border-2 border-[#d6e4ff] bg-[#f0f5ff] px-4 py-2 text-[12px] font-bold text-[#005cc8] hover:bg-[#dbeafe] transition-all"
+            className="flex items-center gap-2 rounded-xl bg-[#003399] px-4 py-2.5 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-[#002b80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc] focus-visible:ring-offset-2"
           >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>download</span>
-            Export Range
+            Export report
           </button>
 
           {/* Shift Settings Button (Developer & Admin) */}
           {(userProfile?.role?.toLowerCase() === "developer" || ["admin", "executive assistant"].includes(userProfile?.role?.toLowerCase() || "")) && (
             <button
               onClick={() => setShowScheduleModal(true)}
-              className="flex items-center gap-2 rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-2 text-[12px] font-bold text-purple-700 hover:bg-purple-100 transition-all shadow-sm"
+              className="flex items-center gap-2 rounded-xl border border-[#d7e2f0] bg-white px-4 py-2.5 text-[13px] font-bold text-[#003399] shadow-sm transition-colors hover:bg-[#f3f7fd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc] focus-visible:ring-offset-2"
               title="Configure employee shift hours and breaks dynamically"
             >
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>schedule</span>
@@ -1059,7 +1064,7 @@ export default function AttendancePage() {
             <button
               onClick={handleUndoDayOff}
               disabled={suspendLoading}
-              className="flex items-center gap-2 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 py-2 text-[12px] font-bold text-orange-700 hover:bg-orange-100 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl border border-[#f2dfaa] bg-[#fff9e8] px-4 py-2.5 text-[13px] font-bold text-[#8a5c00] transition-colors hover:bg-[#fff3cc] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffcc00] focus-visible:ring-offset-2"
             >
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>undo</span>
               {suspendType === "holiday" ? "Undo Holiday" : "Undo Suspension"}
@@ -1067,26 +1072,31 @@ export default function AttendancePage() {
           ) : (
             <button
               onClick={() => { setShowMarkDayOffModal(true); setSuspendDateInput(viewDateStr); }}
-              className="flex items-center gap-2 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2 text-[12px] font-bold text-red-700 hover:bg-red-100 transition-all"
+              className="flex items-center gap-2 rounded-xl border border-[#f2dfaa] bg-[#fff9e8] px-4 py-2.5 text-[13px] font-bold text-[#8a5c00] transition-colors hover:bg-[#fff3cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffcc00] focus-visible:ring-offset-2"
             >
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>event_busy</span>
               Mark Day Off
             </button>
           )}
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* View Tabs */}
-      <div className="flex bg-[#f1f5f9] rounded-2xl p-1.5 w-fit">
-        {(["daily", "weekly", "monthly"] as const).map(mode => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={`px-6 py-2 rounded-xl text-[13px] font-bold capitalize transition-all ${viewMode === mode ? "bg-white text-[#002f76] shadow-sm" : "text-[#5a6e8c] hover:text-[#002f76]"}`}
-          >
-            {mode}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e2eaf4] bg-white px-4 py-3 shadow-sm">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[#7a8ba3]">View</span>
+        <div className="flex rounded-xl bg-[#f2f6fc] p-1">
+          {(["daily", "weekly", "monthly"] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              aria-pressed={viewMode === mode}
+              className={`rounded-lg px-4 py-2 text-[13px] font-bold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc] ${viewMode === mode ? "bg-[#003399] text-white shadow-sm" : "text-[#60738f] hover:bg-white hover:text-[#003399]"}`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
       </div>
 
       {viewMode === "weekly" && (
