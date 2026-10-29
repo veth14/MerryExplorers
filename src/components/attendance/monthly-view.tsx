@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { computeDailyStatus } from "@/lib/attendance-rules";
+import { computeDailyStatus, computeCreditedHours, getScheduleForDate, getBreakMinutesForDate } from "@/lib/attendance-rules";
 
 type AttendanceRecord = {
   _id: string;
@@ -50,14 +50,24 @@ function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function totalHours(records: AttendanceRecord[]): number {
-  let total = 0;
-  for (const r of records) {
-    if (r.clockInTime && r.clockOutTime) {
-      total += new Date(r.clockOutTime).getTime() - new Date(r.clockInTime).getTime();
-    }
+function computeRecordCreditedMs(r: AttendanceRecord, employeeName?: string): number {
+  if (!r.clockInTime) return 0;
+  const clockIn = new Date(r.clockInTime);
+  const schedule = getScheduleForDate(clockIn, employeeName);
+  if (!schedule) return 0;
+
+  let effectiveClockOut = r.clockOutTime;
+  if (!effectiveClockOut) {
+    const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    const manilaDate = new Date(manilaStr);
+    const [endH, endM] = schedule.normalEnd.split(":").map(Number);
+    manilaDate.setHours(endH, endM, 0, 0);
+    effectiveClockOut = new Date(manilaDate.getTime() - 8 * 60 * 60 * 1000).toISOString();
   }
-  return total;
+
+  const breakMins = getBreakMinutesForDate(clockIn);
+  const hours = computeCreditedHours(r.clockInTime, effectiveClockOut, schedule.start, schedule.normalEnd, breakMins);
+  return Math.round(hours * 3600000);
 }
 
 function fmtHours(ms: number): string {
@@ -173,7 +183,7 @@ export function MonthlyView({ year, month, onMonthChange }: MonthlyViewProps) {
   const staffList = [...staffMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 
   const getSummary = (staff: typeof staffList[0]) => {
-    let present = 0, late = 0, absent = 0, completed = 0, exempt = 0;
+    let present = 0, late = 0, absent = 0, completed = 0, exempt = 0, totalMs = 0;
     let holidays = 0, suspensions = 0;
     
     const rangeStart = activeCutoff ? cutoffs.find(c => c.value === activeCutoff)?.start : new Date(year, month, 1);
@@ -188,7 +198,7 @@ export function MonthlyView({ year, month, onMonthChange }: MonthlyViewProps) {
         
         const s = computeDailyStatus(
           rec,
-          { workDays: staff.workDays, noTimeLog: staff.noTimeLog, weeklyHoursTarget: staff.weeklyHoursTarget },
+          { workDays: staff.workDays, noTimeLog: staff.noTimeLog, weeklyHoursTarget: staff.weeklyHoursTarget, fullName: staff.name },
           cur,
           !!susp,
           susp?.type ?? "suspension"
@@ -202,12 +212,13 @@ export function MonthlyView({ year, month, onMonthChange }: MonthlyViewProps) {
         else if (s === "Suspended") suspensions++;
         
         if (rec?.status === "Completed") completed++;
+        if (rec?.clockInTime) {
+          totalMs += computeRecordCreditedMs(rec, staff.name);
+        }
         
         cur.setDate(cur.getDate() + 1);
       }
     }
-    
-    const totalMs = totalHours(staff.records);
     return { present, late, absent, completed, exempt, holidays, suspensions, totalMs };
   };
 

@@ -7,7 +7,7 @@ import { AttendanceRoster } from "@/components/attendance/attendance-roster";
 import type { StaffAttendance } from "@/data/attendance";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
-import { computeDailyStatus, computeTimeInStatus, computeLateDeduction } from "@/lib/attendance-rules";
+import { computeDailyStatus, computeTimeInStatus, computeLateDeduction, computeCreditedHours, getScheduleForDate, getBreakMinutesForDate } from "@/lib/attendance-rules";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { useAuth } from "@/lib/auth-context";
 import { WeeklyView } from "@/components/attendance/weekly-view";
@@ -27,6 +27,7 @@ type AttendanceRecord = {
   timeInStatus?: string;
   clockInPhotoUrl?: string;
   clockOutPhotoUrl?: string;
+  correctedAt?: string;
 };
 
 type AccountDoc = {
@@ -71,22 +72,40 @@ const fmtTime = (iso?: string | null) =>
     })
     : "";
 
-const minsBetween = (a?: string | null, b?: string | null) =>
-  a && b ? Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000)) : 0;
-
 // ── DTR hour rules ──────────────────────────────────────────────────────────
-const BREAK_MINS = 60;          // unpaid break, deducted from the day
-const BREAK_AFTER_MINS = 240;   // only deduct the break if they stayed longer than 4 hours
-const MAX_DAILY_MINS = 480;     // 8 hours maximum credited per day
+const BREAK_MINS = 60;
+const MAX_DAILY_MINS = 480;
 
-const workedMins = (a?: string | null, b?: string | null) => {
-  if (!a || !b) return 0;
-  let m = minsBetween(a, b);
-  const d = new Date(a);
-  const day = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Manila" });
-  const breakMins = day === "Sat" ? 45 : BREAK_MINS;
-  if (m > BREAK_AFTER_MINS) m -= breakMins;
-  return Math.min(m, MAX_DAILY_MINS);
+// workedMins: schedule-aware credited minutes using computeCreditedHours.
+// Caps clock-out at scheduled end time (handles forgot-to-clock-out).
+// Does NOT credit early arrival before scheduled start.
+const workedMins = (clockInISO?: string | null, clockOutISO?: string | null, employeeName?: string): number => {
+  if (!clockInISO) return 0;
+
+  const clockIn = new Date(clockInISO);
+  const schedule = getScheduleForDate(clockIn, employeeName);
+  if (!schedule) return 0;
+
+  // If no clock-out, use scheduled end time as the cap
+  let effectiveClockOutISO = clockOutISO;
+  if (!effectiveClockOutISO) {
+    const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    const manilaDate = new Date(manilaStr);
+    const [endH, endM] = schedule.normalEnd.split(":").map(Number);
+    manilaDate.setHours(endH, endM, 0, 0);
+    // Convert Manila time back to UTC by subtracting 8 hours
+    effectiveClockOutISO = new Date(manilaDate.getTime() - 8 * 60 * 60 * 1000).toISOString();
+  }
+
+  const breakMins = getBreakMinutesForDate(clockIn);
+  const hours = computeCreditedHours(
+    clockInISO,
+    effectiveClockOutISO,
+    schedule.start,
+    schedule.normalEnd,
+    breakMins
+  );
+  return Math.round(hours * 60);
 };
 
 const fmtHM = (mins: number) =>
@@ -523,24 +542,20 @@ export default function AttendancePage() {
           } else if (rec) {
             timeIn = fmtTime(rec.clockInTime);
             timeOut = fmtTime(rec.clockOutTime);
-            const m = workedMins(rec.clockInTime, rec.clockOutTime);
+            const m = workedMins(rec.clockInTime, rec.clockOutTime, name);
             totalMins += m;
             hours = fmtHM(m);
 
             // Correctly determine if employee is late
             let isLate = false;
             let statusLabel = "On Time";
-            if (rec.timeInStatus === "Late") {
-              if (rec.clockInTime && computeTimeInStatus(rec.clockInTime, noTimeLog, name, scheduleConfigs) === "On Time") {
-                statusLabel = "On Time";
-              } else {
-                isLate = true;
-                statusLabel = "Late";
-              }
-            } else if (rec.timeInStatus === "Exempt" || noTimeLog) {
+            const hasAdminOverride = !!(rec as any).correctedAt;
+
+            if (noTimeLog) {
               statusLabel = "Exempt";
-            } else if (rec.timeInStatus === "On Time") {
-              statusLabel = "On Time";
+            } else if (hasAdminOverride && rec.timeInStatus) {
+              statusLabel = rec.timeInStatus;
+              isLate = rec.timeInStatus === "Late";
             } else if (rec.clockInTime) {
               const comp = computeTimeInStatus(rec.clockInTime, noTimeLog, name, scheduleConfigs);
               if (comp === "Late") {
@@ -551,6 +566,8 @@ export default function AttendancePage() {
               } else {
                 statusLabel = "On Time";
               }
+            } else if (rec.timeInStatus === "Exempt") {
+              statusLabel = "Exempt";
             }
 
             if (isLate && rec.clockInTime) {
@@ -664,23 +681,19 @@ export default function AttendancePage() {
             const noTimeLog = teacherAcc?.noTimeLog || exemptions.includes(r.teacherUid);
 
             // Compute worked minutes
-            const m = workedMins(r.clockInTime, r.clockOutTime);
+            const m = workedMins(r.clockInTime, r.clockOutTime, teacherName);
             const hours = r.clockInTime && r.clockOutTime ? fmtHM(m) : (r.clockInTime ? "In Progress" : "—");
 
             // Compute actual attendance status
             let teacherStatus = "On Time";
             let isLate = false;
-            if (r.timeInStatus === "Late") {
-              if (r.clockInTime && computeTimeInStatus(r.clockInTime, noTimeLog, teacherAcc?.fullName || teacherName, scheduleConfigs) === "On Time") {
-                teacherStatus = "On Time";
-              } else {
-                isLate = true;
-                teacherStatus = "Late";
-              }
-            } else if (r.timeInStatus === "Exempt" || noTimeLog) {
+            const hasAdminOverride = !!(r as any).correctedAt;
+
+            if (noTimeLog) {
               teacherStatus = "Exempt (Flexible)";
-            } else if (r.timeInStatus === "On Time") {
-              teacherStatus = "On Time";
+            } else if (hasAdminOverride && r.timeInStatus) {
+              teacherStatus = r.timeInStatus === "Exempt" ? "Exempt (Flexible)" : r.timeInStatus;
+              isLate = r.timeInStatus === "Late";
             } else if (r.clockInTime) {
               const comp = computeTimeInStatus(r.clockInTime, noTimeLog, teacherAcc?.fullName || teacherName, scheduleConfigs);
               if (comp === "Late") {
@@ -691,6 +704,8 @@ export default function AttendancePage() {
               } else {
                 teacherStatus = "On Time";
               }
+            } else if (r.timeInStatus === "Exempt") {
+              teacherStatus = "Exempt (Flexible)";
             } else {
               teacherStatus = "Absent";
             }
@@ -1022,7 +1037,8 @@ export default function AttendancePage() {
       },
       viewDate,
       isSuspended,
-      suspendType ?? "suspension"
+      suspendType ?? "suspension",
+      scheduleConfigs
     ) as AccountStatus;
     return { account: acc, dailyStatus };
   });
@@ -1074,6 +1090,19 @@ export default function AttendancePage() {
     const isExempt = exemptions.includes(uid) || !!account.noTimeLog;
     if (isExempt && displayStatus === "Absent") displayStatus = "Exempt";
 
+    // Compute credited hours for display
+    let hours: string | undefined;
+    if (record?.clockInTime) {
+      const mins = workedMins(record.clockInTime, record.clockOutTime ?? null, name);
+      if (mins > 0) {
+        hours = `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
+      } else if (record.clockOutTime) {
+        hours = "—";
+      } else {
+        hours = "In Progress";
+      }
+    }
+
     return {
       id: uid,
       recordId: record?._id,
@@ -1087,6 +1116,7 @@ export default function AttendancePage() {
       timeOut: record?.clockOutTime
         ? new Date(record.clockOutTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })
         : "—",
+      hours,
       status: displayStatus,
       clockInPhotoUrl: record?.clockInPhotoUrl,
       clockOutPhotoUrl: record?.clockOutPhotoUrl,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { computeDailyStatus } from "@/lib/attendance-rules";
+import { computeDailyStatus, computeCreditedHours, getScheduleForDate, getBreakMinutesForDate } from "@/lib/attendance-rules";
 
 type AttendanceRecord = {
   _id: string;
@@ -120,8 +120,6 @@ export function WeeklyView({ weekStart, onWeekChange }: WeeklyViewProps) {
         weeklyHoursTarget: null
       }));
 
-  const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
   const getCellStatus = (uid: string, date: Date): string => {
     const dStr = toDateStr(date);
     const susp = suspMap.get(dStr);
@@ -134,6 +132,7 @@ export function WeeklyView({ weekStart, onWeekChange }: WeeklyViewProps) {
         workDays: staff?.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         noTimeLog: !!staff?.noTimeLog,
         weeklyHoursTarget: staff?.weeklyHoursTarget ?? null,
+        fullName: staff?.name,
       },
       date,
       !!susp,
@@ -301,10 +300,25 @@ export function WeeklyView({ weekStart, onWeekChange }: WeeklyViewProps) {
                       <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Total Hours</p>
                       <p className="text-[18px] font-extrabold text-[#002f76]">
                         {(() => {
-                          const diff = new Date(selectedCell.record!.clockOutTime!).getTime() - new Date(selectedCell.record!.clockInTime!).getTime();
-                          const h = Math.floor(diff / 3600000);
-                          const m = Math.floor((diff % 3600000) / 60000);
-                          return `${h}h ${m}m`;
+                          const clockIn = new Date(selectedCell.record!.clockInTime!);
+                          const staff = selectedCell.record?.teacherUid ? staffList.find(s => s.uid === selectedCell.record!.teacherUid) : null;
+                          const schedule = getScheduleForDate(clockIn, staff?.name || selectedCell.name);
+                          if (!schedule) {
+                            const diff = Math.max(0, new Date(selectedCell.record!.clockOutTime!).getTime() - clockIn.getTime());
+                            const h = Math.floor(diff / 3600000);
+                            const m = Math.floor((diff % 3600000) / 60000);
+                            return `${h}h ${m}m`;
+                          }
+                          const breakMins = getBreakMinutesForDate(clockIn);
+                          const hours = computeCreditedHours(
+                            selectedCell.record!.clockInTime!,
+                            selectedCell.record!.clockOutTime!,
+                            schedule.start,
+                            schedule.normalEnd,
+                            breakMins
+                          );
+                          const totalMins = Math.round(hours * 60);
+                          return `${Math.floor(totalMins / 60)}h ${String(totalMins % 60).padStart(2, "0")}m`;
                         })()}
                       </p>
                     </div>

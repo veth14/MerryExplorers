@@ -262,7 +262,7 @@ export function computeTimeInStatus(
 }
 
 export function computeDailyStatus(
-  record: { timeInStatus?: string; clockInTime?: string } | null,
+  record: { timeInStatus?: string; clockInTime?: string; correctedAt?: string } | null,
   account: {
     workDays: string[];
     noTimeLog: boolean;
@@ -271,7 +271,8 @@ export function computeDailyStatus(
   },
   date: Date = new Date(),
   isSuspended: boolean = false,
-  dayOffType: "suspension" | "holiday" = "suspension"
+  dayOffType: "suspension" | "holiday" = "suspension",
+  dynamicConfigs?: ScheduleConfigItem[]
 ): DailyAttendanceStatus {
   if (!isWorkDay(account.workDays, date, account.fullName)) return "No Work Day";
   if (isSuspended) return dayOffType === "holiday" ? "Holiday" : "Suspended";
@@ -288,17 +289,20 @@ export function computeDailyStatus(
     return "Absent";
   }
 
-  let status = record.timeInStatus as TimeInStatus | undefined;
-  // If status was marked Late, but the clockInTime evaluates to On Time (e.g. after manual correction to 9:00 AM),
-  // automatically resolve to On Time.
-  if (!status || (status === "Late" && record.clockInTime)) {
-    const recomputed = computeTimeInStatus(record.clockInTime, account.noTimeLog, account.fullName);
-    if (recomputed === "On Time") {
-      status = "On Time";
-    }
+  // Always recompute timeInStatus from the actual clockInTime unless the admin explicitly
+  // corrected this record (correctedAt field present). This ensures:
+  //   - stale "On Time" that is actually late → correctly shown as Late
+  //   - stale "Late" that was corrected to On Time → correctly shown as On Time
+  const hasAdminOverride = !!(record as Record<string, unknown>).correctedAt;
+
+  let status: TimeInStatus;
+  if (hasAdminOverride && record.timeInStatus) {
+    status = record.timeInStatus as TimeInStatus;
+  } else {
+    status = computeTimeInStatus(record.clockInTime!, account.noTimeLog, account.fullName, dynamicConfigs);
   }
 
-  return (status ?? computeTimeInStatus(record.clockInTime, account.noTimeLog, account.fullName)) as DailyAttendanceStatus;
+  return status as DailyAttendanceStatus;
 }
 
 // ── Human-readable helpers ────────────────────────────────────────────────────────

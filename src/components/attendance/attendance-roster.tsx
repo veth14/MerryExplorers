@@ -204,10 +204,11 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
         <table className="w-full min-w-[680px] border-separate border-spacing-0 text-left">
           <thead>
             <tr className="bg-[#003399]">
-              <th className="w-[30%] rounded-l-xl px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Teacher Name</th>
+              <th className="w-[25%] rounded-l-xl px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Teacher Name</th>
               <th className="w-[20%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Group</th>
-              <th className="w-[15%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Time In</th>
-              <th className="w-[15%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Time Out</th>
+              <th className="w-[12%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Time In</th>
+              <th className="w-[12%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Time Out</th>
+              <th className="w-[11%] px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Hours</th>
               <th className="w-[20%] rounded-r-xl px-4 py-3 text-[10px] font-extrabold uppercase tracking-wide text-white">Status</th>
             </tr>
           </thead>
@@ -234,10 +235,39 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                   {staff.timeIn !== "—" ? staff.timeIn : <span className="text-[#9aa3b2] font-semibold text-[12px]">{shiftFallbackLabel}</span>}
                 </td>
                 <td className="border-b border-[#eaf0f7] px-4 py-3.5 text-[13px] font-bold tabular-nums text-[#003399]">{staff.timeOut}</td>
+                <td className="border-b border-[#eaf0f7] px-4 py-3.5 text-[13px] font-mono text-[#003399]">
+                  {staff.hours ?? "—"}
+                </td>
                 <td className="border-b border-[#eaf0f7] px-4 py-3.5">{getStatusBadge(staff.status)}</td>
               </tr>
             ))}
           </tbody>
+          {filteredData.length > 0 && (
+            <tfoot>
+              <tr className="bg-[#f0f5ff] font-extrabold border-t-2 border-[#002f76]">
+                <td colSpan={4} className="px-4 py-3 text-right text-[11px] font-extrabold uppercase tracking-wide text-[#002f76]">
+                  Total Credited Hours
+                </td>
+                <td className="px-4 py-3 text-[12px] font-mono font-extrabold text-[#002f76]">
+                  {(() => {
+                    let totalMins = 0;
+                    for (const staff of filteredData) {
+                      if (staff.hours && staff.hours.includes("h")) {
+                        const [h, m] = staff.hours.split("h ");
+                        totalMins += (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
+                      }
+                    }
+                    return totalMins > 0 ? `${Math.floor(totalMins / 60)}h ${String(totalMins % 60).padStart(2, "0")}m` : "—";
+                  })()}
+                </td>
+                <td className="px-4 py-3 text-[11px] font-extrabold text-[#002f76]">
+                  {filteredData.filter(s => s.status === "Late").length > 0
+                    ? `${filteredData.filter(s => s.status === "Late").length} Late`
+                    : "0 Late"}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>      {/* Attendance Details Modal */}
       {selectedStaff && (
@@ -338,14 +368,18 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
                 </div>
 
                 {!isEditing ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-[#f8fafc] rounded-xl p-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-[#f8fafc] rounded-xl p-3.5">
                       <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock In</p>
-                      <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeIn}</p>
+                      <p className="text-[17px] font-extrabold text-[#002f76]">{selectedStaff.timeIn}</p>
                     </div>
-                    <div className="bg-[#f8fafc] rounded-xl p-4">
+                    <div className="bg-[#f8fafc] rounded-xl p-3.5">
                       <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6e8c] mb-1.5">Clock Out</p>
-                      <p className="text-[20px] font-extrabold text-[#002f76]">{selectedStaff.timeOut}</p>
+                      <p className="text-[17px] font-extrabold text-[#002f76]">{selectedStaff.timeOut}</p>
+                    </div>
+                    <div className="bg-[#f0f5ff] rounded-xl p-3.5 border border-[#d6e4ff]">
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#005cc8] mb-1.5">Hours</p>
+                      <p className="text-[17px] font-extrabold font-mono text-[#002f76]">{selectedStaff.hours ?? "—"}</p>
                     </div>
                   </div>
                 ) : (

@@ -11,6 +11,7 @@ export type StaffAttendance = {
   group: string;
   timeIn: string;
   timeOut: string;
+  hours?: string;
   status: AttendanceStatus;
   clockInPhotoUrl?: string;
   clockOutPhotoUrl?: string;
