@@ -25,6 +25,16 @@ const SESSION_CHIP_KEYS = new Set([
   "Trailblazer: Brave Explorer",
 ]);
 
+function getProgramChipName(programKey: string): string {
+  if (programKey.includes("Curious")) return "Curious";
+  if (programKey.includes("Creative")) return "Creative";
+  if (programKey.includes("Everyday")) return "Everyday";
+  if (programKey.includes("Brave") || programKey.includes("Trailblazer")) return "Trailblazer";
+  if (programKey.includes("Playdate")) return "Playdate";
+  if (programKey.includes("Ballet")) return "Ballet";
+  return programKey.replace(/^Discovery Club:\s*/, "");
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getManilaMonthStr(): string {
@@ -214,21 +224,38 @@ function MonthGrid({
                   </div>
                 )}
 
-                {/* Program session chips */}
+                {/* Program session chips - bold, high-contrast session badge */}
                 {daySessions.map((s, i) => {
                   const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
+                  const chipName = getProgramChipName(s.programKey);
                   return (
                     <div
                       key={`sess-${s.programKey}-${i}`}
-                      className="truncate text-[8.5px] sm:text-[9.5px] font-black px-1 py-0.5 rounded-md border"
+                      className="flex items-center justify-between gap-1 px-1.5 py-0.5 rounded-md border shadow-2xs transition-all hover:scale-[1.01]"
                       style={{
                         backgroundColor: cfg?.bg ?? "#f0f5ff",
                         color: cfg?.color ?? "#0033a0",
                         borderColor: cfg?.border ?? "#c7d8f0",
                       }}
-                      title={`${s.programShortName} · Adv ${s.adventureNumber} · Session ${s.sessionNumber}/${s.totalSessions}`}
+                      title={`${s.programShortName} · Adventure ${s.adventureNumber} · Session ${s.sessionNumber} of ${s.totalSessions}`}
                     >
-                      {cfg?.emoji} {s.programShortName}: S{s.sessionNumber}/{s.totalSessions}
+                      <div className="flex items-center gap-1 min-w-0 truncate">
+                        <span className="text-[10px] shrink-0 leading-none">{cfg?.emoji || "🎒"}</span>
+                        <span className="truncate font-black text-[9px] sm:text-[10px] tracking-tight">{chipName}</span>
+                      </div>
+                      <span
+                        className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-black bg-white/95 border shadow-2xs"
+                        style={{ borderColor: cfg?.border ?? "#cbd5e1" }}
+                      >
+                        <span className="text-[7.5px] font-extrabold uppercase opacity-60">S</span>
+                        <span
+                          className="text-[11px] sm:text-[12px] font-black leading-none"
+                          style={{ color: cfg?.color ?? "#0033a0" }}
+                        >
+                          {s.sessionNumber}
+                        </span>
+                        <span className="text-[8px] font-bold text-slate-400">/{s.totalSessions}</span>
+                      </span>
                     </div>
                   );
                 })}
@@ -715,40 +742,118 @@ function DayDrawer({
           </button>
         </div>
 
-        {/* Program sessions for this day */}
+        {/* Program sessions for this day - prominent session cards */}
         {daySessions.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#4f46e5]/70 mb-2">
-              🎒 Program Sessions
-            </p>
-            <div className="space-y-1.5">
+          <div className="mb-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#4f46e5]">
+                🎒 Program Sessions Today ({daySessions.length})
+              </p>
+              <span className="text-[10.5px] font-bold text-slate-400">
+                Active Adventure
+              </span>
+            </div>
+            <div className="space-y-2">
               {daySessions.map((s, i) => {
                 const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
+                const pct = Math.min(100, Math.round((s.sessionNumber / s.totalSessions) * 100));
                 return (
                   <div
                     key={i}
-                    className="flex items-center justify-between rounded-xl px-3 py-2 border"
+                    className="rounded-2xl p-3 border-2 shadow-xs transition-all bg-white"
                     style={{
-                      backgroundColor: cfg?.bg ?? "#f0f5ff",
                       borderColor: cfg?.border ?? "#c7d8f0",
                     }}
                   >
-                    <span
-                      className="text-[13px] font-black"
-                      style={{ color: cfg?.color ?? "#0033a0" }}
-                    >
-                      {cfg?.emoji} {cfg?.shortName ?? s.programShortName}
-                    </span>
-                    <span
-                      className="text-[12px] font-bold px-2 py-0.5 rounded-lg"
-                      style={{ color: cfg?.color ?? "#0033a0", backgroundColor: "rgba(0,0,0,0.06)" }}
-                    >
-                      Session {s.sessionNumber}/{s.totalSessions}
-                    </span>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-base">{cfg?.emoji || "🎒"}</span>
+                          <span
+                            className="text-[14px] font-black"
+                            style={{ color: cfg?.color ?? "#0033a0" }}
+                          >
+                            {cfg?.shortName ?? s.programShortName}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                          Adventure {s.adventureNumber} · {cfg?.scheduleLabel || s.programKey}
+                        </p>
+                      </div>
+
+                      {/* Prominent Session Badge */}
+                      <div
+                        className="shrink-0 flex flex-col items-center justify-center px-3.5 py-1.5 rounded-xl border-2 shadow-xs"
+                        style={{
+                          backgroundColor: cfg?.bg ?? "#f8faff",
+                          borderColor: cfg?.border ?? "#cbd5e1",
+                        }}
+                      >
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">
+                          SESSION
+                        </span>
+                        <div className="flex items-baseline gap-0.5">
+                          <span
+                            className="text-[22px] font-black leading-none"
+                            style={{ color: cfg?.color ?? "#0033a0" }}
+                          >
+                            {s.sessionNumber}
+                          </span>
+                          <span className="text-[11px] font-extrabold text-slate-400">
+                            /{s.totalSessions}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: cfg?.color ?? "#0033a0",
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 shrink-0">
+                        {pct}% Complete
+                      </span>
+                    </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Inactive programs for this day (e.g. Curious on Tuesdays) */}
+            {(() => {
+              const activeKeys = new Set(daySessions.map((s) => s.programKey));
+              const inactive = Array.from(SESSION_CHIP_KEYS)
+                .filter((k) => !activeKeys.has(k))
+                .map((k) => PROGRAM_SCHEDULE_CONFIGS[k])
+                .filter(Boolean);
+              if (inactive.length === 0) return null;
+              return (
+                <div className="mt-2 rounded-xl bg-slate-50 p-2.5 border border-slate-200/80 text-[11px]">
+                  <p className="font-extrabold text-slate-500 uppercase text-[9px] tracking-wider mb-1">
+                    No session scheduled today for:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {inactive.map((cfg) => (
+                      <span
+                        key={cfg.programKey}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 font-bold text-[10px]"
+                      >
+                        <span>{cfg.emoji}</span>
+                        <span>{cfg.shortName}</span>
+                        <span className="text-slate-400 font-normal">({cfg.scheduleLabel})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

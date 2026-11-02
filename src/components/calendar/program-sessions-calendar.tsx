@@ -40,7 +40,7 @@ export function ProgramSessionsCalendar({
     fetch("/api/programs/schedules")
       .then((r) => r.json())
       .then((data) => {
-        if (mounted && data?.success && Array.isArray(data.schedules)) {
+        if (mounted && (data?.success || data?.ok) && Array.isArray(data.schedules)) {
           setInternalSchedules(data.schedules);
         }
       })
@@ -566,13 +566,13 @@ export function ProgramSessionsCalendar({
                       </div>
                     ))}
 
-                    {/* Program Sessions */}
+                    {/* Program Sessions - bold, readable badge */}
                     {daySessions.slice(0, 3).map((s, i) => {
                       const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
                       return (
                         <div
                           key={`${s.programKey}-${s.sessionNumber}-${i}`}
-                          className="truncate text-[9.5px] font-black px-1.5 py-0.5 rounded-md border shadow-2xs"
+                          className="flex items-center justify-between gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-md border shadow-2xs"
                           style={{
                             backgroundColor: cfg ? cfg.bg : "#f0f5ff",
                             color: cfg ? cfg.color : "#0033a0",
@@ -580,9 +580,23 @@ export function ProgramSessionsCalendar({
                           }}
                           title={`${s.programKey} (Adv ${s.adventureNumber}) — Session ${s.sessionNumber} of ${s.totalSessions}`}
                         >
-                          <span className="mr-0.5">{cfg?.emoji || "🎒"}</span>
-                          <span className="font-extrabold">{cfg?.shortName || s.programShortName}: </span>
-                          <span className="font-black">Adv {s.adventureNumber} · S{s.sessionNumber}/{s.totalSessions}</span>
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span className="text-[10px] shrink-0">{cfg?.emoji || "🎒"}</span>
+                            <span className="font-black truncate text-[9.5px]">{cfg?.shortName || s.programShortName}</span>
+                          </div>
+                          <span
+                            className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-black bg-white/95 border shadow-2xs"
+                            style={{ borderColor: cfg ? cfg.border : "#cbd5e1" }}
+                          >
+                            <span className="text-[7.5px] font-extrabold uppercase opacity-60">S</span>
+                            <span
+                              className="text-[11px] sm:text-[12px] font-black leading-none"
+                              style={{ color: cfg ? cfg.color : "#0033a0" }}
+                            >
+                              {s.sessionNumber}
+                            </span>
+                            <span className="text-[8px] font-bold text-slate-400">/{s.totalSessions}</span>
+                          </span>
                         </div>
                       );
                     })}
