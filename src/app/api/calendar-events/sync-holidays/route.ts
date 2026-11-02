@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
 import { getManilaDateStr } from "@/lib/calendar-events";
+import { getPhSupplementalHolidays } from "@/lib/ph-holidays-supplement";
 
 const NAGER_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 
@@ -41,7 +42,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const holidays: NagerHoliday[] = await resp.json();
+    const nagerHolidays: NagerHoliday[] = await resp.json();
+
+    // Merge Nager.Date holidays with PH supplemental special non-working days
+    // that Nager.Date does not include (e.g. All Souls' Day, Christmas Eve, etc.)
+    const supplemental = getPhSupplementalHolidays(year);
+    const nagerDates = new Set(nagerHolidays.map((h) => h.date));
+    const uniqueSupplemental = supplemental.filter((s) => !nagerDates.has(s.date));
+
+    const holidays: NagerHoliday[] = [
+      ...nagerHolidays,
+      ...uniqueSupplemental.map((s) => ({
+        date: s.date,
+        localName: s.localName,
+        name: s.name,
+        countryCode: "PH",
+        types: s.types,
+      })),
+    ];
+
     const { db } = await connectToDatabase();
     const now = new Date().toISOString();
 
@@ -95,7 +114,7 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     );
 
-    return NextResponse.json({ ok: true, year, synced, skipped });
+    return NextResponse.json({ ok: true, year, synced, skipped, supplemental: uniqueSupplemental.length });
   } catch (err) {
     console.error("[sync-holidays POST]", err);
     return NextResponse.json({ error: "Failed to sync holidays" }, { status: 500 });

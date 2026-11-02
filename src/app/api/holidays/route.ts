@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
+import { getPhSupplementalHolidays } from "@/lib/ph-holidays-supplement";
 
 const NAGER_BASE = "https://date.nager.at/api/v3/PublicHolidays";
 
@@ -61,7 +62,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const holidays: NagerHoliday[] = await resp.json();
+    const nagerHolidays: NagerHoliday[] = await resp.json();
+
+    // Merge supplemental PH special non-working days not in Nager.Date
+    const supplemental = getPhSupplementalHolidays(parseInt(year, 10));
+    const nagerDates = new Set(nagerHolidays.map((h) => h.date));
+    const uniqueSupplemental = supplemental.filter((s) => !nagerDates.has(s.date));
+
+    const holidays: NagerHoliday[] = [
+      ...nagerHolidays,
+      ...uniqueSupplemental.map((s) => ({
+        date: s.date,
+        localName: s.localName,
+        name: s.name,
+        countryCode: "PH",
+        fixed: true,
+        global: true,
+        types: s.types,
+      })),
+    ];
 
     const { db } = await connectToDatabase();
     let seeded = 0;
@@ -83,7 +102,7 @@ export async function POST(request: Request) {
       seeded++;
     }
 
-    return NextResponse.json({ success: true, year, seeded });
+    return NextResponse.json({ success: true, year, seeded, supplemental: uniqueSupplemental.length });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
