@@ -675,6 +675,8 @@ function DayDrawer({
   onEdit,
   onDelete,
   onHide,
+  sessionsByDate,
+  showSessions,
 }: {
   dateStr: string;
   events: CalendarEvent[];
@@ -683,7 +685,12 @@ function DayDrawer({
   onEdit: (e: CalendarEvent) => void;
   onDelete: (e: CalendarEvent) => void;
   onHide: (e: CalendarEvent) => void;
+  sessionsByDate?: Record<string, ProgramSessionItem[]>;
+  showSessions?: boolean;
 }) {
+  const daySessions = showSessions && sessionsByDate
+    ? (sessionsByDate[dateStr] || []).filter((s) => SESSION_CHIP_KEYS.has(s.programKey))
+    : [];
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
@@ -692,7 +699,12 @@ function DayDrawer({
           <div>
             <h3 className="text-[16px] font-black text-[#002f76]">{formatDate(dateStr)}</h3>
             <p className="text-[11px] text-[#9aa3b2] font-medium">
-              {events.length === 0 ? "No events" : `${events.length} event${events.length > 1 ? "s" : ""}`}
+              {events.length === 0 && daySessions.length === 0
+                ? "No events or sessions"
+                : [
+                    events.length > 0 && `${events.length} event${events.length > 1 ? "s" : ""}`,
+                    daySessions.length > 0 && `${daySessions.length} program session${daySessions.length > 1 ? "s" : ""}`,
+                  ].filter(Boolean).join(" · ")}
             </p>
           </div>
           <button
@@ -703,13 +715,54 @@ function DayDrawer({
           </button>
         </div>
 
-        {events.length === 0 ? (
+        {/* Program sessions for this day */}
+        {daySessions.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#4f46e5]/70 mb-2">
+              🎒 Program Sessions
+            </p>
+            <div className="space-y-1.5">
+              {daySessions.map((s, i) => {
+                const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-xl px-3 py-2 border"
+                    style={{
+                      backgroundColor: cfg?.bg ?? "#f0f5ff",
+                      borderColor: cfg?.border ?? "#c7d8f0",
+                    }}
+                  >
+                    <span
+                      className="text-[13px] font-black"
+                      style={{ color: cfg?.color ?? "#0033a0" }}
+                    >
+                      {cfg?.emoji} {cfg?.shortName ?? s.programShortName}
+                    </span>
+                    <span
+                      className="text-[12px] font-bold px-2 py-0.5 rounded-lg"
+                      style={{ color: cfg?.color ?? "#0033a0", backgroundColor: "rgba(0,0,0,0.06)" }}
+                    >
+                      Session {s.sessionNumber}/{s.totalSessions}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {events.length === 0 && daySessions.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-4xl mb-2">📅</div>
             <p className="text-[13px] font-bold text-[#9aa3b2]">No events on this day</p>
             <button onClick={onAdd} className="mt-3 text-[12px] font-bold text-[#0050d5] underline">
               Add one
             </button>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-4">
+            <p className="text-[12px] font-bold text-[#9aa3b2]">No calendar events on this day</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -1407,6 +1460,8 @@ export default function AdminAdventureCalendarPage() {
           onEdit={openEdit}
           onDelete={handleDeleteEvent}
           onHide={handleHideEvent}
+          sessionsByDate={sessionsByDate}
+          showSessions={showSessionChips}
         />
       )}
 
