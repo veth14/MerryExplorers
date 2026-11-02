@@ -688,6 +688,7 @@ function AdminPaymentsPageInner() {
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<any[]>([]); // includes registrations with no payment yet (for manual encoding + the Next tab)
+  const [holidaySkipDates, setHolidaySkipDates] = useState<Set<string>>(new Set());
   const [mainLoading, setMainLoading] = useState(true);
   const [view, setView] = useState<Tab>("current");
   const [renewalSettings, setRenewalSettings] = useState<any[]>([]); // ProgramRenewalEntry[]
@@ -779,6 +780,15 @@ function AdminPaymentsPageInner() {
   }
 
   useEffect(() => {
+    // Load holiday skip dates separately (non-blocking) so a slow DB call can't
+    // delay the main payment list.
+    fetch("/api/holidays/dates")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d?.dates)) setHolidaySkipDates(new Set(d.dates));
+      })
+      .catch(() => {/* non-fatal — falls back to no-skip behaviour */});
+
     Promise.all([
       fetch("/api/accounts").then((res) => res.json()),
       fetch("/api/registrations?status=all").then((res) => res.json()),
@@ -1548,7 +1558,7 @@ function AdminPaymentsPageInner() {
     const prevBal = typeof reg?.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
     const paidToPrev = Math.min(paidVerified, prevBal);
     const appliedToSession = Math.max(0, paidVerified - paidToPrev);
-    const terms = calcRegistrationTerms(reg, student, appliedToSession, reg?.amountDue, asOf);
+    const terms = calcRegistrationTerms(reg, student, appliedToSession, reg?.amountDue, asOf, holidaySkipDates);
     // first payment = the one parents make on the "Secure Your Slot" page
     const isInitial = reg?.status === "reserved" || reg?.status === "early-bird";
     const prog = (PROGRAM_SLOTS as any)[reg?.program] ?? null;
@@ -2055,7 +2065,7 @@ function AdminPaymentsPageInner() {
       const prevBal = typeof reg?.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
       const paidToPrev = Math.min(paidVerified, prevBal);
       const appliedToSession = Math.max(0, paidVerified - paidToPrev);
-      const baseTerms = calcRegistrationTerms(reg, student, appliedToSession, payment.amountDue ?? reg?.amountDue);
+      const baseTerms = calcRegistrationTerms(reg, student, appliedToSession, payment.amountDue ?? reg?.amountDue, new Date(), holidaySkipDates);
       if (!baseTerms) return null;
       const sessionBal = baseTerms.balance;
       const remainingPrev = Math.max(0, prevBal - paidToPrev);

@@ -425,6 +425,7 @@ export default function TrailblazerDashboard(p: Props) {
 
     // Registration records for this family: from props, or (TEMP) fetched here
     const [fetchedRegs, setFetchedRegs] = useState<any[] | null>(null);
+    const [holidaySkipDates, setHolidaySkipDates] = useState<Set<string>>(new Set());
     useEffect(() => {
         const mail = (profile.email || "").toLowerCase();
         if (!TEMP_FETCH_REGISTRATIONS || p.registrations || !mail) return;
@@ -437,6 +438,16 @@ export default function TrailblazerDashboard(p: Props) {
             .catch(() => setFetchedRegs([]));
     }, [p.registrations, profile.email]);
     const registrations: any[] = p.registrations ?? fetchedRegs ?? [];
+
+    // Fetch holiday/suspension dates for holiday-aware payment term calculation
+    useEffect(() => {
+        fetch("/api/holidays/dates")
+            .then((r) => r.json())
+            .then((d) => {
+                if (Array.isArray(d?.dates)) setHolidaySkipDates(new Set(d.dates));
+            })
+            .catch(() => {}); // non-blocking; skip dates remain empty on failure
+    }, []);
 
     const recentAlbum = profile.albums?.[0] ?? null;
     const [expandedAlbum, setExpandedAlbum] = useState<string | null>(recentAlbum?.id ?? null);
@@ -692,7 +703,7 @@ export default function TrailblazerDashboard(p: Props) {
         const regLine = ledger.find((l) => l.key === "reg");
         const paidVerified = regVerified ? regTotalPaid : 0;
         const terms = registration
-            ? calcRegistrationTerms(registration, getStudentSessionInfo(registration, profile), paidVerified, registration.amountDue)
+            ? calcRegistrationTerms(registration, getStudentSessionInfo(registration, profile), paidVerified, registration.amountDue, new Date(), holidaySkipDates)
             : null;
         const fullyPaid = terms?.balance === 0;
         const overdue = !!terms && terms.interest > 0;
