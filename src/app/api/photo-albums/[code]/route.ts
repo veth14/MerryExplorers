@@ -37,6 +37,23 @@ export async function GET(
     const hasPin = Boolean(album.pin);
     const isUnlocked = !hasPin || album.pin === providedPin;
 
+    // If the parent just successfully unlocked with a PIN, record the access event
+    if (hasPin && isUnlocked && providedPin) {
+      const ua = request.headers.get("user-agent") || "";
+      // Fire-and-forget: don't block the response on this write
+      db.collection("student_photo_albums").updateOne(
+        { accessCode: code.toUpperCase() },
+        {
+          $push: {
+            accessLog: {
+              unlockedAt: new Date(),
+              userAgent: ua.slice(0, 300),
+            },
+          } as any,
+        }
+      ).catch((e: any) => console.warn("[photo-albums/[code]] accessLog write failed:", e?.message));
+    }
+
     // Return only safe fields — never expose parentEmail, studentRegistrationId etc.
     const safeAlbum = {
       accessCode: album.accessCode,

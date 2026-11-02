@@ -39,6 +39,7 @@ interface PhotoAlbum {
   expiresAt: string;
   createdAt: string;
   isTrailblazer?: boolean;
+  accessLog?: { unlockedAt: string; userAgent: string }[];
 }
 
 interface PhotoPreview {
@@ -367,6 +368,11 @@ function AlbumCard({
           <span className={`flex items-center gap-1 text-[11px] font-semibold ${album.emailSent ? "text-emerald-600" : "text-amber-500"}`}>
             {album.emailSent ? "✅ Email sent" : "📧 Not sent yet"}
           </span>
+          {(album.accessLog?.length ?? 0) > 0 && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-[#7c3aed]">
+              👁 Viewed {album.accessLog!.length}×
+            </span>
+          )}
         </div>
 
         {/* Access code + link */}
@@ -535,6 +541,58 @@ function ViewAlbumPanel({ album, onClose }: { album: PhotoAlbum; onClose: () => 
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Access log */}
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-widest text-[#0033A0]/60 mb-3">
+              Link Access Log
+              {(album.accessLog?.length ?? 0) > 0 && (
+                <span className="ml-2 normal-case font-semibold text-[#7c3aed]">
+                  — viewed {album.accessLog!.length} time{album.accessLog!.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+            {(album.accessLog?.length ?? 0) === 0 ? (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-[13px] text-[#94a3b8] italic">
+                Not opened yet — link has not been accessed with the correct PIN.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {[...album.accessLog!].reverse().map((entry, i) => {
+                  const dt = new Date(entry.unlockedAt);
+                  const label = dt.toLocaleString("en-PH", {
+                    timeZone: "Asia/Manila",
+                    month: "short", day: "numeric", year: "numeric",
+                    hour: "numeric", minute: "2-digit", hour12: true,
+                  });
+                  // Simplify userAgent to a readable device hint
+                  const ua = entry.userAgent || "";
+                  const device = /iPhone|iPad|iPod/.test(ua)
+                    ? "📱 iPhone / iPad"
+                    : /Android/.test(ua)
+                    ? "📱 Android"
+                    : /Macintosh/.test(ua)
+                    ? "💻 Mac"
+                    : /Windows/.test(ua)
+                    ? "🖥️ Windows PC"
+                    : ua ? "🌐 Other device" : "Unknown";
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[#ede9fe] bg-[#f5f3ff] px-4 py-2.5"
+                    >
+                      <span className="text-[13px] font-bold text-[#5b21b6]">
+                        👁 {label}
+                      </span>
+                      <span className="text-[11px] font-semibold text-[#7c3aed] shrink-0">
+                        {device}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
       </m.div>
