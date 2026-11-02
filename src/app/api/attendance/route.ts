@@ -68,11 +68,24 @@ export async function GET(request: Request) {
 
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
     
-    // Fetch any daily exemptions for this date
+    // Fetch daily exemptions for this query
     let exemptions: string[] = [];
+    let dailyExemptions: { teacherUid: string; dateStr: string }[] = [];
+
     if (resolvedDateStr) {
       const exemptDocs = await db.collection("daily_exemptions").find({ dateStr: resolvedDateStr }).toArray();
       exemptions = exemptDocs.map(d => d.teacherUid);
+      dailyExemptions = exemptDocs.map(d => ({ teacherUid: d.teacherUid, dateStr: d.dateStr }));
+    } else if (startDate && endDate) {
+      const exemptDocs = await db.collection("daily_exemptions").find({
+        dateStr: { $gte: startDate, $lte: endDate }
+      }).toArray();
+      exemptions = Array.from(new Set(exemptDocs.map(d => d.teacherUid)));
+      dailyExemptions = exemptDocs.map(d => ({ teacherUid: d.teacherUid, dateStr: d.dateStr }));
+    } else {
+      const exemptDocs = await db.collection("daily_exemptions").find({}).toArray();
+      exemptions = Array.from(new Set(exemptDocs.map(d => d.teacherUid)));
+      dailyExemptions = exemptDocs.map(d => ({ teacherUid: d.teacherUid, dateStr: d.dateStr }));
     }
 
     return NextResponse.json({ 
@@ -82,7 +95,8 @@ export async function GET(request: Request) {
       suspendReason, 
       suspendType,
       suspendedDays,
-      exemptions
+      exemptions,
+      dailyExemptions
     }, {
       headers: {
         "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30"

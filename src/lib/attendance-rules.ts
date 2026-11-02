@@ -250,15 +250,14 @@ export function computeTimeInStatus(
   const schedule = scheduleTable[day as Exclude<DayAbbr, "Sun">];
 
   const [graceH, graceM] = schedule.graceUntil.split(":").map(Number);
+  const graceTotalMinutes = graceH * 60 + graceM;
 
-  const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
-  const manilaDate = new Date(manilaStr);
-  const graceDeadline = new Date(manilaDate);
-  graceDeadline.setHours(graceH, graceM, 0, 0);
+  // Manila is UTC+8 with zero DST — integer minutes comparison avoids locale/timezone parsing bugs
+  const phtMs = clockIn.getTime() + 8 * 3600 * 1000;
+  const phtDate = new Date(phtMs);
+  const clockInMinutes = phtDate.getUTCHours() * 60 + phtDate.getUTCMinutes();
 
-  const manilaClockIn = new Date(manilaStr);
-  manilaClockIn.setSeconds(0, 0);
-  return manilaClockIn <= graceDeadline ? "On Time" : "Late";
+  return clockInMinutes <= graceTotalMinutes ? "On Time" : "Late";
 }
 
 export function computeDailyStatus(
@@ -366,36 +365,32 @@ export function computeLateDeduction(
 ): LateDeductionResult {
   if (noTimeLog) return { lateMinutes: 0, deduction: 0, method: "none" };
 
+  const clockIn = new Date(clockInISO);
   const { scheduledStart, lateThreshold } = getLateDeductionConfigForDate(
-    new Date(clockInISO),
+    clockIn,
     employeeName,
     dynamicConfigs
   );
 
-  const clockIn = new Date(clockInISO);
-  const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
-  const manilaIn = new Date(manilaStr);
-
   const [startH, startM] = scheduledStart.split(":").map(Number);
   const [threshH, threshM] = lateThreshold.split(":").map(Number);
 
-  const startBoundary = new Date(manilaIn);
-  startBoundary.setHours(startH, startM, 0, 0);
+  const phtMs = clockIn.getTime() + 8 * 3600 * 1000;
+  const phtDate = new Date(phtMs);
+  const clockInMinutes = phtDate.getUTCHours() * 60 + phtDate.getUTCMinutes();
 
-  const threshBoundary = new Date(manilaIn);
-  threshBoundary.setHours(threshH, threshM, 0, 0);
+  const startTotalMinutes = startH * 60 + startM;
+  const threshTotalMinutes = threshH * 60 + threshM;
 
-  if (manilaIn <= startBoundary) {
+  if (clockInMinutes <= startTotalMinutes) {
     return { lateMinutes: 0, deduction: 0, method: "none" };
   }
 
-  if (manilaIn >= threshBoundary) {
-    return { lateMinutes: 0, deduction: hourlyRate, method: "threshold" };
+  const lateMinutes = clockInMinutes - startTotalMinutes;
+  if (clockInMinutes >= threshTotalMinutes) {
+    return { lateMinutes, deduction: hourlyRate, method: "threshold" };
   }
 
-  const lateMinutes = Math.floor(
-    (manilaIn.getTime() - startBoundary.getTime()) / 60_000,
-  );
   const deduction = parseFloat(((hourlyRate / 60) * lateMinutes).toFixed(2));
   return { lateMinutes, deduction, method: "per-minute" };
 }
@@ -409,29 +404,29 @@ export function computeCreditedHours(
   scheduledEnd: string,
   breakMins: number,
 ): number {
-  const clockIn = new Date(clockInISO);
-  const clockOut = new Date(clockOutISO);
+  const inMs = new Date(clockInISO).getTime();
+  const outMs = new Date(clockOutISO).getTime();
+  if (isNaN(inMs) || isNaN(outMs)) return 0;
 
-  const manilaInStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
-  const manilaOutStr = clockOut.toLocaleString("en-US", { timeZone: "Asia/Manila" });
-  const manilaIn = new Date(manilaInStr);
-  const manilaOut = new Date(manilaOutStr);
+  // Manila epoch day offset (UTC+8)
+  const phtInMs = inMs + 8 * 3600 * 1000;
+  const phtDate = new Date(phtInMs);
+  const dayStartPhtMs = Date.UTC(phtDate.getUTCFullYear(), phtDate.getUTCMonth(), phtDate.getUTCDate());
 
   const [startH, startM] = scheduledStart.split(":").map(Number);
   const [endH, endM] = scheduledEnd.split(":").map(Number);
 
-  const schedStart = new Date(manilaIn);
-  schedStart.setHours(startH, startM, 0, 0);
+  // Scheduled shift boundaries in UTC ms
+  const schedStartUtcMs = dayStartPhtMs + (startH * 3600 + startM * 60) * 1000 - 8 * 3600 * 1000;
+  const schedEndUtcMs = dayStartPhtMs + (endH * 3600 + endM * 60) * 1000 - 8 * 3600 * 1000;
 
-  const schedEnd = new Date(manilaIn);
-  schedEnd.setHours(endH, endM, 0, 0);
+  // Early arrival does NOT count before scheduled start
+  const effectiveStartMs = Math.max(inMs, schedStartUtcMs);
+  // Overtime does NOT count past scheduled shift normalEnd (caps forget-to-timeout hours)
+  const effectiveEndMs = Math.min(outMs, schedEndUtcMs);
 
-  const effectiveStart = manilaIn < schedStart ? schedStart : manilaIn;
-  const effectiveEnd = manilaOut > schedEnd ? schedEnd : manilaOut;
-
-  const elapsedMs = Math.max(0, effectiveEnd.getTime() - effectiveStart.getTime());
-  // Only deduct break if the employee worked more than 4 hours (240 mins)
-  // Ensures half-day shifts (e.g. 9:00 AM - 12:00 PM = 3h) are not unfairly penalized with a lunch break deduction
+  const elapsedMs = Math.max(0, effectiveEndMs - effectiveStartMs);
+  // Only deduct break if the employee rendered more than 4 hours (240 mins)
   const effectiveBreakMins = elapsedMs > 240 * 60_000 ? breakMins : 0;
 
   const creditedMs = Math.max(0, elapsedMs - effectiveBreakMins * 60_000);

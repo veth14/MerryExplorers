@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { computeAdventureBadge } from "@/lib/adventure-badge";
 import { upsertAdventureCycleHistory } from "@/lib/adventure-cycle";
 import { PROGRAM_SLOTS } from "@/data/landing";
+import { PROGRAM_SCHEDULE_CONFIGS } from "@/lib/program-sessions";
 
 // Visual metadata for programs
 export const PROGRAM_CONFIG_META: Record<string, { emoji: string; color: string; bg: string; border: string; gradient: string; short: string; badge: string }> = {
@@ -655,6 +656,11 @@ export function RenewalSettingsManager() {
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider border ${meta.badge}`}>
                             {meta.short}
                           </span>
+                          {PROGRAM_SCHEDULE_CONFIGS[prog.programKey] && (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                              {PROGRAM_SCHEDULE_CONFIGS[prog.programKey].defaultSessions} Sessions ({PROGRAM_SCHEDULE_CONFIGS[prog.programKey].scheduleLabel})
+                            </span>
+                          )}
                           {prog.programKey === MASTER_PROGRAM && (
                             <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
                               👑 Master Cycle Source
@@ -706,6 +712,12 @@ export function RenewalSettingsManager() {
                       <span className="text-[10px] text-slate-400 font-semibold">
                         Public Form
                       </span>
+                      <a
+                        href={`/admin/calendar?tab=programs&program=${encodeURIComponent(prog.programKey)}`}
+                        className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0050d5] text-[10.5px] font-black border border-blue-200 transition-colors"
+                      >
+                        <span>📅</span> Sessions
+                      </a>
                     </div>
                   </div>
                 </div>

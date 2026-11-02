@@ -40,6 +40,14 @@ export function AttendanceRoster({ data, dateStr, onToggleExempt, exemptLoading,
   })();
 
   const getStatusBadge = (status: StaffAttendance["status"]) => {
+    if (typeof status === "string" && status.startsWith("Late")) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-[#fffdf0] text-[#d97706] border border-[#fef08a]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d97706]" />
+          {status}
+        </span>
+      );
+    }
     switch (status) {
       case "On Time":
         return (

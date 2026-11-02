@@ -79,25 +79,31 @@ const MAX_DAILY_MINS = 480;
 // workedMins: schedule-aware credited minutes using computeCreditedHours.
 // Caps clock-out at scheduled end time (handles forgot-to-clock-out).
 // Does NOT credit early arrival before scheduled start.
-const workedMins = (clockInISO?: string | null, clockOutISO?: string | null, employeeName?: string): number => {
+const workedMins = (
+  clockInISO?: string | null,
+  clockOutISO?: string | null,
+  employeeName?: string,
+  dynamicConfigs?: any[]
+): number => {
   if (!clockInISO) return 0;
 
   const clockIn = new Date(clockInISO);
-  const schedule = getScheduleForDate(clockIn, employeeName);
+  const schedule = getScheduleForDate(clockIn, employeeName, dynamicConfigs);
   if (!schedule) return 0;
 
   // If no clock-out, use scheduled end time as the cap
   let effectiveClockOutISO = clockOutISO;
   if (!effectiveClockOutISO) {
-    const manilaStr = clockIn.toLocaleString("en-US", { timeZone: "Asia/Manila" });
-    const manilaDate = new Date(manilaStr);
+    const inMs = clockIn.getTime();
+    const phtInMs = inMs + 8 * 3600 * 1000;
+    const phtDate = new Date(phtInMs);
+    const dayStartPhtMs = Date.UTC(phtDate.getUTCFullYear(), phtDate.getUTCMonth(), phtDate.getUTCDate());
     const [endH, endM] = schedule.normalEnd.split(":").map(Number);
-    manilaDate.setHours(endH, endM, 0, 0);
-    // Convert Manila time back to UTC by subtracting 8 hours
-    effectiveClockOutISO = new Date(manilaDate.getTime() - 8 * 60 * 60 * 1000).toISOString();
+    const schedEndUtcMs = dayStartPhtMs + (endH * 3600 + endM * 60) * 1000 - 8 * 3600 * 1000;
+    effectiveClockOutISO = new Date(schedEndUtcMs).toISOString();
   }
 
-  const breakMins = getBreakMinutesForDate(clockIn);
+  const breakMins = getBreakMinutesForDate(clockIn, dynamicConfigs);
   const hours = computeCreditedHours(
     clockInISO,
     effectiveClockOutISO,
@@ -480,6 +486,14 @@ export default function AttendancePage() {
       const json = await res.json();
       if (!json.success) throw new Error("Failed to fetch");
 
+      // Build daily exemptions map for accurate per-day flexible override
+      const dailyExemptSet = new Set<string>();
+      if (Array.isArray(json.dailyExemptions)) {
+        for (const de of json.dailyExemptions) {
+          dailyExemptSet.add(`${de.teacherUid}_${de.dateStr}`);
+        }
+      }
+
       // Build suspended days map
       const suspMap = new Map<string, { type: "suspension" | "holiday"; reason?: string }>();
       if (Array.isArray(json.suspendedDays)) {
@@ -511,7 +525,6 @@ export default function AttendancePage() {
           acc?.fullName || `${acc?.firstName ?? ""} ${acc?.lastName ?? ""}`.trim() || "Unknown";
         const room = exportPosition.trim() || getPosition(acc) || "—";
         const workDays = acc?.workDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        const noTimeLog = acc?.noTimeLog || exemptions.includes(exportTeacherUid);
 
         const days: DtrDay[] = [];
         const dtrExcel: ExportRow[] = [];
@@ -542,7 +555,8 @@ export default function AttendancePage() {
           } else if (rec) {
             timeIn = fmtTime(rec.clockInTime);
             timeOut = fmtTime(rec.clockOutTime);
-            const m = workedMins(rec.clockInTime, rec.clockOutTime, name);
+            const isDayExempt = !!acc?.noTimeLog || dailyExemptSet.has(`${exportTeacherUid}_${dStr}`);
+            const m = workedMins(rec.clockInTime, rec.clockOutTime, name, scheduleConfigs);
             totalMins += m;
             hours = fmtHM(m);
 
@@ -550,10 +564,10 @@ export default function AttendancePage() {
             let isLate = false;
             let statusLabel = "On Time";
 
-            if (noTimeLog) {
+            if (isDayExempt) {
               statusLabel = "Exempt";
             } else if (rec.clockInTime) {
-              const comp = computeTimeInStatus(rec.clockInTime, noTimeLog, name, scheduleConfigs);
+              const comp = computeTimeInStatus(rec.clockInTime, isDayExempt, name, scheduleConfigs);
               if (comp === "Late") {
                 isLate = true;
                 statusLabel = "Late";
@@ -567,7 +581,7 @@ export default function AttendancePage() {
             }
 
             if (isLate && rec.clockInTime) {
-              const lateRes = computeLateDeduction(rec.clockInTime, 0, noTimeLog, name);
+              const lateRes = computeLateDeduction(rec.clockInTime, 0, isDayExempt, name, scheduleConfigs);
               if (lateRes.lateMinutes > 0) {
                 statusLabel = `Late (${lateRes.lateMinutes}m)`;
               }
@@ -674,20 +688,20 @@ export default function AttendancePage() {
             const teacherName = getAttendanceTeacherName(r.name);
             const teacherAcc = accounts.find((a) => (a.id || a._id) === r.teacherUid) ||
               accounts.find((a) => (a.fullName || "").toLowerCase() === teacherName.toLowerCase());
-            const noTimeLog = teacherAcc?.noTimeLog || exemptions.includes(r.teacherUid);
+            const isDayExempt = !!teacherAcc?.noTimeLog || dailyExemptSet.has(`${r.teacherUid}_${dStr}`);
 
-            // Compute worked minutes
-            const m = workedMins(r.clockInTime, r.clockOutTime, teacherName);
+            // Compute worked minutes with shift capping
+            const m = workedMins(r.clockInTime, r.clockOutTime, teacherName, scheduleConfigs);
             const hours = r.clockInTime && r.clockOutTime ? fmtHM(m) : (r.clockInTime ? "In Progress" : "—");
 
             // Purely dynamic attendance status
             let teacherStatus = "On Time";
             let isLate = false;
 
-            if (noTimeLog) {
+            if (isDayExempt) {
               teacherStatus = "Exempt (Flexible)";
             } else if (r.clockInTime) {
-              const comp = computeTimeInStatus(r.clockInTime, noTimeLog, teacherAcc?.fullName || teacherName, scheduleConfigs);
+              const comp = computeTimeInStatus(r.clockInTime, isDayExempt, teacherAcc?.fullName || teacherName, scheduleConfigs);
               if (comp === "Late") {
                 isLate = true;
                 teacherStatus = "Late";
@@ -703,7 +717,7 @@ export default function AttendancePage() {
             }
 
             if (isLate && r.clockInTime) {
-              const lateDeduct = computeLateDeduction(r.clockInTime, 0, noTimeLog, teacherAcc?.fullName || teacherName);
+              const lateDeduct = computeLateDeduction(r.clockInTime, 0, isDayExempt, teacherAcc?.fullName || teacherName, scheduleConfigs);
               if (lateDeduct.lateMinutes > 0) {
                 teacherStatus = `Late (${lateDeduct.lateMinutes}m)`;
               }
@@ -1085,7 +1099,7 @@ export default function AttendancePage() {
     // Compute credited hours for display
     let hours: string | undefined;
     if (record?.clockInTime) {
-      const mins = workedMins(record.clockInTime, record.clockOutTime ?? null, name);
+      const mins = workedMins(record.clockInTime, record.clockOutTime ?? null, name, scheduleConfigs);
       if (mins > 0) {
         hours = `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
       } else if (record.clockOutTime) {

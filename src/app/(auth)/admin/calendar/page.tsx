@@ -11,6 +11,7 @@ import {
   getManilaDateStr,
   addMonths,
 } from "@/lib/calendar-events";
+import { ProgramSessionsCalendar } from "@/components/calendar/program-sessions-calendar";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -829,6 +830,20 @@ export default function AdminAdventureCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(getManilaMonthStr());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calendarTab, setCalendarTab] = useState<"school" | "programs">("school");
+  const [selectedProgramQuery, setSelectedProgramQuery] = useState<string>("all");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "programs") {
+        setCalendarTab("programs");
+      }
+      if (params.get("program")) {
+        setSelectedProgramQuery(params.get("program")!);
+      }
+    }
+  }, []);
 
   // Holiday sync state (for current year + next year)
   const currentYear = parseInt(today.slice(0, 4), 10);
@@ -1071,6 +1086,47 @@ export default function AdminAdventureCalendarPage() {
           </div>
         </div>
 
+        {/* ── View Switcher Tabs ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-[#e2e8f0] shadow-xs">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCalendarTab("school")}
+              className={`px-4 py-2.5 rounded-xl text-[13px] font-black transition-all flex items-center gap-2 cursor-pointer ${
+                calendarTab === "school"
+                  ? "bg-[#003399] text-white shadow-sm"
+                  : "bg-transparent text-[#5a6e8c] hover:bg-[#f0f4f9]"
+              }`}
+            >
+              <span>🗓️</span> School Calendar
+            </button>
+            <button
+              onClick={() => setCalendarTab("programs")}
+              className={`px-4 py-2.5 rounded-xl text-[13px] font-black transition-all flex items-center gap-2 cursor-pointer ${
+                calendarTab === "programs"
+                  ? "bg-[#003399] text-white shadow-sm"
+                  : "bg-transparent text-[#5a6e8c] hover:bg-[#f0f4f9]"
+              }`}
+            >
+              <span>🎒</span> Program Sessions Calendar
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                calendarTab === "programs" ? "bg-amber-400 text-[#002f76]" : "bg-blue-100 text-[#005cc8]"
+              }`}>
+                Per Program
+              </span>
+            </button>
+          </div>
+
+          <div className="text-[12px] font-bold text-[#5a6e8c] px-3">
+            {calendarTab === "school"
+              ? "General school events, holidays & suspensions"
+              : "Session dates, adventure start/end & automatic holiday skip"}
+          </div>
+        </div>
+
+        {calendarTab === "programs" ? (
+          <ProgramSessionsCalendar initialProgramKey={selectedProgramQuery} />
+        ) : (
+          <>
         {/* ── Holiday Sync Notice ── */}
         <div className="rounded-2xl border border-amber-200/90 bg-amber-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -1251,6 +1307,8 @@ export default function AdminAdventureCalendarPage() {
             </span>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* ── Modals ── */}
