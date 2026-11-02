@@ -58,11 +58,17 @@ export function fmtIsoDate(iso: string) {
 // How many Mondays have passed from the due date onward.
 // A due date that falls on a Monday counts as the first interest Monday.
 // `now` is the "as of" moment: today by default, or the date the parent actually paid.
-export function countMondaysAfter(dueIso: string, now = new Date()) {
+// `skipDates` — set of "YYYY-MM-DD" strings for holidays / suspensions.  A Monday that
+// falls on a holiday is NOT counted: no session that day means no interest charge.
+export function countMondaysAfter(dueIso: string, now = new Date(), skipDates?: Set<string>) {
     const d = new Date(dueIso + "T00:00:00");
     let count = 0;
+    const pad = (x: number) => String(x).padStart(2, "0");
     while (d <= now) {
-        if (d.getDay() === 1) count++;
+        if (d.getDay() === 1) {
+            const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            if (!skipDates?.has(dateStr)) count++;
+        }
         d.setDate(d.getDate() + 1);
     }
     return count;
@@ -248,19 +254,26 @@ export function getStudentSessionInfo(reg: any, account?: any, adventureStart?: 
     return { enrolledAt, schedule, classTime };
 }
 
-export function getBalanceDueDate(student: { enrolledAt?: string; schedule: string }): string | null {
-    return getNthSessionDate(student.enrolledAt, student.schedule, BALANCE_DUE_SESSION);
+export function getBalanceDueDate(
+    student: { enrolledAt?: string; schedule: string },
+    skipDates?: Set<string>
+): string | null {
+    return getNthSessionDate(student.enrolledAt, student.schedule, BALANCE_DUE_SESSION, skipDates);
 }
 
 // The full breakdown for one registration.
-// `asOf` = the moment interest is calculated up to. Leave it out for "today";
-// pass the payment date when recording a payment that was made earlier.
+// `asOf`       = the moment interest is calculated up to (today by default, or the payment date).
+// `skipDates`  = Set of "YYYY-MM-DD" holiday / suspension strings fetched from the DB.
+//                  • Skips those dates when finding the Nth session (due-date calculation).
+//                  • Skips holiday Mondays when counting interest weeks.
+//                Pass an empty Set or omit it to keep the old (no-skip) behaviour.
 export function calcRegistrationTerms(
     reg: any,
     student: { enrolledAt?: string; schedule: string },
     paidVerified: number,
     fallbackDue?: number,
-    asOf: Date = new Date()
+    asOf: Date = new Date(),
+    skipDates?: Set<string>
 ) {
     const rawDue = getRegistrationTotal(reg, fallbackDue);
     const due = rawDue && rawDue > 0 ? rawDue : null;
@@ -274,9 +287,9 @@ export function calcRegistrationTerms(
     if (due != null) {
         reservation = Math.round(due * RESERVATION_RATE);
         balanceShare = due - reservation;
-        dueDate = getBalanceDueDate(student);
+        dueDate = getBalanceDueDate(student, skipDates);
         if (dueDate && balance && balance > 0) {
-            mondays = countMondaysAfter(dueDate, asOf);
+            mondays = countMondaysAfter(dueDate, asOf, skipDates);
             interest = Math.round(balance * WEEKLY_INTEREST_RATE * mondays);
         }
     }

@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
 import { requireAdmin } from "@/lib/auth-guard";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
+import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +66,8 @@ export async function GET(
     const appliedToCurrentSession = Math.max(0, paidVerified - paidToPrevious);
     const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
       + (registration.uniformOrdered ? 650 : 0);
-    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToCurrentSession, fallbackTotal);
+    const skipDates = await getHolidaySkipSet(db);
+    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToCurrentSession, fallbackTotal, new Date(), skipDates);
     const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
     const sessionBalance = terms.balance;
     const totalBalance = sessionBalance != null ? sessionBalance + remainingPrevious : (remainingPrevious > 0 ? remainingPrevious : null);

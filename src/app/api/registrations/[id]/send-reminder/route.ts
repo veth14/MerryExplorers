@@ -4,6 +4,7 @@ import nodemailer from "nodemailer";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, fmtIsoDate, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified, WEEKLY_INTEREST_RATE } from "@/lib/payment-terms";
+import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
@@ -78,7 +79,8 @@ export async function POST(
     const renewalSettings = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const adventureStart = getRegistrationAdventureStart(renewalSettings?.programs || [], registration, getManilaTodayIso());
     const student = getStudentSessionInfo(registration, parentAccount, adventureStart);
-    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToSession, fallbackTotal);
+    const skipDates = await getHolidaySkipSet(db);
+    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToSession, fallbackTotal, new Date(), skipDates);
     const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
     const sessionBalance = terms.balance ?? Math.max(0, (terms.due ?? fallbackTotal) - appliedToSession);
     const total = terms.due ?? fallbackTotal;

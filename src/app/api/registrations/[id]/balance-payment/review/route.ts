@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
+import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
 export const dynamic = "force-dynamic";
@@ -79,7 +80,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const fallbackTotal = (getRegistrationTotal({ ...pricedRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
       + (registration.uniformOrdered ? 650 : 0);
     const paidOn = payment.paidOn ? new Date(payment.paidOn) : payment.submittedAt ? new Date(payment.submittedAt) : now;
-    const terms = calcRegistrationTerms(pricedRegistration, student, paidVerified, fallbackTotal, paidOn);
+    const skipDates = await getHolidaySkipSet(db);
+    const terms = calcRegistrationTerms(pricedRegistration, student, paidVerified, fallbackTotal, paidOn, skipDates);
     const allocation = allocateBalancePayment(terms, Number(payment.amountPaid), false);
     if (!allocation.ok) return NextResponse.json({ error: allocation.error || "This payment cannot be applied to the current balance." }, { status: 409 });
 

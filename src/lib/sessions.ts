@@ -73,10 +73,15 @@ export function getCompletedSessionsCount(enrolledAtStr: string | undefined, sch
     return count;
 }
 
-// Calendar date (YYYY-MM-DD) of the Nth class day, counting from the enrolled date (inclusive).
-// Uses the same day-by-day counting as getCompletedSessionsCount, so session N here is the day
-// the dashboard's counter reaches N.
-export function getNthSessionDate(enrolledAtStr: string | undefined, schedule: string, n: number): string | null {
+// Calendar date (YYYY-MM-DD) of the Nth *actual* class day, counting from the enrolled date
+// (inclusive). Holiday / suspension dates in `skipDates` are automatically skipped so that the
+// 6th-session due date always reflects reality (e.g. a Monday holiday pushes the count forward).
+export function getNthSessionDate(
+    enrolledAtStr: string | undefined,
+    schedule: string,
+    n: number,
+    skipDates?: Set<string>
+): string | null {
     if (!enrolledAtStr) return null;
     const days = parseScheduleDays(schedule);
     if (days.length === 0) return null;
@@ -87,11 +92,11 @@ export function getNthSessionDate(enrolledAtStr: string | undefined, schedule: s
 
     let count = 0;
     for (let i = 0; i < 800; i++) {
-        if (days.includes(d.getDay())) {
+        const pad = (x: number) => String(x).padStart(2, "0");
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        if (days.includes(d.getDay()) && !(skipDates?.has(dateStr))) {
             count++;
-            if (count === n) {
-                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-            }
+            if (count === n) return dateStr;
         }
         d.setDate(d.getDate() + 1);
     }

@@ -7,6 +7,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
+import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 
@@ -152,7 +153,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         );
         const student = getStudentSessionInfo(pricedReg, parentAcc, adventureStart);
         const paidVerified = isRegistrationVerified(reg.status) ? reg.amountPaid || reg.amountDue || 0 : 0;
-        const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue);
+        const skipDates = await getHolidaySkipSet(db);
+        const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue, new Date(), skipDates);
 
         // The admin's screen showed a "total payable". If it no longer matches (interest ticked over, or
         // another payment was just saved) refuse instead of applying money against numbers they never saw.
