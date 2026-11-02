@@ -949,7 +949,7 @@ export default function AdminAdventureCalendarPage() {
     fetch("/api/programs/schedules")
       .then((r) => r.json())
       .then((data) => {
-        if (!mounted || !data?.success || !Array.isArray(data.schedules)) return;
+        if (!mounted || (!data?.success && !data?.ok) || !Array.isArray(data.schedules)) return;
         const map: Record<string, ProgramSessionItem[]> = {};
         for (const sched of data.schedules) {
           if (!SESSION_CHIP_KEYS.has(sched.programKey)) continue;
