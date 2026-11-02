@@ -12,6 +12,18 @@ import {
   addMonths,
 } from "@/lib/calendar-events";
 import { ProgramSessionsCalendar } from "@/components/calendar/program-sessions-calendar";
+import {
+  PROGRAM_SCHEDULE_CONFIGS,
+  ProgramSessionItem,
+} from "@/lib/program-sessions";
+
+// Programs shown as session chips on the School Calendar grid (subset only)
+const SESSION_CHIP_KEYS = new Set([
+  "Discovery Club: Curious Explorer",
+  "Discovery Club: Creative Explorer",
+  "Discovery Club: Everyday Explorer",
+  "Trailblazer: Brave Explorer",
+]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -108,11 +120,15 @@ function MonthGrid({
   eventsByDate,
   today,
   onDayClick,
+  sessionsByDate,
+  showSessions,
 }: {
   yearMonth: string;
   eventsByDate: EventsByDate;
   today: string;
   onDayClick: (dateStr: string, events: CalendarEvent[]) => void;
+  sessionsByDate?: Record<string, ProgramSessionItem[]>;
+  showSessions?: boolean;
 }) {
   const [year, month] = yearMonth.split("-").map(Number);
   const days = daysInMonth(year, month);
@@ -151,6 +167,11 @@ function MonthGrid({
           const isToday = dateStr === today;
           const dayNum = parseInt(dateStr.split("-")[2], 10);
           const isSunday = idx % 7 === 0;
+
+          // Session chips (only the 4 target programs)
+          const daySessions = showSessions && sessionsByDate
+            ? (sessionsByDate[dateStr] || []).filter((s) => SESSION_CHIP_KEYS.has(s.programKey))
+            : [];
 
           return (
             <button
@@ -192,6 +213,25 @@ function MonthGrid({
                     +{dayEvents.length - 3} more
                   </div>
                 )}
+
+                {/* Program session chips */}
+                {daySessions.map((s, i) => {
+                  const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
+                  return (
+                    <div
+                      key={`sess-${s.programKey}-${i}`}
+                      className="truncate text-[8.5px] sm:text-[9.5px] font-black px-1 py-0.5 rounded-md border"
+                      style={{
+                        backgroundColor: cfg?.bg ?? "#f0f5ff",
+                        color: cfg?.color ?? "#0033a0",
+                        borderColor: cfg?.border ?? "#c7d8f0",
+                      }}
+                      title={`${s.programShortName} · Adv ${s.adventureNumber} · Session ${s.sessionNumber}/${s.totalSessions}`}
+                    >
+                      {cfg?.emoji} {s.programShortName}: S{s.sessionNumber}/{s.totalSessions}
+                    </div>
+                  );
+                })}
               </div>
             </button>
           );
@@ -831,6 +871,8 @@ export default function AdminAdventureCalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [calendarTab, setCalendarTab] = useState<"school" | "programs">("school");
+  const [showSessionChips, setShowSessionChips] = useState(true);
+  const [sessionsByDate, setSessionsByDate] = useState<Record<string, ProgramSessionItem[]>>({});
   const [selectedProgramQuery, setSelectedProgramQuery] = useState<string>("all");
 
   useEffect(() => {
@@ -900,6 +942,27 @@ export default function AdminAdventureCalendarPage() {
   useEffect(() => {
     loadEvents(currentMonth);
   }, [currentMonth, loadEvents]);
+
+  // Fetch program sessions for chips on the School Calendar grid
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/programs/schedules")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!mounted || !data?.success || !Array.isArray(data.schedules)) return;
+        const map: Record<string, ProgramSessionItem[]> = {};
+        for (const sched of data.schedules) {
+          if (!SESSION_CHIP_KEYS.has(sched.programKey)) continue;
+          for (const session of sched.sessions) {
+            if (!map[session.dateStr]) map[session.dateStr] = [];
+            map[session.dateStr].push(session);
+          }
+        }
+        if (mounted) setSessionsByDate(map);
+      })
+      .catch((err) => console.error("[calendar] load sessions:", err));
+    return () => { mounted = false; };
+  }, []);
 
   const triggerHolidaySync = useCallback(async (year: number) => {
     if (!isMountedRef.current) return;
@@ -1226,6 +1289,18 @@ export default function AdminAdventureCalendarPage() {
                 Today
               </button>
               <button
+                type="button"
+                onClick={() => setShowSessionChips((v) => !v)}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 border ${
+                  showSessionChips
+                    ? "bg-[#eef4ff] text-[#0033a0] border-[#0033a0]/30"
+                    : "bg-slate-50 text-slate-500 border-slate-200"
+                }`}
+                title="Toggle program session numbers on calendar"
+              >
+                🎒 {showSessionChips ? "Sessions ON" : "Sessions OFF"}
+              </button>
+              <button
                 onClick={() => { setEditEvent(null); setFormDefaultDate(today); setShowForm(true); }}
                 className="px-3 py-1.5 rounded-xl bg-[#0033a0] text-white text-[11px] font-black hover:bg-[#002270] transition-all hidden sm:inline-flex items-center gap-1"
               >
@@ -1244,6 +1319,8 @@ export default function AdminAdventureCalendarPage() {
               eventsByDate={eventsByDate}
               today={today}
               onDayClick={(dateStr, evts) => setDayDrawer({ date: dateStr, events: evts })}
+              sessionsByDate={sessionsByDate}
+              showSessions={showSessionChips}
             />
           )}
         </div>
