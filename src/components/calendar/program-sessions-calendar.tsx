@@ -227,7 +227,7 @@ export function ProgramSessionsCalendar({
         </div>
 
         {/* Program Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-thin">
+        <div className="flex flex-wrap items-center gap-2 pb-1 pt-1">
           <button
             type="button"
             onClick={() => handleSelectProgram("all")}
@@ -504,7 +504,7 @@ export function ProgramSessionsCalendar({
                 return (
                   <div
                     key={`empty-${idx}`}
-                    className="bg-[#f8faff] min-h-[90px] sm:min-h-[105px]"
+                    className="bg-[#f8faff] min-h-[100px] sm:min-h-[116px]"
                   />
                 );
               }
@@ -526,7 +526,7 @@ export function ProgramSessionsCalendar({
                       skipped: daySkipped,
                     })
                   }
-                  className={`relative min-h-[90px] sm:min-h-[105px] p-1.5 text-left transition-colors group flex flex-col justify-between ${
+                  className={`relative min-h-[100px] sm:min-h-[116px] p-2 text-left transition-colors group flex flex-col justify-between ${
                     isToday
                       ? "bg-[#eff6ff] hover:bg-[#e0efff]"
                       : isSunday
@@ -567,7 +567,7 @@ export function ProgramSessionsCalendar({
                     ))}
 
                     {/* Program Sessions - bold, readable badge */}
-                    {daySessions.slice(0, 3).map((s, i) => {
+                    {daySessions.slice(0, 2).map((s, i) => {
                       const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
                       return (
                         <div
@@ -601,9 +601,9 @@ export function ProgramSessionsCalendar({
                       );
                     })}
 
-                    {daySessions.length > 3 && (
+                    {daySessions.length > 2 && (
                       <div className="text-[9px] font-black text-[#5a6e8c] px-1">
-                        +{daySessions.length - 3} more
+                        +{daySessions.length - 2} more
                       </div>
                     )}
                   </div>

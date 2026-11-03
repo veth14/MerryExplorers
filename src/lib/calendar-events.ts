@@ -64,6 +64,7 @@ export interface CalendarEvent {
   sourceRef?: string;  // e.g. program key if source==="programs"
   programKey?: string | null; // Specific program this event applies to (or null for all)
   programKeys?: string[];     // Specific programs this event applies to (empty/omitted = playgroup-wide)
+  adventureNumber?: number;   // Adventure cycle linked from Programs settings
   description?: string; // Public-facing event description shown on landing page & public calendar
   instructions?: string; // Public-facing event instructions shown in event details
   notes?: string;       // Admin-only internal notes
@@ -526,4 +527,29 @@ export function getEventProgramKeys(e: { programKeys?: string[]; programKey?: st
     return [e.programKey.trim()];
   }
   return [];
+}
+
+/** Attach the live adventure cycle from Programs to older/manual calendar events. */
+export function linkCalendarEventAdventure<T extends CalendarEvent>(
+  events: T[],
+  programs: Array<{ programKey: string; currentAdventure?: number }>
+): T[] {
+  const adventurePrograms = new Set([
+    "Discovery Club: Curious Explorer",
+    "Discovery Club: Creative Explorer",
+    "Discovery Club: Everyday Explorer",
+    "Trailblazer: Brave Explorer",
+  ]);
+  return events.map((event) => {
+    if (event.source !== "manual" || event.type === "holiday" || event.type === "suspension") return event;
+    if (Number.isInteger(event.adventureNumber) && (event.adventureNumber || 0) > 0) return event;
+    const keys = getEventProgramKeys(event);
+    const key = keys.length > 0
+      ? keys.find((programKey) => adventurePrograms.has(programKey))
+      : "Discovery Club: Curious Explorer";
+    const adventureNumber = key ? programs.find((program) => program.programKey === key)?.currentAdventure : undefined;
+    return Number.isInteger(adventureNumber) && (adventureNumber || 0) > 0
+      ? { ...event, adventureNumber }
+      : event;
+  });
 }

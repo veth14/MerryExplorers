@@ -24,6 +24,24 @@ const PH_SUPPLEMENTAL_HOLIDAYS: Record<number, SupplementalHoliday[]> = {
       types: ["Special Non-Working"],
     },
     {
+      date: "2026-11-16",
+      localName: "ASEAN Summit Special Non-Working Day",
+      name: "ASEAN Summit Special Non-Working Day",
+      types: ["Special Non-Working", "National Capital Region"],
+    },
+    {
+      date: "2026-11-17",
+      localName: "ASEAN Summit Special Non-Working Day",
+      name: "ASEAN Summit Special Non-Working Day",
+      types: ["Special Non-Working", "National Capital Region"],
+    },
+    {
+      date: "2026-11-18",
+      localName: "ASEAN Summit Special Non-Working Day",
+      name: "ASEAN Summit Special Non-Working Day",
+      types: ["Special Non-Working", "National Capital Region"],
+    },
+    {
       date: "2026-12-24",
       localName: "Bisperas ng Pasko",
       name: "Christmas Eve",

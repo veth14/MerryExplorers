@@ -9,6 +9,7 @@ import {
   deriveProgramEvents,
   deduplicateCalendarEvents,
   getEnglishCalendarEventTitle,
+  linkCalendarEventAdventure,
 } from "@/lib/calendar-events";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,9 @@ async function getPublicEvents(month: string): Promise<CalendarEvent[]> {
       visibility: d.visibility as "public",
       source: d.source,
       sourceRef: d.sourceRef,
+      programKey: d.programKey || null,
+      programKeys: Array.isArray(d.programKeys) ? d.programKeys : (d.programKey ? [d.programKey] : []),
+      adventureNumber: Number.isInteger(d.adventureNumber) ? d.adventureNumber : undefined,
       notes: d.notes,
       description: d.description || undefined,
       instructions: d.instructions || undefined,
@@ -64,13 +68,14 @@ async function getPublicEvents(month: string): Promise<CalendarEvent[]> {
         .collection("settings")
         .findOne({ _key: "renewal_settings_v2" });
       if (settingsDoc?.programs) {
+        const linkedEvents = linkCalendarEventAdventure(events, settingsDoc.programs);
         const progEvents = deriveProgramEvents(settingsDoc.programs).filter(
           (e) =>
             e.visibility === "public" &&
             e.startDate >= firstDay &&
             e.startDate <= lastDay
         );
-        return deduplicateCalendarEvents([...events, ...progEvents]).sort((a, b) =>
+        return deduplicateCalendarEvents([...linkedEvents, ...progEvents]).sort((a, b) =>
           a.startDate.localeCompare(b.startDate)
         );
       }
@@ -106,6 +111,9 @@ async function getUpcomingPublicEvents(limit = 4): Promise<CalendarEvent[]> {
       endDate: d.endDate,
       visibility: "public" as const,
       source: d.source,
+      programKey: d.programKey || null,
+      programKeys: Array.isArray(d.programKeys) ? d.programKeys : (d.programKey ? [d.programKey] : []),
+      adventureNumber: Number.isInteger(d.adventureNumber) ? d.adventureNumber : undefined,
       notes: d.notes,
       description: d.description || undefined,
       instructions: d.instructions || undefined,
@@ -118,10 +126,11 @@ async function getUpcomingPublicEvents(limit = 4): Promise<CalendarEvent[]> {
         .collection("settings")
         .findOne({ _key: "renewal_settings_v2" });
       if (settingsDoc?.programs) {
+        const linkedEvents = linkCalendarEventAdventure(events, settingsDoc.programs);
         const progEvents = deriveProgramEvents(settingsDoc.programs).filter(
           (e) => e.visibility === "public" && e.startDate >= todayStr
         );
-        return deduplicateCalendarEvents([...events, ...progEvents])
+        return deduplicateCalendarEvents([...linkedEvents, ...progEvents])
           .sort((a, b) => a.startDate.localeCompare(b.startDate))
           .slice(0, limit);
       }

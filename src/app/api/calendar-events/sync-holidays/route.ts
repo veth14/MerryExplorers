@@ -31,18 +31,18 @@ export async function POST(req: NextRequest) {
     const currentYear = parseInt(todayStr.slice(0, 4), 10);
     const year = parseInt(searchParams.get("year") || String(currentYear), 10);
 
-    const resp = await fetch(`${NAGER_BASE}/${year}/PH`, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (!resp.ok) {
-      return NextResponse.json(
-        { error: `Nager.Date returned ${resp.status} for year ${year}` },
-        { status: 502 }
-      );
+    // Supplemental proclamation dates must still be saved when the external
+    // holiday feed is temporarily unavailable.
+    let nagerHolidays: NagerHoliday[] = [];
+    try {
+      const resp = await fetch(`${NAGER_BASE}/${year}/PH`, {
+        headers: { Accept: "application/json" },
+      });
+      if (resp.ok) nagerHolidays = await resp.json();
+      else console.warn(`[sync-holidays] Nager.Date returned ${resp.status}; syncing supplemental dates only`);
+    } catch (error) {
+      console.warn("[sync-holidays] Nager.Date unavailable; syncing supplemental dates only", error);
     }
-
-    const nagerHolidays: NagerHoliday[] = await resp.json();
 
     // Merge Nager.Date holidays with PH supplemental special non-working days
     // that Nager.Date does not include (e.g. All Souls' Day, Christmas Eve, etc.)
@@ -137,10 +137,26 @@ export async function GET(req: NextRequest) {
       .collection("calendar_holiday_sync")
       .findOne({ year, country: "PH" });
 
+    // A previous sync may predate newly declared holidays. Treat the year as
+    // synced only when every current supplemental record has been reconciled.
+    const supplemental = getPhSupplementalHolidays(year);
+    const missingSupplemental = await Promise.all(
+      supplemental.map(async (holiday) => {
+        const stableKey = `PH:${year}:${holiday.date}:${holiday.localName || holiday.name}`;
+        const existing = await db.collection("calendar_events").findOne(
+          { stableKey },
+          { projection: { _id: 1 } }
+        );
+        return existing ? null : holiday.date;
+      })
+    );
+    const missingDates = missingSupplemental.filter((date): date is string => date !== null);
+
     return NextResponse.json({
-      synced: !!syncDoc,
+      synced: !!syncDoc && missingDates.length === 0,
       syncedAt: syncDoc?.syncedAt || null,
       count: syncDoc?.count || 0,
+      missingSupplemental: missingDates,
     });
   } catch (err) {
     console.error("[sync-holidays GET]", err);

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
-import { getManilaDateStr, CalendarEvent, deriveProgramEvents, deduplicateCalendarEvents, getEnglishCalendarEventTitle } from "@/lib/calendar-events";
+import { getManilaDateStr, CalendarEvent, deriveProgramEvents, deduplicateCalendarEvents, getEnglishCalendarEventTitle, linkCalendarEventAdventure } from "@/lib/calendar-events";
 
 /** GET /api/calendar-events
  * Query params:
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       .limit(limit)
       .toArray();
 
-    const events: CalendarEvent[] = docs.map((d) => {
+    let events: CalendarEvent[] = docs.map((d) => {
       const pKeys = Array.isArray(d.programKeys)
         ? d.programKeys.map((k) => String(k).trim()).filter(Boolean)
         : (d.programKey ? [String(d.programKey).trim()] : []);
@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
         sourceRef: d.sourceRef,
         programKey: pKeys[0] || null,
         programKeys: pKeys,
+        adventureNumber: Number.isInteger(d.adventureNumber) ? d.adventureNumber : undefined,
         description: d.description || undefined,
         instructions: d.instructions || undefined,
         notes: d.notes,
@@ -87,6 +88,7 @@ export async function GET(req: NextRequest) {
           .collection("settings")
           .findOne({ _key: "renewal_settings_v2" });
         if (settingsDoc?.programs) {
+          events = linkCalendarEventAdventure(events, settingsDoc.programs);
           programEvents = deriveProgramEvents(settingsDoc.programs);
 
           if (month) {
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, instructions, notes, imageUrl, programKey, programKeys } = body;
+    const { title, type, startDate, endDate, visibility, description, instructions, notes, imageUrl, programKey, programKeys, adventureNumber } = body;
 
     if (!title?.trim() || !type || !startDate || !visibility) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -158,6 +160,7 @@ export async function POST(req: NextRequest) {
       source: "manual" as const,
       programKey: normalizedProgramKeys[0] || null,
       programKeys: normalizedProgramKeys,
+      ...(Number.isInteger(adventureNumber) && adventureNumber > 0 ? { adventureNumber } : {}),
       description: description?.trim() || null,
       instructions: instructions?.trim() || null,
       notes: notes?.trim() || null,
@@ -200,7 +203,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, instructions, notes, hidden, imageUrl, programKey, programKeys } = body;
+    const { title, type, startDate, endDate, visibility, description, instructions, notes, hidden, imageUrl, programKey, programKeys, adventureNumber } = body;
 
     const { db } = await connectToDatabase();
 
@@ -231,6 +234,10 @@ export async function PUT(req: NextRequest) {
       );
       update.programKeys = normalizedProgramKeys;
       update.programKey = normalizedProgramKeys[0] || null;
+    }
+    if (adventureNumber !== undefined) {
+      if (Number.isInteger(adventureNumber) && adventureNumber > 0) update.adventureNumber = adventureNumber;
+      else update.adventureNumber = null;
     }
     if (hidden !== undefined) update.hidden = hidden;
 

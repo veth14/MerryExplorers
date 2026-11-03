@@ -174,7 +174,7 @@ function MonthGrid({
       <div className="grid grid-cols-7 gap-px bg-[#e8edf5] rounded-2xl overflow-hidden border border-[#e8edf5]">
         {cells.map((dateStr, idx) => {
           if (!dateStr) {
-            return <div key={`empty-${idx}`} className="bg-[#f8faff] min-h-[80px] sm:min-h-[90px]" />;
+            return <div key={`empty-${idx}`} className="bg-[#f8faff] min-h-[92px] sm:min-h-[112px]" />;
           }
 
           const dayEvents = eventsByDate[dateStr] || [];
@@ -192,7 +192,7 @@ function MonthGrid({
               key={dateStr}
               onClick={() => onDayClick(dateStr, dayEvents)}
               className={`
-                relative bg-white min-h-[80px] sm:min-h-[90px] p-1.5 text-left
+                relative bg-white min-h-[92px] sm:min-h-[112px] p-2 text-left
                 hover:bg-[#f0f5ff] transition-colors group
                 ${isSunday ? "bg-[#fafafa]" : ""}
               `}
@@ -209,7 +209,7 @@ function MonthGrid({
 
               {/* Event dots / chips */}
               <div className="flex flex-col gap-0.5">
-                {dayEvents.slice(0, 3).map((e, i) => {
+                {dayEvents.slice(0, 2).map((e, i) => {
                   const meta = EVENT_TYPE_META[e.type];
                   const pKeys = (Array.isArray(e.programKeys) && e.programKeys.length > 0)
                     ? e.programKeys
@@ -222,22 +222,22 @@ function MonthGrid({
                   return (
                     <div
                       key={`${e._id}-${i}`}
-                      className="truncate text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded-md"
+                      className="truncate text-[9.5px] sm:text-[10px] font-bold px-1.5 py-1 rounded-md"
                       style={{ backgroundColor: meta.bg, color: meta.color }}
-                      title={`${e.title}${progSuffix}`}
+                      title={`${e.title}${e.adventureNumber ? ` · Adventure ${e.adventureNumber}` : ""}${progSuffix}`}
                     >
-                      {displayEmoji} {e.title}
+                      {displayEmoji} {e.title}{e.adventureNumber ? ` · Adv ${e.adventureNumber}` : ""}
                     </div>
                   );
                 })}
-                {dayEvents.length > 3 && (
+                {dayEvents.length > 2 && (
                   <div className="text-[9px] font-bold text-[#5a6e8c] px-1">
-                    +{dayEvents.length - 3} more
+                    +{dayEvents.length - 2} more events
                   </div>
                 )}
 
                 {/* Program session chips - bold, high-contrast session badge */}
-                {daySessions.map((s, i) => {
+                {daySessions.slice(0, 2).map((s, i) => {
                   const cfg = PROGRAM_SCHEDULE_CONFIGS[s.programKey];
                   const chipName = getProgramChipName(s.programKey);
                   return (
@@ -271,6 +271,11 @@ function MonthGrid({
                     </div>
                   );
                 })}
+                {daySessions.length > 2 && (
+                  <div className="text-[9px] font-bold text-[#5a6e8c] px-1">
+                    +{daySessions.length - 2} more sessions
+                  </div>
+                )}
               </div>
             </button>
           );
@@ -296,6 +301,13 @@ const PROGRAM_EVENT_OPTIONS = [
   { value: "", label: "🎈 All Programs (Playgroup-Wide)", emoji: "🎒" },
   ...AVAILABLE_PROGRAMS.map((p) => ({ value: p.value, label: `${p.emoji} ${p.label} (${p.schedule})`, emoji: p.emoji })),
 ];
+
+const ADVENTURE_PROGRAM_KEYS = new Set([
+  "Discovery Club: Curious Explorer",
+  "Discovery Club: Creative Explorer",
+  "Discovery Club: Everyday Explorer",
+  "Trailblazer: Brave Explorer",
+]);
 
 const EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string; emoji: string }[] = [
   { value: "holiday", label: "Holiday", emoji: "🎉" },
@@ -331,8 +343,34 @@ function EventFormModal({
     return [];
   }, [initial]);
   const [programKeys, setProgramKeys] = useState<string[]>(initialKeys);
+  const [programAdventures, setProgramAdventures] = useState<Record<string, number>>({});
   const [isProgramDropdownOpen, setIsProgramDropdownOpen] = useState(false);
   const programDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/renewal-settings")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!active || !Array.isArray(data.programs)) return;
+        const adventures: Record<string, number> = {};
+        for (const program of data.programs) {
+          if (ADVENTURE_PROGRAM_KEYS.has(program.programKey) && Number.isInteger(program.currentAdventure)) {
+            adventures[program.programKey] = program.currentAdventure;
+          }
+        }
+        setProgramAdventures(adventures);
+      })
+      .catch((err) => console.error("[calendar] load program adventure links:", err));
+    return () => { active = false; };
+  }, []);
+
+  const selectedAdventureNumber = useMemo(() => {
+    const linkedProgram = programKeys.find((key) => ADVENTURE_PROGRAM_KEYS.has(key));
+    if (linkedProgram) return programAdventures[linkedProgram] ?? null;
+    if (programKeys.length > 0) return null;
+    return programAdventures["Discovery Club: Curious Explorer"] ?? null;
+  }, [programAdventures, programKeys]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -453,6 +491,7 @@ function EventFormModal({
       visibility,
       programKeys: programKeys.length > 0 ? programKeys : [],
       programKey: programKeys.length > 0 ? programKeys[0] : null,
+      adventureNumber: selectedAdventureNumber ?? undefined,
       description: description.trim() || undefined,
       instructions: instructions.trim() || undefined,
       notes: notes.trim() || undefined,
@@ -750,6 +789,21 @@ function EventFormModal({
                   Applies to the entire playgroup. Click above to select one or multiple specific programs.
                 </p>
               )}
+
+              {selectedAdventureNumber ? (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#d9e5ff] bg-gradient-to-r from-[#f5f8ff] to-white px-3 py-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-base shadow-xs">🗺️</span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#8191aa]">Linked adventure</p>
+                    <p className="text-[12px] font-black text-[#0033a0]">Adventure {selectedAdventureNumber} <span className="font-medium text-[#718096]">· from Programs settings</span></p>
+                  </div>
+                  <span className="ml-auto rounded-full border border-[#c7d8f0] bg-white px-2 py-1 text-[9.5px] font-bold text-[#536782]">
+                    {programKeys.length ? "Selected program" : "Playgroup cycle"}
+                  </span>
+                </div>
+              ) : programKeys.length > 0 ? (
+                <p className="mt-2 text-[10.5px] text-[#8a98ad]">The selected program does not use adventure cycles.</p>
+              ) : null}
             </div>
           </div>
 
@@ -1229,7 +1283,10 @@ function DayDrawer({
                 >
                   <div className="flex flex-col gap-2 mb-2 min-w-0">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-black text-[#002f76] leading-snug break-words">{e.title}</p>
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <p className="text-[14px] font-black text-[#002f76] leading-snug break-words">{e.title}</p>
+                        {e.adventureNumber && <span className="inline-flex items-center rounded-full border border-[#d8e2ff] bg-[#f2f5ff] px-2 py-0.5 text-[9px] font-black text-[#4f46e5]">🗺️ Adventure {e.adventureNumber}</span>}
+                      </div>
                       {e.endDate && e.endDate !== e.startDate && (
                         <p className="text-[10.5px] font-medium text-[#9aa3b2] mt-0.5">
                           Until {formatDate(e.endDate)}
@@ -1466,26 +1523,29 @@ export default function AdminAdventureCalendarPage() {
     loadEvents(currentMonth);
   }, [currentMonth, loadEvents]);
 
+  const loadProgramSessions = useCallback(async () => {
+    try {
+      const res = await fetch("/api/programs/schedules");
+      const data = await res.json();
+      if (!isMountedRef.current || (!data?.success && !data?.ok) || !Array.isArray(data.schedules)) return;
+      const map: Record<string, ProgramSessionItem[]> = {};
+      for (const sched of data.schedules) {
+        if (!SESSION_CHIP_KEYS.has(sched.programKey)) continue;
+        for (const session of sched.sessions) {
+          if (!map[session.dateStr]) map[session.dateStr] = [];
+          map[session.dateStr].push(session);
+        }
+      }
+      if (isMountedRef.current) setSessionsByDate(map);
+    } catch (err) {
+      console.error("[calendar] load sessions:", err);
+    }
+  }, []);
+
   // Fetch program sessions for chips on the School Calendar grid
   useEffect(() => {
-    let mounted = true;
-    fetch("/api/programs/schedules")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!mounted || (!data?.success && !data?.ok) || !Array.isArray(data.schedules)) return;
-        const map: Record<string, ProgramSessionItem[]> = {};
-        for (const sched of data.schedules) {
-          if (!SESSION_CHIP_KEYS.has(sched.programKey)) continue;
-          for (const session of sched.sessions) {
-            if (!map[session.dateStr]) map[session.dateStr] = [];
-            map[session.dateStr].push(session);
-          }
-        }
-        if (mounted) setSessionsByDate(map);
-      })
-      .catch((err) => console.error("[calendar] load sessions:", err));
-    return () => { mounted = false; };
-  }, []);
+    loadProgramSessions();
+  }, [loadProgramSessions]);
 
   const triggerHolidaySync = useCallback(async (year: number) => {
     if (!isMountedRef.current) return;
@@ -1498,19 +1558,21 @@ export default function AdminAdventureCalendarPage() {
       });
       if (!isMountedRef.current) return;
       const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Holiday sync failed");
       if (isMountedRef.current) {
         setHolidaySync((prev) => ({
           ...prev,
           [year]: { syncing: false, synced: true, count: data.synced || 0, syncedAt: new Date().toISOString() },
         }));
         loadEvents(currentMonth);
+        loadProgramSessions();
       }
     } catch {
       if (isMountedRef.current) {
         setHolidaySync((prev) => ({ ...prev, [year]: { ...(prev[year] || {}), syncing: false, synced: false, count: 0, syncedAt: null } }));
       }
     }
-  }, [currentMonth, loadEvents]);
+  }, [currentMonth, loadEvents, loadProgramSessions]);
 
   // Check holiday sync status on mount
   useEffect(() => {
@@ -1642,7 +1704,7 @@ export default function AdminAdventureCalendarPage() {
         {/* ── Top Header ── */}
         <div className="rounded-3xl bg-gradient-to-r from-[#002f76] via-[#0033a0] to-[#1e40af] p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
           <div className="absolute -right-8 -bottom-8 opacity-10 text-[160px] select-none pointer-events-none">🗓️</div>
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 min-w-0">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-[11px] font-black uppercase tracking-wider text-amber-300 mb-2">
                 🗺️ Adventure Calendar
@@ -1655,7 +1717,7 @@ export default function AdminAdventureCalendarPage() {
                 <strong>Public</strong> appear on the parent-facing calendar and .ics feed.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => { setEditEvent(null); setFormDefaultDate(today); setShowForm(true); }}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-[#002f76] text-[13px] font-black transition-all shadow-md"
@@ -1746,7 +1808,7 @@ export default function AdminAdventureCalendarPage() {
         </div>
 
         {/* ── Month Summary Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-4">
           {[
             { label: "This Month", monthStr: thisMonthStr, evts: thisMonthEvents },
             { label: "Next Month", monthStr: nextMonthStr, evts: nextMonthEvents },
@@ -1754,16 +1816,19 @@ export default function AdminAdventureCalendarPage() {
             const [y, m] = monthStr.split("-").map(Number);
             const mLabel = new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
             return (
-              <div key={monthStr} className="rounded-3xl bg-white border border-[#e2e8f0] shadow-sm p-5">
+              <div key={monthStr} className="rounded-3xl bg-white border border-[#e2e8f0] shadow-sm p-5 min-h-[190px]">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-[10.5px] font-extrabold uppercase tracking-widest text-[#9aa3b2]">{label}</p>
                     <p className="text-[16px] font-black text-[#002f76]">{mLabel}</p>
                   </div>
-                  <span className="text-[28px]">📅</span>
+                  <div className="w-10 h-10 rounded-2xl bg-[#f3f7ff] border border-[#e4ebf5] flex items-center justify-center text-[19px]">📅</div>
                 </div>
                 {evts.length === 0 ? (
-                  <p className="text-[12px] text-[#9aa3b2] font-medium">No events</p>
+                  <div className="rounded-2xl border border-dashed border-[#e1e8f2] bg-[#fafcff] px-3.5 py-3">
+                    <p className="text-[12px] font-bold text-[#7b8aa1]">Nothing scheduled yet</p>
+                    <p className="mt-0.5 text-[10.5px] text-[#a0adbf]">Events added for this month will appear here.</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {evts.slice(0, 5).map((e) => (
@@ -1772,7 +1837,7 @@ export default function AdminAdventureCalendarPage() {
                           {formatDate(e.startDate).slice(0, 6)}
                         </span>
                         <TypeChip type={e.type} />
-                        <span className="text-[11.5px] font-bold text-[#002f76] truncate">{e.title}</span>
+                        <span className="text-[11.5px] font-bold text-[#002f76] truncate">{e.title}{e.adventureNumber ? ` · Adventure ${e.adventureNumber}` : ""}</span>
                       </div>
                     ))}
                     {evts.length > 5 && (
@@ -1877,6 +1942,7 @@ export default function AdminAdventureCalendarPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[13px] font-black text-[#002f76]">{e.title}</p>
+                      {e.adventureNumber && <span className="rounded-full border border-[#d8e2ff] bg-[#f2f5ff] px-2 py-0.5 text-[9px] font-black text-[#4f46e5]">🗺️ Adventure {e.adventureNumber}</span>}
                       <TypeChip type={e.type} />
                       {e.source !== "manual" && <SourceLock source={e.source} />}
                     </div>

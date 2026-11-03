@@ -380,6 +380,11 @@ export function PublicCalendarView({
                       <p className="font-fredoka text-[13px] sm:text-[14px] font-semibold text-[#002f76] leading-snug line-clamp-2 mt-2">
                         {e.title}
                       </p>
+                      {e.adventureNumber && (
+                        <span className="mt-1 inline-flex items-center rounded-full border border-[#d8e2ff] bg-[#f2f5ff] px-2 py-0.5 text-[9px] font-black text-[#4f46e5]">
+                          🗺️ Adventure {e.adventureNumber}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -848,6 +853,11 @@ export function PublicCalendarView({
                         <h4 className="font-fredoka text-[15px] font-semibold text-[#002f76] truncate">
                           {e.title}
                         </h4>
+                        {e.adventureNumber && (
+                          <span className="inline-flex items-center rounded-full border border-[#d8e2ff] bg-[#f2f5ff] px-2 py-0.5 text-[9px] font-black text-[#4f46e5]">
+                            🗺️ Adventure {e.adventureNumber}
+                          </span>
+                        )}
                         <span
                           className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
                           style={{
