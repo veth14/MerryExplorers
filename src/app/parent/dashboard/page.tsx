@@ -13,6 +13,11 @@ import VirtualOnboardingModal from "@/components/VirtualOnboardingModal";
 import VirtualDashboard from "@/components/VirtualDashboard";
 import TrailblazerDashboard from "@/components/TrailblazerDashboard";
 import { parseReference } from "@/lib/receipt-ocr";
+import {
+  getCompletedSessionsCount,
+  matchProgramSchedule,
+  calculateCalendarSessionProgress,
+} from "@/lib/sessions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -251,36 +256,7 @@ function parseEndTime(classTime: string): { hour: number; minute: number } | nul
   return { hour, minute: min };
 }
 
-function getCompletedSessionsCount(enrolledAtStr: string | undefined, schedule: string, classTime: string): number {
-  if (!enrolledAtStr) return 0;
-  const days = parseScheduleDays(schedule);
-  const endTime = parseEndTime(classTime) || parseStartTime(classTime);
-  if (days.length === 0 || !endTime) return 0;
-
-  const startDate = new Date(enrolledAtStr);
-  startDate.setHours(0, 0, 0, 0);
-
-  const now = new Date();
-  let count = 0;
-  let current = new Date(startDate);
-
-  while (current <= now) {
-    if (days.includes(current.getDay())) {
-      const isToday = current.toDateString() === now.toDateString();
-      if (isToday) {
-        const endOfClassToday = new Date(now);
-        endOfClassToday.setHours(endTime.hour, endTime.minute, 0, 0);
-        if (now >= endOfClassToday) {
-          count++;
-        }
-      } else {
-        count++;
-      }
-    }
-    current.setDate(current.getDate() + 1);
-  }
-  return count;
-}
+// getCompletedSessionsCount is imported from @/lib/sessions (supports holidays and calendar sync)
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -770,11 +746,19 @@ function FileViewerModal({ viewer, onClose }: { viewer: FileViewerState; onClose
 
 
 // Countdown Timer
-function NextSessionCountdown({ schedule, classTime }: { schedule: string; classTime: string }) {
+function NextSessionCountdown({
+  schedule,
+  classTime,
+  targetDate,
+}: {
+  schedule: string;
+  classTime: string;
+  targetDate?: Date | null;
+}) {
   const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
 
   useEffect(() => {
-    const nextDate = getNextSessionDate(schedule, classTime);
+    const nextDate = targetDate !== undefined ? targetDate : getNextSessionDate(schedule, classTime);
     if (!nextDate) return;
 
     const interval = setInterval(() => {
@@ -925,6 +909,19 @@ export default function ParentDashboardPage() {
     }
   }, []);
   const [sessionPayments, setSessionPayments] = useState<any[]>([]);
+  const [programSchedules, setProgramSchedules] = useState<any[]>([]);
+
+  // Fetch official calendar schedules (auto-skips holidays & suspensions)
+  useEffect(() => {
+    fetch("/api/programs/schedules")
+      .then((r) => r.json())
+      .then((d) => {
+        if ((d?.success || d?.ok) && Array.isArray(d.schedules)) {
+          setProgramSchedules(d.schedules);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
 
   // ─── Toast ─────────────────────────────────────────────────────────────────
@@ -1068,6 +1065,15 @@ export default function ParentDashboardPage() {
     profile.studentInfo?.program === "virtual-session" ||
     profile.studentInfo?.program === "Virtual Tutorial";
 
+  // ── Official Calendar Session Progress ──
+  const matchedSchedule = matchProgramSchedule(programSchedules, profile.program);
+  const sessionProgress = calculateCalendarSessionProgress({
+    programSchedule: matchedSchedule,
+    schedule: profile.schedule,
+    classTime: profile.classTime,
+    enrolledAt: profile.studentInfo?.enrolledAt,
+  });
+
   const childFavorites = profile.studentInfo?.childInfo || (profile as any).childInfo;
   const hasAnsweredFavorites = Boolean(
     childFavorites?.favoriteSong &&
@@ -1152,6 +1158,7 @@ export default function ParentDashboardPage() {
           loadingFileId={loadingFileId}
           agreement={<WaiverAgreementText />}
           setLightbox={setLightbox}
+          programSchedules={programSchedules}
         />
         {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
         {lightbox && (
@@ -1419,7 +1426,7 @@ export default function ParentDashboardPage() {
               </span>
               {/* Prominent Adventure Badge */}
               <span style={{ padding: "5px 14px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)", color: "#92400e", borderRadius: "20px", fontSize: "13px", fontWeight: "900", border: "2px solid #fbbf24", letterSpacing: "0.2px", boxShadow: "0 2px 8px rgba(251,191,36,0.25)" }}>
-                🏕️ Adventure {renewalSettings.currentAdventure || 1}
+                🏕️ Adventure {sessionProgress.adventureNumber || renewalSettings.currentAdventure || 1}
               </span>
               {profile.classTime && (
                 <span style={{ padding: "4px 12px", background: "#f0fdf4", color: "#15803d", borderRadius: "20px", fontSize: "12px", fontWeight: "700", border: "1px solid #bbf7d0" }}>
@@ -1436,19 +1443,10 @@ export default function ParentDashboardPage() {
           <div className="responsive-hero-stats" style={{ display: "flex", gap: "16px", flexShrink: 0 }}>
             <div style={{ textAlign: "center", padding: "12px 18px", background: "#f8faff", borderRadius: "14px", border: "1px solid #e8efff" }}>
               <div style={{ fontSize: "24px", fontWeight: "800", color: "#0050d5" }}>
-                {isVirtualSession ? (profile.virtualSessionsCompleted || 0) : getCompletedSessionsCount(profile.studentInfo?.enrolledAt, profile.schedule, profile.classTime)}
+                {isVirtualSession ? (profile.virtualSessionsCompleted || 0) : sessionProgress.completedSessions}
                 {!isVirtualSession && (
                   <span style={{ fontSize: "14px", color: "#64748b", fontWeight: "600", marginLeft: "2px" }}>
-                    {(() => {
-                      const programs: Record<string, number> = {
-                        "Discovery Club: Curious Explorer": 8,
-                        "Discovery Club: Creative Explorer": 12,
-                        "Discovery Club: Everyday Explorer": 14,
-                        "Trailblazer: Brave Explorer": 18,
-                      };
-                      const total = programs[profile.program];
-                      return total ? `/ ${total}` : "";
-                    })()}
+                    / {sessionProgress.totalSessions}
                   </span>
                 )}
               </div>
@@ -1548,7 +1546,7 @@ export default function ParentDashboardPage() {
                   {profile.schedule && profile.classTime && (
                     <div className="responsive-banner-box" style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(12px)", borderRadius: "16px", padding: "20px 24px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", minWidth: "220px" }}>
                       <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.65, marginBottom: "10px" }}>⏱ Next Session</div>
-                      <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} />
+                      <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} targetDate={sessionProgress.nextSessionDate} />
                     </div>
                   )}
                 </div>

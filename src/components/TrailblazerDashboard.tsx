@@ -3,7 +3,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import Image from "next/image";
 import { Fredoka } from "next/font/google";
-import { getCompletedSessionsCount } from "@/lib/sessions";
+import { getCompletedSessionsCount, matchProgramSchedule, calculateCalendarSessionProgress } from "@/lib/sessions";
 import {
     RESERVATION_RATE, WEEKLY_INTEREST_RATE, BALANCE_DUE_SESSION,
     isRegistrationVerified, fmtPeso, fmtIsoDate,
@@ -47,6 +47,7 @@ type Props = {
     setLightbox?: (lb: any) => void;
     // Registration records for this family (must be filtered to the logged-in parent on the server).
     registrations?: any[];
+    programSchedules?: any[];
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -94,11 +95,11 @@ function getNextSessionDate(schedule: string, classTime: string): Date | null {
     return null;
 }
 
-function NextSessionCountdown({ schedule, classTime }: { schedule: string; classTime: string }) {
+function NextSessionCountdown({ schedule, classTime, targetDate }: { schedule: string; classTime: string; targetDate?: Date | null }) {
     const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
 
     useEffect(() => {
-        const nextDate = getNextSessionDate(schedule, classTime);
+        const nextDate = targetDate !== undefined ? targetDate : getNextSessionDate(schedule, classTime);
         if (!nextDate) return;
 
         const tick = () => {
@@ -426,6 +427,22 @@ export default function TrailblazerDashboard(p: Props) {
     // Registration records for this family: from props, or (TEMP) fetched here
     const [fetchedRegs, setFetchedRegs] = useState<any[] | null>(null);
     const [holidaySkipDates, setHolidaySkipDates] = useState<Set<string>>(new Set());
+    const [fetchedSchedules, setFetchedSchedules] = useState<any[] | null>(null);
+
+    // Fetch official program schedules from School Calendar if not passed as prop
+    useEffect(() => {
+        if (p.programSchedules && p.programSchedules.length > 0) return;
+        fetch("/api/programs/schedules")
+            .then((r) => r.json())
+            .then((d) => {
+                if ((d?.success || d?.ok) && Array.isArray(d.schedules)) {
+                    setFetchedSchedules(d.schedules);
+                }
+            })
+            .catch(() => {});
+    }, [p.programSchedules]);
+
+    const allSchedules = p.programSchedules ?? fetchedSchedules ?? [];
     useEffect(() => {
         const mail = (profile.email || "").toLowerCase();
         if (!TEMP_FETCH_REGISTRATIONS || p.registrations || !mail) return;
@@ -455,13 +472,19 @@ export default function TrailblazerDashboard(p: Props) {
     const childFavs = profile.studentInfo?.childInfo || profile.childInfo;
     const firstName = (profile.fullName || "").split(" ")[0] || "there";
 
-    // Sessions completed, counted the same way as the main parent dashboard and Payment Tracking
-    const TOTAL_SESSIONS = 18; // Trailblazer: Brave Explorer
-    const sessionsDone = getCompletedSessionsCount(
-        profile.studentInfo?.enrolledAt,
-        profile.schedule || profile.studentInfo?.schedule || "",
-        profile.classTime || profile.studentInfo?.classTime || ""
-    );
+    // ── CALENDAR CONNECTED SESSION COUNTER ──
+    // Synchronized with official School & Program Calendar (skips holidays & suspensions)
+    const matchedProg = matchProgramSchedule(allSchedules, profile.program || "Trailblazer: Brave Explorer");
+    const sessionProgress = calculateCalendarSessionProgress({
+        programSchedule: matchedProg,
+        schedule: profile.schedule || profile.studentInfo?.schedule || "",
+        classTime: profile.classTime || profile.studentInfo?.classTime || "",
+        enrolledAt: profile.studentInfo?.enrolledAt,
+        skipDates: holidaySkipDates,
+    });
+    const TOTAL_SESSIONS = sessionProgress.totalSessions;
+    const sessionsDone = sessionProgress.completedSessions;
+    const currentAdventure = sessionProgress.adventureNumber;
 
     const tabs: { id: Tab; label: string; icon: string }[] = [
         { id: "session", label: "Session", icon: "calendar" },
@@ -480,13 +503,21 @@ export default function TrailblazerDashboard(p: Props) {
                     <Heading icon="clock" title="Current program" sub="Here is the schedule for your child's sessions." />
                     <div className="vp-grid">
                         <InfoBox label="Program" value={profile.program || "Trailblazer"} bg="#dff1ff" />
+                        <InfoBox label="Adventure" value={`Adventure ${currentAdventure}`} bg="#fff6cf" />
                         {profile.schedule && <InfoBox label="Schedule" value={profile.schedule} bg="#d8f5dc" />}
-                        {profile.classTime && <InfoBox label="Time" value={profile.classTime} bg="#fff6cf" />}
+                        {profile.classTime && <InfoBox label="Time" value={profile.classTime} bg="#ffe0eb" />}
                     </div>
                     {profile.schedule && profile.classTime && (
                         <div className="vp-due" style={{ marginTop: 22, marginBottom: 0, alignItems: "center", textAlign: "center" }}>
-                            <span className="vp-label" style={{ color: "#fff" }}>Next session countdown</span>
-                            <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} />
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6, marginBottom: 8, width: "100%" }}>
+                                <span className="vp-label" style={{ color: "#fff", margin: 0 }}>Next session countdown</span>
+                                {sessionProgress.nextSessionLabel && (
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: SUN_LIGHT }}>
+                                        📅 {sessionProgress.nextSessionLabel}
+                                    </span>
+                                )}
+                            </div>
+                            <NextSessionCountdown schedule={profile.schedule} classTime={profile.classTime} targetDate={sessionProgress.nextSessionDate} />
                         </div>
                     )}
                 </Card>
