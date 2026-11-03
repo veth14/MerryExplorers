@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         {
           $set: {
             stableKey,
-            title: h.localName || h.name,
+            title: h.name || h.localName,
             type: "holiday",
             startDate: h.date,
             endDate: null,

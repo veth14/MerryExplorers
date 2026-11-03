@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEvents, EventAttributes } from "ics";
 import { connectToDatabase } from "@/lib/mongodb";
-import { getManilaDateStr, deriveProgramEvents, EVENT_TYPE_META, deduplicateCalendarEvents, CalendarEvent } from "@/lib/calendar-events";
+import { getManilaDateStr, deriveProgramEvents, EVENT_TYPE_META, deduplicateCalendarEvents, CalendarEvent, getEnglishCalendarEventTitle } from "@/lib/calendar-events";
 
 /**
  * GET /api/calendar.ics
@@ -49,10 +49,10 @@ export async function GET(_req: NextRequest) {
       return [y, m, d];
     }
 
-    function buildDescription(type: string, notes?: string | null): string {
+    function buildDescription(type: string, notes?: string | null, instructions?: string | null): string {
       const meta = EVENT_TYPE_META[type as keyof typeof EVENT_TYPE_META];
       const typeLine = meta ? `${meta.emoji} ${meta.label}` : type;
-      return [typeLine, notes].filter(Boolean).join("\n\n");
+      return [typeLine, notes, instructions ? `Instructions: ${instructions}` : ""].filter(Boolean).join("\n\n");
     }
 
     const icsEvents: EventAttributes[] = [];
@@ -61,13 +61,14 @@ export async function GET(_req: NextRequest) {
     const combinedEvents: CalendarEvent[] = [
       ...docs.map((d) => ({
         _id: d.stableKey ? `${d.stableKey}@merryexplorers` : d._id.toString(),
-        title: d.title,
+        title: getEnglishCalendarEventTitle(String(d.title || ""), d.type),
         type: d.type,
         startDate: d.startDate,
         endDate: d.endDate,
         visibility: d.visibility as "public",
         source: d.source,
         notes: d.notes,
+        instructions: d.instructions || undefined,
       })),
       ...programEvents,
     ];
@@ -87,7 +88,7 @@ export async function GET(_req: NextRequest) {
       icsEvents.push({
         uid,
         title: e.title,
-        description: buildDescription(e.type, e.notes),
+        description: buildDescription(e.type, e.notes, e.instructions),
         start,
         end: endExclusive,
         startInputType: "local",

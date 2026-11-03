@@ -4,6 +4,68 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Branded cursor is mounted only on pages that use the public site header. */
+body.public-cursor-enabled,
+body.public-cursor-enabled * {
+  cursor: none !important;
+}
+
+body.public-cursor-enabled input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]),
+body.public-cursor-enabled textarea,
+body.public-cursor-enabled [contenteditable="true"] {
+  cursor: text !important;
+}
+
+.public-cursor {
+  position: fixed;
+  left: -100px;
+  top: -100px;
+  z-index: 100000;
+  width: 38px;
+  height: 42px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-3px, -2px, 0);
+  transition: opacity 140ms ease;
+  will-change: left, top;
+}
+
+.public-cursor.is-visible { opacity: 1; }
+.public-cursor.is-input { opacity: 0; }
+
+.public-cursor__arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 34px;
+  filter: drop-shadow(0 1px 2px rgb(0 32 91 / 18%));
+  transform-origin: 8px 6px;
+  transition: opacity 120ms ease, transform 140ms ease;
+}
+
+.public-cursor__hand {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  width: 31px;
+  height: 35px;
+  opacity: 0;
+  transform: scale(.86);
+  transform-origin: 12px 11px;
+  filter: drop-shadow(0 1px 2px rgb(0 32 91 / 18%));
+  transition: opacity 120ms ease, transform 140ms ease;
+}
+
+.public-cursor.is-interactive .public-cursor__arrow { opacity: 0; transform: scale(.55) rotate(-14deg); }
+.public-cursor.is-interactive .public-cursor__hand { opacity: 1; transform: scale(1); }
+.public-cursor.is-pressed .public-cursor__hand { transform: scale(.92); }
+.public-cursor.is-pressed:not(.is-interactive) .public-cursor__arrow { transform: scale(.92); }
+
+@media (prefers-reduced-motion: reduce) {
+  .public-cursor, .public-cursor__arrow, .public-cursor__hand { transition: none; }
+}
+
 /* Prevent layout shift when mobile menu locks scroll.
    Adds padding-right equal to the scrollbar width so fixed elements don't jump. */
 html.menu-open {

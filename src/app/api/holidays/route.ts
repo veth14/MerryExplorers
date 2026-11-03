@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         {
           $set: {
             dateStr: h.date,
-            reason: h.localName || h.name,
+            reason: h.name || h.localName,
             type: "holiday",
             source: "nager",
             createdAt: new Date(),

@@ -12,6 +12,7 @@ import {
   getManilaDateStr,
   openCalendarEvent,
 } from "@/lib/calendar-events";
+import { EventPhotoFrame } from "@/components/calendar/event-photo-frame";
 
 const EVENT_IMAGES: Record<string, string> = {
   adventure_start: "/images/events/adventure_start.jpg",
@@ -93,7 +94,7 @@ const MAJOR_EVENT_TYPES: CalendarEventType[] = [
 
 // ─── Event Detail Modal ───────────────────────────────────────────────────────
 
-function EventDetailModal({
+export function EventDetailModal({
   event,
   onClose,
 }: {
@@ -101,6 +102,7 @@ function EventDetailModal({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [isSquarePhoto, setIsSquarePhoto] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -151,16 +153,24 @@ function EventDetailModal({
           className="relative w-full sm:max-w-xl bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]"
         >
           {/* Image Banner */}
-          <div className="relative h-56 sm:h-64 w-full shrink-0 overflow-hidden bg-slate-100">
-            <Image
-              src={imgUrl}
-              alt={event.title}
-              fill
-              sizes="(max-width: 640px) 100vw, 576px"
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
+          <div className={`relative ${event.imageUrl && isSquarePhoto ? "aspect-square" : "h-56 sm:h-64"} w-full shrink-0 overflow-hidden bg-slate-100`}>
+            {event.imageUrl ? (
+              <EventPhotoFrame
+                src={imgUrl}
+                alt={event.title}
+                onAspectRatioChange={(ratio) => setIsSquarePhoto(Math.abs(ratio - 1) <= 0.12)}
+              />
+            ) : (
+              <Image
+                src={imgUrl}
+                alt={event.title}
+                fill
+                sizes="(max-width: 640px) 100vw, 576px"
+                className="object-cover"
+                priority
+              />
+            )}
+            {!event.imageUrl && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />}
 
             {/* Close button */}
             <button
@@ -214,6 +224,12 @@ function EventDetailModal({
                 {description}
               </p>
             </div>
+            {event.instructions && (
+              <div className="rounded-2xl bg-[#eef4ff] border border-[#c7d8f0] p-4">
+                <p className="text-[11px] font-black uppercase tracking-wider text-[#0033a0] mb-1">📌 Instructions</p>
+                <p className="text-[13px] text-[#3d5580] leading-relaxed font-medium whitespace-pre-wrap">{event.instructions}</p>
+              </div>
+            )}
           </div>
 
           {/* Footer CTAs */}
@@ -274,15 +290,19 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
       >
         {/* Visual picture on left / top */}
         <div className="relative md:w-5/12 h-64 md:h-auto min-h-[240px] overflow-hidden bg-slate-100">
-          <Image
-            src={imgUrl}
-            alt={event.title}
-            fill
-            sizes="(max-width: 768px) 100vw, 360px"
-            className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-black/10" />
+          {event.imageUrl ? (
+            <EventPhotoFrame src={imgUrl} alt={event.title} />
+          ) : (
+            <Image
+              src={imgUrl}
+              alt={event.title}
+              fill
+              sizes="(max-width: 768px) 100vw, 360px"
+              className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+              priority
+            />
+          )}
+          {!event.imageUrl && <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-black/10" />}
 
           {/* Date Glass Badge */}
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-xs rounded-2xl px-3.5 py-2 shadow-lg border border-white/60 text-center min-w-[58px]">
@@ -393,14 +413,18 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
       >
         {/* Picture Banner on top */}
         <div className="relative h-44 w-full overflow-hidden bg-slate-100">
-          <Image
-            src={imgUrl}
-            alt={event.title}
-            fill
-            sizes="350px"
-            className="object-cover group-hover:scale-105 transition-transform duration-600 ease-out"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+          {event.imageUrl ? (
+            <EventPhotoFrame src={imgUrl} alt={event.title} />
+          ) : (
+            <Image
+              src={imgUrl}
+              alt={event.title}
+              fill
+              sizes="350px"
+              className="object-cover group-hover:scale-105 transition-transform duration-600 ease-out"
+            />
+          )}
+          {!event.imageUrl && <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />}
 
           {/* Date Glass Badge */}
           <div className="absolute top-3.5 left-3.5 bg-white/95 backdrop-blur-xs rounded-2xl px-3 py-1.5 shadow-md border border-white/60 text-center min-w-[50px]">

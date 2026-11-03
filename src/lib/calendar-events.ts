@@ -19,6 +19,40 @@ export type CalendarEventType =
 export type CalendarVisibility = "public" | "internal";
 export type CalendarSource = "manual" | "programs" | "holiday_auto";
 
+const PH_HOLIDAY_ENGLISH_NAMES: Record<string, string> = {
+  "araw ng bagong taon": "New Year's Day",
+  "bagong taon": "New Year's Day",
+  "bagong taon ng tsino": "Chinese New Year",
+  "annibersaryo ng rebolusyon sa edsa": "EDSA People Power Revolution Anniversary",
+  "huwebes santo": "Maundy Thursday",
+  "biyernes santo": "Good Friday",
+  "sabado de gloria": "Black Saturday",
+  "araw ng kagitingan": "Day of Valor",
+  "araw ng manggagawa": "Labor Day",
+  "araw ng kalayaan": "Independence Day",
+  "araw ng paggunita kay ninoy aquino": "Ninoy Aquino Day",
+  "araw ng paggunita sa dakilang kabayanihan ni ninoy aquino": "Ninoy Aquino Day",
+  "araw ng mga bayani": "National Heroes Day",
+  "araw ng mga santo": "All Saints' Day",
+  "araw ni bonifacio": "Bonifacio Day",
+  "araw ni gat andres bonifacio": "Bonifacio Day",
+  "araw ng imaculada concepcion": "Feast of the Immaculate Conception",
+  "araw ng imakulada concepcion": "Feast of the Immaculate Conception",
+  "kapistahan ng imakulada concepcion": "Feast of the Immaculate Conception",
+  "kapistahan ng immaculada concepcion": "Feast of the Immaculate Conception",
+  "araw ng pasko": "Christmas Day",
+  "araw ni rizal": "Rizal Day",
+  "araw ng mga patay": "All Souls' Day",
+  "bisperas ng pasko": "Christmas Eve",
+  "huling araw ng taon": "Last Day of the Year",
+};
+
+/** Return an English label for Filipino holiday names while preserving other event titles. */
+export function getEnglishCalendarEventTitle(title: string, type: CalendarEventType): string {
+  if (type !== "holiday") return title;
+  return PH_HOLIDAY_ENGLISH_NAMES[title.trim().toLocaleLowerCase("en-US")] || title;
+}
+
 export interface CalendarEvent {
   _id: string;
   title: string;
@@ -31,6 +65,7 @@ export interface CalendarEvent {
   programKey?: string | null; // Specific program this event applies to (or null for all)
   programKeys?: string[];     // Specific programs this event applies to (empty/omitted = playgroup-wide)
   description?: string; // Public-facing event description shown on landing page & public calendar
+  instructions?: string; // Public-facing event instructions shown in event details
   notes?: string;       // Admin-only internal notes
   imageUrl?: string;    // Optional event photo (1080x1080 square or 1920x1080 presentation)
   autoAdded?: boolean;
@@ -385,6 +420,7 @@ export function buildGoogleCalendarUrl(event: CalendarEvent): string {
     [
       EVENT_TYPE_META[event.type]?.label ? `Category: ${EVENT_TYPE_META[event.type].label}` : "",
       event.description || event.notes || "",
+      event.instructions ? `Instructions: ${event.instructions}` : "",
       "Merry Explorers Playgroup & Learning Center",
     ]
       .filter(Boolean)
@@ -404,7 +440,10 @@ export function buildSingleEventIcsUrl(event: CalendarEvent): string {
     type: event.type,
   });
   if (event.endDate) params.set("endDate", event.endDate);
-  const desc = event.description || event.notes || "";
+  const desc = [
+    event.description || event.notes || "",
+    event.instructions ? `Instructions: ${event.instructions}` : "",
+  ].filter(Boolean).join("\n\n");
   if (desc) params.set("description", desc);
   return `/api/calendar-events/single-ics?${params.toString()}`;
 }
@@ -426,6 +465,7 @@ export function buildAndroidCalendarIntent(event: CalendarEvent): string {
     [
       EVENT_TYPE_META[event.type]?.label ? `Category: ${EVENT_TYPE_META[event.type].label}` : "",
       event.description || event.notes || "",
+      event.instructions ? `Instructions: ${event.instructions}` : "",
       "Merry Explorers Playgroup & Learning Center",
     ]
       .filter(Boolean)

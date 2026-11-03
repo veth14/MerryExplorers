@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
-import { getManilaDateStr, CalendarEvent, deriveProgramEvents, deduplicateCalendarEvents } from "@/lib/calendar-events";
+import { getManilaDateStr, CalendarEvent, deriveProgramEvents, deduplicateCalendarEvents, getEnglishCalendarEventTitle } from "@/lib/calendar-events";
 
 /** GET /api/calendar-events
  * Query params:
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
         : (d.programKey ? [String(d.programKey).trim()] : []);
       return {
         _id: d._id.toString(),
-        title: d.title,
+        title: getEnglishCalendarEventTitle(String(d.title || ""), d.type),
         type: d.type,
         startDate: d.startDate,
         endDate: d.endDate,
@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
         programKey: pKeys[0] || null,
         programKeys: pKeys,
         description: d.description || undefined,
+        instructions: d.instructions || undefined,
         notes: d.notes,
         imageUrl: d.imageUrl || undefined,
         autoAdded: d.autoAdded,
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, notes, imageUrl, programKey, programKeys } = body;
+    const { title, type, startDate, endDate, visibility, description, instructions, notes, imageUrl, programKey, programKeys } = body;
 
     if (!title?.trim() || !type || !startDate || !visibility) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -158,6 +159,7 @@ export async function POST(req: NextRequest) {
       programKey: normalizedProgramKeys[0] || null,
       programKeys: normalizedProgramKeys,
       description: description?.trim() || null,
+      instructions: instructions?.trim() || null,
       notes: notes?.trim() || null,
       imageUrl: imageUrl?.trim() || null,
       autoAdded: false,
@@ -198,7 +200,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, notes, hidden, imageUrl, programKey, programKeys } = body;
+    const { title, type, startDate, endDate, visibility, description, instructions, notes, hidden, imageUrl, programKey, programKeys } = body;
 
     const { db } = await connectToDatabase();
 
@@ -217,6 +219,7 @@ export async function PUT(req: NextRequest) {
     if (endDate !== undefined) update.endDate = endDate || null;
     if (visibility !== undefined) update.visibility = visibility;
     if (description !== undefined) update.description = description?.trim() || null;
+    if (instructions !== undefined) update.instructions = instructions?.trim() || null;
     if (notes !== undefined) update.notes = notes?.trim() || null;
     if (imageUrl !== undefined) update.imageUrl = imageUrl?.trim() || null;
     if (programKeys !== undefined || programKey !== undefined) {

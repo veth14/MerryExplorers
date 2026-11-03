@@ -14,6 +14,8 @@ import {
   openCalendarEvent,
 } from "@/lib/calendar-events";
 import { PROGRAM_SCHEDULE_CONFIGS } from "@/lib/program-sessions";
+import { EventDetailModal } from "@/components/landing/calendar-section";
+import { EventPhotoFrame } from "@/components/calendar/event-photo-frame";
 
 interface PublicCalendarViewProps {
   initialMonth: string; // "YYYY-MM"
@@ -47,35 +49,6 @@ function formatRelativeDays(dateStr: string, todayStr: string): string {
   return "";
 }
 
-function buildGoogleCalendarUrl(event: CalendarEvent): string {
-  const [y, m, d] = event.startDate.split("-").map(Number);
-  const startYmd = `${y}${String(m).padStart(2, "0")}${String(d).padStart(2, "0")}`;
-
-  // Next day for all-day exclusive end
-  let endYmd = startYmd;
-  if (event.endDate && event.endDate > event.startDate) {
-    const [ey, em, ed] = event.endDate.split("-").map(Number);
-    const endDateObj = new Date(ey, em - 1, ed + 1);
-    endYmd = `${endDateObj.getFullYear()}${String(endDateObj.getMonth() + 1).padStart(2, "0")}${String(endDateObj.getDate()).padStart(2, "0")}`;
-  } else {
-    const nextDay = new Date(y, m - 1, d + 1);
-    endYmd = `${nextDay.getFullYear()}${String(nextDay.getMonth() + 1).padStart(2, "0")}${String(nextDay.getDate()).padStart(2, "0")}`;
-  }
-
-  const title = encodeURIComponent(event.title);
-  const details = encodeURIComponent(
-    [
-      EVENT_TYPE_META[event.type]?.label ? `Category: ${EVENT_TYPE_META[event.type].label}` : "",
-      event.notes || "",
-      "Merry Explorers Playgroup & Learning Center",
-    ]
-      .filter(Boolean)
-      .join("\n\n")
-  );
-
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startYmd}/${endYmd}&details=${details}&location=${encodeURIComponent("Merry Explorers, Caloocan")}`;
-}
-
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function PublicCalendarView({
@@ -95,6 +68,7 @@ export function PublicCalendarView({
   });
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showSubscribeModal, setShowSubscribeModal] = useState<boolean>(false);
   const [copiedFeed, setCopiedFeed] = useState<boolean>(false);
   const [isClientMounted, setIsClientMounted] = useState(false);
@@ -261,11 +235,13 @@ export function PublicCalendarView({
   return (
     <div>
       {/* ── Redesigned Playful Hero (Soft, Warm, Merry Explorers Palette) ── */}
-      <section className="relative pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 px-4 sm:px-8 overflow-hidden bg-gradient-to-b from-[#f0f6ff]/80 via-[#faf9f5] to-[#faf9f5]">
+      <section className="relative pt-32 sm:pt-36 md:pt-40 pb-12 sm:pb-16 px-4 sm:px-8 overflow-hidden bg-gradient-to-b from-[#eaf3ff] via-[#f6f8fc] to-[#faf9f5]">
         {/* Soft playful background decorations */}
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-gradient-to-r from-[#ffe082]/20 via-[#90caf9]/20 to-[#a5d6a7]/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[min(1000px,90vw)] h-[340px] bg-gradient-to-r from-[#ffe082]/25 via-[#90caf9]/25 to-[#a5d6a7]/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-32 left-[12%] hidden lg:block h-16 w-16 rounded-3xl border border-white/80 bg-white/35 rotate-12 shadow-sm" />
+        <div className="absolute top-44 right-[13%] hidden lg:block h-10 w-10 rounded-2xl border border-white/80 bg-[#fff5d8]/70 -rotate-12 shadow-sm" />
 
-        <div className="relative mx-auto max-w-5xl text-center space-y-4">
+        <div className="relative mx-auto max-w-6xl text-center space-y-4">
           {/* Breadcrumb / Back Link */}
           <div className="flex items-center justify-center gap-2 mb-2">
             <Link
@@ -277,7 +253,7 @@ export function PublicCalendarView({
           </div>
 
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FFF8E7] text-[#855300] border-2 border-[#FDE68A] shadow-xs">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/85 text-[#855300] border border-[#f1d98b] shadow-[0_6px_20px_rgba(31,55,96,0.08)] backdrop-blur-sm">
             <span className="text-[14px]">🗺️</span>
             <span className="text-[11.5px] font-fredoka font-bold tracking-wider uppercase">
               Adventure Calendar
@@ -285,12 +261,12 @@ export function PublicCalendarView({
           </div>
 
           {/* Main Title */}
-          <h1 className="font-fredoka text-[36px] sm:text-[48px] md:text-[54px] font-bold text-[#0033A0] tracking-tight leading-tight">
+          <h1 className="font-fredoka text-[38px] sm:text-[52px] md:text-[60px] font-bold text-[#0033A0] tracking-tight leading-[1.04] drop-shadow-[0_2px_0_rgba(255,255,255,0.8)]">
             Mark Your Calendar
           </h1>
 
           {/* Friendly Subtitle */}
-          <p className="text-[15px] sm:text-[17px] text-[#4a5f82] max-w-2xl mx-auto font-medium leading-relaxed">
+          <p className="text-[15px] sm:text-[17px] text-[#526987] max-w-2xl mx-auto font-medium leading-relaxed">
             Keep track of upcoming adventure start dates, public registration openings, renewal windows, and Philippine holidays — all in one joyful place.
           </p>
 
@@ -312,11 +288,19 @@ export function PublicCalendarView({
               <span>📆</span> Subscribe to Calendar
             </button>
           </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1 text-[10.5px] sm:text-[11px] font-semibold text-[#71819a]">
+            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#35a56f]" />Public event dates</span>
+            <span className="hidden sm:inline h-3 w-px bg-[#d5deeb]" />
+            <span className="inline-flex items-center gap-1.5">🌏 All dates in Manila time</span>
+            <span className="hidden sm:inline h-3 w-px bg-[#d5deeb]" />
+            <span className="inline-flex items-center gap-1.5">🔄 Live calendar feed</span>
+          </div>
         </div>
       </section>
 
       {/* ── Main Interactive Calendar Section ── */}
-      <div className="mx-auto w-full max-w-5xl px-4 sm:px-8 pb-16 sm:pb-24 space-y-8">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-8 pb-16 sm:pb-24 space-y-9">
         {/* ── Upcoming Events Quick Strip ── */}
         {upcomingEvents.length > 0 && (
           <section>
@@ -345,6 +329,9 @@ export function PublicCalendarView({
               const monthAbbr = new Date(y, mStr - 1, 1).toLocaleDateString("en-US", {
                 month: "short",
               });
+              const weekdayAbbr = new Date(y, mStr - 1, dStr).toLocaleDateString("en-US", {
+                weekday: "short",
+              });
               const relText = formatRelativeDays(e.startDate, todayStr);
 
               return (
@@ -360,42 +347,49 @@ export function PublicCalendarView({
                     }
                     setSelectedDate(e.startDate);
                   }}
-                  className="group text-left rounded-3xl bg-white border-2 border-[#e8f0fe] p-4 shadow-[0_8px_24px_rgba(0,51,160,0.04)] hover:shadow-[0_12px_32px_rgba(0,51,160,0.12)] hover:border-[#bfe0fb] transition-all hover:-translate-y-0.5 active:translate-y-0 relative overflow-hidden"
+                  className="group text-left rounded-[1.5rem] bg-white border border-[#e3eaf5] p-4 shadow-[0_10px_28px_rgba(20,52,100,0.06)] hover:shadow-[0_18px_38px_rgba(20,52,100,0.12)] hover:border-[#b8cbed] transition-all hover:-translate-y-1 active:translate-y-0 relative overflow-hidden min-h-[158px] flex flex-col"
                 >
                   <div
                     className="absolute top-0 left-0 right-0 h-1.5"
                     style={{ backgroundColor: meta.color }}
                   />
-                  <div className="flex items-start justify-between mb-2 pt-1">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="font-fredoka text-[28px] font-bold text-[#002f76] leading-none">
+                  <div className="flex items-start gap-3 pt-1">
+                    <div className="w-[52px] h-[58px] rounded-2xl border border-[#e5ebf5] bg-gradient-to-b from-[#ffffff] to-[#edf3fc] flex flex-col items-center justify-center shadow-inner shrink-0 text-center">
+                      <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#7a8ba5] leading-none mb-1">
+                        {weekdayAbbr}
+                      </span>
+                      <span className="font-fredoka tabular-nums text-[21px] font-bold text-[#002f76] leading-none">
                         {dStr}
                       </span>
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#64748b]">
+                      <span className="mt-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#7083a0]">
                         {monthAbbr}
                       </span>
                     </div>
-                    <span className="text-[24px] transform group-hover:scale-110 transition-transform">
-                      {meta.emoji}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border"
+                          style={{ color: meta.color, backgroundColor: meta.bg, borderColor: meta.border }}
+                        >
+                          {meta.label}
+                        </span>
+                        <span className="w-8 h-8 rounded-xl flex items-center justify-center text-[18px] bg-[#f8faff] border border-[#edf1f7] transform group-hover:scale-110 transition-transform shrink-0">
+                          {meta.emoji}
+                        </span>
+                      </div>
+                      <p className="font-fredoka text-[13px] sm:text-[14px] font-semibold text-[#002f76] leading-snug line-clamp-2 mt-2">
+                        {e.title}
+                      </p>
+                    </div>
                   </div>
 
-                  <p className="font-fredoka text-[14px] font-semibold text-[#002f76] leading-snug line-clamp-2 mb-2">
-                    {e.title}
-                  </p>
-
-                  <div className="flex items-center justify-between gap-1 mt-auto">
-                    <span
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
-                      style={{ color: meta.color, backgroundColor: meta.bg, borderColor: meta.border }}
-                    >
-                      {meta.emoji} {meta.label}
+                  <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-[#edf1f7]">
+                    <span className="text-[10px] font-semibold text-[#7b8aa1]">
+                      {relText || weekdayAbbr}
                     </span>
-                    {relText && (
-                      <span className="text-[10px] font-bold text-[#ff9800] bg-[#fff8e7] px-2 py-0.5 rounded-full">
-                        {relText}
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#315b9f] group-hover:text-[#0033a0]">
+                      View date <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                    </span>
                   </div>
                 </button>
               );
@@ -405,9 +399,9 @@ export function PublicCalendarView({
       )}
 
       {/* ── Interactive Month Calendar ── */}
-      <section className="rounded-3xl bg-white border-2 border-[#e2eaf5] shadow-[0_16px_40px_rgba(0,51,160,0.06)] overflow-hidden">
+      <section className="rounded-[2rem] bg-white border border-[#dfe8f5] shadow-[0_22px_60px_rgba(20,52,100,0.08)] overflow-hidden">
         {/* Navigation Bar */}
-        <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-[#eef2f8] bg-gradient-to-r from-[#fbfdff] via-white to-[#fbfdff]">
+        <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-[#e8eef7] bg-gradient-to-r from-[#f6f9ff] via-white to-[#f8fbff]">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -618,7 +612,7 @@ export function PublicCalendarView({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSelectedDate(null)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-xs pointer-events-auto"
+                className="fixed inset-0 bg-[#07152b]/55 backdrop-blur-sm pointer-events-auto"
               />
 
               {/* Modal Dialog Content (Sticks 100% flush to bottom on mobile) */}
@@ -628,7 +622,10 @@ export function PublicCalendarView({
                 exit={reduceMotion ? { opacity: 0 } : { y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 350 }}
                 style={{ transformOrigin: "bottom center" }}
-                className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-[2rem] sm:rounded-3xl rounded-b-none sm:rounded-b-3xl border-t-2 border-x-0 border-b-0 sm:border-2 border-[#dbe6f6] shadow-[0_-12px_40px_rgba(0,51,160,0.2)] sm:shadow-2xl max-h-[85dvh] flex flex-col overflow-hidden pointer-events-auto mb-0"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="calendar-day-modal-title"
+                className="relative z-10 w-full sm:max-w-xl bg-white rounded-t-[2rem] sm:rounded-[2rem] rounded-b-none sm:rounded-b-[2rem] border-t border-x-0 border-b-0 sm:border border-white/80 shadow-[0_-16px_56px_rgba(0,30,90,0.24)] sm:shadow-[0_28px_90px_rgba(0,30,90,0.28)] max-h-[85dvh] flex flex-col overflow-hidden pointer-events-auto mb-0"
               >
               {/* Mobile grab handle */}
               <div className="sm:hidden pt-3 pb-1 flex justify-center">
@@ -636,19 +633,29 @@ export function PublicCalendarView({
               </div>
 
               {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-[#eef2f8] flex items-center justify-between bg-gradient-to-r from-[#fbfdff] to-white">
-                <div>
-                  <span className="text-[11px] font-black uppercase tracking-wider text-[#FF9800] bg-[#FFF8E7] px-2.5 py-0.5 rounded-full inline-block mb-1">
-                    {formatRelativeDays(selectedDate, todayStr) || "Selected Date"}
-                  </span>
-                  <h3 className="font-fredoka text-[18px] sm:text-[20px] font-bold text-[#002f76]">
-                    {formatDisplayDate(selectedDate)}
-                  </h3>
+              <div className="px-5 sm:px-7 py-5 border-b border-[#e8eef8] flex items-center justify-between gap-4 bg-gradient-to-r from-[#f3f7ff] via-white to-[#fff9eb]">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-14 h-14 rounded-2xl bg-white border border-[#dce7f8] shadow-[0_5px_14px_rgba(0,51,160,0.09)] flex flex-col items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#7290b8] leading-none">
+                      {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-US", { month: "short" })}
+                    </span>
+                    <span className="font-fredoka text-[23px] font-bold text-[#0033a0] leading-tight">
+                      {Number(selectedDate.slice(-2))}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#9a6200] bg-[#fff5d8] border border-[#f4df9a] px-2.5 py-1 rounded-full inline-block mb-1.5">
+                      {formatRelativeDays(selectedDate, todayStr) || "Calendar date"}
+                    </span>
+                    <h3 id="calendar-day-modal-title" className="font-fredoka text-[17px] sm:text-[19px] font-bold text-[#002f76] leading-tight">
+                      {formatDisplayDate(selectedDate)}
+                    </h3>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedDate(null)}
-                  className="w-9 h-9 rounded-full bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#475569] flex items-center justify-center font-bold text-lg transition-colors cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-white/90 hover:bg-white text-[#526987] border border-[#e4ebf5] shadow-xs flex items-center justify-center font-bold text-lg transition-all hover:shadow-sm cursor-pointer shrink-0"
                   aria-label="Close"
                 >
                   ✕
@@ -656,7 +663,7 @@ export function PublicCalendarView({
               </div>
 
               {/* Modal Body: Events List */}
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-3.5 flex-1">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1 bg-[#f9fbff]">
                 {selectedDateEvents.length === 0 ? (
                   <div className="text-center py-8 px-4">
                     <span className="text-[44px] mb-2 inline-block">☀️</span>
@@ -676,31 +683,34 @@ export function PublicCalendarView({
                       emoji: "📅",
                       label: "Event",
                     };
-                    const gcalUrl = buildGoogleCalendarUrl(e);
-
                     return (
                       <div
                         key={e._id}
-                        className="rounded-2xl border-2 p-4 bg-white shadow-xs transition-all flex flex-col gap-2.5"
-                        style={{ borderColor: `${meta.color}40` }}
+                        className="rounded-[1.4rem] border border-[#e3eaf5] p-4 sm:p-5 bg-white shadow-[0_8px_24px_rgba(16,48,96,0.06)] transition-all flex flex-col gap-4"
                       >
-                          <div className="flex items-start gap-3">
-                            <span
-                              className="w-10 h-10 rounded-2xl flex items-center justify-center text-[22px] shrink-0 border"
-                              style={{
-                                backgroundColor: meta.bg,
-                                borderColor: meta.border,
-                              }}
+                        <div className="flex items-center gap-3.5">
+                          <span
+                            className="w-12 h-12 rounded-2xl flex items-center justify-center text-[23px] shrink-0 border shadow-inner"
+                            style={{ backgroundColor: meta.bg, borderColor: meta.border }}
+                          >
+                            {meta.emoji}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEvent(e)}
+                              className="font-fredoka text-left text-[16px] sm:text-[17px] font-bold text-[#002f76] leading-snug hover:text-[#0050d5] transition-colors cursor-pointer"
                             >
-                              {meta.emoji}
-                            </span>
-                            <div>
-                              <h4 className="font-fredoka text-[16px] font-bold text-[#002f76] leading-snug">
-                                {e.title}
-                              </h4>
-                              <div className="flex flex-wrap gap-1.5 items-center mt-1">
+                              {e.title}
+                            </button>
+                            {e.description && (
+                              <p className="mt-1.5 text-[11px] sm:text-[12px] leading-relaxed text-[#71819a] line-clamp-2">
+                                {e.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-1.5 items-center mt-2">
                                 <span
-                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border"
                                   style={{
                                     color: meta.color,
                                     backgroundColor: meta.bg,
@@ -718,41 +728,37 @@ export function PublicCalendarView({
                                     return (
                                       <span
                                         key={k}
-                                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]"
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]"
                                       >
                                         {cfg?.emoji || "🎒"} {cfg?.shortName || k}
                                       </span>
                                     );
                                   });
                                 })()}
-                              </div>
                             </div>
                           </div>
-                        {e.imageUrl && (
-                          <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-xs">
-                            <img
-                              src={e.imageUrl}
-                              alt={e.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-
-                        {e.notes && (
-                          <div className="bg-[#f8fafc] rounded-xl p-2.5 text-[12px] text-[#475569] leading-relaxed border border-[#edf2f7]">
-                            <p className="font-semibold text-[#1e293b] text-[11px] uppercase tracking-wider mb-0.5">
-                              Details:
-                            </p>
-                            {e.notes}
-                          </div>
-                        )}
-
-                        {/* Add to Calendar CTA */}
-                        <div className="pt-1 flex justify-end">
+                          {e.imageUrl ? (
+                            <div className="relative w-[88px] h-[72px] sm:w-[104px] sm:h-[82px] rounded-xl overflow-hidden border border-[#e5ebf5] shrink-0">
+                              <EventPhotoFrame src={e.imageUrl} alt={e.title} />
+                            </div>
+                          ) : (
+                            <div className="w-[88px] h-[72px] sm:w-[104px] sm:h-[82px] rounded-xl flex items-center justify-center text-3xl bg-gradient-to-br from-[#f3f7ff] to-[#fff7e4] border border-[#e5ebf5] shrink-0">
+                              {meta.emoji}
+                            </div>
+                          )}
+                        </div>
+                        <div className="pt-3 border-t border-[#edf1f7] flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEvent(e)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0033a0] hover:bg-[#002779] text-white text-[11px] font-bold shadow-sm hover:shadow-md transition-all cursor-pointer"
+                          >
+                            View Details <span aria-hidden="true">→</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => openCalendarEvent(e)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95 cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#f5f8ff] text-[#244c8b] text-[11px] font-bold border border-[#dbe5f4] shadow-xs transition-all active:scale-95 cursor-pointer"
                           >
                             <span>📅</span> Add to Calendar
                           </button>
@@ -764,14 +770,15 @@ export function PublicCalendarView({
               </div>
 
               {/* Modal Footer - Extra bottom padding on mobile for safe area and zero cut-off */}
-              <div className="px-6 pt-3.5 pb-8 sm:pb-3.5 bg-[#f8fafc] border-t border-[#eef2f8] flex items-center justify-between shrink-0">
-                <span className="text-[12px] text-[#64748b] font-semibold">
+              <div className="px-5 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 bg-white border-t border-[#edf1f7] flex items-center justify-between shrink-0">
+                <span className="inline-flex items-center gap-2 text-[12px] text-[#64748b] font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-[#4f7ee8]" />
                   {selectedDateEvents.length} event{selectedDateEvents.length === 1 ? "" : "s"}
                 </span>
                 <button
                   type="button"
                   onClick={() => setSelectedDate(null)}
-                  className="px-5 py-2.5 rounded-xl bg-[#0033a0] hover:bg-[#002f76] text-white text-[13px] font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="px-5 py-2.5 rounded-xl bg-[#f2f5fa] hover:bg-[#e8eef7] border border-[#dfe7f2] text-[#28456f] text-[12px] font-bold transition-all cursor-pointer active:scale-95"
                 >
                   Done
                 </button>
@@ -786,14 +793,22 @@ export function PublicCalendarView({
       {/* ── Month Event Agenda List ── */}
       {currentEvents.length > 0 && (
         <section>
-          <div className="flex items-center gap-2.5 mb-4">
-            <span className="w-2.5 h-6 bg-[#0033a0] rounded-full inline-block" />
-            <h2 className="font-fredoka text-[22px] sm:text-[24px] font-bold text-[#002f76]">
-              All Events in {monthLabel}
-            </h2>
+          <div className="flex items-end justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-6 bg-[#0033a0] rounded-full inline-block" />
+              <div>
+                <h2 className="font-fredoka text-[22px] sm:text-[24px] font-bold text-[#002f76] leading-tight">
+                  All Events in {monthLabel}
+                </h2>
+                <p className="mt-1 text-[11px] text-[#7b8aa1]">A quick look at every date this month</p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[#e1e9f4] bg-white px-3 py-1.5 text-[10px] font-bold text-[#71819a] shadow-xs">
+              {currentEvents.length} listed
+            </span>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {currentEvents.map((e) => {
               const meta = EVENT_TYPE_META[e.type] ?? {
                 color: "#0033a0",
@@ -803,26 +818,30 @@ export function PublicCalendarView({
                 label: "Event",
               };
               const isSelected = e.startDate === selectedDate;
+              const [, monthNumber, dayNumber] = e.startDate.split("-").map(Number);
+              const eventMonth = new Date(2000, monthNumber - 1, 1).toLocaleDateString("en-US", { month: "short" });
 
               return (
-                <div
+                <button
+                  type="button"
                   key={e._id}
                   onClick={() => setSelectedDate(e.startDate)}
                   className={`
-                    group flex items-center justify-between gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer
+                    group w-full text-left flex items-center justify-between gap-4 p-3 sm:p-4 rounded-[1.4rem] border transition-all cursor-pointer
                     ${
                       isSelected
-                        ? "bg-[#eef4ff] border-[#0033a0] shadow-sm"
-                        : "bg-white border-[#e8f0fe] hover:border-[#bfe0fb] hover:shadow-xs"
+                        ? "bg-[#f3f7ff] border-[#7da5e8] shadow-[0_8px_24px_rgba(0,51,160,0.08)]"
+                        : "bg-white border-[#e4ebf5] hover:border-[#b8cbed] hover:shadow-[0_10px_28px_rgba(20,52,100,0.07)] hover:-translate-y-0.5"
                     }
                   `}
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
                     <div
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center text-[22px] shrink-0 border"
-                      style={{ backgroundColor: meta.bg, borderColor: meta.border }}
+                      className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 border bg-gradient-to-b from-white to-[#f4f7fc] shadow-inner"
+                      style={{ borderColor: isSelected ? "#bdd0f0" : "#e7edf5" }}
                     >
-                      {meta.emoji}
+                      <span className="font-fredoka text-[20px] font-bold text-[#0033a0] leading-none">{dayNumber}</span>
+                      <span className="mt-1 text-[9px] font-black uppercase tracking-widest text-[#71819a]">{eventMonth}</span>
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -840,17 +859,17 @@ export function PublicCalendarView({
                           {meta.emoji} {meta.label}
                         </span>
                       </div>
-                      <p className="text-[12px] font-semibold text-[#64748b]">
+                      <p className="mt-1 text-[11px] sm:text-[12px] font-medium text-[#71819a]">
                         {formatDisplayDate(e.startDate)}
-                        {e.endDate && e.endDate !== e.startDate && ` – ${formatDisplayDate(e.endDate)}`}
+                        {e.endDate && e.endDate !== e.startDate && ` · through ${formatDisplayDate(e.endDate)}`}
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[12px] font-bold text-[#0033a0] opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">
-                    View Details →
+                  <span className="w-9 h-9 rounded-full bg-[#f4f7fc] border border-[#e5ebf4] text-[#40659c] flex items-center justify-center text-lg group-hover:bg-[#0033a0] group-hover:border-[#0033a0] group-hover:text-white transition-all shrink-0">
+                    ›
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -858,10 +877,14 @@ export function PublicCalendarView({
       )}
 
       {/* ── Event Types Legend ── */}
-      <section className="rounded-3xl border-2 border-[#e8f0fe] bg-white p-5 shadow-xs">
-        <p className="text-[11px] font-black uppercase tracking-widest text-[#64748b] mb-3">
-          Event Categories
-        </p>
+      <section className="rounded-[1.7rem] border border-[#e1e9f4] bg-white p-5 sm:p-6 shadow-[0_10px_30px_rgba(20,52,100,0.05)]">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1 mb-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8291a8] mb-1">Explore the calendar</p>
+            <h3 className="font-fredoka text-[17px] font-bold text-[#002f76]">Event Categories</h3>
+          </div>
+          <p className="text-[11px] text-[#8291a8]">Color-coded dates make each event easy to spot.</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {(Object.entries(EVENT_TYPE_META) as [CalendarEventType, typeof EVENT_TYPE_META[CalendarEventType]][])
             .filter(([t]) => t !== "suspension")
@@ -878,8 +901,10 @@ export function PublicCalendarView({
       </section>
 
       {/* ── Subscribable .ics Banner ── */}
-      <section className="rounded-3xl bg-gradient-to-br from-[#002f76] via-[#0033a0] to-[#0d47a1] text-white p-6 sm:p-8 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="space-y-1.5 text-center sm:text-left">
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#00265f] via-[#0033a0] to-[#1454b8] text-white p-6 sm:p-9 shadow-[0_22px_55px_rgba(0,44,125,0.2)] flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="absolute -right-12 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-20 -bottom-36 h-64 w-64 rounded-full bg-[#69a7ff]/15 blur-3xl pointer-events-none" />
+        <div className="relative space-y-1.5 text-center sm:text-left">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[#FFC107] text-[11px] font-black uppercase tracking-wider">
             📆 Live Calendar Feed
           </div>
@@ -891,7 +916,7 @@ export function PublicCalendarView({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
+        <div className="relative flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
           <a
             href={`${siteUrl}/api/calendar.ics`}
             target="_blank"
@@ -1094,6 +1119,12 @@ export function PublicCalendarView({
           )}
         </AnimatePresence>,
         document.body
+      )}
+      {selectedEvent && (
+        <EventDetailModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
       )}
     </div>
   );

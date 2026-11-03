@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
+import dynamic from "next/dynamic";
 import {
   CalendarEvent,
   CalendarEventType,
@@ -12,10 +13,13 @@ import {
   addMonths,
 } from "@/lib/calendar-events";
 import { ProgramSessionsCalendar } from "@/components/calendar/program-sessions-calendar";
+import { EventPhotoFrame } from "@/components/calendar/event-photo-frame";
 import {
   PROGRAM_SCHEDULE_CONFIGS,
   ProgramSessionItem,
 } from "@/lib/program-sessions";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 // Programs shown as session chips on the Playgroup Calendar grid (subset only)
 const SESSION_CHIP_KEYS = new Set([
@@ -362,6 +366,10 @@ function EventFormModal({
   const [endDate, setEndDate] = useState(initial?.endDate || "");
   const [visibility, setVisibility] = useState<CalendarVisibility>(initial?.visibility || "public");
   const [description, setDescription] = useState(initial?.description || "");
+  const [showDescriptionEmojiPicker, setShowDescriptionEmojiPicker] = useState(false);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionSelectionRef = useRef({ start: 0, end: 0 });
+  const [instructions, setInstructions] = useState(initial?.instructions || "");
   const [notes, setNotes] = useState(initial?.notes || "");
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl || "");
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -419,6 +427,19 @@ function EventFormModal({
     }
   };
 
+  const insertDescriptionEmoji = (emoji: string) => {
+    const { start, end } = descriptionSelectionRef.current;
+    const nextDescription = `${description.slice(0, start)}${emoji}${description.slice(end)}`;
+    const nextPosition = start + emoji.length;
+    setDescription(nextDescription);
+    descriptionSelectionRef.current = { start: nextPosition, end: nextPosition };
+    setShowDescriptionEmojiPicker(false);
+    requestAnimationFrame(() => {
+      descriptionInputRef.current?.focus();
+      descriptionInputRef.current?.setSelectionRange(nextPosition, nextPosition);
+    });
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError("Event title is required"); return; }
@@ -433,6 +454,7 @@ function EventFormModal({
       programKeys: programKeys.length > 0 ? programKeys : [],
       programKey: programKeys.length > 0 ? programKeys[0] : null,
       description: description.trim() || undefined,
+      instructions: instructions.trim() || undefined,
       notes: notes.trim() || undefined,
       imageUrl: imageUrl.trim() || undefined,
     });
@@ -806,24 +828,80 @@ function EventFormModal({
 
           {/* Section 3: Public Event Description (NEW!) */}
           <div className="pt-2 border-t border-[#edf2f7] space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#002f76]">
                 Event Description <span className="font-normal text-[#64748b] normal-case tracking-normal">(shown to parents)</span>
               </label>
-              <span className="text-[10px] font-bold text-[#0050d5] bg-[#eef4ff] px-2 py-0.5 rounded-md border border-[#c7d8f0]">
-                📢 Appears in Event Details Modal
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="hidden sm:inline text-[10px] font-bold text-[#0050d5] bg-[#eef4ff] px-2 py-0.5 rounded-md border border-[#c7d8f0]">
+                  📢 Appears in Event Details Modal
+                </span>
+              </div>
             </div>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="e.g. Join us for a fun-filled morning of interactive storytelling, music, and playful exploration! All curious explorers and families are warmly invited."
-              className="w-full rounded-2xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-3 text-[13px] font-medium text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all resize-none shadow-xs"
-            />
+            <div className="relative">
+              <textarea
+                ref={descriptionInputRef}
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  descriptionSelectionRef.current = {
+                    start: e.currentTarget.selectionStart,
+                    end: e.currentTarget.selectionEnd,
+                  };
+                }}
+                onSelect={(e) => {
+                  descriptionSelectionRef.current = {
+                    start: e.currentTarget.selectionStart,
+                    end: e.currentTarget.selectionEnd,
+                  };
+                }}
+                rows={3}
+                placeholder="e.g. Join us for a fun-filled morning of interactive storytelling, music, and playful exploration! All curious explorers and families are warmly invited."
+                className="w-full rounded-2xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-3 pb-12 text-[13px] font-medium text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all resize-none shadow-xs"
+              />
+              <div className="absolute bottom-2.5 right-2.5 z-10">
+                <button
+                  type="button"
+                  onClick={() => setShowDescriptionEmojiPicker((open) => !open)}
+                  aria-label="Pick an emoji for the event description"
+                  aria-expanded={showDescriptionEmojiPicker}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[#c7d8f0] bg-white/95 px-2.5 py-1 text-[11px] font-bold text-[#0050d5] shadow-xs hover:bg-[#eef4ff] transition-colors"
+                >
+                  😊 <span className="hidden sm:inline">Add emoji</span>
+                </button>
+                {showDescriptionEmojiPicker && (
+                  <div className="absolute right-0 bottom-full mb-2 z-[60]">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => insertDescriptionEmoji(emojiData.emoji)}
+                      width={300}
+                      height={350}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
             <p className="text-[10.5px] text-[#9aa3b2]">
               Parents see this when they click the event card on the homepage to read details.
             </p>
+          </div>
+
+          <div className="pt-2 border-t border-[#edf2f7] space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#002f76]">
+                Event Instructions <span className="font-normal text-[#64748b] normal-case tracking-normal">(shown on both calendars)</span>
+              </label>
+              <span className="text-[10px] font-bold text-[#0050d5] bg-[#eef4ff] px-2 py-0.5 rounded-md border border-[#c7d8f0]">
+                📌 Public event details
+              </span>
+            </div>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={3}
+              placeholder="e.g. Please bring a water bottle, arrive 10 minutes early, or wear comfortable clothes."
+              className="w-full rounded-2xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-3 text-[13px] font-medium text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all resize-y shadow-xs"
+            />
+            <p className="text-[10.5px] text-[#9aa3b2]">Parents can read these instructions from the event details on the public calendar.</p>
           </div>
 
           {/* Section 4: Event Photo / Banner (Optional) */}
@@ -839,12 +917,8 @@ function EventFormModal({
 
             {imageUrl ? (
               <div className="rounded-2xl border-2 border-[#c7d8f0] bg-[#f8faff] p-3 space-y-2">
-                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-sm">
-                  <img
-                    src={imageUrl}
-                    alt="Event Preview"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
+                  <EventPhotoFrame src={imageUrl} alt="Event Preview" />
                   <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
                     <button
                       type="button"
@@ -996,8 +1070,8 @@ function DayDrawer({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 z-10 max-h-[80vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
+      <div className="relative bg-white w-[calc(100%-1rem)] sm:w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-[0_24px_70px_rgba(0,30,90,0.22)] p-4 sm:p-5 z-10 max-h-[min(86dvh,780px)] overflow-x-hidden overflow-y-auto overscroll-contain">
+          <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-[16px] font-black text-[#002f76]">{formatDate(dateStr)}</h3>
             <p className="text-[11px] text-[#9aa3b2] font-medium">
@@ -1153,16 +1227,16 @@ function DayDrawer({
                   key={e._id}
                   className="rounded-2xl border border-[#e8edf5] bg-[#f8faff] p-4"
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex flex-col gap-2 mb-2 min-w-0">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-black text-[#002f76] leading-snug">{e.title}</p>
+                      <p className="text-[14px] font-black text-[#002f76] leading-snug break-words">{e.title}</p>
                       {e.endDate && e.endDate !== e.startDate && (
                         <p className="text-[10.5px] font-medium text-[#9aa3b2] mt-0.5">
                           Until {formatDate(e.endDate)}
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-1.5 items-center flex-wrap shrink-0">
+                    <div className="flex gap-1.5 items-center flex-wrap min-w-0">
                       {(() => {
                         const pKeys = (Array.isArray(e.programKeys) && e.programKeys.length > 0)
                           ? e.programKeys
@@ -1171,7 +1245,7 @@ function DayDrawer({
                         return pKeys.map((k) => (
                           <span
                             key={k}
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9.5px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0] max-w-full"
                           >
                             {PROGRAM_SCHEDULE_CONFIGS[k]?.emoji || "🎒"} {PROGRAM_SCHEDULE_CONFIGS[k]?.shortName || k}
                           </span>
@@ -1182,12 +1256,8 @@ function DayDrawer({
                   </div>
 
                   {e.imageUrl && (
-                    <div className="mb-3 relative w-full h-28 rounded-xl overflow-hidden bg-slate-900 border border-slate-200">
-                      <img
-                        src={e.imageUrl}
-                        alt={e.title}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="mb-3 relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                      <EventPhotoFrame src={e.imageUrl} alt={e.title} />
                     </div>
                   )}
 
@@ -1222,13 +1292,19 @@ function DayDrawer({
                   </div>
 
                   {e.description && (
-                    <p className="text-[11.5px] font-medium text-[#2d4367] mt-2 border-t border-[#e8edf5] pt-2 leading-relaxed">
+                    <p className="text-[12px] font-medium text-[#2d4367] mt-2 border-t border-[#e8edf5] pt-2 leading-relaxed break-words">
                       📢 <span className="font-bold text-[#0033a0]">Public Description:</span> {e.description}
                     </p>
                   )}
 
+                  {e.instructions && (
+                    <p className="text-[12px] font-medium text-[#2d4367] mt-2 border-t border-[#e8edf5] pt-2 leading-relaxed break-words">
+                      📌 <span className="font-bold text-[#0033a0]">Public Instructions:</span> {e.instructions}
+                    </p>
+                  )}
+
                   {e.notes && (
-                    <p className="text-[11px] font-medium text-[#9aa3b2] mt-1.5 border-t border-dashed border-[#e8edf5] pt-1.5">
+                    <p className="text-[11px] font-medium text-[#9aa3b2] mt-1.5 border-t border-dashed border-[#e8edf5] pt-1.5 break-words">
                       🔒 <span className="font-bold">Staff notes:</span> {e.notes}
                     </p>
                   )}

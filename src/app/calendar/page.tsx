@@ -8,6 +8,7 @@ import {
   getManilaDateStr,
   deriveProgramEvents,
   deduplicateCalendarEvents,
+  getEnglishCalendarEventTitle,
 } from "@/lib/calendar-events";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ async function getPublicEvents(month: string): Promise<CalendarEvent[]> {
 
     const events: CalendarEvent[] = docs.map((d) => ({
       _id: d._id.toString(),
-      title: d.title,
+      title: getEnglishCalendarEventTitle(String(d.title || ""), d.type),
       type: d.type,
       startDate: d.startDate,
       endDate: d.endDate,
@@ -51,6 +52,8 @@ async function getPublicEvents(month: string): Promise<CalendarEvent[]> {
       source: d.source,
       sourceRef: d.sourceRef,
       notes: d.notes,
+      description: d.description || undefined,
+      instructions: d.instructions || undefined,
       imageUrl: d.imageUrl || undefined,
       autoAdded: d.autoAdded,
     }));
@@ -97,13 +100,15 @@ async function getUpcomingPublicEvents(limit = 4): Promise<CalendarEvent[]> {
 
     const events: CalendarEvent[] = docs.map((d) => ({
       _id: d._id.toString(),
-      title: d.title,
+      title: getEnglishCalendarEventTitle(String(d.title || ""), d.type),
       type: d.type,
       startDate: d.startDate,
       endDate: d.endDate,
       visibility: "public" as const,
       source: d.source,
       notes: d.notes,
+      description: d.description || undefined,
+      instructions: d.instructions || undefined,
       imageUrl: d.imageUrl || undefined,
       autoAdded: d.autoAdded,
     }));

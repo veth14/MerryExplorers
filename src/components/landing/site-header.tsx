@@ -6,6 +6,7 @@ import Image from "next/image";
 import { m, AnimatePresence } from "framer-motion";
 import { NAV_LINKS } from "@/data/landing";
 import { MenuIcon, CloseIcon } from "./icons";
+import { PublicCursor } from "./public-cursor";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -36,12 +37,14 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <m.header
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed top-0 left-0 right-0 z-50 pointer-events-none pt-4 md:pt-6"
-    >
+    <>
+      <PublicCursor />
+      <m.header
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed top-0 left-0 right-0 z-50 pointer-events-none pt-4 md:pt-6"
+      >
       {/* The pill */}
       <m.div
         animate={{
@@ -182,6 +185,7 @@ export function SiteHeader() {
           </div>
         )}
       </AnimatePresence>
-    </m.header>
+      </m.header>
+    </>
   );
 }

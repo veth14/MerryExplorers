@@ -23,6 +23,7 @@ import {
   getManilaDateStr,
   deriveProgramEvents,
   deduplicateCalendarEvents,
+  getEnglishCalendarEventTitle,
 } from "@/lib/calendar-events";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ async function getUpcomingCalendarEvents(): Promise<CalendarEvent[]> {
         : (d.programKey ? [String(d.programKey).trim()] : []);
       return {
         _id: d._id.toString(),
-        title: d.title,
+        title: getEnglishCalendarEventTitle(String(d.title || ""), d.type),
         type: d.type,
         startDate: d.startDate,
         endDate: d.endDate,
@@ -85,6 +86,7 @@ async function getUpcomingCalendarEvents(): Promise<CalendarEvent[]> {
         programKey: pKeys[0] || null,
         programKeys: pKeys,
         description: d.description || undefined,
+        instructions: d.instructions || undefined,
         notes: d.notes || undefined,
         imageUrl: d.imageUrl || undefined,
         autoAdded: d.autoAdded,
