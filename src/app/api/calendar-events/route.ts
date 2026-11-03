@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, notes, imageUrl } = body;
+    const { title, type, startDate, endDate, visibility, description, notes, imageUrl, programKey } = body;
 
     if (!title?.trim() || !type || !startDate || !visibility) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
       endDate: endDate || null,
       visibility,
       source: "manual" as const,
+      programKey: programKey ? String(programKey).trim() : null,
       description: description?.trim() || null,
       notes: notes?.trim() || null,
       imageUrl: imageUrl?.trim() || null,
@@ -182,7 +183,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, notes, hidden, imageUrl } = body;
+    const { title, type, startDate, endDate, visibility, description, notes, hidden, imageUrl, programKey } = body;
 
     const { db } = await connectToDatabase();
 
@@ -203,6 +204,7 @@ export async function PUT(req: NextRequest) {
     if (description !== undefined) update.description = description?.trim() || null;
     if (notes !== undefined) update.notes = notes?.trim() || null;
     if (imageUrl !== undefined) update.imageUrl = imageUrl?.trim() || null;
+    if (programKey !== undefined) update.programKey = programKey ? String(programKey).trim() : null;
     if (hidden !== undefined) update.hidden = hidden;
 
     await db.collection("calendar_events").updateOne(

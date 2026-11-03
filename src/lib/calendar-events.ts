@@ -28,6 +28,7 @@ export interface CalendarEvent {
   visibility: CalendarVisibility;
   source: CalendarSource;
   sourceRef?: string;  // e.g. program key if source==="programs"
+  programKey?: string | null; // Specific program this event applies to (or null for all)
   description?: string; // Public-facing event description shown on landing page & public calendar
   notes?: string;       // Admin-only internal notes
   imageUrl?: string;    // Optional event photo (1080x1080 square or 1920x1080 presentation)

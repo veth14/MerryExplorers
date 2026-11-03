@@ -207,14 +207,15 @@ function MonthGrid({
               <div className="flex flex-col gap-0.5">
                 {dayEvents.slice(0, 3).map((e, i) => {
                   const meta = EVENT_TYPE_META[e.type];
+                  const prog = e.programKey ? PROGRAM_SCHEDULE_CONFIGS[e.programKey] : null;
                   return (
                     <div
                       key={`${e._id}-${i}`}
                       className="truncate text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded-md"
                       style={{ backgroundColor: meta.bg, color: meta.color }}
-                      title={e.title}
+                      title={`${e.title}${prog ? ` (${prog.shortName})` : ""}`}
                     >
-                      {meta.emoji} {e.title}
+                      {prog ? prog.emoji : meta.emoji} {e.title}
                     </div>
                   );
                 })}
@@ -270,6 +271,17 @@ function MonthGrid({
 
 // ─── Event Form Modal ─────────────────────────────────────────────────────────
 
+const PROGRAM_EVENT_OPTIONS: { value: string; label: string; emoji: string }[] = [
+  { value: "", label: "🎒 All Programs (School-Wide)", emoji: "🎒" },
+  { value: "Discovery Club: Curious Explorer", label: "🔎 Curious Explorer (Mon & Wed)", emoji: "🔎" },
+  { value: "Discovery Club: Creative Explorer", label: "🎨 Creative Explorer (Tue, Thu, Fri)", emoji: "🎨" },
+  { value: "Discovery Club: Everyday Explorer", label: "🌈 Everyday Explorer (Mon–Fri)", emoji: "🌈" },
+  { value: "Trailblazer: Brave Explorer", label: "🏕️ Trailblazer: Brave Explorer (Mon–Fri)", emoji: "🏕️" },
+  { value: "Saturday Playdate", label: "🛝 Saturday Playdate (Saturdays)", emoji: "🛝" },
+  { value: "Ballet", label: "🩰 Ballet (Saturdays)", emoji: "🩰" },
+  { value: "Virtual Tutorial", label: "🖥️ Virtual Tutorial (Flexible)", emoji: "🖥️" },
+];
+
 const EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string; emoji: string }[] = [
   { value: "holiday", label: "Holiday", emoji: "🎉" },
   { value: "suspension", label: "Class Suspension", emoji: "🚫" },
@@ -294,6 +306,7 @@ function EventFormModal({
   const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title || "");
   const [type, setType] = useState<CalendarEventType>(initial?.type || "merry_event");
+  const [programKey, setProgramKey] = useState<string>(initial?.programKey || "");
   const [startDate, setStartDate] = useState(initial?.startDate || initial?.defaultDate || "");
   const [endDate, setEndDate] = useState(initial?.endDate || "");
   const [visibility, setVisibility] = useState<CalendarVisibility>(initial?.visibility || "public");
@@ -366,6 +379,7 @@ function EventFormModal({
       startDate,
       endDate: endDate || undefined,
       visibility,
+      programKey: programKey ? programKey : null,
       description: description.trim() || undefined,
       notes: notes.trim() || undefined,
       imageUrl: imageUrl.trim() || undefined,
@@ -453,6 +467,37 @@ function EventFormModal({
                   );
                 })}
               </div>
+            </div>
+
+            {/* Applicable Program Dropdown */}
+            <div className="pt-2 border-t border-[#edf2f7]">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#002f76]">
+                  Applicable Program <span className="font-normal text-[#64748b] normal-case tracking-normal">(optional)</span>
+                </label>
+                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
+                  {programKey ? "🎯 Program-Specific" : "🏫 School-Wide"}
+                </span>
+              </div>
+              <div className="relative">
+                <select
+                  value={programKey}
+                  onChange={(e) => setProgramKey(e.target.value)}
+                  className="w-full rounded-2xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-3 text-[13.5px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all shadow-xs appearance-none cursor-pointer pr-10"
+                >
+                  {PROGRAM_EVENT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[#002f76] text-xs font-black">
+                  ▼
+                </div>
+              </div>
+              <p className="text-[10.5px] text-[#9aa3b2] mt-1">
+                Choose a program if this event or activity applies specifically to one group (e.g. Curious Explorer).
+              </p>
             </div>
           </div>
 
@@ -887,7 +932,12 @@ function DayDrawer({
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-1 shrink-0">
+                    <div className="flex gap-1.5 items-center flex-wrap shrink-0">
+                      {e.programKey && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]">
+                          {PROGRAM_SCHEDULE_CONFIGS[e.programKey]?.emoji || "🎒"} {PROGRAM_SCHEDULE_CONFIGS[e.programKey]?.shortName || e.programKey}
+                        </span>
+                      )}
                       <TypeChip type={e.type} />
                     </div>
                   </div>
