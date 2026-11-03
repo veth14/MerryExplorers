@@ -29,6 +29,7 @@ export interface CalendarEvent {
   source: CalendarSource;
   sourceRef?: string;  // e.g. program key if source==="programs"
   programKey?: string | null; // Specific program this event applies to (or null for all)
+  programKeys?: string[];     // Specific programs this event applies to (empty/omitted = playgroup-wide)
   description?: string; // Public-facing event description shown on landing page & public calendar
   notes?: string;       // Admin-only internal notes
   imageUrl?: string;    // Optional event photo (1080x1080 square or 1920x1080 presentation)
@@ -472,3 +473,17 @@ export function openCalendarEvent(event: CalendarEvent): void {
   window.open(buildGoogleCalendarUrl(event), "_blank", "noopener,noreferrer");
 }
 
+
+/**
+ * Returns all assigned program keys for an event, normalizing both programKeys and legacy programKey.
+ * Returns an empty array if the event is Playgroup-Wide.
+ */
+export function getEventProgramKeys(e: { programKeys?: string[]; programKey?: string | null }): string[] {
+  if (Array.isArray(e.programKeys) && e.programKeys.length > 0) {
+    return e.programKeys.filter(Boolean);
+  }
+  if (e.programKey && typeof e.programKey === "string" && e.programKey.trim()) {
+    return [e.programKey.trim()];
+  }
+  return [];
+}

@@ -53,24 +53,31 @@ export async function GET(req: NextRequest) {
       .limit(limit)
       .toArray();
 
-    const events: CalendarEvent[] = docs.map((d) => ({
-      _id: d._id.toString(),
-      title: d.title,
-      type: d.type,
-      startDate: d.startDate,
-      endDate: d.endDate,
-      visibility: d.visibility,
-      source: d.source,
-      sourceRef: d.sourceRef,
-      description: d.description || undefined,
-      notes: d.notes,
-      imageUrl: d.imageUrl || undefined,
-      autoAdded: d.autoAdded,
-      hidden: d.hidden,
-      createdBy: d.createdBy,
-      updatedBy: d.updatedBy,
-      updatedAt: d.updatedAt,
-    }));
+    const events: CalendarEvent[] = docs.map((d) => {
+      const pKeys = Array.isArray(d.programKeys)
+        ? d.programKeys.map((k) => String(k).trim()).filter(Boolean)
+        : (d.programKey ? [String(d.programKey).trim()] : []);
+      return {
+        _id: d._id.toString(),
+        title: d.title,
+        type: d.type,
+        startDate: d.startDate,
+        endDate: d.endDate,
+        visibility: d.visibility,
+        source: d.source,
+        sourceRef: d.sourceRef,
+        programKey: pKeys[0] || null,
+        programKeys: pKeys,
+        description: d.description || undefined,
+        notes: d.notes,
+        imageUrl: d.imageUrl || undefined,
+        autoAdded: d.autoAdded,
+        hidden: d.hidden,
+        createdBy: d.createdBy,
+        updatedBy: d.updatedBy,
+        updatedAt: d.updatedAt,
+      };
+    });
 
     let programEvents: CalendarEvent[] = [];
     if (includePrograms) {
@@ -119,7 +126,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, notes, imageUrl, programKey } = body;
+    const { title, type, startDate, endDate, visibility, description, notes, imageUrl, programKey, programKeys } = body;
 
     if (!title?.trim() || !type || !startDate || !visibility) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -134,6 +141,13 @@ export async function POST(req: NextRequest) {
     const { db } = await connectToDatabase();
     const now = new Date().toISOString();
 
+    const rawKeys = Array.isArray(programKeys)
+      ? programKeys
+      : (programKey ? [programKey] : []);
+    const normalizedProgramKeys = Array.from(
+      new Set(rawKeys.map((k) => String(k).trim()).filter(Boolean))
+    );
+
     const doc = {
       title: title.trim(),
       type,
@@ -141,7 +155,8 @@ export async function POST(req: NextRequest) {
       endDate: endDate || null,
       visibility,
       source: "manual" as const,
-      programKey: programKey ? String(programKey).trim() : null,
+      programKey: normalizedProgramKeys[0] || null,
+      programKeys: normalizedProgramKeys,
       description: description?.trim() || null,
       notes: notes?.trim() || null,
       imageUrl: imageUrl?.trim() || null,
@@ -183,7 +198,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const body = await req.json();
-    const { title, type, startDate, endDate, visibility, description, notes, hidden, imageUrl, programKey } = body;
+    const { title, type, startDate, endDate, visibility, description, notes, hidden, imageUrl, programKey, programKeys } = body;
 
     const { db } = await connectToDatabase();
 
@@ -204,7 +219,16 @@ export async function PUT(req: NextRequest) {
     if (description !== undefined) update.description = description?.trim() || null;
     if (notes !== undefined) update.notes = notes?.trim() || null;
     if (imageUrl !== undefined) update.imageUrl = imageUrl?.trim() || null;
-    if (programKey !== undefined) update.programKey = programKey ? String(programKey).trim() : null;
+    if (programKeys !== undefined || programKey !== undefined) {
+      const rawKeys = Array.isArray(programKeys)
+        ? programKeys
+        : (programKey ? [programKey] : []);
+      const normalizedProgramKeys = Array.from(
+        new Set(rawKeys.map((k) => String(k).trim()).filter(Boolean))
+      );
+      update.programKeys = normalizedProgramKeys;
+      update.programKey = normalizedProgramKeys[0] || null;
+    }
     if (hidden !== undefined) update.hidden = hidden;
 
     await db.collection("calendar_events").updateOne(

@@ -207,15 +207,22 @@ function MonthGrid({
               <div className="flex flex-col gap-0.5">
                 {dayEvents.slice(0, 3).map((e, i) => {
                   const meta = EVENT_TYPE_META[e.type];
-                  const prog = e.programKey ? PROGRAM_SCHEDULE_CONFIGS[e.programKey] : null;
+                  const pKeys = (Array.isArray(e.programKeys) && e.programKeys.length > 0)
+                    ? e.programKeys
+                    : (e.programKey ? [e.programKey] : []);
+                  const progConfigs = pKeys.map((k) => PROGRAM_SCHEDULE_CONFIGS[k]).filter(Boolean);
+                  const emojis = progConfigs.map((c) => c.emoji);
+                  const displayEmoji = emojis.length > 0 ? emojis.join("") : meta.emoji;
+                  const progNames = progConfigs.map((c) => c.shortName);
+                  const progSuffix = progNames.length > 0 ? ` (${progNames.join(", ")})` : "";
                   return (
                     <div
                       key={`${e._id}-${i}`}
                       className="truncate text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded-md"
                       style={{ backgroundColor: meta.bg, color: meta.color }}
-                      title={`${e.title}${prog ? ` (${prog.shortName})` : ""}`}
+                      title={`${e.title}${progSuffix}`}
                     >
-                      {prog ? prog.emoji : meta.emoji} {e.title}
+                      {displayEmoji} {e.title}
                     </div>
                   );
                 })}
@@ -271,15 +278,19 @@ function MonthGrid({
 
 // ─── Event Form Modal ─────────────────────────────────────────────────────────
 
-const PROGRAM_EVENT_OPTIONS: { value: string; label: string; emoji: string }[] = [
+const AVAILABLE_PROGRAMS: { value: string; label: string; short: string; emoji: string; schedule: string }[] = [
+  { value: "Discovery Club: Curious Explorer", label: "Curious Explorer", short: "Curious", emoji: "🔎", schedule: "Mon & Wed" },
+  { value: "Discovery Club: Creative Explorer", label: "Creative Explorer", short: "Creative", emoji: "🎨", schedule: "Tue, Thu, Fri" },
+  { value: "Discovery Club: Everyday Explorer", label: "Everyday Explorer", short: "Everyday", emoji: "🌈", schedule: "Mon–Fri" },
+  { value: "Trailblazer: Brave Explorer", label: "Trailblazer: Brave Explorer", short: "Trailblazer", emoji: "🏕️", schedule: "Mon–Fri" },
+  { value: "Saturday Playdate", label: "Saturday Playdate", short: "Playdate", emoji: "🛝", schedule: "Saturdays" },
+  { value: "Ballet", label: "Ballet", short: "Ballet", emoji: "🩰", schedule: "Saturdays" },
+  { value: "Virtual Tutorial", label: "Virtual Tutorial", short: "Virtual", emoji: "💻", schedule: "Flexible" },
+];
+
+const PROGRAM_EVENT_OPTIONS = [
   { value: "", label: "🎈 All Programs (Playgroup-Wide)", emoji: "🎒" },
-  { value: "Discovery Club: Curious Explorer", label: "🔎 Curious Explorer (Mon & Wed)", emoji: "🔎" },
-  { value: "Discovery Club: Creative Explorer", label: "🎨 Creative Explorer (Tue, Thu, Fri)", emoji: "🎨" },
-  { value: "Discovery Club: Everyday Explorer", label: "🌈 Everyday Explorer (Mon–Fri)", emoji: "🌈" },
-  { value: "Trailblazer: Brave Explorer", label: "🏕️ Trailblazer: Brave Explorer (Mon–Fri)", emoji: "🏕️" },
-  { value: "Saturday Playdate", label: "🛝 Saturday Playdate (Saturdays)", emoji: "🛝" },
-  { value: "Ballet", label: "🩰 Ballet (Saturdays)", emoji: "🩰" },
-  { value: "Virtual Tutorial", label: "🖥️ Virtual Tutorial (Flexible)", emoji: "🖥️" },
+  ...AVAILABLE_PROGRAMS.map((p) => ({ value: p.value, label: `${p.emoji} ${p.label} (${p.schedule})`, emoji: p.emoji })),
 ];
 
 const EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string; emoji: string }[] = [
@@ -306,7 +317,47 @@ function EventFormModal({
   const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title || "");
   const [type, setType] = useState<CalendarEventType>(initial?.type || "merry_event");
-  const [programKey, setProgramKey] = useState<string>(initial?.programKey || "");
+  const initialKeys = useMemo(() => {
+    if (Array.isArray(initial?.programKeys) && initial.programKeys.length > 0) {
+      return initial.programKeys.filter(Boolean);
+    }
+    if (initial?.programKey && typeof initial.programKey === "string" && initial.programKey.trim()) {
+      return [initial.programKey.trim()];
+    }
+    return [];
+  }, [initial]);
+  const [programKeys, setProgramKeys] = useState<string[]>(initialKeys);
+  const [isProgramDropdownOpen, setIsProgramDropdownOpen] = useState(false);
+  const programDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (programDropdownRef.current && !programDropdownRef.current.contains(event.target as Node)) {
+        setIsProgramDropdownOpen(false);
+      }
+    }
+    if (isProgramDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isProgramDropdownOpen]);
+
+  const toggleProgram = (progValue: string) => {
+    if (programKeys.includes(progValue)) {
+      setProgramKeys(programKeys.filter((k) => k !== progValue));
+    } else {
+      setProgramKeys([...programKeys, progValue]);
+    }
+  };
+
+  const selectAllPrograms = () => {
+    setProgramKeys(AVAILABLE_PROGRAMS.map((p) => p.value));
+  };
+
+  const resetToPlaygroupWide = () => {
+    setProgramKeys([]);
+  };
+
   const [startDate, setStartDate] = useState(initial?.startDate || initial?.defaultDate || "");
   const [endDate, setEndDate] = useState(initial?.endDate || "");
   const [visibility, setVisibility] = useState<CalendarVisibility>(initial?.visibility || "public");
@@ -379,7 +430,8 @@ function EventFormModal({
       startDate,
       endDate: endDate || undefined,
       visibility,
-      programKey: programKey ? programKey : null,
+      programKeys: programKeys.length > 0 ? programKeys : [],
+      programKey: programKeys.length > 0 ? programKeys[0] : null,
       description: description.trim() || undefined,
       notes: notes.trim() || undefined,
       imageUrl: imageUrl.trim() || undefined,
@@ -469,35 +521,213 @@ function EventFormModal({
               </div>
             </div>
 
-            {/* Applicable Program Dropdown */}
-            <div className="pt-2 border-t border-[#edf2f7]">
+            {/* Applicable Programs Multi-Select */}
+            <div className="pt-2 border-t border-[#edf2f7]" ref={programDropdownRef}>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-[11px] font-extrabold uppercase tracking-widest text-[#002f76]">
-                  Applicable Program <span className="font-normal text-[#64748b] normal-case tracking-normal">(optional)</span>
+                  Applicable Programs <span className="font-normal text-[#64748b] normal-case tracking-normal">(optional)</span>
                 </label>
-                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
-                  {programKey ? "🎯 Program-Specific" : "🎈 Playgroup-Wide"}
+                <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
+                  programKeys.length === 0
+                    ? "bg-slate-50 text-slate-600 border-slate-200"
+                    : "bg-[#eef4ff] text-[#0033a0] border-[#c7d8f0]"
+                }`}>
+                  {programKeys.length === 0
+                    ? "🎈 Playgroup-Wide"
+                    : programKeys.length === 1
+                    ? "🎯 1 Program Selected"
+                    : `🎯 ${programKeys.length} Programs Selected`}
                 </span>
               </div>
+
+              {/* Multi-Select Trigger Button */}
               <div className="relative">
-                <select
-                  value={programKey}
-                  onChange={(e) => setProgramKey(e.target.value)}
-                  className="w-full rounded-2xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-3 text-[13.5px] font-bold text-[#002f76] outline-none focus:border-[#0050d5] focus:bg-white transition-all shadow-xs appearance-none cursor-pointer pr-10"
+                <button
+                  type="button"
+                  onClick={() => setIsProgramDropdownOpen(!isProgramDropdownOpen)}
+                  className="w-full rounded-2xl border-2 border-[#e2e8f0] bg-[#f8faff] px-4 py-3 text-[13px] font-bold text-[#002f76] outline-none hover:border-[#c7d8f0] focus:border-[#0050d5] focus:bg-white transition-all shadow-xs flex items-center justify-between cursor-pointer text-left"
                 >
-                  {PROGRAM_EVENT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[#002f76] text-xs font-black">
-                  ▼
-                </div>
+                  <div className="flex items-center gap-2 truncate pr-2">
+                    {programKeys.length === 0 ? (
+                      <span className="flex items-center gap-2 text-[#002f76]">
+                        <span className="text-base">🎈</span>
+                        <span>All Programs (Playgroup-Wide)</span>
+                      </span>
+                    ) : programKeys.length === 1 ? (
+                      (() => {
+                        const p = AVAILABLE_PROGRAMS.find((o) => o.value === programKeys[0]);
+                        return (
+                          <span className="flex items-center gap-2 text-[#002f76] truncate">
+                            <span className="text-base">{p?.emoji || "🎯"}</span>
+                            <span className="truncate">{p?.label || programKeys[0]} ({p?.schedule})</span>
+                          </span>
+                        );
+                      })()
+                    ) : (
+                      <span className="flex items-center gap-2 text-[#002f76] truncate">
+                        <span className="text-base shrink-0">
+                          {programKeys.map((k) => AVAILABLE_PROGRAMS.find((p) => p.value === k)?.emoji || "🎯").slice(0, 4).join(" ")}
+                          {programKeys.length > 4 ? "..." : ""}
+                        </span>
+                        <span className="font-black text-[#0050d5] shrink-0">
+                          {programKeys.length} programs selected
+                        </span>
+                        <span className="text-slate-400 font-normal text-xs truncate">
+                          ({programKeys.map((k) => AVAILABLE_PROGRAMS.find((p) => p.value === k)?.short || k).join(", ")})
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[#002f76] text-xs font-black shrink-0 ml-2">
+                    {isProgramDropdownOpen ? "▲" : "▼"}
+                  </div>
+                </button>
+
+                {/* Dropdown Menu (Multi-select popup) */}
+                {isProgramDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border-2 border-[#c7d8f0] shadow-2xl p-2.5 max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150">
+                    {/* Option: Playgroup-Wide */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetToPlaygroupWide();
+                        setIsProgramDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                        programKeys.length === 0
+                          ? "bg-[#eef4ff] text-[#002f76] font-black border border-[#c7d8f0]"
+                          : "hover:bg-slate-50 text-[#5a6e8c] font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-base">🎈</span>
+                        <div>
+                          <div className="text-[12.5px] leading-tight font-black text-[#002f76]">
+                            All Programs (Playgroup-Wide)
+                          </div>
+                          <div className="text-[10px] text-[#8ca0ba] font-medium">
+                            Applies center-wide to all children &amp; programs
+                          </div>
+                        </div>
+                      </div>
+                      {programKeys.length === 0 && (
+                        <span className="w-5 h-5 rounded-full bg-[#0050d5] text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Quick Action Bar */}
+                    <div className="flex items-center justify-between px-2 pt-2.5 pb-1 border-t border-[#edf2f7] mt-1.5">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#8ca0ba]">
+                        Select specific programs ({programKeys.length}/7):
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={selectAllPrograms}
+                          className="text-[10.5px] font-bold text-[#0050d5] hover:underline cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-[#cbd5e1] text-[10px]">·</span>
+                        <button
+                          type="button"
+                          onClick={resetToPlaygroupWide}
+                          className="text-[10.5px] font-bold text-[#64748b] hover:text-red-500 hover:underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Checkbox Rows */}
+                    <div className="space-y-1">
+                      {AVAILABLE_PROGRAMS.map((prog) => {
+                        const isChecked = programKeys.includes(prog.value);
+                        return (
+                          <button
+                            key={prog.value}
+                            type="button"
+                            onClick={() => toggleProgram(prog.value)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all cursor-pointer ${
+                              isChecked
+                                ? "bg-[#f0f7ff] text-[#002f76] font-bold border border-[#bae0fd]"
+                                : "hover:bg-slate-50 text-[#475569] font-medium"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                  isChecked
+                                    ? "bg-[#0050d5] border-[#0050d5] text-white"
+                                    : "border-[#cbd5e1] bg-white"
+                                }`}
+                              >
+                                {isChecked && <span className="text-[10px] font-black leading-none">✓</span>}
+                              </div>
+                              <span className="text-base shrink-0">{prog.emoji}</span>
+                              <div className="truncate">
+                                <span className="text-[12px] font-bold text-[#002f76] mr-1.5">{prog.label}</span>
+                                <span className="text-[10.5px] text-[#64748b] font-medium">({prog.schedule})</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Done button footer */}
+                    <div className="pt-2 border-t border-[#edf2f7] mt-1.5 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsProgramDropdownOpen(false)}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#0050d5] hover:bg-[#003ea8] text-white text-[11.5px] font-bold shadow-xs cursor-pointer"
+                      >
+                        ✓ Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="text-[10.5px] text-[#9aa3b2] mt-1">
-                Choose a program if this event or activity applies specifically to one group (e.g. Curious Explorer).
-              </p>
+
+              {/* Active Program Pills with remove button */}
+              {programKeys.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] font-extrabold text-[#8ca0ba] uppercase tracking-wider">Active:</span>
+                  {programKeys.map((pk) => {
+                    const prog = AVAILABLE_PROGRAMS.find((p) => p.value === pk);
+                    return (
+                      <span
+                        key={pk}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border bg-[#eef4ff] text-[#002f76] border-[#c7d8f0] shadow-xs"
+                      >
+                        <span>{prog?.emoji || "🎒"}</span>
+                        <span>{prog?.short || pk}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleProgram(pk)}
+                          className="w-3.5 h-3.5 rounded-full hover:bg-[#d6e7ff] text-[#0050d5] flex items-center justify-center font-black text-xs leading-none transition-colors ml-0.5 cursor-pointer"
+                          title="Remove this program"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={resetToPlaygroupWide}
+                    className="text-[10.5px] font-bold text-[#64748b] hover:text-red-500 underline ml-1 cursor-pointer"
+                  >
+                    Reset to Playgroup-Wide
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[10.5px] text-[#9aa3b2] mt-1">
+                  Applies to the entire playgroup. Click above to select one or multiple specific programs.
+                </p>
+              )}
             </div>
           </div>
 
@@ -933,11 +1163,20 @@ function DayDrawer({
                       )}
                     </div>
                     <div className="flex gap-1.5 items-center flex-wrap shrink-0">
-                      {e.programKey && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]">
-                          {PROGRAM_SCHEDULE_CONFIGS[e.programKey]?.emoji || "🎒"} {PROGRAM_SCHEDULE_CONFIGS[e.programKey]?.shortName || e.programKey}
-                        </span>
-                      )}
+                      {(() => {
+                        const pKeys = (Array.isArray(e.programKeys) && e.programKeys.length > 0)
+                          ? e.programKeys
+                          : (e.programKey ? [e.programKey] : []);
+                        if (pKeys.length === 0) return null;
+                        return pKeys.map((k) => (
+                          <span
+                            key={k}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]"
+                          >
+                            {PROGRAM_SCHEDULE_CONFIGS[k]?.emoji || "🎒"} {PROGRAM_SCHEDULE_CONFIGS[k]?.shortName || k}
+                          </span>
+                        ));
+                      })()}
                       <TypeChip type={e.type} />
                     </div>
                   </div>

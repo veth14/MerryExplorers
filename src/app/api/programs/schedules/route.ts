@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import {
-  getAllProgramsSchedules,
+  generateProgramSchedule,
+  PROGRAM_SCHEDULE_CONFIGS,
+  PROGRAM_KEYS_LIST,
   buildSessionsByDateMap,
   buildSkippedDatesByDateMap,
   getManilaTodayStr,
+  ProgramScheduleResult,
 } from "@/lib/program-sessions";
 
 export const dynamic = "force-dynamic";
@@ -47,36 +50,71 @@ export async function GET(req: NextRequest) {
 
     // 4. Build lookup maps
     const holidaysMap = new Map<string, string>();
-    const suspensionsMap = new Map<string, string>();
 
     for (const item of calHolidaysAndSuspensions) {
       if (item.type === "holiday" && item.startDate) {
         holidaysMap.set(item.startDate, item.title || "Holiday");
-      } else if (item.type === "suspension" && item.startDate) {
-        suspensionsMap.set(item.startDate, item.title || "Class Suspended");
       }
     }
 
     for (const item of attendanceSuspendedDays) {
-      if (item.dateStr) {
-        if (item.type === "holiday") {
-          if (!holidaysMap.has(item.dateStr)) {
-            holidaysMap.set(item.dateStr, item.reason || "Holiday");
+      if (item.dateStr && item.type === "holiday" && !holidaysMap.has(item.dateStr)) {
+        holidaysMap.set(item.dateStr, item.reason || "Holiday");
+      }
+    }
+
+    const allSuspensionDates = new Set<string>();
+    for (const item of calHolidaysAndSuspensions) {
+      if (item.type === "suspension" && item.startDate) {
+        allSuspensionDates.add(item.startDate);
+      }
+    }
+    for (const item of attendanceSuspendedDays) {
+      if (item.dateStr && item.type !== "holiday") {
+        allSuspensionDates.add(item.dateStr);
+      }
+    }
+
+    // Helper to get suspensions for a specific program (program-specific or playgroup-wide)
+    function getProgramSuspensions(progKey: string): Map<string, string> {
+      const sMap = new Map<string, string>();
+      for (const item of calHolidaysAndSuspensions) {
+        if (item.type === "suspension" && item.startDate) {
+          const pKeys = Array.isArray(item.programKeys) && item.programKeys.length > 0
+            ? item.programKeys
+            : (item.programKey ? [item.programKey] : []);
+          if (pKeys.length === 0 || pKeys.includes(progKey)) {
+            sMap.set(item.startDate, item.title || "Class Suspended");
           }
-        } else {
-          suspensionsMap.set(item.dateStr, item.reason || "Class Suspended");
         }
       }
+      for (const item of attendanceSuspendedDays) {
+        if (item.dateStr && item.type !== "holiday") {
+          sMap.set(item.dateStr, item.reason || "Class Suspended");
+        }
+      }
+      return sMap;
     }
 
     const todayStr = getManilaTodayStr();
 
-    // 5. Generate all program schedules
-    const allSchedules = getAllProgramsSchedules({
-      programs: rawPrograms,
-      holidaysMap,
-      suspensionsMap,
-      todayStr,
+    // 5. Generate all program schedules with program-aware suspensions
+    const programList = rawPrograms && rawPrograms.length > 0
+      ? rawPrograms
+      : PROGRAM_KEYS_LIST.map((key) => ({ programKey: key }));
+
+    const allSchedules: ProgramScheduleResult[] = programList.map((p: any) => {
+      const config = PROGRAM_SCHEDULE_CONFIGS[p.programKey];
+      const currentAdv = Number(p.currentAdventure) || 2;
+      return generateProgramSchedule({
+        programKey: p.programKey,
+        adventureNumber: currentAdv,
+        startDateStr: p.adventureStartDate,
+        totalSessions: config?.defaultSessions ?? 8,
+        holidaysMap,
+        suspensionsMap: getProgramSuspensions(p.programKey),
+        todayStr,
+      });
     });
 
     const schedules = filterProgramKey
@@ -101,7 +139,7 @@ export async function GET(req: NextRequest) {
       byDate,
       skippedByDate,
       holidaysCount: holidaysMap.size,
-      suspensionsCount: suspensionsMap.size,
+      suspensionsCount: allSuspensionDates.size,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to load program schedules";

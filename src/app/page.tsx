@@ -70,19 +70,26 @@ async function getUpcomingCalendarEvents(): Promise<CalendarEvent[]> {
       .limit(6)
       .toArray();
 
-    const events: CalendarEvent[] = docs.map((d) => ({
-      _id: d._id.toString(),
-      title: d.title,
-      type: d.type,
-      startDate: d.startDate,
-      endDate: d.endDate,
-      visibility: "public" as const,
-      source: d.source,
-      description: d.description || undefined,
-      notes: d.notes || undefined,
-      imageUrl: d.imageUrl || undefined,
-      autoAdded: d.autoAdded,
-    }));
+    const events: CalendarEvent[] = docs.map((d) => {
+      const pKeys = Array.isArray(d.programKeys)
+        ? d.programKeys.map((k) => String(k).trim()).filter(Boolean)
+        : (d.programKey ? [String(d.programKey).trim()] : []);
+      return {
+        _id: d._id.toString(),
+        title: d.title,
+        type: d.type,
+        startDate: d.startDate,
+        endDate: d.endDate,
+        visibility: "public" as const,
+        source: d.source,
+        programKey: pKeys[0] || null,
+        programKeys: pKeys,
+        description: d.description || undefined,
+        notes: d.notes || undefined,
+        imageUrl: d.imageUrl || undefined,
+        autoAdded: d.autoAdded,
+      };
+    });
 
     // Merge live program events
     try {

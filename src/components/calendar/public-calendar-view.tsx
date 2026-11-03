@@ -13,6 +13,7 @@ import {
   deduplicateCalendarEvents,
   openCalendarEvent,
 } from "@/lib/calendar-events";
+import { PROGRAM_SCHEDULE_CONFIGS } from "@/lib/program-sessions";
 
 interface PublicCalendarViewProps {
   initialMonth: string; // "YYYY-MM"
@@ -549,6 +550,15 @@ export function PublicCalendarView({
                           bg: "#eef4ff",
                           emoji: "📅",
                         };
+                        const pKeys = (Array.isArray(e.programKeys) && e.programKeys.length > 0)
+                          ? e.programKeys
+                          : (e.programKey ? [e.programKey] : []);
+                        const progConfigs = pKeys.map((k) => PROGRAM_SCHEDULE_CONFIGS[k]).filter(Boolean);
+                        const progEmojis = progConfigs.map((c) => c.emoji);
+                        const displayEmoji = progEmojis.length > 0 ? progEmojis.join("") : meta.emoji;
+                        const progNames = progConfigs.map((c) => c.shortName);
+                        const progSuffix = progNames.length > 0 ? ` (${progNames.join(", ")})` : "";
+
                         return (
                           <div
                             key={`${e._id}-${i}`}
@@ -558,9 +568,9 @@ export function PublicCalendarView({
                               color: meta.color,
                               borderColor: `${meta.color}25`,
                             }}
-                            title={e.title}
+                            title={`${e.title}${progSuffix}`}
                           >
-                            <span className="mr-0.5">{meta.emoji}</span> {e.title}
+                            <span className="mr-0.5">{displayEmoji}</span> {e.title}
                           </div>
                         );
                       })}
@@ -688,16 +698,34 @@ export function PublicCalendarView({
                               <h4 className="font-fredoka text-[16px] font-bold text-[#002f76] leading-snug">
                                 {e.title}
                               </h4>
-                              <span
-                                className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
-                                style={{
-                                  color: meta.color,
-                                  backgroundColor: meta.bg,
-                                  borderColor: meta.border,
-                                }}
-                              >
-                                {meta.emoji} {meta.label}
-                              </span>
+                              <div className="flex flex-wrap gap-1.5 items-center mt-1">
+                                <span
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                                  style={{
+                                    color: meta.color,
+                                    backgroundColor: meta.bg,
+                                    borderColor: meta.border,
+                                  }}
+                                >
+                                  {meta.emoji} {meta.label}
+                                </span>
+                                {(() => {
+                                  const pKeys = (Array.isArray(e.programKeys) && e.programKeys.length > 0)
+                                    ? e.programKeys
+                                    : (e.programKey ? [e.programKey] : []);
+                                  return pKeys.map((k) => {
+                                    const cfg = PROGRAM_SCHEDULE_CONFIGS[k];
+                                    return (
+                                      <span
+                                        key={k}
+                                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border bg-[#f0f5ff] text-[#0033a0] border-[#c7d8f0]"
+                                      >
+                                        {cfg?.emoji || "🎒"} {cfg?.shortName || k}
+                                      </span>
+                                    );
+                                  });
+                                })()}
+                              </div>
                             </div>
                           </div>
                         {e.imageUrl && (
