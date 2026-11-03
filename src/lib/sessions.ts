@@ -125,7 +125,7 @@ export interface CalendarSessionProgress {
 }
 
 /**
- * Calculates accurate session progress directly from the official school calendar.
+ * Calculates accurate session progress directly from the official playgroup calendar.
  * Automatically respects:
  * - Holidays and Class Suspensions (already factored into programSchedule.sessions)
  * - Program-specific meeting days (Mon/Wed for Curious, Tue/Thu/Fri for Creative, etc.)

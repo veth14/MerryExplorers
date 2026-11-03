@@ -290,7 +290,7 @@ export function PublicCalendarView({
 
           {/* Friendly Subtitle */}
           <p className="text-[15px] sm:text-[17px] text-[#4a5f82] max-w-2xl mx-auto font-medium leading-relaxed">
-            Keep track of upcoming adventure start dates, public registration openings, renewal windows, and Philippine school holidays — all in one joyful place.
+            Keep track of upcoming adventure start dates, public registration openings, renewal windows, and Philippine holidays — all in one joyful place.
           </p>
 
           {/* Action CTAs */}
@@ -859,7 +859,7 @@ export function PublicCalendarView({
             Sync Directly to Your Phone
           </h3>
           <p className="text-[13px] text-blue-100 max-w-md">
-            Subscribe once and automatically see school events, adventure start dates, and holiday closures in Apple Calendar, Google Calendar, or Outlook.
+            Subscribe once and automatically see playgroup events, adventure start dates, and holiday closures in Apple Calendar, Google Calendar, or Outlook.
           </p>
         </div>
 

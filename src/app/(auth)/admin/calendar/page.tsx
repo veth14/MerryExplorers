@@ -17,7 +17,7 @@ import {
   ProgramSessionItem,
 } from "@/lib/program-sessions";
 
-// Programs shown as session chips on the School Calendar grid (subset only)
+// Programs shown as session chips on the Playgroup Calendar grid (subset only)
 const SESSION_CHIP_KEYS = new Set([
   "Discovery Club: Curious Explorer",
   "Discovery Club: Creative Explorer",
@@ -272,7 +272,7 @@ function MonthGrid({
 // ─── Event Form Modal ─────────────────────────────────────────────────────────
 
 const PROGRAM_EVENT_OPTIONS: { value: string; label: string; emoji: string }[] = [
-  { value: "", label: "🎒 All Programs (School-Wide)", emoji: "🎒" },
+  { value: "", label: "🎈 All Programs (Playgroup-Wide)", emoji: "🎒" },
   { value: "Discovery Club: Curious Explorer", label: "🔎 Curious Explorer (Mon & Wed)", emoji: "🔎" },
   { value: "Discovery Club: Creative Explorer", label: "🎨 Creative Explorer (Tue, Thu, Fri)", emoji: "🎨" },
   { value: "Discovery Club: Everyday Explorer", label: "🌈 Everyday Explorer (Mon–Fri)", emoji: "🌈" },
@@ -476,7 +476,7 @@ function EventFormModal({
                   Applicable Program <span className="font-normal text-[#64748b] normal-case tracking-normal">(optional)</span>
                 </label>
                 <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
-                  {programKey ? "🎯 Program-Specific" : "🏫 School-Wide"}
+                  {programKey ? "🎯 Program-Specific" : "🎈 Playgroup-Wide"}
                 </span>
               </div>
               <div className="relative">
@@ -1368,7 +1368,7 @@ export default function AdminAdventureCalendarPage() {
                   : "bg-transparent text-[#5a6e8c] hover:bg-[#f0f4f9]"
               }`}
             >
-              <span>🗓️</span> School Calendar
+              <span>🗓️</span> Playgroup Calendar
             </button>
             <button
               onClick={() => setCalendarTab("programs")}
@@ -1389,7 +1389,7 @@ export default function AdminAdventureCalendarPage() {
 
           <div className="text-[12px] font-bold text-[#5a6e8c] px-3">
             {calendarTab === "school"
-              ? "General school events, holidays & suspensions"
+              ? "Playgroup events, holidays & center closures"
               : "Session dates, adventure start/end & automatic holiday skip"}
           </div>
         </div>
