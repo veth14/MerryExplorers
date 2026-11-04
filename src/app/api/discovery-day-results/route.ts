@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { parentName, email, childName, childAge, scores, finalProgram, attempted, answers } = data;
+    const { parentName, email, facebook, childName, childAge, scores, finalProgram, attempted, answers } = data;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     const newResult = {
       parentName: parentName || "Parent",
       email,
+      facebook: typeof facebook === "string" ? facebook.trim().slice(0, 300) : "",
       childName: childName || "",
       childAge: childAge || "",
       scores,
@@ -267,6 +268,7 @@ export async function GET(request: Request) {
       id: r._id.toString(),
       parentName: r.parentName,
       email: r.email,
+      facebook: r.facebook || "",
       childName: r.childName || "",
       childAge: r.childAge || "",
       scores: r.scores,

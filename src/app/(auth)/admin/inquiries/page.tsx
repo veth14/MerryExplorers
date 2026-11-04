@@ -23,6 +23,7 @@ type Inquiry = {
   parentName: string;
   email: string;
   phone: string;
+  facebook?: string;
   childName: string;
   childAge: string;
   message: string;
@@ -79,6 +80,19 @@ function formatDate(dateStr: string) {
 function formatTime(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function getFacebookUrl(value: string) {
+  const candidate = value.trim();
+  if (!/^https?:\/\//i.test(candidate)) return null;
+  try {
+    const url = new URL(candidate);
+    return /(^|\.)facebook\.com$/i.test(url.hostname) || /(^|\.)fb\.com$/i.test(url.hostname) || url.hostname.toLowerCase() === "fb.me"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Build a unified, sorted thread from the new thread[] and legacy replies[] */
@@ -307,12 +321,14 @@ export default function InquiriesPage() {
 
 
   const handleExport = () => {
-    const headers = ["Name", "Email", "Phone", "Child Name", "Child Age", "Status", "Message", "Date"];
+    const headers = ["Name", "Email", "Phone", "Facebook", "Child Name", "Child Age", "Status", "Message", "Date"];
     const rows = filtered.map((inq) => [
-      inq.parentName, inq.email, inq.phone, inq.childName, inq.childAge,
-      inq.status, `"${inq.message.replace(/"/g, '""')}"`, formatDate(inq.createdAt),
+      inq.parentName, inq.email, inq.phone, inq.facebook || "", inq.childName, inq.childAge,
+      inq.status, inq.message, formatDate(inq.createdAt),
     ]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -325,7 +341,7 @@ export default function InquiriesPage() {
   const filtered = inquiries.filter((inq) => {
     const matchStatus = filterStatus === "All" || inq.status === filterStatus;
     const q = search.toLowerCase();
-    const matchSearch = !q || inq.parentName.toLowerCase().includes(q) || inq.email.toLowerCase().includes(q) || inq.childName?.toLowerCase().includes(q);
+    const matchSearch = !q || inq.parentName.toLowerCase().includes(q) || inq.email.toLowerCase().includes(q) || inq.childName?.toLowerCase().includes(q) || inq.facebook?.toLowerCase().includes(q);
     return matchStatus && matchSearch;
   });
 
@@ -487,6 +503,7 @@ export default function InquiriesPage() {
                     <td className="py-3.5">
                       <p className="text-[13px] font-semibold text-[#002f76]">{inq.email}</p>
                       {inq.phone && <p className="text-[12px] text-[#5a6e8c]">{inq.phone}</p>}
+                      {inq.facebook && <p className="text-[12px] text-[#1877f2]">Facebook: {inq.facebook}</p>}
                     </td>
                     <td className="py-3.5">
                       {inq.childName ? (
@@ -534,6 +551,15 @@ export default function InquiriesPage() {
                   </svg>
                 </button>
               </div>
+            </div>
+
+            <div className="bg-white border-b border-[#f1f5f9] px-6 py-3 flex flex-wrap items-center gap-x-2 gap-y-1 shrink-0 text-[12px]">
+              <span className="font-extrabold uppercase tracking-widest text-[#5a6e8c]">Facebook</span>
+              {selectedInquiry.facebook ? (
+                getFacebookUrl(selectedInquiry.facebook) ? (
+                  <a href={getFacebookUrl(selectedInquiry.facebook)!} target="_blank" rel="noreferrer" className="font-bold text-[#1877f2] hover:underline break-all">{selectedInquiry.facebook}</a>
+                ) : <span className="font-bold text-[#002f76] break-all">{selectedInquiry.facebook}</span>
+              ) : <span className="text-[#94a3b8]">Not provided</span>}
             </div>
 
             {/* Child Info strip */}

@@ -10,6 +10,7 @@ type DiscoveryResult = {
   id: string;
   parentName: string;
   email: string;
+  facebook?: string;
   childName: string;
   childAge: string;
   scores: Record<string, number>;
@@ -42,6 +43,18 @@ function formatDate(dateStr: string) {
 }
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+function getFacebookUrl(value: string) {
+  const candidate = value.trim();
+  if (!/^https?:\/\//i.test(candidate)) return null;
+  try {
+    const url = new URL(candidate);
+    return /(^|\.)facebook\.com$/i.test(url.hostname) || /(^|\.)fb\.com$/i.test(url.hostname) || url.hostname.toLowerCase() === "fb.me"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function StatusBadge({ status }: { status: ResultStatus }) {
@@ -132,7 +145,8 @@ export default function DiscoveryDayAdminPage() {
         !q ||
         r.parentName?.toLowerCase().includes(q) ||
         r.childName?.toLowerCase().includes(q) ||
-        r.email?.toLowerCase().includes(q);
+        r.email?.toLowerCase().includes(q) ||
+        r.facebook?.toLowerCase().includes(q);
       const matchProgram = filterProgram === "All" || r.finalProgram === filterProgram;
       const matchStatus = filterStatus === "All" || r.status === filterStatus;
       return matchSearch && matchProgram && matchStatus;
@@ -296,6 +310,7 @@ export default function DiscoveryDayAdminPage() {
                       <td className="py-4 pr-4">
                         <p className="text-[13px] font-bold text-[#334155]">{r.parentName}</p>
                         <p className="text-[11.5px] text-[#5a6e8c]">{r.email}</p>
+                        {r.facebook && <p className="text-[11.5px] text-[#1877f2]">Facebook: {r.facebook}</p>}
                       </td>
                       <td className="py-4 pr-4">
                         <ProgramBadge program={r.finalProgram} />
@@ -362,6 +377,16 @@ export default function DiscoveryDayAdminPage() {
                 <div>
                   <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Email</p>
                   <a href={`mailto:${selected.email}`} className="font-bold text-[#0033A0] hover:underline break-all text-sm">{selected.email}</a>
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Facebook</p>
+                  {selected.facebook ? (
+                    getFacebookUrl(selected.facebook) ? (
+                      <a href={getFacebookUrl(selected.facebook)!} target="_blank" rel="noreferrer" className="font-bold text-[#1877f2] hover:underline break-all text-sm">{selected.facebook}</a>
+                    ) : (
+                      <p className="font-bold text-[#334155] break-all text-sm">{selected.facebook}</p>
+                    )
+                  ) : <p className="text-sm text-[#94a3b8]">Not provided</p>}
                 </div>
               </div>
 

@@ -284,10 +284,10 @@ function QuestionScreen({ qIndex, questionText, onAnswer }: { qIndex: number; se
 }
 
 function EmailCaptureScreen({ program, scores, attempted, answers, childName, childAge, onSubmit }: { program: SectionKey; scores: Record<SectionKey, number>; attempted: SectionKey[]; answers: QuizAnswer[]; childName: string; childAge: string; onSubmit: () => void }) {
-  const [pn, setPn] = useState(""); const [em, setEm] = useState(""); const [loading, setLoading] = useState(false);
+  const [pn, setPn] = useState(""); const [em, setEm] = useState(""); const [facebook, setFacebook] = useState(""); const [loading, setLoading] = useState(false);
   async function hs(e: React.FormEvent) {
     e.preventDefault(); if (!em) return; setLoading(true);
-    try { await fetch("/api/discovery-day-results", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parentName: pn, email: em, childName, childAge, scores, finalProgram: program, attempted, answers }) }); }
+    try { await fetch("/api/discovery-day-results", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parentName: pn, email: em, facebook, childName, childAge, scores, finalProgram: program, attempted, answers }) }); }
     catch (err) { console.error(err); } finally { setLoading(false); onSubmit(); }
   }
   return (
@@ -302,6 +302,7 @@ function EmailCaptureScreen({ program, scores, attempted, answers, childName, ch
       <form onSubmit={hs} style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 320 }}>
         <input type="text" placeholder="Parent's Name (Optional)" value={pn} onChange={e => setPn(e.target.value)} className="dq-input" />
         <input type="email" required placeholder="Email Address" value={em} onChange={e => setEm(e.target.value)} className="dq-input" />
+        <input type="text" placeholder="Facebook profile link or name (Optional)" value={facebook} onChange={e => setFacebook(e.target.value)} className="dq-input" maxLength={300} />
         <button type="submit" className="dq-btn" disabled={loading || !em} style={{ marginTop: 4, opacity: loading || !em ? 0.5 : 1, cursor: loading || !em ? "not-allowed" : "pointer" }}>{loading ? "Sending..." : "See My Results →"}</button>
       </form>
     </div>

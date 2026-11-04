@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { parentName, email, phone, childName, childAge, message } = data;
+    const { parentName, email, phone, facebook, childName, childAge, message } = data;
 
     if (!parentName || !email || !message) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       parentName,
       email,
       phone: phone || "",
+      facebook: typeof facebook === "string" ? facebook.trim().slice(0, 300) : "",
       childName: childName || "",
       childAge: childAge || "",
       message,

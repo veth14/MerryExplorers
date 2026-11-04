@@ -90,6 +90,7 @@ function InquirePageInner() {
   const [parentName, setParentName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [facebook, setFacebook] = useState("");
   const [childName, setChildName] = useState("");
   const [childAge, setChildAge] = useState("");
   const [message, setMessage] = useState("");
@@ -119,12 +120,12 @@ function InquirePageInner() {
       const res = await fetch("/api/inquiries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parentName, email, phone, childName, childAge, message }),
+        body: JSON.stringify({ parentName, email, phone, facebook, childName, childAge, message }),
       });
       const json = await res.json();
       if (json.success) {
         setSuccess(true);
-        setParentName(""); setEmail(""); setPhone("");
+        setParentName(""); setEmail(""); setPhone(""); setFacebook("");
         setChildName(""); setChildAge(""); setMessage("");
       } else {
         setError("Something went wrong. Please try again.");
@@ -219,6 +220,10 @@ function InquirePageInner() {
                     <div>
                       <input type="text" value={childName} onChange={(e) => setChildName(e.target.value)} placeholder="Child's Name (Optional)" className={inputCls} />
                     </div>
+                  </div>
+
+                  <div>
+                    <input type="text" value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="Facebook Profile Link or Name (Optional)" maxLength={300} className={inputCls} />
                   </div>
 
                   <div>
