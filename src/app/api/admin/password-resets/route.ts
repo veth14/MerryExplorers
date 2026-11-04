@@ -16,34 +16,75 @@ function getServiceAccount() {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireRoles(request, ["developer"]);
+  const auth = await requireRoles(request, ["developer", "admin"]);
   if ("response" in auth) return auth.response;
 
   try {
     const { db } = await connectToDatabase();
-    const [accounts, events] = await Promise.all([
+    const [staffDocs, parentDocs, events] = await Promise.all([
       db.collection("accounts").find({}, {
         projection: { fullName: 1, email: 1, role: 1, status: 1 },
+      }).toArray(),
+      db.collection("parent_accounts").find({}, {
+        projection: {
+          fullName: 1,
+          email: 1,
+          role: 1,
+          status: 1,
+          childName: 1,
+          childrenNames: 1,
+          program: 1,
+          classTime: 1,
+          phone: 1,
+        },
       }).toArray(),
       db.collection("password_reset_logs").find({})
         .sort({ createdAt: -1 }).limit(100).toArray(),
     ]);
 
-    return NextResponse.json({
-      accounts: accounts
-        .filter((account) => typeof account.email === "string" && account.email.trim())
-        .map((account) => ({
+    const formattedStaff = staffDocs
+      .filter((account) => typeof account.email === "string" && account.email.trim())
+      .map((account) => ({
+        id: account._id.toString(),
+        fullName: account.fullName || "Unnamed staff",
+        email: account.email,
+        role: account.role || "Staff",
+        accountType: "staff" as const,
+        status: account.status || "active",
+      }));
+
+    const formattedParents = parentDocs
+      .filter((account) => typeof account.email === "string" && account.email.trim())
+      .map((account) => {
+        const childName =
+          account.childName ||
+          (Array.isArray(account.childrenNames) && account.childrenNames.length > 0
+            ? account.childrenNames.join(", ")
+            : "");
+        return {
           id: account._id.toString(),
-          fullName: account.fullName || "Unnamed account",
+          fullName: account.fullName || "Unnamed parent",
           email: account.email,
-          role: account.role || "Staff",
+          role: "Parent",
+          accountType: "parent" as const,
+          childName,
+          program: account.program || "",
+          classTime: account.classTime || "",
+          phone: account.phone || "",
           status: account.status || "active",
-        })),
+        };
+      });
+
+    return NextResponse.json({
+      accounts: [...formattedStaff, ...formattedParents],
       history: events.map((event) => ({
         id: event._id.toString(),
         targetName: event.targetName,
         targetEmail: event.targetEmail,
         targetRole: event.targetRole,
+        accountType: event.accountType || "staff",
+        childName: event.childName || "",
+        program: event.program || "",
         requestedByName: event.requestedByName,
         createdAt: event.createdAt,
         outcome: event.outcome,
@@ -56,7 +97,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireRoles(request, ["developer"]);
+  const auth = await requireRoles(request, ["developer", "admin"]);
   if ("response" in auth) return auth.response;
 
   let body: { accountId?: string; newPassword?: string };
@@ -82,7 +123,13 @@ export async function POST(request: Request) {
 
   try {
     const { db } = await connectToDatabase();
-    const account = await db.collection("accounts").findOne({ _id: accountId });
+    
+    // Look up in accounts (staff) first, then in parent_accounts
+    const staffDoc = await db.collection("accounts").findOne({ _id: accountId as any });
+    const parentDoc = staffDoc ? null : await db.collection("parent_accounts").findOne({ _id: accountId as any });
+    const account = staffDoc || parentDoc;
+    const isParent = !staffDoc && !!parentDoc;
+
     if (!account || typeof account.email !== "string") {
       return NextResponse.json({ error: "Account not found." }, { status: 404 });
     }
@@ -109,18 +156,33 @@ export async function POST(request: Request) {
       },
     );
     if (!firebaseResponse.ok) {
-      // Do not persist or echo the submitted password or upstream response.
+      const errText = await firebaseResponse.text();
+      console.error("Firebase update password failed:", firebaseResponse.status, errText);
       return NextResponse.json({ error: "Firebase could not update this account password." }, { status: 502 });
     }
+
+    if (isParent) {
+      await db.collection("parent_accounts").updateOne(
+        { _id: accountId as any },
+        { $set: { updatedAt: new Date().toISOString() } }
+      ).catch(() => {});
+    }
+
+    const childName = isParent
+      ? account.childName || (Array.isArray(account.childrenNames) ? account.childrenNames.join(", ") : undefined)
+      : undefined;
 
     try {
       await db.collection("password_reset_logs").insertOne({
         targetUid: accountId,
         targetName: account.fullName || "Unnamed account",
         targetEmail: account.email,
-        targetRole: account.role || "Staff",
+        targetRole: isParent ? "Parent" : (account.role || "Staff"),
+        accountType: isParent ? "parent" : "staff",
+        childName,
+        program: isParent ? (account.program || undefined) : undefined,
         requestedByUid: auth.user.uid,
-        requestedByName: auth.user.email || "Developer",
+        requestedByName: auth.user.email || (auth.user.role === "developer" ? "Developer" : "Admin"),
         createdAt: new Date(),
         outcome: "password_updated",
       });

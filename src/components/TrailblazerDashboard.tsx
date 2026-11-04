@@ -880,7 +880,7 @@ export default function TrailblazerDashboard(p: Props) {
                             <details className="vp-more">
                                 <summary>See fee breakdown</summary>
                                 <div className="vp-receipt">
-                                    {terms.items.map((it) => (
+                                    {terms.items.map((it: any) => (
                                         <div key={it.key} className="vp-rrow"><span>{it.label}</span><span>{fmtPeso(it.amount)}</span></div>
                                     ))}
                                     <div className="vp-rrow total"><span>Total fee</span><span>{fmtPeso(terms.due)}</span></div>

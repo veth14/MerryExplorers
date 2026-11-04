@@ -27,8 +27,8 @@ export async function GET(request: Request) {
 
   try {
     const { db } = await connectToDatabase();
-    const account = (await db.collection("parent_accounts").findOne({ _id: uid }))
-      || await db.collection("accounts").findOne({ _id: uid });
+    const account = (await db.collection("parent_accounts").findOne({ _id: uid as any }))
+      || await db.collection("accounts").findOne({ _id: uid as any });
     if (!account || String(account.role || "").toLowerCase() !== "parent") {
       return NextResponse.json({ error: "Parent account not found" }, { status: 404 });
     }
