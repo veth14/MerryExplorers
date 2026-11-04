@@ -4,11 +4,6 @@ import { ObjectId } from "mongodb";
 import { getAuthenticatedUser } from "@/lib/auth-guard";
 import { computeTimeInStatus } from "@/lib/attendance-rules";
 
-function manilaDateStr(date = new Date()) {
-  const local = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
-}
-
 // GET /api/attendance
 // Params:
 //   ?date=YYYY-MM-DD  — single day (admin daily view)
@@ -50,10 +45,8 @@ export async function GET(request: Request) {
       query.teacherUid = uid;
     }
 
-    // Interns can only view their own current-day clock record.
+    // Interns can view their own attendance history, but never another person's records.
     if (auth.role === "intern") {
-      resolvedDateStr = manilaDateStr();
-      query.dateStr = resolvedDateStr;
       query.teacherUid = auth.uid;
     }
 

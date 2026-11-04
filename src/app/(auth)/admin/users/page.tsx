@@ -38,6 +38,10 @@ function generateAccountPassword() {
   return `${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")}aA1!`;
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 const AVAILABLE_TAGS = [
   "Early Childhood Ed", "CPR Certified", "Montessori Trained",
   "Child Development", "Special Needs", "Art Specialist",
@@ -217,6 +221,7 @@ function UserModal({
     if (step === 1) {
       if (!draft.fullName.trim()) { setError("Full name is required."); return false; }
       if (!draft.email.trim()) { setError("Email is required."); return false; }
+      if (!isValidEmail(draft.email)) { setError("Enter a valid email address."); return false; }
     }
     if (step === 2 && isTeacher && draft.role !== "Intern" && !draft.employeeId.trim()) { setError("Employee ID is required."); return false; }
     return true;
@@ -226,6 +231,7 @@ function UserModal({
     if (!draft.role) { setError("Please select a role in Avatar & Role."); return false; }
     if (!draft.fullName.trim()) { setError("Full name is required in Personal Info."); return false; }
     if (!draft.email.trim()) { setError("Email is required in Personal Info."); return false; }
+    if (!isValidEmail(draft.email)) { setError("Enter a valid email address."); return false; }
     if (isTeacher && draft.role !== "Intern" && !draft.employeeId.trim()) { setError("Employee ID is required in Work Details."); return false; }
     return true;
   }
@@ -262,7 +268,7 @@ function UserModal({
         status: draft.status,
         fullName: draft.fullName,
         dateOfBirth: draft.dateOfBirth,
-        email: draft.email,
+        email: draft.email.trim(),
         phone: draft.phone,
         homeAddress: draft.homeAddress,
         role: draft.role,
@@ -290,7 +296,7 @@ function UserModal({
       await onSave(account, initial?.id);
     } catch (err: any) {
       console.error(err);
-      setError("An error occurred while saving the account.");
+      setError(err instanceof Error ? err.message : "An error occurred while saving the account.");
     } finally {
       setLoading(false);
     }
@@ -528,13 +534,16 @@ function UserModal({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Email Address" required>
-                  <input
-                    type="email"
-                    value={draft.email}
-                    onChange={(e) => set("email", e.target.value)}
-                    placeholder="jane@merryexplorers.edu"
-                    className={INPUT_CLS}
-                  />
+                  <div>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      value={draft.email}
+                      onChange={(e) => set("email", e.target.value)}
+                      placeholder="jane@merryexplorers.edu"
+                      className={INPUT_CLS}
+                    />
+                  </div>
                 </Field>
                 <Field label="Phone Number">
                   <input
@@ -1177,11 +1186,13 @@ export default function UsersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(account),
       });
-      if (res.ok) {
-        setAccounts((prev) => prev.map((a) => (a.id === id ? { ...account, id } : a)));
-        invalidateCache("accounts:all");
-        await writeAudit("EDIT", account.fullName, account.role, id);
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}));
+        throw new Error(result.error || "Failed to update account.");
       }
+      setAccounts((prev) => prev.map((a) => (a.id === id ? { ...account, id } : a)));
+      invalidateCache("accounts:all");
+      await writeAudit("EDIT", account.fullName, account.role, id);
     } else {
       // Add
       let tempApp: ReturnType<typeof initializeApp> | undefined;

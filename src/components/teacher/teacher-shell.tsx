@@ -18,10 +18,11 @@ export function TeacherShell({ title, description, children }: TeacherShellProps
   const router = useRouter();
   const { userProfile } = useAuth();
   const isIntern = (userProfile?.role || "").toLowerCase() === "intern";
+  const internAllowedPages = ["/teacher", "/teacher/clock", "/teacher/history", "/teacher/profile"];
 
   useEffect(() => {
-    if (isIntern && pathname !== "/teacher/clock") {
-      router.replace("/teacher/clock");
+    if (isIntern && !internAllowedPages.includes(pathname)) {
+      router.replace("/teacher");
     }
   }, [isIntern, pathname, router]);
 

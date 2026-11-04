@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { requireInternalAuth } from "@/lib/auth-guard";
+import { getAuthenticatedUser, requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 
 /**
@@ -8,13 +8,17 @@ import { ObjectId } from "mongodb";
  * Returns the subset of the given announcement IDs that this teacher has already read.
  */
 export async function GET(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await getAuthenticatedUser(request);
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const { searchParams } = new URL(request.url);
     const teacherUid = searchParams.get("uid");
     const idsParam = searchParams.get("ids");
+
+    if (auth.role === "intern" && teacherUid !== auth.uid) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     if (!teacherUid || !idsParam) {
       return NextResponse.json({ success: true, readIds: [] });

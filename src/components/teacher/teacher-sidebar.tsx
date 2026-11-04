@@ -346,8 +346,9 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
   const isDeveloper = (userProfile?.role || "").toLowerCase() === "developer";
   const isIntern = (userProfile?.role || "").toLowerCase() === "intern";
   const canUploadPhotos = isExecPartner || isDeveloper || (userProfile?.permissions || []).includes("photo-albums");
+  const internTeacherPages = ["/teacher", "/teacher/clock", "/teacher/history", "/teacher/profile"];
   const visibleTeacherNavItems = isIntern
-    ? teacherNavItems.filter((item) => item.href === "/teacher/clock")
+    ? teacherNavItems.filter((item) => internTeacherPages.includes(item.href))
     : teacherNavItems;
 
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }

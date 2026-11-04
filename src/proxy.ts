@@ -34,8 +34,9 @@ export function proxy(request: NextRequest) {
     if (role === 'admin' || role === 'parent') {
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
-    if (role === 'intern' && pathname !== '/teacher/clock') {
-      return NextResponse.redirect(new URL('/teacher/clock', request.url));
+    const internTeacherPages = ['/teacher', '/teacher/clock', '/teacher/history', '/teacher/profile'];
+    if (role === 'intern' && !internTeacherPages.includes(pathname)) {
+      return NextResponse.redirect(new URL('/teacher', request.url));
     }
     // executive assistant and developer can access /teacher
   }
@@ -66,7 +67,7 @@ export function proxy(request: NextRequest) {
       } else if (role === 'parent') {
         return NextResponse.redirect(new URL('/parent/dashboard', request.url));
       } else if (role === 'intern') {
-        return NextResponse.redirect(new URL('/teacher/clock', request.url));
+        return NextResponse.redirect(new URL('/teacher', request.url));
       } else if (role === 'executive assistant' || role === 'developer' || role === 'teacher') {
         return NextResponse.redirect(new URL('/teacher', request.url));
       } else {

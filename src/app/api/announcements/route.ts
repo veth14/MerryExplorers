@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { requireInternalAuth } from "@/lib/auth-guard";
+import { getAuthenticatedUser, requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 
 // GET /api/announcements
@@ -9,12 +9,15 @@ import { ObjectId } from "mongodb";
 //   ?all=true   — all records (admin manage view)
 //   ?admin=true — all records + readCount + totalTeachers (admin stats view)
 export async function GET(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await getAuthenticatedUser(request);
+  if (auth instanceof NextResponse) return auth;
   try {
     const { searchParams } = new URL(request.url);
     const fetchAll = searchParams.get("all") === "true";
     const adminView = searchParams.get("admin") === "true";
+    if (auth.role === "intern" && (fetchAll || adminView)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { db } = await connectToDatabase();
     

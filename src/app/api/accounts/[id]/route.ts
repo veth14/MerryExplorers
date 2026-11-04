@@ -92,9 +92,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const id = (await params).id;
     const auth = await requireRoles(request, [...SIGNED_IN_ROLES]);
     if ("response" in auth) return auth.response;
-    if (auth.user.role === "intern") {
-      return NextResponse.json({ error: "Intern accounts cannot edit profile details" }, { status: 403 });
-    }
     if (!canManageAccount(auth.user.role, id, auth.user.uid)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -104,10 +101,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     delete requestedUpdates.id;
     delete requestedUpdates._id;
     const isAdmin = ADMIN_ROLES.includes(auth.user.role as (typeof ADMIN_ROLES)[number]);
+    const selfEditableFields = auth.user.role === "intern"
+      ? new Set([...SELF_EDITABLE_FIELDS].filter((field) => field !== "email"))
+      : SELF_EDITABLE_FIELDS;
     const updateData = isAdmin
       ? requestedUpdates
       : Object.fromEntries(
-          Object.entries(requestedUpdates).filter(([field]) => SELF_EDITABLE_FIELDS.has(field))
+          Object.entries(requestedUpdates).filter(([field]) => selfEditableFields.has(field))
         );
 
     if (Object.keys(updateData).length === 0) {
@@ -115,7 +115,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const { db } = await connectToDatabase();
-
     let result = await db.collection("parent_accounts").updateOne(
       { _id: id as any },
       { $set: updateData }

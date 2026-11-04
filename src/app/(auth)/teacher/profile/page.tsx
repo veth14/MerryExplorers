@@ -422,20 +422,26 @@ export default function TeacherProfilePage() {
                       Email Address
                     </label>
                     {isEditing ? (
-                      <input
-                        type="email"
-                        className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full"
-                        value={formData.personalInfo.email}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            personalInfo: {
-                              ...formData.personalInfo,
-                              email: e.target.value,
-                            },
-                          })
-                        }
-                      />
+                      <div>
+                        <input
+                          type="email"
+                          disabled={(userProfile as any)?.role?.toLowerCase() === "intern"}
+                          className="p-3 rounded-xl bg-white border border-brand-orange/40 font-bold text-brand-navy text-sm outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all w-full disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                          value={formData.personalInfo.email}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              personalInfo: {
+                                ...formData.personalInfo,
+                                email: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                        {(userProfile as any)?.role?.toLowerCase() === "intern" && (
+                          <p className="mt-1 text-[10px] font-semibold text-brand-navy/50">Ask an administrator to change your sign-in email.</p>
+                        )}
+                      </div>
                     ) : (
                       <div className="p-3 rounded-xl bg-orange-50/50 border border-brand-orange/20 font-bold text-brand-navy text-sm">
                         {formData.personalInfo.email}
@@ -506,8 +512,7 @@ export default function TeacherProfilePage() {
                         Password & Security
                       </h4>
                       <p className="text-[11px] font-bold text-brand-navy/50 mt-0.5">
-                        Need to change your password? We will email you a secure
-                        link.
+                        Change your password securely using your current password.
                       </p>
                     </div>
                     <button

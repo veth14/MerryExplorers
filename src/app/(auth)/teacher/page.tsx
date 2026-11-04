@@ -260,6 +260,7 @@ export default function TeacherDashboardPage() {
   );
 
   const firstName = userProfile?.fullName?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Teacher";
+  const isIntern = userProfile?.role?.toLowerCase() === "intern";
   const isClocked = todayShift?.status === "In Progress";
   const isClockedOut = todayShift?.status === "Completed";
   const clockInTimeStr = todayShift?.clockInTime ? formatTime(todayShift.clockInTime) : null;
@@ -369,7 +370,7 @@ export default function TeacherDashboardPage() {
               <div className="rounded-2xl bg-brand-sky/20 border border-brand-sky/30 p-4">
                 <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-brand-blue mb-2">
                   <UsersIcon />
-                  Room
+                  {isIntern ? "Program" : "Room"}
                 </div>
                 <div className="text-[15px] font-black text-brand-navy">{(userProfile as any)?.assignedRoom || "Unassigned"}</div>
               </div>
@@ -407,12 +408,14 @@ export default function TeacherDashboardPage() {
                   </span>
                 )}
               </div>
-              <a
-                href="/teacher/announcements"
-                className="text-[10px] font-black uppercase tracking-widest text-brand-blue hover:underline"
-              >
-                View All
-              </a>
+              {!isIntern && (
+                <a
+                  href="/teacher/announcements"
+                  className="text-[10px] font-black uppercase tracking-widest text-brand-blue hover:underline"
+                >
+                  View All
+                </a>
+              )}
             </div>
 
             <div className="flex flex-col gap-4">
