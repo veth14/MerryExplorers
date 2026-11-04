@@ -51,6 +51,38 @@ function formatFullDate(dateStr: string): string {
   });
 }
 
+function getEventRelativeStatus(event: CalendarEvent): {
+  isToday: boolean;
+  isTomorrow: boolean;
+  relativeBadge: string;
+  diffDays: number;
+} {
+  const todayStr = getManilaDateStr();
+  const isHappeningNow =
+    event.startDate === todayStr ||
+    Boolean(event.endDate && event.startDate <= todayStr && event.endDate >= todayStr);
+
+  const [y1, m1, d1] = event.startDate.split("-").map(Number);
+  const [y2, m2, d2] = todayStr.split("-").map(Number);
+  const target = new Date(y1, m1 - 1, d1).getTime();
+  const today = new Date(y2, m2 - 1, d2).getTime();
+  const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+
+  if (isHappeningNow) {
+    return { isToday: true, isTomorrow: false, relativeBadge: "Happening Today! 🎉", diffDays: 0 };
+  }
+  if (diffDays === 1) {
+    return { isToday: false, isTomorrow: true, relativeBadge: "Starts Tomorrow! 🚀", diffDays: 1 };
+  }
+  if (diffDays > 1 && diffDays <= 7) {
+    return { isToday: false, isTomorrow: false, relativeBadge: `Starts in ${diffDays} days! ✨`, diffDays };
+  }
+  if (diffDays > 7 && diffDays <= 30) {
+    return { isToday: false, isTomorrow: false, relativeBadge: `In ${diffDays} days`, diffDays };
+  }
+  return { isToday: false, isTomorrow: false, relativeBadge: "", diffDays };
+}
+
 function formatRelativeDays(dateStr: string): string {
   const todayStr = getManilaDateStr();
   const [y1, m1, d1] = dateStr.split("-").map(Number);
@@ -259,6 +291,7 @@ export function EventDetailModal({
 
 function FeaturedEventCard({ event }: { event: CalendarEvent }) {
   const [showModal, setShowModal] = useState(false);
+  const [isSquarePhoto, setIsSquarePhoto] = useState(true);
   const meta = EVENT_TYPE_META[event.type as CalendarEventType] ?? {
     emoji: "📅",
     label: "Event",
@@ -268,14 +301,15 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
   };
   const { month, day } = formatShortDate(event.startDate);
   const fullDate = formatFullDate(event.startDate);
-  const relativeBadge = formatRelativeDays(event.startDate);
+  const status = getEventRelativeStatus(event);
+  const isToday = status.isToday;
+  const relativeBadge = status.relativeBadge;
   const imgUrl = event.imageUrl || EVENT_IMAGES[event.type] || "/images/events/adventure_start.jpg";
   const description =
     event.description ||
     event.notes ||
     DEFAULT_DESCRIPTIONS[event.type] ||
-    "Join us for our upcoming school milestone at Merry Explorers!";
-  const gcalUrl = buildGoogleCalendarUrl(event);
+    "Join us for our upcoming playgroup milestone at Merry Explorers!";
   const reduce = useReducedMotion();
 
   return (
@@ -286,18 +320,39 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
         viewport={{ once: true, margin: "-30px" }}
         transition={{ duration: 0.55, ease: "easeOut" }}
         onClick={() => setShowModal(true)}
-        className="group w-full max-w-3xl mx-auto rounded-[2.5rem] bg-white border-2 border-[#dbe6f6] shadow-[0_20px_50px_-15px_rgba(0,51,160,0.12)] hover:shadow-[0_25px_65px_-10px_rgba(0,51,160,0.18)] hover:border-[#93c5fd] transition-all overflow-hidden flex flex-col md:flex-row cursor-pointer"
+        className={`group w-full max-w-4xl mx-auto rounded-[2.5rem] transition-all overflow-hidden flex flex-col md:flex-row cursor-pointer ${
+          isToday
+            ? "border-2 border-amber-400 ring-4 ring-amber-400/30 shadow-[0_25px_65px_-10px_rgba(245,158,11,0.35)] bg-gradient-to-br from-[#fffef5] via-white to-white"
+            : "border-2 border-[#dbe6f6] shadow-[0_20px_50px_-15px_rgba(0,51,160,0.12)] hover:shadow-[0_25px_65px_-10px_rgba(0,51,160,0.18)] hover:border-[#93c5fd] bg-white"
+        }`}
       >
-        {/* Visual picture on left / top */}
-        <div className="relative md:w-5/12 h-64 md:h-auto min-h-[240px] overflow-hidden bg-slate-100">
+        {/* Visual picture on left / top — 1:1 square friendly */}
+        <div className={`relative md:w-1/2 ${isSquarePhoto ? "aspect-square" : "h-64 md:h-auto min-h-[260px]"} overflow-hidden bg-slate-100`}>
+          {isToday && (
+            <div className="absolute top-0 inset-x-0 z-30 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white px-4 py-1.5 shadow-md flex items-center justify-between text-[11px] font-black uppercase tracking-wider">
+              <span className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white shadow-xs" />
+                </span>
+                <span>Live Today · Happening Now!</span>
+              </span>
+              <span className="text-xs">🎉</span>
+            </div>
+          )}
+
           {event.imageUrl ? (
-            <EventPhotoFrame src={imgUrl} alt={event.title} />
+            <EventPhotoFrame
+              src={imgUrl}
+              alt={event.title}
+              onAspectRatioChange={(ratio) => setIsSquarePhoto(Math.abs(ratio - 1) <= 0.18)}
+            />
           ) : (
             <Image
               src={imgUrl}
               alt={event.title}
               fill
-              sizes="(max-width: 768px) 100vw, 360px"
+              sizes="(max-width: 768px) 100vw, 420px"
               className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
               priority
             />
@@ -305,9 +360,13 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
           {!event.imageUrl && <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-black/10" />}
 
           {/* Date Glass Badge */}
-          <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-xs rounded-2xl px-3.5 py-2 shadow-lg border border-white/60 text-center min-w-[58px]">
-            <span className="text-[10px] font-black uppercase tracking-wider text-[#718096] block leading-none mb-1">
-              {month}
+          <div className={`absolute ${isToday ? "top-8" : "top-4"} left-4 bg-white/95 backdrop-blur-xs rounded-2xl px-3.5 py-2 shadow-lg border ${
+            isToday ? "border-amber-300 ring-2 ring-amber-400/40" : "border-white/60"
+          } text-center min-w-[58px] z-20`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider ${
+              isToday ? "text-amber-700 font-extrabold" : "text-[#718096]"
+            } block leading-none mb-1`}>
+              {isToday ? "TODAY" : month}
             </span>
             <span className="text-[26px] font-black text-[#002f76] leading-none block">
               {day}
@@ -315,10 +374,10 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
           </div>
 
           {/* Category Pill Floating on Image */}
-          <div className="absolute bottom-4 left-4">
+          <div className="absolute bottom-4 left-4 z-20">
             <span
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider shadow-md border"
-              style={{ color: meta.color, backgroundColor: "white", borderColor: meta.border }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider shadow-md border bg-white/95 backdrop-blur-xs"
+              style={{ color: meta.color, borderColor: meta.border }}
             >
               <span>{meta.emoji}</span> {meta.label}
             </span>
@@ -326,15 +385,19 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
         </div>
 
         {/* Content on right */}
-        <div className="p-7 sm:p-8 md:w-7/12 flex flex-col justify-between bg-gradient-to-br from-white via-white to-[#fbfdff]">
+        <div className="p-7 sm:p-8 md:w-1/2 flex flex-col justify-between bg-gradient-to-br from-white via-white to-[#fbfdff]">
           <div className="space-y-3">
             {/* Top meta row */}
             <div className="flex items-center gap-2 flex-wrap">
-              {relativeBadge && (
+              {isToday ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black text-amber-950 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 border border-amber-300 shadow-xs">
+                  <span>✨</span> Happening Today!
+                </span>
+              ) : relativeBadge ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black text-[#855300] bg-[#FFF8E7] border border-[#FDE68A] shadow-xs">
                   {relativeBadge}
                 </span>
-              )}
+              ) : null}
               <span className="text-[12px] font-bold text-[#64748b]">
                 {fullDate}
               </span>
@@ -353,28 +416,57 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
 
           {/* Action Buttons */}
           <div className="pt-6 mt-4 border-t border-[#edf2f7] flex items-center justify-between gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                openCalendarEvent(event);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[12px] font-bold border border-[#bfdbfe] shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
-            >
-              <span>📅</span> Add to Calendar
-            </button>
+            {isToday ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCalendarEvent(event);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[12px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
+                >
+                  <span>📅</span> Add to Calendar
+                </button>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowModal(true);
-              }}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#0050d5] hover:text-[#002270] transition-colors py-1 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-            >
-              <span>View Details</span>
-              <span>→</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0050d5] to-[#0033a0] hover:from-[#003ea8] hover:to-[#002270] text-white text-[13px] font-black shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🎉 View Today&apos;s Details</span>
+                  <span>→</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCalendarEvent(event);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[12px] font-bold border border-[#bfdbfe] shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>📅</span> Add to Calendar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#0050d5] hover:text-[#002270] transition-colors py-1 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  <span>View Details</span>
+                  <span>→</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </m.div>
@@ -388,6 +480,7 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
 
 function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
   const [showModal, setShowModal] = useState(false);
+  const [isSquarePhoto, setIsSquarePhoto] = useState(true);
   const meta = EVENT_TYPE_META[event.type as CalendarEventType] ?? {
     emoji: "📅",
     label: "Event",
@@ -396,9 +489,11 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
     border: "#c7d8f0",
   };
   const { month, day } = formatShortDate(event.startDate);
-  const relativeBadge = formatRelativeDays(event.startDate);
+  const status = getEventRelativeStatus(event);
+  const isToday = status.isToday;
+  const isTomorrow = status.isTomorrow;
+  const relativeBadge = status.relativeBadge;
   const imgUrl = event.imageUrl || EVENT_IMAGES[event.type] || "/images/events/adventure_start.jpg";
-  const gcalUrl = buildGoogleCalendarUrl(event);
   const reduce = useReducedMotion();
 
   return (
@@ -409,79 +504,172 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
         viewport={{ once: true, margin: "-30px" }}
         transition={{ duration: 0.5, delay: index * 0.08, ease: "easeOut" }}
         onClick={() => setShowModal(true)}
-        className="group w-full sm:w-[350px] flex flex-col rounded-[2.2rem] bg-white border-2 border-[#e8f1fa] shadow-[0_16px_40px_-15px_rgba(0,51,160,0.08)] hover:border-[#93c5fd] hover:shadow-[0_22px_55px_-10px_rgba(0,51,160,0.16)] transition-all overflow-hidden cursor-pointer"
+        className={`group w-full sm:w-[370px] md:w-[390px] max-w-[420px] flex flex-col rounded-[2.5rem] transition-all overflow-hidden cursor-pointer ${
+          isToday
+            ? "border-2 border-amber-400 ring-4 ring-amber-400/30 shadow-[0_25px_60px_-10px_rgba(245,158,11,0.35)] sm:scale-[1.03] sm:-translate-y-2 z-10 bg-gradient-to-b from-[#fffef5] via-white to-white"
+            : "border-2 border-[#e8f1fa] shadow-[0_16px_40px_-15px_rgba(0,51,160,0.08)] hover:border-[#93c5fd] hover:shadow-[0_22px_55px_-10px_rgba(0,51,160,0.16)] bg-white opacity-95 hover:opacity-100"
+        }`}
       >
-        {/* Picture Banner on top */}
-        <div className="relative h-44 w-full overflow-hidden bg-slate-100">
+        {/* Picture Banner on top — 1080x1080 square friendly with zero blurry sidebars */}
+        <div className={`relative ${isSquarePhoto ? "aspect-square" : "h-64 sm:h-72"} w-full overflow-hidden bg-slate-100`}>
+          {/* Top LIVE TODAY Banner */}
+          {isToday && (
+            <div className="absolute top-0 inset-x-0 z-30 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white px-3.5 py-1.5 shadow-md flex items-center justify-between text-[11px] font-black uppercase tracking-wider">
+              <span className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white shadow-xs" />
+                </span>
+                <span>Live Today · Happening Now!</span>
+              </span>
+              <span className="text-xs">🎉</span>
+            </div>
+          )}
+
           {event.imageUrl ? (
-            <EventPhotoFrame src={imgUrl} alt={event.title} />
+            <EventPhotoFrame
+              src={imgUrl}
+              alt={event.title}
+              onAspectRatioChange={(ratio) => setIsSquarePhoto(Math.abs(ratio - 1) <= 0.18)}
+            />
           ) : (
             <Image
               src={imgUrl}
               alt={event.title}
               fill
-              sizes="350px"
+              sizes="(max-width: 640px) 100vw, 390px"
               className="object-cover group-hover:scale-105 transition-transform duration-600 ease-out"
             />
           )}
           {!event.imageUrl && <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />}
 
           {/* Date Glass Badge */}
-          <div className="absolute top-3.5 left-3.5 bg-white/95 backdrop-blur-xs rounded-2xl px-3 py-1.5 shadow-md border border-white/60 text-center min-w-[50px]">
-            <span className="text-[9.5px] font-black uppercase tracking-wider text-[#718096] block leading-none mb-0.5">
-              {month}
+          <div
+            className={`absolute left-3.5 ${
+              isToday ? "top-8" : "top-3.5"
+            } bg-white/95 backdrop-blur-xs rounded-2xl px-3 py-1.5 shadow-md border ${
+              isToday ? "border-amber-300 ring-2 ring-amber-400/35" : "border-white/60"
+            } text-center min-w-[50px] z-20`}
+          >
+            <span
+              className={`text-[9.5px] font-black uppercase tracking-wider ${
+                isToday ? "text-amber-700 font-extrabold" : "text-[#718096]"
+              } block leading-none mb-0.5`}
+            >
+              {isToday ? "TODAY" : month}
             </span>
             <span className="text-[22px] font-black text-[#002f76] leading-none block">
               {day}
             </span>
           </div>
 
-          {/* Category Pill Floating */}
-          <div className="absolute bottom-3 left-3.5">
+          {/* Floating Category & Program Pill */}
+          <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between gap-1.5 z-20 pointer-events-none">
             <span
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm border bg-white"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm border bg-white/95 backdrop-blur-xs"
               style={{ color: meta.color, borderColor: meta.border }}
             >
               <span>{meta.emoji}</span> {meta.label}
             </span>
+            {event.programKey && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold border bg-white/95 backdrop-blur-xs text-[#0033a0] border-[#c7d8f0] shadow-xs truncate max-w-[150px]">
+                {event.programKey.replace(/^Discovery Club:\s*/, "")}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Card Body */}
         <div className="p-5 sm:p-6 flex flex-col justify-between flex-1 gap-4">
           <div>
-            {relativeBadge && (
-              <span className="inline-block text-[10.5px] font-black text-[#855300] bg-[#FFF8E7] border border-[#FDE68A] px-2.5 py-0.5 rounded-full mb-2">
-                {relativeBadge}
-              </span>
+            {isToday ? (
+              <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-black text-amber-950 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 border border-amber-300 px-3 py-1 rounded-full shadow-xs">
+                  <span className="text-xs">✨</span> Happening Today!
+                </span>
+                <span className="text-[11.5px] font-bold text-[#64748b]">
+                  {formatFullDate(event.startDate)}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                {relativeBadge && (
+                  <span className="inline-block text-[10.5px] font-black text-[#855300] bg-[#FFF8E7] border border-[#FDE68A] px-2.5 py-0.5 rounded-full">
+                    {relativeBadge}
+                  </span>
+                )}
+                <span className="text-[11.5px] font-bold text-[#64748b]">
+                  {formatFullDate(event.startDate)}
+                </span>
+              </div>
             )}
-            <h3 className="font-fredoka text-[18px] font-bold text-[#002f76] leading-snug group-hover:text-[#0050d5] transition-colors">
+
+            <h3
+              className={`font-fredoka text-[19px] sm:text-[20px] font-bold leading-snug group-hover:text-[#0050d5] transition-colors ${
+                isToday ? "text-[#002f76]" : "text-[#002f76]"
+              }`}
+            >
               {event.title}
             </h3>
+
+            {event.description && (
+              <p className="text-[12.5px] text-[#5b7294] leading-relaxed line-clamp-2 mt-1.5 font-medium">
+                {event.description}
+              </p>
+            )}
           </div>
 
-          <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                openCalendarEvent(event);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95 cursor-pointer"
-            >
-              <span>📅</span> Add to Calendar
-            </button>
+          <div className="pt-3.5 border-t border-[#f1f5f9] flex items-center justify-between gap-2">
+            {isToday ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCalendarEvent(event);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11.5px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
+                >
+                  <span>📅</span> Calendar
+                </button>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowModal(true);
-              }}
-              className="text-[11.5px] font-bold text-[#0050d5] hover:text-[#002270] transition-colors py-1 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-            >
-              Details →
-            </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0050d5] to-[#0033a0] hover:from-[#003ea8] hover:to-[#002270] text-white text-[12px] font-black shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🎉 View Today&apos;s Details</span>
+                  <span>→</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCalendarEvent(event);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>📅</span> Add to Calendar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowModal(true);
+                  }}
+                  className="text-[11.5px] font-bold text-[#0050d5] hover:text-[#002270] transition-colors py-1 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  Details →
+                </button>
+              </>
+            )}
           </div>
         </div>
       </m.div>
@@ -552,7 +740,7 @@ export function CalendarSection({ events }: { events: CalendarEvent[] }) {
         ) : majorEvents.length === 1 ? (
           <FeaturedEventCard event={majorEvents[0]} />
         ) : (
-          <div className="flex flex-wrap justify-center gap-6 max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center items-stretch gap-6 sm:gap-8 max-w-6xl mx-auto">
             {majorEvents.map((event, i) => (
               <EventCard key={event._id} event={event} index={i} />
             ))}
