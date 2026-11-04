@@ -13,6 +13,22 @@ import {
   openCalendarEvent,
 } from "@/lib/calendar-events";
 import { EventPhotoFrame } from "@/components/calendar/event-photo-frame";
+function CalendarIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  );
+}
+
 
 const EVENT_IMAGES: Record<string, string> = {
   adventure_start: "/images/events/adventure_start.jpg",
@@ -69,13 +85,13 @@ function getEventRelativeStatus(event: CalendarEvent): {
   const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
 
   if (isHappeningNow) {
-    return { isToday: true, isTomorrow: false, relativeBadge: "Happening Today! 🎉", diffDays: 0 };
+    return { isToday: true, isTomorrow: false, relativeBadge: "Happening Today", diffDays: 0 };
   }
   if (diffDays === 1) {
-    return { isToday: false, isTomorrow: true, relativeBadge: "Starts Tomorrow! 🚀", diffDays: 1 };
+    return { isToday: false, isTomorrow: true, relativeBadge: "Starts Tomorrow", diffDays: 1 };
   }
   if (diffDays > 1 && diffDays <= 7) {
-    return { isToday: false, isTomorrow: false, relativeBadge: `Starts in ${diffDays} days! ✨`, diffDays };
+    return { isToday: false, isTomorrow: false, relativeBadge: `Starts in ${diffDays} days`, diffDays };
   }
   if (diffDays > 7 && diffDays <= 30) {
     return { isToday: false, isTomorrow: false, relativeBadge: `In ${diffDays} days`, diffDays };
@@ -91,9 +107,9 @@ function formatRelativeDays(dateStr: string): string {
   const today = new Date(y2, m2 - 1, d2).getTime();
   const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return "Happening Today! 🎉";
-  if (diffDays === 1) return "Starts Tomorrow! 🚀";
-  if (diffDays > 1 && diffDays <= 7) return `Starts in ${diffDays} days! ✨`;
+  if (diffDays === 0) return "Happening Today";
+  if (diffDays === 1) return "Starts Tomorrow";
+  if (diffDays > 1 && diffDays <= 7) return `Starts in ${diffDays} days`;
   if (diffDays > 7 && diffDays <= 30) return `In ${diffDays} days`;
   return "";
 }
@@ -246,7 +262,7 @@ export function EventDetailModal({
                 {event.title}
               </h2>
               <p className="text-[13px] font-semibold text-[#64748b]">
-                📅 {fullDate}
+                {fullDate}
                 {endDateStr && <span className="ml-1">→ {endDateStr}</span>}
               </p>
             </div>
@@ -258,7 +274,7 @@ export function EventDetailModal({
             </div>
             {event.instructions && (
               <div className="rounded-2xl bg-[#eef4ff] border border-[#c7d8f0] p-4">
-                <p className="text-[11px] font-black uppercase tracking-wider text-[#0033a0] mb-1">📌 Instructions</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-[#0033a0] mb-1">Instructions</p>
                 <p className="text-[13px] text-[#3d5580] leading-relaxed font-medium whitespace-pre-wrap">{event.instructions}</p>
               </div>
             )}
@@ -271,7 +287,7 @@ export function EventDetailModal({
               onClick={() => openCalendarEvent(event)}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#0033A0] hover:bg-[#002270] text-white text-[13.5px] font-black shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
             >
-              <span>📅</span> Add to Calendar
+              <CalendarIcon className="w-4 h-4" /><span>Add to Calendar</span>
             </button>
             <button
               onClick={onClose}
@@ -329,15 +345,15 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
         {/* Visual picture on left / top — 1:1 square friendly */}
         <div className={`relative md:w-1/2 ${isSquarePhoto ? "aspect-square" : "h-64 md:h-auto min-h-[260px]"} overflow-hidden bg-slate-100`}>
           {isToday && (
-            <div className="absolute top-0 inset-x-0 z-30 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white px-4 py-1.5 shadow-md flex items-center justify-between text-[11px] font-black uppercase tracking-wider">
+            <div className="absolute top-0 inset-x-0 z-30 bg-[#b91c1c] text-white px-4 py-1.5 shadow-xs flex items-center justify-between text-[11px] font-bold uppercase tracking-wider">
               <span className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
+                <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white shadow-xs" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
                 </span>
-                <span>Live Today · Happening Now!</span>
+                <span className="font-extrabold tracking-wider">Happening Today</span>
               </span>
-              <span className="text-xs">🎉</span>
+              <span className="text-[10px] font-semibold text-rose-100 uppercase tracking-widest">Active</span>
             </div>
           )}
 
@@ -379,7 +395,7 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider shadow-md border bg-white/95 backdrop-blur-xs"
               style={{ color: meta.color, borderColor: meta.border }}
             >
-              <span>{meta.emoji}</span> {meta.label}
+              {meta.label}
             </span>
           </div>
         </div>
@@ -390,8 +406,9 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
             {/* Top meta row */}
             <div className="flex items-center gap-2 flex-wrap">
               {isToday ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black text-amber-950 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 border border-amber-300 shadow-xs">
-                  <span>✨</span> Happening Today!
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 shadow-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                  <span>Happening Today</span>
                 </span>
               ) : relativeBadge ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black text-[#855300] bg-[#FFF8E7] border border-[#FDE68A] shadow-xs">
@@ -426,7 +443,7 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
                   }}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[12px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
                 >
-                  <span>📅</span> Add to Calendar
+                  <CalendarIcon className="w-4 h-4 text-slate-600" /><span>Add to Calendar</span>
                 </button>
 
                 <button
@@ -437,7 +454,7 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
                   }}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0050d5] to-[#0033a0] hover:from-[#003ea8] hover:to-[#002270] text-white text-[13px] font-black shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
                 >
-                  <span>🎉 View Today&apos;s Details</span>
+                  <span>View Event Details</span>
                   <span>→</span>
                 </button>
               </>
@@ -451,7 +468,7 @@ function FeaturedEventCard({ event }: { event: CalendarEvent }) {
                   }}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[12px] font-bold border border-[#bfdbfe] shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
                 >
-                  <span>📅</span> Add to Calendar
+                  <CalendarIcon className="w-4 h-4 text-[#0033a0]" /><span>Add to Calendar</span>
                 </button>
 
                 <button
@@ -514,15 +531,15 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
         <div className={`relative ${isSquarePhoto ? "aspect-square" : "h-64 sm:h-72"} w-full overflow-hidden bg-slate-100`}>
           {/* Top LIVE TODAY Banner */}
           {isToday && (
-            <div className="absolute top-0 inset-x-0 z-30 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white px-3.5 py-1.5 shadow-md flex items-center justify-between text-[11px] font-black uppercase tracking-wider">
+            <div className="absolute top-0 inset-x-0 z-30 bg-[#b91c1c] text-white px-3.5 py-1.5 shadow-xs flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wider">
               <span className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
+                <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white shadow-xs" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
                 </span>
-                <span>Live Today · Happening Now!</span>
+                <span className="font-extrabold tracking-wider">Happening Today</span>
               </span>
-              <span className="text-xs">🎉</span>
+              <span className="text-[9.5px] font-semibold text-rose-100 uppercase tracking-widest">Active</span>
             </div>
           )}
 
@@ -569,7 +586,7 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm border bg-white/95 backdrop-blur-xs"
               style={{ color: meta.color, borderColor: meta.border }}
             >
-              <span>{meta.emoji}</span> {meta.label}
+              {meta.label}
             </span>
             {event.programKey && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold border bg-white/95 backdrop-blur-xs text-[#0033a0] border-[#c7d8f0] shadow-xs truncate max-w-[150px]">
@@ -584,8 +601,9 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
           <div>
             {isToday ? (
               <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-black text-amber-950 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 border border-amber-300 px-3 py-1 rounded-full shadow-xs">
-                  <span className="text-xs">✨</span> Happening Today!
+                <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                  <span>Happening Today</span>
                 </span>
                 <span className="text-[11.5px] font-bold text-[#64748b]">
                   {formatFullDate(event.startDate)}
@@ -630,7 +648,7 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11.5px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
                 >
-                  <span>📅</span> Calendar
+                  <CalendarIcon className="w-3.5 h-3.5 text-slate-600" /><span>Calendar</span>
                 </button>
 
                 <button
@@ -641,7 +659,7 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
                   }}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0050d5] to-[#0033a0] hover:from-[#003ea8] hover:to-[#002270] text-white text-[12px] font-black shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
                 >
-                  <span>🎉 View Today&apos;s Details</span>
+                  <span>View Details</span>
                   <span>→</span>
                 </button>
               </>
@@ -655,7 +673,7 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#eef4ff] hover:bg-[#dbeafe] text-[#0033a0] text-[11px] font-bold border border-[#bfdbfe] transition-all active:scale-95 cursor-pointer"
                 >
-                  <span>📅</span> Add to Calendar
+                  <CalendarIcon className="w-3.5 h-3.5 text-[#0033a0]" /><span>Add to Calendar</span>
                 </button>
 
                 <button
@@ -698,7 +716,7 @@ export function CalendarSection({ events }: { events: CalendarEvent[] }) {
       />
 
       <div className="absolute top-8 right-6 sm:right-16 pointer-events-none z-0 select-none text-[80px] opacity-5 hidden sm:block">
-        🗓️
+        
       </div>
 
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 relative z-10">
@@ -711,7 +729,7 @@ export function CalendarSection({ events }: { events: CalendarEvent[] }) {
           className="text-center mb-12 sm:mb-16"
         >
           <span className="font-fredoka text-[13px] font-semibold uppercase tracking-wider text-[#0050d5] bg-[#edf5ff] px-4 py-1.5 rounded-full inline-block mb-3 border border-[#d6e7ff] shadow-sm">
-            🗺️ Events &amp; Important Dates
+            Events &amp; Important Dates
           </span>
           <h2 className="font-fredoka text-[32px] sm:text-[42px] font-bold text-[#002f76] tracking-normal">
             Mark Your Calendar
@@ -759,7 +777,7 @@ export function CalendarSection({ events }: { events: CalendarEvent[] }) {
             href="/under-development"
             className="inline-flex items-center gap-2.5 rounded-2xl bg-[#0033A0] hover:bg-[#002270] text-white px-6 py-3.5 text-[14px] font-black shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
           >
-            <span>📅</span>
+            <CalendarIcon className="w-4 h-4 text-white" />
             <span>View Full Calendar</span>
           </Link>
           <Link
@@ -768,7 +786,7 @@ export function CalendarSection({ events }: { events: CalendarEvent[] }) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-2xl border-2 border-[#e2e8f0] bg-white hover:bg-[#f0f5ff] text-[#002f76] px-5 py-3.5 text-[13px] font-bold transition-all"
           >
-            <span>📥</span>
+            <DownloadIcon className="w-4 h-4 text-[#002f76]" />
             <span>Subscribe to Calendar</span>
           </Link>
         </m.div>

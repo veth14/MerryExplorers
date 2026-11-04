@@ -14,6 +14,22 @@ import {
   openCalendarEvent,
 } from "@/lib/calendar-events";
 import { PROGRAM_SCHEDULE_CONFIGS } from "@/lib/program-sessions";
+function CalendarIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  );
+}
+
 import { EventDetailModal } from "@/components/landing/calendar-section";
 import { EventPhotoFrame } from "@/components/calendar/event-photo-frame";
 
@@ -278,23 +294,23 @@ export function PublicCalendarView({
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-[#f1f6fd] text-[#0033a0] font-fredoka text-[14px] font-bold border-2 border-[#d5e3f7] shadow-sm hover:shadow-md transition-all active:scale-95"
             >
-              <span>📥</span> Download .ics
+              <DownloadIcon className="w-4 h-4 text-slate-600" /><span>Download .ics</span>
             </a>
             <button
               type="button"
               onClick={() => setShowSubscribeModal(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FFC107] hover:bg-[#ffb800] text-[#0a1835] font-fredoka text-[14px] font-bold shadow-[0_4px_14px_rgba(255,193,7,0.35)] hover:shadow-[0_6px_20px_rgba(255,193,7,0.45)] transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
             >
-              <span>📆</span> Subscribe to Calendar
+              <CalendarIcon className="w-4 h-4 text-white" /><span>Subscribe to Calendar</span>
             </button>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1 text-[10.5px] sm:text-[11px] font-semibold text-[#71819a]">
             <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#35a56f]" />Public event dates</span>
             <span className="hidden sm:inline h-3 w-px bg-[#d5deeb]" />
-            <span className="inline-flex items-center gap-1.5">🌏 All dates in Manila time</span>
+            <span className="inline-flex items-center gap-1.5">All dates in Manila time</span>
             <span className="hidden sm:inline h-3 w-px bg-[#d5deeb]" />
-            <span className="inline-flex items-center gap-1.5">🔄 Live calendar feed</span>
+            <span className="inline-flex items-center gap-1.5">Live calendar feed</span>
           </div>
         </div>
       </section>
@@ -312,7 +328,7 @@ export function PublicCalendarView({
               </h2>
             </div>
             <span className="text-[12px] font-bold text-[#64748b] bg-[#eef4ff] px-3 py-1 rounded-full">
-              ✨ Next 4 Events
+              Next 4 Events
             </span>
           </div>
 
@@ -358,15 +374,15 @@ export function PublicCalendarView({
                 >
                   {/* Top Bar: Live Pulsing Banner for Today, thin line for others */}
                   {isToday ? (
-                    <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white px-3 flex items-center justify-between text-[9.5px] font-black uppercase tracking-wider z-20">
+                    <div className="absolute top-0 left-0 right-0 h-6 bg-[#b91c1c] text-white px-3 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider z-20">
                       <span className="flex items-center gap-1.5">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white shadow-2xs" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
                         </span>
-                        <span>Live Today · Happening Now!</span>
+                        <span className="font-extrabold tracking-wider">Happening Today</span>
                       </span>
-                      <span className="text-xs leading-none">🎉</span>
+                      <span className="text-[8.5px] font-medium text-rose-100 uppercase tracking-widest">Active</span>
                     </div>
                   ) : (
                     <div
@@ -410,16 +426,14 @@ export function PublicCalendarView({
                         >
                           {meta.label}
                         </span>
-                        <span className="w-7 h-7 rounded-xl flex items-center justify-center text-[16px] bg-[#f8faff] border border-[#edf1f7] transform group-hover:scale-110 transition-transform shrink-0">
-                          {meta.emoji}
-                        </span>
+                        
                       </div>
                       <p className="font-fredoka text-[13.5px] sm:text-[14px] font-bold text-[#002f76] leading-snug line-clamp-2 mt-1.5">
                         {e.title}
                       </p>
                       {e.adventureNumber && (
                         <span className="mt-1 inline-flex items-center rounded-full border border-[#d8e2ff] bg-[#f2f5ff] px-2 py-0.5 text-[9px] font-black text-[#4f46e5]">
-                          🗺️ Adventure {e.adventureNumber}
+                          Adventure {e.adventureNumber}
                         </span>
                       )}
                     </div>
@@ -427,8 +441,9 @@ export function PublicCalendarView({
 
                   <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-[#edf1f7]">
                     {isToday ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
-                        <span className="animate-pulse">✨</span> Happening Today!
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                        <span>Happening Today</span>
                       </span>
                     ) : (
                       <span className="text-[10px] font-semibold text-[#7b8aa1]">
@@ -488,14 +503,14 @@ export function PublicCalendarView({
             onClick={handleJumpToToday}
             className="px-3.5 py-2 rounded-2xl border-2 border-[#FFC107] bg-[#FFF8E7] hover:bg-[#FFC107] text-[#855300] hover:text-[#0a1835] font-fredoka text-[13px] font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
           >
-            <span>🎈</span>
+            <CalendarIcon className="w-3.5 h-3.5 text-amber-800" />
             <span className="hidden sm:inline">Jump to</span> Today
           </button>
         </div>
 
         {/* Mobile tap hint */}
         <div className="sm:hidden px-4 py-2 bg-[#f0f6ff] text-[#0033a0] text-[11px] font-bold text-center border-b border-[#e2eaf5] flex items-center justify-center gap-1.5">
-          <span>👆</span> Tap any date to view scheduled events & details
+          Tap any date to view scheduled events & details
         </div>
 
         {/* Calendar Body with Animation */}
@@ -822,7 +837,7 @@ export function PublicCalendarView({
                             onClick={() => openCalendarEvent(e)}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#f5f8ff] text-[#244c8b] text-[11px] font-bold border border-[#dbe5f4] shadow-xs transition-all active:scale-95 cursor-pointer"
                           >
-                            <span>📅</span> Add to Calendar
+                            <CalendarIcon className="w-4 h-4 text-[#0033a0]" /><span>Add to Calendar</span>
                           </button>
                         </div>
                       </div>
@@ -912,7 +927,7 @@ export function PublicCalendarView({
                         </h4>
                         {e.adventureNumber && (
                           <span className="inline-flex items-center rounded-full border border-[#d8e2ff] bg-[#f2f5ff] px-2 py-0.5 text-[9px] font-black text-[#4f46e5]">
-                            🗺️ Adventure {e.adventureNumber}
+                            Adventure {e.adventureNumber}
                           </span>
                         )}
                         <span
@@ -973,7 +988,7 @@ export function PublicCalendarView({
         <div className="absolute -left-20 -bottom-36 h-64 w-64 rounded-full bg-[#69a7ff]/15 blur-3xl pointer-events-none" />
         <div className="relative space-y-1.5 text-center sm:text-left">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[#FFC107] text-[11px] font-black uppercase tracking-wider">
-            📆 Live Calendar Feed
+            Live Calendar Feed
           </div>
           <h3 className="font-fredoka text-[22px] sm:text-[26px] font-bold">
             Sync Directly to Your Phone
@@ -990,14 +1005,14 @@ export function PublicCalendarView({
             rel="noopener noreferrer"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-blue-50 text-[#0033a0] font-fredoka text-[14px] font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
           >
-            <span>📥</span> Download .ics
+            <DownloadIcon className="w-4 h-4 text-slate-600" /><span>Download .ics</span>
           </a>
           <button
             type="button"
             onClick={() => setShowSubscribeModal(true)}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#FFC107] hover:bg-[#ffb800] text-[#0a1835] font-fredoka text-[14px] font-bold shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
           >
-            <span>🎈</span> Subscribe Feed
+            <span>Subscribe Feed</span>
           </button>
         </div>
       </section>
@@ -1154,7 +1169,7 @@ export function PublicCalendarView({
                             : "bg-[#0033a0] hover:bg-[#002f76] text-white active:scale-95"
                         }`}
                       >
-                        {copiedFeed ? "Copied! ✨" : "Copy Link"}
+                        {copiedFeed ? "Copied!" : "Copy Link"}
                       </button>
                     </div>
                     <p className="text-[11px] text-[#94a3b8] leading-tight">
@@ -1171,7 +1186,7 @@ export function PublicCalendarView({
                     rel="noopener noreferrer"
                     className="text-[12px] font-bold text-[#0033a0] hover:underline inline-flex items-center gap-1"
                   >
-                    <span>📥</span> Download .ics file
+                    <DownloadIcon className="w-4 h-4 text-slate-600" /><span>Download .ics file</span>
                   </a>
                   <button
                     type="button"
