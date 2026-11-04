@@ -7,7 +7,7 @@ import { getCompletedSessionsCount, matchProgramSchedule, calculateCalendarSessi
 import {
     RESERVATION_RATE, WEEKLY_INTEREST_RATE, BALANCE_DUE_SESSION,
     isRegistrationVerified, fmtPeso, fmtIsoDate,
-    getStudentSessionInfo, calcRegistrationTerms,
+    getStudentSessionInfo, calcRegistrationTerms, getRegistrationAdventureStart, getManilaTodayIso,
 } from "@/lib/payment-terms";
 
 const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -142,10 +142,6 @@ function fmtExpiry(str: string) {
 }
 
 // ─── Payments (rules + math live in @/lib/payment-terms, shared with Payment Tracking) ───
-// TEMP (testing only): when the parent page does not pass `registrations`, fetch them here and keep
-// only this parent's. This downloads EVERY family's registrations to the browser, so replace it with
-// a server route that returns only the logged-in parent's registration, then set this to false.
-const TEMP_FETCH_REGISTRATIONS = true;
 
 type LedgerRow = {
     key: string; label: string; date: string; method: string; ref: string;
@@ -424,7 +420,7 @@ export default function TrailblazerDashboard(p: Props) {
     const { profile } = p;
     const [tab, setTab] = useState<Tab>("session");
 
-    // Registration records for this family: from props, or (TEMP) fetched here
+    // Registration records are fetched from a parent-scoped endpoint, never the admin-wide list.
     const [fetchedRegs, setFetchedRegs] = useState<any[] | null>(null);
     const [holidaySkipDates, setHolidaySkipDates] = useState<Set<string>>(new Set());
     const [fetchedSchedules, setFetchedSchedules] = useState<any[] | null>(null);
@@ -444,16 +440,14 @@ export default function TrailblazerDashboard(p: Props) {
 
     const allSchedules = p.programSchedules ?? fetchedSchedules ?? [];
     useEffect(() => {
-        const mail = (profile.email || "").toLowerCase();
-        if (!TEMP_FETCH_REGISTRATIONS || p.registrations || !mail) return;
-        fetch("/api/registrations?status=all")
+        if (p.registrations || !p.user?.uid) return;
+        fetch(`/api/parents/registrations?uid=${encodeURIComponent(p.user.uid)}`)
             .then((r) => r.json())
             .then((d) => {
-                const list: any[] = d?.success && Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : [];
-                setFetchedRegs(list.filter((r) => (r.parentInfo?.email || "").toLowerCase() === mail));
+                setFetchedRegs(Array.isArray(d?.registrations) ? d.registrations : []);
             })
             .catch(() => setFetchedRegs([]));
-    }, [p.registrations, profile.email]);
+    }, [p.registrations, p.user?.uid]);
     const registrations: any[] = p.registrations ?? fetchedRegs ?? [];
 
     // Fetch holiday/suspension dates for holiday-aware payment term calculation
@@ -733,12 +727,39 @@ export default function TrailblazerDashboard(p: Props) {
         // Balance math: identical to Payment Tracking (running total of the registration, only when verified)
         const regLine = ledger.find((l) => l.key === "reg");
         const paidVerified = regVerified ? regTotalPaid : 0;
+        const previousAdventureBalance = Math.max(0, Number(registration?.previousAdventureBalance) || 0);
+        const paidToPrevious = Math.min(paidVerified, previousAdventureBalance);
+        const appliedToCurrentSession = Math.max(0, paidVerified - paidToPrevious);
+        const adventureStart = registration
+            ? getRegistrationAdventureStart(p.allRenewalPrograms, registration, getManilaTodayIso())
+            : undefined;
+        // Prefer the parent's server-computed terms. This uses the same holiday list,
+        // Adventure anchor, and pricing data as the registration payment page/API.
+        // Keep the local calculation only for registrations supplied by older callers.
+        const serverTerms = registration?.paymentTerms;
         const terms = registration
-            ? calcRegistrationTerms(registration, getStudentSessionInfo(registration, profile), paidVerified, registration.amountDue, new Date(), holidaySkipDates)
+            ? serverTerms || calcRegistrationTerms(
+                registration,
+                getStudentSessionInfo(registration, profile, adventureStart),
+                appliedToCurrentSession,
+                registration.amountDue,
+                new Date(),
+                holidaySkipDates
+            )
             : null;
+        const remainingPreviousBalance = Math.max(0, previousAdventureBalance - paidToPrevious);
+        if (terms && !serverTerms) {
+            terms.balance = terms.balance == null ? remainingPreviousBalance || null : terms.balance + remainingPreviousBalance;
+            terms.totalPayable = terms.totalPayable == null ? terms.balance : terms.totalPayable + remainingPreviousBalance;
+        }
         const fullyPaid = terms?.balance === 0;
         const overdue = !!terms && terms.interest > 0;
         const regPending = !!regLine && !regLine.verified && !regLine.rejected;
+        const pendingBalance = balances.some((payment: any) => payment.verified !== true && payment.rejected !== true);
+        const canSubmitBalance = Boolean(
+            registration?.id && ["approved", "active"].includes(registration.status) &&
+            Number(terms?.balance) > 0 && !pendingBalance
+        );
         const pct = (n: number) => Math.round(n * 100);
 
         // Which part of the schedule is covered by verified payments
@@ -809,6 +830,15 @@ export default function TrailblazerDashboard(p: Props) {
                                     </span>
                                 )}
                             </div>
+
+                            {canSubmitBalance && (
+                                <a href={`/register/payment/${encodeURIComponent(registration.id)}`} className="vp-btn" style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
+                                    Submit balance payment · {fmtPeso(terms?.totalPayable || terms?.balance || 0)}
+                                </a>
+                            )}
+                            {pendingBalance && (
+                                <div className="vp-note-box" style={{ marginTop: 14 }}>Your balance payment receipt is waiting for review. You can submit another after it has been reviewed.</div>
+                            )}
 
                             {regPending && (
                                 <div className="vp-note-box">Your registration payment is awaiting verification, so it is not counted in the balance yet.</div>

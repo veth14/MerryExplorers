@@ -38,6 +38,7 @@ type RegData = {
     weeksOfInterest: number;
     totalPayable: number | null;
     dueDate?: string | null;
+    interestStart?: string | null;
   } | null;
 };
 
@@ -625,7 +626,12 @@ export default function PaymentPage() {
                   )}
                   <div className="flex justify-between border-t border-white/30 pt-2"><span className="text-white/80">Remaining Balance</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.balance || 0).toLocaleString()}</span></div>
                   {Number(regData?.balanceInfo?.interest) > 0 && <div className="flex justify-between"><span className="text-white/80">Overdue Interest ({regData?.balanceInfo?.weeksOfInterest} week{regData?.balanceInfo?.weeksOfInterest === 1 ? "" : "s"})</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.interest || 0).toLocaleString()}</span></div>}
-                  {regData?.balanceInfo?.dueDate && <div className="border-t border-white/30 pt-2 text-[11px] text-white/75">Balance due date: {new Date(`${regData.balanceInfo.dueDate}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}. Overdue balances accrue 4% weekly interest.</div>}
+                  {regData?.balanceInfo?.dueDate && <div className="border-t border-white/30 pt-2 text-[11px] leading-relaxed text-white/80">
+                    Balance due on session 6: {new Date(`${regData.balanceInfo.dueDate}T12:00:00Z`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric" })}.
+                    {regData.balanceInfo.interestStart
+                      ? ` 4% weekly interest starts ${new Date(`${regData.balanceInfo.interestStart}T12:00:00Z`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "long", month: "long", day: "numeric", year: "numeric" })}.`
+                      : " 4% weekly interest applies after the due date."}
+                  </div>}
                 </div>
               </div>
             ) : (

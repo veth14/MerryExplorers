@@ -12,6 +12,12 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
+    // This page verifies the actual Firebase token and developer role in its
+    // API routes. Let signed-in users reach the client guard even if their
+    // browser role cookie is stale; no protected account data is served here.
+    if (pathname.startsWith('/admin/password-resets')) {
+      return NextResponse.next();
+    }
     // Teachers with the "photo-albums" permission are allowed into that one page.
     // The middleware cannot read DB permissions, so we allow all teachers through to
     // /admin/photo-albums — the sidebar only shows the link to permitted users.

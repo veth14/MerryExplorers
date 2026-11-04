@@ -395,6 +395,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
         { label: "Photo Albums", href: "/admin/photo-albums", icon: <GalleryIcon /> },
         { label: "Reports", href: "/admin/reports", icon: <ReportsIcon /> },
         { label: "Audit Log", href: "/admin/audit-log", icon: <AuditIcon /> },
+        ...(isDeveloper ? [{ label: "Password Resets", href: "/admin/password-resets", icon: <AuditIcon /> }] : []),
       ],
     },
   ];

@@ -119,6 +119,8 @@ This project connects to Firebase, MongoDB, Supabase, and the Gmail API. Create 
 - `src/lib/supabase.ts`
 - `src/lib/gmail-client.ts`
 
+Developer password resets also require `FIREBASE_SERVICE_ACCOUNT_JSON`, containing the Firebase project's service account JSON. Set it as a server-only secret in local `.env.local` and the deployment environment; never add a `NEXT_PUBLIC_` prefix or commit the credential. The service account must be allowed to manage Firebase Authentication users. The reset page stores only reset audit details, never passwords.
+
 ### Run the dev server
 
 ```bash

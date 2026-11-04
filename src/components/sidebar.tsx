@@ -30,6 +30,7 @@ const navItems = [
   { label: "Photo Albums", href: "/admin/photo-albums" },
   { label: "Payroll", href: "/admin/payroll" },
   { label: "Audit Log", href: "/admin/audit-log" },
+  { label: "Password Resets", href: "/admin/password-resets" },
 ] as const;
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -268,6 +269,7 @@ const iconMap: Record<string, React.ComponentType<{ active?: boolean }>> = {
   "Photo Albums": GalleryIcon,
   Payroll: PayrollIcon,
   "Audit Log": AuditIcon,
+  "Password Resets": AuditIcon,
 };
 
 type SidebarProps = {
@@ -421,11 +423,12 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     },
     {
       title: "Content & System",
-      items: ["Inquiries", "Announcements", "Gallery", "Photo Albums", "Reports", "Audit Log"],
+      items: ["Inquiries", "Announcements", "Gallery", "Photo Albums", "Reports", "Audit Log", "Password Resets"],
     },
   ].map((g) => ({
     ...g,
     items: g.items
+      .filter((item) => item !== "Password Resets" || (userProfile?.role || "").toLowerCase() === "developer")
       .map((label) => navItems.find((i) => i.label === label))
       .filter(Boolean) as { label: string; href: string }[],
   }));

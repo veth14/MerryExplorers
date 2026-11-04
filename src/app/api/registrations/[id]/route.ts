@@ -86,6 +86,7 @@ export async function GET(
           weeksOfInterest: terms.mondays,
           totalPayable,
           dueDate: terms.dueDate,
+          interestStart: terms.interestStart,
         }
       : null;
     const reservationIsExpired = registration.status === "expired" || (

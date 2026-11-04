@@ -107,12 +107,15 @@ export function getRegistrationItems(reg: any): FeeItem[] {
     return items;
 }
 
-// First Monday on or after the due date: the day the first 4% is charged ("YYYY-MM-DD")
-export function firstInterestDate(dueIso: string): string {
+// First non-holiday Monday on or after the due date: the first day 4% is charged.
+export function firstInterestDate(dueIso: string, skipDates?: Set<string>): string {
     const d = new Date(dueIso + "T00:00:00");
-    while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    while (true) {
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        if (d.getDay() === 1 && !skipDates?.has(dateStr)) return dateStr;
+        d.setDate(d.getDate() + 1);
+    }
 }
 
 // Full cost of a registration = sum of its items.
@@ -294,6 +297,6 @@ export function calcRegistrationTerms(
         }
     }
     const totalPayable = balance != null ? balance + interest : null;
-    const interestStart = dueDate && balance && balance > 0 ? firstInterestDate(dueDate) : null;
+    const interestStart = dueDate && balance && balance > 0 ? firstInterestDate(dueDate, skipDates) : null;
     return { interestStart, due, items: getRegistrationItems(reg), paidVerified, balance, reservation, balanceShare, dueDate, mondays, interest, totalPayable };
 }
