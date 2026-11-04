@@ -332,6 +332,9 @@ export function PublicCalendarView({
               const weekdayAbbr = new Date(y, mStr - 1, dStr).toLocaleDateString("en-US", {
                 weekday: "short",
               });
+              const isToday =
+                e.startDate === todayStr ||
+                Boolean(e.endDate && e.startDate <= todayStr && e.endDate >= todayStr);
               const relText = formatRelativeDays(e.startDate, todayStr);
 
               return (
@@ -347,16 +350,45 @@ export function PublicCalendarView({
                     }
                     setSelectedDate(e.startDate);
                   }}
-                  className="group text-left rounded-[1.5rem] bg-white border border-[#e3eaf5] p-4 shadow-[0_10px_28px_rgba(20,52,100,0.06)] hover:shadow-[0_18px_38px_rgba(20,52,100,0.12)] hover:border-[#b8cbed] transition-all hover:-translate-y-1 active:translate-y-0 relative overflow-hidden min-h-[158px] flex flex-col"
+                  className={`group text-left rounded-[1.8rem] p-4.5 transition-all relative overflow-hidden min-h-[164px] flex flex-col cursor-pointer ${
+                    isToday
+                      ? "bg-gradient-to-b from-[#fffef5] via-white to-white border-2 border-amber-400 ring-4 ring-amber-400/30 shadow-[0_20px_45px_rgba(245,158,11,0.28)] sm:scale-[1.03] sm:-translate-y-1.5 z-10"
+                      : "bg-white border border-[#e3eaf5] shadow-[0_10px_28px_rgba(20,52,100,0.06)] hover:shadow-[0_18px_38px_rgba(20,52,100,0.12)] hover:border-[#b8cbed] hover:-translate-y-1 active:translate-y-0"
+                  }`}
                 >
-                  <div
-                    className="absolute top-0 left-0 right-0 h-1.5"
-                    style={{ backgroundColor: meta.color }}
-                  />
-                  <div className="flex items-start gap-3 pt-1">
-                    <div className="w-[52px] h-[58px] rounded-2xl border border-[#e5ebf5] bg-gradient-to-b from-[#ffffff] to-[#edf3fc] flex flex-col items-center justify-center shadow-inner shrink-0 text-center">
-                      <span className="text-[8px] font-black uppercase tracking-[0.12em] text-[#7a8ba5] leading-none mb-1">
-                        {weekdayAbbr}
+                  {/* Top Bar: Live Pulsing Banner for Today, thin line for others */}
+                  {isToday ? (
+                    <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white px-3 flex items-center justify-between text-[9.5px] font-black uppercase tracking-wider z-20">
+                      <span className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white shadow-2xs" />
+                        </span>
+                        <span>Live Today · Happening Now!</span>
+                      </span>
+                      <span className="text-xs leading-none">🎉</span>
+                    </div>
+                  ) : (
+                    <div
+                      className="absolute top-0 left-0 right-0 h-1.5"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                  )}
+
+                  <div className={`flex items-start gap-3 ${isToday ? "pt-5" : "pt-1"}`}>
+                    <div
+                      className={`w-[52px] h-[58px] rounded-2xl border flex flex-col items-center justify-center shrink-0 text-center shadow-inner ${
+                        isToday
+                          ? "border-amber-300 ring-2 ring-amber-400/35 bg-gradient-to-b from-amber-50 to-amber-100/70"
+                          : "border-[#e5ebf5] bg-gradient-to-b from-[#ffffff] to-[#edf3fc]"
+                      }`}
+                    >
+                      <span
+                        className={`text-[8.5px] font-black uppercase tracking-[0.12em] leading-none mb-1 ${
+                          isToday ? "text-amber-800 font-extrabold" : "text-[#7a8ba5]"
+                        }`}
+                      >
+                        {isToday ? "TODAY" : weekdayAbbr}
                       </span>
                       <span className="font-fredoka tabular-nums text-[21px] font-bold text-[#002f76] leading-none">
                         {dStr}
@@ -365,19 +397,24 @@ export function PublicCalendarView({
                         {monthAbbr}
                       </span>
                     </div>
+
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
                         <span
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border"
-                          style={{ color: meta.color, backgroundColor: meta.bg, borderColor: meta.border }}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border shadow-2xs"
+                          style={{
+                            color: meta.color,
+                            backgroundColor: meta.bg,
+                            borderColor: meta.border,
+                          }}
                         >
                           {meta.label}
                         </span>
-                        <span className="w-8 h-8 rounded-xl flex items-center justify-center text-[18px] bg-[#f8faff] border border-[#edf1f7] transform group-hover:scale-110 transition-transform shrink-0">
+                        <span className="w-7 h-7 rounded-xl flex items-center justify-center text-[16px] bg-[#f8faff] border border-[#edf1f7] transform group-hover:scale-110 transition-transform shrink-0">
                           {meta.emoji}
                         </span>
                       </div>
-                      <p className="font-fredoka text-[13px] sm:text-[14px] font-semibold text-[#002f76] leading-snug line-clamp-2 mt-2">
+                      <p className="font-fredoka text-[13.5px] sm:text-[14px] font-bold text-[#002f76] leading-snug line-clamp-2 mt-1.5">
                         {e.title}
                       </p>
                       {e.adventureNumber && (
@@ -389,10 +426,21 @@ export function PublicCalendarView({
                   </div>
 
                   <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-[#edf1f7]">
-                    <span className="text-[10px] font-semibold text-[#7b8aa1]">
-                      {relText || weekdayAbbr}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#315b9f] group-hover:text-[#0033a0]">
+                    {isToday ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                        <span className="animate-pulse">✨</span> Happening Today!
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-[#7b8aa1]">
+                        {relText || weekdayAbbr}
+                      </span>
+                    )}
+
+                    <span
+                      className={`inline-flex items-center gap-1 text-[10.5px] font-extrabold transition-colors ${
+                        isToday ? "text-[#0050d5]" : "text-[#315b9f] group-hover:text-[#0033a0]"
+                      }`}
+                    >
                       View date <span className="transition-transform group-hover:translate-x-0.5">→</span>
                     </span>
                   </div>
@@ -505,6 +553,8 @@ export function PublicCalendarView({
                       ${
                         isSelected
                           ? "bg-[#eef4ff] border-[#0033a0] shadow-md ring-2 ring-[#0033a0]/30 -translate-y-0.5"
+                          : isToday
+                          ? "bg-gradient-to-b from-[#fffef7] to-white border-2 border-amber-400 ring-2 ring-amber-400/30 shadow-md"
                           : hasEvents
                           ? "bg-white border-[#dbe6f6] hover:border-[#93c5fd] hover:bg-[#f8faff] hover:shadow-sm"
                           : isSunday
@@ -516,22 +566,29 @@ export function PublicCalendarView({
                   >
                     {/* Top row: day number + indicator */}
                     <div className="flex items-center justify-between w-full">
-                      <span
-                        className={`
-                          inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[12px] sm:text-[13px] font-black transition-all
-                          ${
-                            isToday
-                              ? "bg-[#0033a0] text-white shadow-sm ring-2 ring-[#0033a0]/20"
-                              : isSelected
-                              ? "bg-[#002f76] text-white"
-                              : isSunday
-                              ? "text-[#dc2626]"
-                              : "text-[#1e293b] group-hover:text-[#0033a0]"
-                          }
-                        `}
-                      >
-                        {dayNum}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`
+                            inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[12px] sm:text-[13px] font-black transition-all
+                            ${
+                              isToday
+                                ? "bg-gradient-to-r from-[#0033a0] to-[#0050d5] text-white shadow-sm ring-2 ring-amber-400/50"
+                                : isSelected
+                                ? "bg-[#002f76] text-white"
+                                : isSunday
+                                ? "text-[#dc2626]"
+                                : "text-[#1e293b] group-hover:text-[#0033a0]"
+                            }
+                          `}
+                        >
+                          {dayNum}
+                        </span>
+                        {isToday && (
+                          <span className="text-[8.5px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-2xs hidden sm:inline-block leading-none">
+                            Today
+                          </span>
+                        )}
+                      </div>
 
                       {/* Small badge count on mobile if multiple */}
                       {hasEvents && (
