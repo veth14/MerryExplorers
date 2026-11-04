@@ -225,7 +225,7 @@ export default function DiscoveryDayAdminPage() {
           />
         </section>
 
-        <div className="flex flex-col xl:flex-row gap-4 relative items-start">
+        <div className="relative">
           {/* Table Container matching Inquiries */}
           <div className="w-full min-w-0 flex-1 overflow-x-auto bg-white rounded-[1.5rem] p-4 sm:p-6 shadow-sm border border-[#e4e2e1]/50">
             
@@ -244,8 +244,8 @@ export default function DiscoveryDayAdminPage() {
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name or email..."
-                    className="pl-9 pr-4 py-2 text-[13px] font-semibold border border-[#e2e8f0] rounded-full focus:outline-none focus:border-[#005cc8] bg-[#f8fafc] w-52"
+                    placeholder="Search child, parent, email, or Facebook..."
+                    className="pl-9 pr-4 py-2 text-[13px] font-semibold border border-[#e2e8f0] rounded-full focus:outline-none focus:border-[#005cc8] bg-[#f8fafc] w-64 max-w-full"
                   />
                 </div>
                 <select
@@ -351,54 +351,76 @@ export default function DiscoveryDayAdminPage() {
 
           {/* Detail Panel */}
           {selected && (
-            <div className="w-full shrink-0 rounded-[1.5rem] bg-white p-5 sm:p-6 shadow-sm border border-[#e4e2e1]/50 space-y-5 xl:sticky xl:top-4 xl:w-[360px]">
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="font-headline text-base font-extrabold text-[#002f76] leading-tight">
-                  {selected.childName ? `${selected.childName}'s` : "Child's"} Results
-                </h2>
-                <button onClick={() => setSelected(null)} className="text-[#94a3b8] hover:text-[#334155] p-1 rounded-lg hover:bg-[#f1f5f9]">
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0b1d3a]/50 backdrop-blur-sm sm:items-center sm:p-6" onClick={() => setSelected(null)}>
+            <div role="dialog" aria-modal="true" aria-labelledby="discovery-result-title" onClick={(event) => event.stopPropagation()} className="flex h-[92dvh] max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[28px] border border-white/70 bg-white shadow-[0_24px_80px_rgba(0,31,84,0.25)] sm:h-auto sm:max-h-[90vh] sm:rounded-3xl">
+              <div className="shrink-0 border-b border-[#e8eef7] bg-gradient-to-r from-[#f4f8ff] via-white to-[#fffaf0] px-5 pb-4 pt-3 sm:px-7 sm:pb-5 sm:pt-6">
+                <div className="mx-auto mb-3 h-1.5 w-11 rounded-full bg-[#c8d5e8] sm:hidden" />
+                <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#8194b1]">Discovery Day submission</p>
+                  <h2 id="discovery-result-title" className="font-headline text-xl font-extrabold leading-tight text-[#002f76] sm:text-2xl">
+                    {selected.childName ? `${selected.childName}'s` : "Child's"} Results
+                  </h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium text-[#71839e]">Submitted {formatDate(selected.createdAt)} · {formatTime(selected.createdAt)}</p>
+                    <StatusBadge status={selected.status} />
+                  </div>
+                </div>
+                <button aria-label="Close result details" onClick={() => setSelected(null)} className="rounded-full border border-[#dce5f1] bg-white p-2 text-[#64748b] shadow-sm transition hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-[#002f76]">
                   <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
               </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+              <div className="grid gap-5 lg:grid-cols-[minmax(280px,0.82fr)_minmax(0,1.18fr)]">
+              <div className="space-y-4">
 
               {/* Child Info */}
-              <div className="rounded-xl bg-[#f8fafc] p-4 space-y-2">
+              <div className="grid gap-4 rounded-2xl border border-[#e5edf8] bg-[#f8fbff] p-4 sm:grid-cols-2 sm:p-5">
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Child</p>
-                  <p className="font-bold text-[#334155]">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#8194b1]">Child</p>
+                  <p className="mt-1 font-extrabold text-[#173b70]">
                     {selected.childName || "—"}{" "}
-                    <span className="font-medium text-[#94a3b8]">({selected.childAge || "age not set"})</span>
+                    <span className="text-sm font-semibold text-[#8194b1]">· {selected.childAge || "Age not set"}</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Parent</p>
-                  <p className="font-bold text-[#334155]">{selected.parentName}</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#8194b1]">Parent</p>
+                  <p className="mt-1 font-bold text-[#334155]">{selected.parentName}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Email</p>
-                  <a href={`mailto:${selected.email}`} className="font-bold text-[#0033A0] hover:underline break-all text-sm">{selected.email}</a>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#8194b1]">Email</p>
+                  <a href={`mailto:${selected.email}`} className="mt-1 block break-all text-sm font-bold text-[#0033A0] hover:underline">{selected.email}</a>
                 </div>
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Facebook</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#8194b1]">Facebook</p>
                   {selected.facebook ? (
                     getFacebookUrl(selected.facebook) ? (
-                      <a href={getFacebookUrl(selected.facebook)!} target="_blank" rel="noreferrer" className="font-bold text-[#1877f2] hover:underline break-all text-sm">{selected.facebook}</a>
+                      <a href={getFacebookUrl(selected.facebook)!} target="_blank" rel="noreferrer" className="mt-1 block break-all text-sm font-bold text-[#1877f2] hover:underline">{selected.facebook}</a>
                     ) : (
-                      <p className="font-bold text-[#334155] break-all text-sm">{selected.facebook}</p>
+                      <p className="mt-1 break-all text-sm font-bold text-[#334155]">{selected.facebook}</p>
                     )
-                  ) : <p className="text-sm text-[#94a3b8]">Not provided</p>}
+                  ) : <p className="mt-1 text-sm text-[#94a3b8]">Not provided</p>}
                 </div>
               </div>
 
               {/* Best Fit */}
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8] mb-2">Best Fit Program</p>
-                <ProgramBadge program={selected.finalProgram} />
+              <div className="overflow-hidden rounded-2xl border border-[#f1df9e] bg-gradient-to-br from-[#fff9e5] via-white to-[#f3f8ff] p-5 shadow-sm">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#ffdf72] text-xl shadow-sm">⭐</div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#8e7730]">Recommended fit</p>
+                <h3 className="mt-1 text-lg font-extrabold text-[#123b79]">
+                  {selected.finalProgram === "curious" ? "Curious Explorer" : selected.finalProgram === "creative" ? "Creative Explorer" : selected.finalProgram === "trailblazer" ? "Trailblazer" : selected.finalProgram}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[#64748b]">Based on {selected.childName || "your child"}&apos;s quiz responses.</p>
               </div>
 
               {/* Score Bars */}
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8] mb-2">Scores</p>
+              <div className="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#8194b1]">Fit scores</p>
+                  <span className="rounded-full bg-[#f1f6ff] px-2.5 py-1 text-[10px] font-bold text-[#47658f]">Out of 10</span>
+                </div>
                 <div className="space-y-2.5">
                   {(selected.attempted || []).map((sec) => {
                     const score = selected.scores?.[sec] ?? 0;
@@ -419,19 +441,27 @@ export default function DiscoveryDayAdminPage() {
                   })}
                 </div>
               </div>
+              </div>
 
               {/* Individual quiz responses */}
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8] mb-2">Questions &amp; Answers</p>
+              <div className="rounded-2xl border border-[#e5edf8] bg-[#fbfcff] p-4 sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#8194b1]">Quiz responses</p>
+                    <h3 className="mt-1 text-base font-extrabold text-[#173b70]">Questions &amp; Answers</h3>
+                  </div>
+                  {selected.answers?.length ? <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-[#47658f] shadow-sm">{selected.answers.length} answered</span> : null}
+                </div>
                 {selected.answers?.length ? (
-                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     {selected.answers.map((answer, index) => (
-                      <div key={`${answer.questionIndex ?? index}-${index}`} className="rounded-xl bg-[#f8fafc] p-3">
-                        <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wider text-[#94a3b8]">
-                          {answer.section.replace(/-/g, " ")}
-                        </p>
-                        <p className="text-[11px] font-semibold leading-snug text-[#334155]">{answer.question}</p>
-                        <p className="mt-1.5 text-[11px] font-extrabold text-[#0050d5]">Answer: {answer.answer}</p>
+                      <div key={`${answer.questionIndex ?? index}-${index}`} className="rounded-xl border border-[#edf2f8] bg-white p-3.5 shadow-[0_2px_8px_rgba(20,55,100,0.04)]">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <p className="text-[9px] font-extrabold uppercase tracking-wider text-[#8497b3]">{answer.section.replace(/-/g, " ")}</p>
+                          <span className="rounded-full bg-[#f1f6ff] px-2 py-0.5 text-[9px] font-extrabold text-[#5375a8]">Q{(answer.questionIndex ?? index) + 1}</span>
+                        </div>
+                        <p className="text-xs font-semibold leading-relaxed text-[#334155]">{answer.question}</p>
+                        <p className="mt-2 rounded-lg bg-[#f1f7ff] px-2.5 py-1.5 text-[11px] font-extrabold text-[#0050d5]">Answer: {answer.answer}</p>
                       </div>
                     ))}
                   </div>
@@ -442,16 +472,19 @@ export default function DiscoveryDayAdminPage() {
                 )}
               </div>
 
-              {/* Status Buttons */}
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#94a3b8] mb-2">Update Status</p>
-                <div className="flex flex-wrap gap-1.5">
+              </div>
+              </div>
+
+              <div className="shrink-0 border-t border-[#e8eef7] bg-white px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-7 sm:pb-6">
+                {/* Status Buttons */}
+                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-[#8194b1]">Update Status</p>
+                <div className="mb-3 flex flex-nowrap gap-1.5 overflow-x-auto pb-1">
                   {ALL_STATUSES.map((s) => (
                     <button
                       key={s}
                       disabled={updating || selected.status === s}
                       onClick={() => updateStatus(selected.id, s)}
-                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
                         selected.status === s
                           ? "bg-[#0033A0] text-white border-[#0033A0]"
                           : "bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#0033A0]/40 hover:text-[#0033A0]"
@@ -461,17 +494,15 @@ export default function DiscoveryDayAdminPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Quick Email */}
-              <div className="pt-2 border-t border-[#f1f5f9]">
+                {/* Quick Email */}
                 <a
                   href={`mailto:${selected.email}?subject=Your Discovery Day Booking – Merry Explorers&body=Hi ${selected.parentName},%0A%0AThank you for completing our Discovery Day Fit Score quiz! Based on your results, ${selected.childName || "your child"} is a great fit for our ${selected.finalProgram} program.%0A%0AWe'd love to invite you to book a Discovery Day slot. Please reply to this email to schedule your visit.%0A%0AWarmly,%0AThe Merry Explorers Team`}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#0033A0] text-white text-[12px] font-bold hover:bg-[#002080] transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#0033A0] text-white text-[12px] font-bold hover:bg-[#002080] transition-colors shadow-[0_5px_14px_rgba(0,51,160,0.18)]"
                 >
                   ✉ Email Parent
                 </a>
               </div>
+            </div>
             </div>
           )}
         </div>
