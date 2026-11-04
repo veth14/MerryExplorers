@@ -774,7 +774,7 @@ export function CalendarSection({ events }: { events: CalendarEvent[] }) {
           className="mt-10 sm:mt-12 flex flex-col sm:flex-row items-center justify-center gap-3"
         >
           <Link
-            href="/under-development"
+            href="/calendar"
             className="inline-flex items-center gap-2.5 rounded-2xl bg-[#0033A0] hover:bg-[#002270] text-white px-6 py-3.5 text-[14px] font-black shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
           >
             <CalendarIcon className="w-4 h-4 text-white" />
