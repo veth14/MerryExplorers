@@ -344,7 +344,11 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
 
   const isExecPartner = (userProfile?.role || "").toLowerCase() === "executive assistant";
   const isDeveloper = (userProfile?.role || "").toLowerCase() === "developer";
+  const isIntern = (userProfile?.role || "").toLowerCase() === "intern";
   const canUploadPhotos = isExecPartner || isDeveloper || (userProfile?.permissions || []).includes("photo-albums");
+  const visibleTeacherNavItems = isIntern
+    ? teacherNavItems.filter((item) => item.href === "/teacher/clock")
+    : teacherNavItems;
 
   async function handleLogout() { setUserMenuOpen(false); await signOut(); }
   function handleNavClick() { onClose?.(); }
@@ -435,7 +439,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
         <div>
           <SectionLabel>Teacher Tools</SectionLabel>
           <div className="space-y-0.5">
-            {teacherNavItems.map((item) => {
+            {visibleTeacherNavItems.map((item) => {
               const Icon = teacherIconMap[item.label];
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
@@ -450,7 +454,7 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
               );
             })}
             {/* Photo Albums — shown to teachers with the "photo-albums" permission */}
-            {canUploadPhotos && !isExecPartner && !isDeveloper && (
+            {!isIntern && canUploadPhotos && !isExecPartner && !isDeveloper && (
               <NavItem
                 href="/admin/photo-albums"
                 label="Photo Albums"
@@ -550,17 +554,21 @@ export function TeacherSidebar({ mobileOpen = false, onClose }: TeacherSidebarPr
             "absolute bottom-full left-0 right-0 mb-2 z-50 overflow-hidden rounded-2xl bg-white shadow-[0_8px_32px_rgba(0,47,118,0.16)] border border-[#e2e8f5] transition-all duration-200 origin-bottom",
             userMenuOpen ? "opacity-100 scale-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-95 translate-y-2 pointer-events-none",
           ].join(" ")}>
-            <Link
-              href="/teacher/contact"
-              onClick={() => { setUserMenuOpen(false); onClose?.(); }}
-              className="flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#3d5a8a] hover:bg-[#eaf0fe] transition-colors"
-            >
-              <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#eef1fb] text-[#002f76]">
-                <BugReportIcon />
-              </span>
-              <span>Report a Bug</span>
-            </Link>
-            <div className="h-px bg-[#f0f4fa] mx-3" />
+            {!isIntern && (
+              <>
+                <Link
+                  href="/teacher/contact"
+                  onClick={() => { setUserMenuOpen(false); onClose?.(); }}
+                  className="flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#3d5a8a] hover:bg-[#eaf0fe] transition-colors"
+                >
+                  <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#eef1fb] text-[#002f76]">
+                    <BugReportIcon />
+                  </span>
+                  <span>Report a Bug</span>
+                </Link>
+                <div className="h-px bg-[#f0f4fa] mx-3" />
+              </>
+            )}
             <button
               onClick={handleLogout}
               className="flex w-full items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#c0392b] hover:bg-[#fef2f2] transition-colors"

@@ -570,7 +570,7 @@ export default function TeacherProfilePage() {
                     Employment Type
                   </label>
                   <div className="p-3 rounded-xl bg-brand-sky/30 border border-brand-sky/20 font-bold text-brand-navy text-sm">
-                    {formData.workDetails.employmentType === "part-time" ? (formData.workDetails.weeklyHoursTarget ? `OJT (${formData.workDetails.weeklyHoursTarget}h)` : "Part-Time") : "Full-Time"}
+                    {(userProfile as any)?.role?.toLowerCase() === "intern" ? "Student Intern" : formData.workDetails.employmentType === "part-time" ? (formData.workDetails.weeklyHoursTarget ? `OJT (${formData.workDetails.weeklyHoursTarget}h)` : "Part-Time") : "Full-Time"}
                   </div>
                 </div>
               </div>

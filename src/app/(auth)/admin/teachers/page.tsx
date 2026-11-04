@@ -57,7 +57,7 @@ export default function TeachersPage() {
         if (Array.isArray(json)) {
           const teachersOnly = json.filter((acc) => {
             const r = (acc.role || "").toLowerCase();
-            return r !== "admin" && r !== "parent";
+            return ["lead teacher", "lead_teacher", "assistant teacher", "assistant_teacher"].includes(r);
           });
           setAccounts(teachersOnly.map(mapAccountToTeacher));
         }

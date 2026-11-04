@@ -18,6 +18,7 @@ const statusConfig: Record<UserStatus, { label: string; dot: string; text: strin
 const roleConfig: Record<string, { bg: string; text: string; border: string }> = {
   "Lead Teacher":      { bg: "bg-[#fff8e1]", text: "text-[#a07000]", border: "border-[#ffd54f]" },
   "Assistant Teacher": { bg: "bg-[#e8effe]", text: "text-[#0050d5]", border: "border-[#c5d6ff]" },
+  "Intern":             { bg: "bg-[#f5f0ff]", text: "text-[#6d28d9]", border: "border-[#ddd0ff]" },
 };
 
 function EditIcon() {
@@ -100,7 +101,9 @@ export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
                 : user.fullName.includes("Ian Angelo Valmores")
                   ? "Developer"
                   : "Administrator"
-              : user.assignedRoom}
+              : user.role === "Intern"
+                ? `${user.yearLevel || "Grade 12"} · ${user.strand || "ABM"}`
+                : user.assignedRoom}
           </p>
         </div>
 
@@ -141,11 +144,17 @@ export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
 
         {/* Work details chip row */}
         <div className="flex items-center gap-2 pt-0.5">
-          <span className="text-[11px] font-bold text-[#8898aa] bg-[#f0f4f9] px-2.5 py-1 rounded-lg">
-            {user.employeeId}
-          </span>
+          {user.employeeId && (
+            <span className="text-[11px] font-bold text-[#8898aa] bg-[#f0f4f9] px-2.5 py-1 rounded-lg">
+              {user.employeeId}
+            </span>
+          )}
           <span className="text-[11px] font-bold text-[#8898aa] bg-[#f0f4f9] px-2.5 py-1 rounded-lg truncate">
-            {user.employmentType === "part-time" ? (user.weeklyHoursTarget ? `OJT (${user.weeklyHoursTarget}h)` : "Part-Time") : "Full-Time"}
+            {user.role === "Intern"
+              ? `Student Intern${user.weeklyHoursTarget ? ` · ${user.weeklyHoursTarget}h/wk` : ""}`
+              : user.employmentType === "part-time"
+                ? (user.weeklyHoursTarget ? `OJT (${user.weeklyHoursTarget}h)` : "Part-Time")
+                : "Full-Time"}
           </span>
         </div>
 

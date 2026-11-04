@@ -1,6 +1,16 @@
-export type TeacherRole = "Lead Teacher" | "Assistant Teacher";
+export type TeacherRole = "Lead Teacher" | "Assistant Teacher" | "Intern";
 export type UserStatus = "active" | "inactive" | "on-leave";
 export type EmploymentType = "full-time" | "part-time";
+
+export const ASSIGNED_PROGRAMS = [
+  "Discovery Club: Curious Explorer",
+  "Discovery Club: Creative Explorer",
+  "Discovery Club: Everyday Explorer",
+  "Trailblazer: Brave Explorer",
+  "Saturday Playdate",
+  "Ballet",
+  "Virtual Tutorial",
+] as const;
 
 export type EmergencyContact = {
   name: string;
@@ -27,6 +37,8 @@ export type UserAccount = {
 
   // Work details
   role: TeacherRole;
+  strand?: string;
+  yearLevel?: string;
   assignedRoom: string;
   employeeId: string;
 

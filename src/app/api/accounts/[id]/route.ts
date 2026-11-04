@@ -12,6 +12,7 @@ const SIGNED_IN_ROLES = [
   "teacher",
   "lead teacher",
   "assistant teacher",
+  "intern",
   "parent",
 ] as const;
 
@@ -91,6 +92,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const id = (await params).id;
     const auth = await requireRoles(request, [...SIGNED_IN_ROLES]);
     if ("response" in auth) return auth.response;
+    if (auth.user.role === "intern") {
+      return NextResponse.json({ error: "Intern accounts cannot edit profile details" }, { status: 403 });
+    }
     if (!canManageAccount(auth.user.role, id, auth.user.uid)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

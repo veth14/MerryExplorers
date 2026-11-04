@@ -19,7 +19,7 @@ export function proxy(request: NextRequest) {
       return NextResponse.next();
     }
     // Only block regular teachers and parents from other admin pages
-    if (role === 'teacher' || role === 'parent') {
+    if (role === 'teacher' || role === 'intern' || role === 'parent') {
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
     // executive assistant, developer and admin can both access /admin
@@ -33,6 +33,9 @@ export function proxy(request: NextRequest) {
     // Block pure admins and parents from teacher pages
     if (role === 'admin' || role === 'parent') {
       return NextResponse.redirect(new URL('/unauthorized', request.url));
+    }
+    if (role === 'intern' && pathname !== '/teacher/clock') {
+      return NextResponse.redirect(new URL('/teacher/clock', request.url));
     }
     // executive assistant and developer can access /teacher
   }
@@ -62,6 +65,8 @@ export function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL('/admin', request.url));
       } else if (role === 'parent') {
         return NextResponse.redirect(new URL('/parent/dashboard', request.url));
+      } else if (role === 'intern') {
+        return NextResponse.redirect(new URL('/teacher/clock', request.url));
       } else if (role === 'executive assistant' || role === 'developer' || role === 'teacher') {
         return NextResponse.redirect(new URL('/teacher', request.url));
       } else {

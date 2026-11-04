@@ -21,6 +21,7 @@ type SuspendedDay = {
 };
 
 type AccountDoc = {
+  id?: string;
   _id?: string;
   fullName?: string;
   role?: string;
@@ -123,7 +124,7 @@ export function MonthlyView({ year, month, onMonthChange }: MonthlyViewProps) {
         setSuspendedDays(attJson.suspendedDays || []);
       }
       if (Array.isArray(accJson)) {
-        setAccounts(accJson.filter((a: AccountDoc) => a.role === "teacher" || a.role === "staff"));
+        setAccounts(accJson.filter((a: AccountDoc) => !["admin", "parent"].includes((a.role || "").toLowerCase())));
       }
     } finally {
       setLoading(false);
@@ -157,7 +158,7 @@ export function MonthlyView({ year, month, onMonthChange }: MonthlyViewProps) {
 
   // Init from accounts
   for (const a of accounts) {
-    const uid = (a._id || "") as string;
+    const uid = (a.id || a._id || "") as string;
     staffMap.set(uid, { 
       uid, name: a.fullName || "Unknown", group: a.assignedRoom || "—", color: a.avatarColor || "#005cc8", 
       workDays: a.workDays || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],

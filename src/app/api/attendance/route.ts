@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { requireInternalAuth } from "@/lib/auth-guard";
+import { getAuthenticatedUser } from "@/lib/auth-guard";
 import { computeTimeInStatus } from "@/lib/attendance-rules";
+
+function manilaDateStr(date = new Date()) {
+  const local = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
+}
 
 // GET /api/attendance
 // Params:
@@ -10,8 +15,8 @@ import { computeTimeInStatus } from "@/lib/attendance-rules";
 //   ?uid=UID          — all records for a teacher (timekeeping)
 //   ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD  — date range (multi-date export)
 export async function GET(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await getAuthenticatedUser(request);
+  if (auth instanceof NextResponse) return auth;
   try {
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');
@@ -43,6 +48,13 @@ export async function GET(request: Request) {
     }
     if (uid) {
       query.teacherUid = uid;
+    }
+
+    // Interns can only view their own current-day clock record.
+    if (auth.role === "intern") {
+      resolvedDateStr = manilaDateStr();
+      query.dateStr = resolvedDateStr;
+      query.teacherUid = auth.uid;
     }
 
     // Check if this date is marked as suspended or holiday
@@ -88,6 +100,11 @@ export async function GET(request: Request) {
       dailyExemptions = exemptDocs.map(d => ({ teacherUid: d.teacherUid, dateStr: d.dateStr }));
     }
 
+    if (auth.role === "intern") {
+      exemptions = exemptions.filter((teacherUid) => teacherUid === auth.uid);
+      dailyExemptions = dailyExemptions.filter((entry) => entry.teacherUid === auth.uid);
+    }
+
     return NextResponse.json({ 
       success: true, 
       data: attendanceRecords, 
@@ -110,13 +127,16 @@ export async function GET(request: Request) {
 
 // POST /api/attendance (Clock in)
 export async function POST(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await getAuthenticatedUser(request);
+  if (auth instanceof NextResponse) return auth;
   try {
     const data = await request.json();
     const { teacherUid, name, group, clockInPhotoUrl } = data;
 
     if (!teacherUid) return NextResponse.json({ error: "Missing teacherUid" }, { status: 400 });
+    if (auth.role === "intern" && teacherUid !== auth.uid) {
+      return NextResponse.json({ error: "Interns may only clock in for their own account" }, { status: 403 });
+    }
 
     const { db } = await connectToDatabase();
 
@@ -136,6 +156,9 @@ export async function POST(request: Request) {
 
     // Look up the account to get noTimeLog flag for status computation
     const accountDoc = await db.collection("accounts").findOne({ _id: teacherUid as any });
+    if (auth.role === "intern" && accountDoc?.role?.toLowerCase() !== "intern") {
+      return NextResponse.json({ error: "Intern account not found" }, { status: 403 });
+    }
     let noTimeLog = accountDoc?.noTimeLog ?? false;
 
     // Check if there is a specific daily exemption for this teacher today
@@ -155,8 +178,8 @@ export async function POST(request: Request) {
 
     const newRecord = {
       teacherUid,
-      name,
-      group: group || "Unassigned",
+      name: auth.role === "intern" ? accountDoc?.fullName || name : name,
+      group: auth.role === "intern" ? accountDoc?.assignedRoom || "Unassigned" : group || "Unassigned",
       dateStr,
       clockInTime: now.toISOString(),
       clockInPhotoUrl: clockInPhotoUrl || null,
@@ -178,8 +201,8 @@ export async function POST(request: Request) {
 
 // PUT /api/attendance (Clock out, start break, end break)
 export async function PUT(request: Request) {
-  const deny = await requireInternalAuth(request);
-  if (deny) return deny;
+  const auth = await getAuthenticatedUser(request);
+  if (auth instanceof NextResponse) return auth;
   try {
     const data = await request.json();
     const { id, action, photoUrl } = data; // action: 'clock-out', 'start-break', 'end-break'
@@ -190,6 +213,17 @@ export async function PUT(request: Request) {
     const record = await db.collection("attendance").findOne({ _id: new ObjectId(id) });
 
     if (!record) return NextResponse.json({ error: "Record not found" }, { status: 404 });
+    if (auth.role === "intern") {
+      if (record.teacherUid !== auth.uid) {
+        return NextResponse.json({ error: "Interns may only update their own attendance" }, { status: 403 });
+      }
+      if (action !== "clock-out") {
+        return NextResponse.json({ error: "Interns may only clock out" }, { status: 403 });
+      }
+      if (record.clockOutTime) {
+        return NextResponse.json({ error: "This attendance record is already clocked out" }, { status: 409 });
+      }
+    }
 
     const now = new Date();
     const updateDoc: any = { $set: { updatedAt: now } };

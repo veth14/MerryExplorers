@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar";
 import { TeacherTopbar } from "@/components/teacher/teacher-topbar";
+import { useAuth } from "@/lib/auth-context";
 
 type TeacherShellProps = {
   title?: string;
@@ -12,6 +14,16 @@ type TeacherShellProps = {
 
 export function TeacherShell({ title, description, children }: TeacherShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const { userProfile } = useAuth();
+  const isIntern = (userProfile?.role || "").toLowerCase() === "intern";
+
+  useEffect(() => {
+    if (isIntern && pathname !== "/teacher/clock") {
+      router.replace("/teacher/clock");
+    }
+  }, [isIntern, pathname, router]);
 
   return (
     <div className="h-screen bg-[#f0f4f9] text-on-background flex overflow-hidden">

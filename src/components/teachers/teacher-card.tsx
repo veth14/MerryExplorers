@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Teacher } from "@/data/teachers";
+import { ASSIGNED_PROGRAMS } from "@/data/users";
 import { Modal } from "@/components/ui/modal";
 
 type TeacherCardProps = {
@@ -291,7 +292,7 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
       >
         <div className="space-y-4">
           <div className="relative z-20">
-            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Assigned Class</label>
+            <label className="block text-[13px] font-extrabold text-[#002f76] mb-1.5">Assigned Program</label>
             <div 
               onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
               className={`w-full border ${isClassDropdownOpen ? "border-[#0050d5] ring-1 ring-[#0050d5]" : "border-[#e2e8f0] hover:border-[#0050d5]"} rounded-xl px-3 py-2.5 text-[13px] font-bold text-[#002f76] bg-white shadow-sm cursor-pointer flex justify-between items-center transition-colors`}
@@ -306,7 +307,7 @@ export function TeacherCard({ teacher }: TeacherCardProps) {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setIsClassDropdownOpen(false)} />
                 <div className="absolute left-0 right-0 mt-2 bg-white border border-[#e2e8f0] shadow-lg rounded-xl z-20 py-1 overflow-hidden">
-                  {["Unassigned", "Little Explorers", "Tiny Explorers"].map((option) => (
+                  {["Unassigned", ...ASSIGNED_PROGRAMS].map((option) => (
                     <div 
                       key={option}
                       onClick={() => {

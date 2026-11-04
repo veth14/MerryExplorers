@@ -2,13 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/app-shell";
-import { UserAccount, TeacherRole, UserStatus, EmergencyContact } from "@/data/users";
+import { ASSIGNED_PROGRAMS, UserAccount, TeacherRole, UserStatus, EmergencyContact } from "@/data/users";
 import { UserMetricCard } from "@/components/users/user-metric-card";
 import { UserCard } from "@/components/users/user-card";
 import { uploadAvatar } from "@/lib/supabase";
 import { firebaseConfig } from "@/lib/firebase";
 import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, deleteUser, updateProfile, type User } from "firebase/auth";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { useAuth } from "@/lib/auth-context";
@@ -16,6 +16,10 @@ import { useAuth } from "@/lib/auth-context";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
   return name.trim().split(" ").filter(Boolean).slice(0, 2).map((n) => n[0].toUpperCase()).join("");
+}
+
+function isParentAccount(account: UserAccount) {
+  return (account.role || "").trim().toLowerCase() === "parent";
 }
 
 const AVATAR_COLORS = [
@@ -27,6 +31,13 @@ function randomColor() {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
 
+function generateAccountPassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  return `${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")}aA1!`;
+}
+
 const AVAILABLE_TAGS = [
   "Early Childhood Ed", "CPR Certified", "Montessori Trained",
   "Child Development", "Special Needs", "Art Specialist",
@@ -36,9 +47,8 @@ const AVAILABLE_TAGS = [
 const ALL_WORK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DEFAULT_FULL_TIME_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const ASSIGNED_ROOMS = [
-  "Little Explorers", "Tiny Explorers", "Unassigned"
-];
+const INTERN_STRANDS = ["ABM", "STEM", "HUMSS", "GAS", "TVL", "Arts and Design", "Sports"];
+const INTERN_YEAR_LEVELS = ["Grade 11", "Grade 12"];
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 function StepDots({ current, total }: { current: number; total: number }) {
@@ -101,6 +111,8 @@ function emptyDraft(): Draft {
     phone: "",
     homeAddress: "",
     role: "Assistant Teacher",
+    strand: "",
+    yearLevel: "",
     assignedRoom: "",
     employeeId: "",
     workDays: [...DEFAULT_FULL_TIME_DAYS],
@@ -134,6 +146,8 @@ function draftFromUser(u: UserAccount): Draft {
     phone: u.phone || "",
     homeAddress: u.homeAddress || "",
     role: u.role || "",
+    strand: u.strand || (u.role === "Intern" ? "ABM" : ""),
+    yearLevel: u.yearLevel || (u.role === "Intern" ? "Grade 12" : ""),
     assignedRoom: u.assignedRoom || "",
     employeeId: u.employeeId || "",
     workDays: u.workDays?.length ? [...u.workDays] : [...DEFAULT_FULL_TIME_DAYS],
@@ -176,7 +190,9 @@ function UserModal({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isTeacher = !["admin", "executive assistant", "developer"].includes((draft.role || "").toLowerCase());
-  const STEPS = isTeacher 
+  const STEPS = draft.role === "Intern"
+    ? ["Avatar & Role", "Personal & School Info", "Intern Work Details"]
+    : isTeacher
     ? ["Avatar & Role", "Personal Info", "Work Details", "Payroll Details", "Emergency Contacts"]
     : ["Avatar & Role", "Personal Info", "Payroll Details"];
 
@@ -202,7 +218,7 @@ function UserModal({
       if (!draft.fullName.trim()) { setError("Full name is required."); return false; }
       if (!draft.email.trim()) { setError("Email is required."); return false; }
     }
-    if (step === 2 && isTeacher && !draft.employeeId.trim()) { setError("Employee ID is required."); return false; }
+    if (step === 2 && isTeacher && draft.role !== "Intern" && !draft.employeeId.trim()) { setError("Employee ID is required."); return false; }
     return true;
   }
 
@@ -210,7 +226,7 @@ function UserModal({
     if (!draft.role) { setError("Please select a role in Avatar & Role."); return false; }
     if (!draft.fullName.trim()) { setError("Full name is required in Personal Info."); return false; }
     if (!draft.email.trim()) { setError("Email is required in Personal Info."); return false; }
-    if (isTeacher && !draft.employeeId.trim()) { setError("Employee ID is required in Work Details."); return false; }
+    if (isTeacher && draft.role !== "Intern" && !draft.employeeId.trim()) { setError("Employee ID is required in Work Details."); return false; }
     return true;
   }
 
@@ -250,13 +266,15 @@ function UserModal({
         phone: draft.phone,
         homeAddress: draft.homeAddress,
         role: draft.role,
+        strand: draft.role === "Intern" ? draft.strand || "ABM" : undefined,
+        yearLevel: draft.role === "Intern" ? draft.yearLevel || "Grade 12" : undefined,
         assignedRoom: draft.assignedRoom || "Unassigned",
         employeeId: draft.employeeId,
         workDays: draft.workDays,
-        employmentType: draft.employmentType,
+        employmentType: draft.role === "Intern" ? "part-time" : draft.employmentType,
         shiftTime: draft.shiftTime,
-        noTimeLog: draft.noTimeLog,
-        weeklyHoursTarget: draft.weeklyHoursTarget,
+        noTimeLog: draft.role === "Intern" ? false : draft.noTimeLog,
+        weeklyHoursTarget: draft.role === "Intern" ? null : draft.weeklyHoursTarget,
         monthlyRate: draft.monthlyRate,
         dailyRate: draft.dailyRate,
         sssContribution: draft.sssContribution,
@@ -308,7 +326,7 @@ function UserModal({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-[17px] font-extrabold text-white">
-                {mode === "add" ? "Add Teacher Account" : (isTeacher ? "Edit Teacher Account" : "Edit Admin Account")}
+                {mode === "add" ? (draft.role === "Intern" ? "Add Intern Account" : "Add Staff Account") : (draft.role === "Intern" ? "Edit Intern Account" : isTeacher ? "Edit Staff Account" : "Edit Admin Account")}
               </h2>
               <p className="text-[11px] text-white/60 mt-0.5">{STEPS[step]}</p>
             </div>
@@ -397,17 +415,25 @@ function UserModal({
 
               {/* Role */}
               {isTeacher ? (
-                <Field label="Teacher Role" required>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["Lead Teacher", "Assistant Teacher"] as TeacherRole[]).map((r) => (
+                <Field label="Staff Role" required>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {(["Lead Teacher", "Assistant Teacher", "Intern"] as TeacherRole[]).map((r) => (
                       <button
                         key={r}
                         type="button"
-                        onClick={() => set("role", r)}
+                        onClick={() => {
+                          set("role", r);
+                          if (r === "Intern") {
+                            if (!draft.strand) set("strand", "ABM");
+                            if (!draft.yearLevel) set("yearLevel", "Grade 12");
+                          }
+                        }}
                         className={`rounded-xl border-2 py-3 text-[13px] font-bold transition-all ${draft.role === r
                             ? r === "Lead Teacher"
                               ? "border-[#ffb800] bg-[#fff8e1] text-[#a07000]"
-                              : "border-[#0050d5] bg-[#f0f5ff] text-[#0050d5]"
+                              : r === "Intern"
+                                ? "border-[#7c3aed] bg-[#f5f0ff] text-[#6d28d9]"
+                                : "border-[#0050d5] bg-[#f0f5ff] text-[#0050d5]"
                             : "border-[#e2e8f0] bg-white text-[#8898aa] hover:border-[#c5d6ff]"
                           }`}
                       >
@@ -520,6 +546,24 @@ function UserModal({
                   />
                 </Field>
               </div>
+              {draft.role === "Intern" && (
+                <div className="rounded-xl border border-[#e5dcff] bg-[#faf8ff] p-4">
+                  <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wider text-[#6d4bb3]">Student Details</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Strand" required>
+                      <select value={draft.strand || "ABM"} onChange={(e) => set("strand", e.target.value)} className={SELECT_CLS}>
+                        {INTERN_STRANDS.map((strand) => <option key={strand} value={strand}>{strand}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Year Level" required>
+                      <select value={draft.yearLevel || "Grade 12"} onChange={(e) => set("yearLevel", e.target.value)} className={SELECT_CLS}>
+                        {INTERN_YEAR_LEVELS.map((yearLevel) => <option key={yearLevel} value={yearLevel}>{yearLevel}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <p className="mt-2 text-[11px] font-medium text-[#7a6c9c]">Intern accounts are set up for Grade 12 ABM students by default. You can change these details above.</p>
+                </div>
+              )}
               <Field label="Home Address">
                 <input
                   value={draft.homeAddress}
@@ -544,25 +588,26 @@ function UserModal({
             <div className="space-y-4">
               {/* Employee ID + Assigned Room */}
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Employee ID" required>
+                <Field label={draft.role === "Intern" ? "Student ID (Optional)" : "Employee ID"} required={draft.role !== "Intern"}>
                   <input
                     autoFocus
                     value={draft.employeeId}
                     onChange={(e) => set("employeeId", e.target.value)}
-                    placeholder="ME-2024-001"
+                    placeholder={draft.role === "Intern" ? "School ID (optional)" : "ME-2024-001"}
                     className={INPUT_CLS}
                   />
                 </Field>
-                <Field label="Assigned Room">
+                <Field label={draft.role === "Intern" ? "Internship Program" : "Assigned Program"}>
                   <select value={draft.assignedRoom} onChange={(e) => set("assignedRoom", e.target.value)} className={SELECT_CLS}>
-                    <option value="">Select room…</option>
-                    {ASSIGNED_ROOMS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    <option value="">Select program…</option>
+                    {ASSIGNED_PROGRAMS.map((program) => <option key={program} value={program}>{program}</option>)}
+                    <option value="Unassigned">Unassigned</option>
                   </select>
                 </Field>
               </div>
 
-              {/* Employment Type */}
-              <Field label="Employment Type">
+              {/* Employment Type is only relevant to employee accounts. */}
+              {draft.role !== "Intern" && <Field label="Employment Type">
                 <div className="grid grid-cols-2 gap-3">
                   {(["full-time", "part-time"] as const).map((t) => (
                     <button
@@ -585,7 +630,7 @@ function UserModal({
                     </button>
                   ))}
                 </div>
-              </Field>
+              </Field>}
 
               {/* Work Days */}
               <Field label="Work Days">
@@ -633,7 +678,18 @@ function UserModal({
                 </div>
               </div>
 
-              {/* Special options */}
+              {draft.role === "Intern" ? (
+                <div className="flex items-start gap-3 rounded-xl border border-[#e5dcff] bg-[#faf8ff] p-4">
+                  <span className="material-symbols-outlined text-[#6d28d9]" style={{ fontSize: "20px" }}>fact_check</span>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#43227e]">Daily Clock In &amp; DTR enabled</p>
+                    <p className="mt-0.5 text-[11.5px] font-medium leading-relaxed text-[#7a6c9c]">
+                      The selected work days and clock-in/out times will be recorded for the intern’s daily time record.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+              /* Special options */
               <div className="space-y-3 rounded-xl border border-[#e2e8f0] bg-[#f8faff] px-4 py-3.5">
                 <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#5a6e8c] mb-2">Special Arrangements</p>
 
@@ -740,6 +796,7 @@ function UserModal({
                   </div>
                 </label>
               </div>
+              )}
 
               {/* Role preview */}
               <div className="rounded-xl bg-[#f0f5ff] border border-[#c5d6ff] px-4 py-3 flex items-center gap-3">
@@ -995,9 +1052,54 @@ function DeleteModal({
   );
 }
 
+type CreatedCredentials = { fullName: string; email: string; password: string };
+
+function CreatedCredentialsModal({ credentials, onClose }: { credentials: CreatedCredentials; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyCredentials() {
+    await navigator.clipboard.writeText(
+      `Merry Explorers login\nEmail: ${credentials.email}\nPassword: ${credentials.password}`
+    );
+    setCopied(true);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="credentials-title">
+      <button type="button" className="absolute inset-0 bg-[#061b3b]/55 backdrop-blur-sm" onClick={onClose} aria-label="Close account credentials" />
+      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[#dbe6ff] bg-white shadow-2xl">
+        <div className="bg-gradient-to-r from-[#002f76] to-[#0050d5] px-6 py-5 text-white">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/65">Account ready</p>
+          <h2 id="credentials-title" className="mt-1 text-[20px] font-extrabold">Login credentials</h2>
+          <p className="mt-1 text-[13px] font-semibold text-white/75">{credentials.fullName} can now sign in.</p>
+        </div>
+        <div className="space-y-4 p-6">
+          <div className="rounded-2xl border border-[#e2eaf8] bg-[#f7faff] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#8294b2]">Login email</p>
+            <p className="mt-1 break-all text-[14px] font-bold text-[#002f76]">{credentials.email}</p>
+          </div>
+          <div className="rounded-2xl border border-[#ffe4a6] bg-[#fffaf0] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#a07000]">Initial password</p>
+            <p className="mt-1 break-all font-mono text-[15px] font-bold tracking-wide text-[#6f4b00]">{credentials.password}</p>
+          </div>
+          <p className="text-[12px] font-medium leading-relaxed text-[#667894]">
+            Copy and share these details securely. The password is shown only this time and can’t be retrieved later.
+          </p>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-[#d0d8e8] py-3 text-[13px] font-bold text-[#526986] hover:bg-[#f6f8fc]">Done</button>
+            <button type="button" onClick={copyCredentials} className="flex-1 rounded-xl bg-[#0050d5] py-3 text-[13px] font-extrabold text-white shadow-md shadow-[#0050d5]/20 hover:bg-[#0044b8]">
+              {copied ? "Copied credentials" : "Copy credentials"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
-type FilterTab = "All" | "Admins" | "Lead Teachers" | "Assistants" | "On Leave";
-const TABS: FilterTab[] = ["All", "Admins", "Lead Teachers", "Assistants", "On Leave"];
+type FilterTab = "All" | "Admins" | "Lead Teachers" | "Assistants" | "Interns" | "On Leave";
+const TABS: FilterTab[] = ["All", "Admins", "Lead Teachers", "Assistants", "Interns", "On Leave"];
 
 export default function UsersPage() {
   const { user, userProfile } = useAuth();
@@ -1007,6 +1109,7 @@ export default function UsersPage() {
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editTarget, setEditTarget] = useState<UserAccount | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserAccount | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<CreatedCredentials | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch accounts on mount
@@ -1015,7 +1118,7 @@ export default function UsersPage() {
       try {
         const data = await cachedFetch<UserAccount[]>("accounts:all", "/api/accounts", 60_000);
         if (Array.isArray(data)) {
-          setAccounts(data);
+          setAccounts(data.filter((account) => !isParentAccount(account)));
         }
       } catch (e) {
         console.error("Failed to load accounts", e);
@@ -1031,6 +1134,7 @@ export default function UsersPage() {
       if (activeTab === "Admins") return ["admin", "executive assistant", "developer"].includes((u.role || "").toLowerCase());
       if (activeTab === "Lead Teachers") return u.role === "Lead Teacher";
       if (activeTab === "Assistants") return u.role === "Assistant Teacher";
+      if (activeTab === "Interns") return u.role === "Intern";
       if (activeTab === "On Leave") return u.status === "on-leave";
       return true;
     })
@@ -1080,15 +1184,19 @@ export default function UsersPage() {
       }
     } else {
       // Add
+      let tempApp: ReturnType<typeof initializeApp> | undefined;
+      let tempAuth: ReturnType<typeof getAuth> | undefined;
+      let createdAuthUser: User | null = null;
+      const password = generateAccountPassword();
       try {
         // 1. Create a secondary Firebase App to prevent logging out the Admin
         const tempAppName = `TempApp_${Date.now()}`;
-        const tempApp = initializeApp(firebaseConfig, tempAppName);
-        const tempAuth = getAuth(tempApp);
+        tempApp = initializeApp(firebaseConfig, tempAppName);
+        tempAuth = getAuth(tempApp);
 
-        // 2. Create the user in Firebase Auth with a default password
-        const defaultPassword = "Explorers123!";
-        const userCredential = await createUserWithEmailAndPassword(tempAuth, account.email, defaultPassword);
+        // 2. Create the user with a unique initial password
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, account.email, password);
+        createdAuthUser = userCredential.user;
 
         // 3. Set the display name in Auth to their full name
         await updateProfile(userCredential.user, { displayName: account.fullName });
@@ -1103,23 +1211,29 @@ export default function UsersPage() {
           body: JSON.stringify({ ...account, id: firebaseUid }),
         });
 
-        if (res.ok) {
-          const newAccount = await res.json();
-          setAccounts((prev) => [newAccount, ...prev]);
-          invalidateCache("accounts:all");
-          await writeAudit("CREATE", account.fullName, account.role, firebaseUid);
-        } else {
-          console.error("Failed to save to MongoDB");
+        if (!res.ok) {
+          const responseData = await res.json().catch(() => ({}));
+          throw new Error(responseData.error || "Failed to save the account details.");
         }
 
-        // Clean up the temporary Firebase app
-        await tempAuth.signOut();
-        await deleteApp(tempApp);
+        const newAccount = await res.json();
+        setAccounts((prev) => [newAccount, ...prev]);
+        invalidateCache("accounts:all");
+        setCreatedCredentials({ fullName: account.fullName, email: account.email, password });
+        await writeAudit("CREATE", account.fullName, account.role, firebaseUid);
 
       } catch (err: any) {
-        console.error("Failed to create user in Firebase:", err);
+        if (createdAuthUser) {
+          await deleteUser(createdAuthUser).catch((deleteError) => {
+            console.error("Could not remove incomplete Firebase account:", deleteError);
+          });
+        }
+        console.error("Failed to create account:", err);
         alert(`Error creating user: ${err.message}`);
-        return; // Stop saving if Auth fails
+        return;
+      } finally {
+        if (tempAuth) await tempAuth.signOut().catch(() => {});
+        if (tempApp) await deleteApp(tempApp).catch(() => {});
       }
     }
     setModalMode(null);
@@ -1173,11 +1287,12 @@ export default function UsersPage() {
   const admins = accounts.filter((u) => ["admin", "executive assistant", "developer"].includes((u.role || "").toLowerCase())).length;
   const leads = accounts.filter((u) => u.role === "Lead Teacher").length;
   const assistants = accounts.filter((u) => u.role === "Assistant Teacher").length;
+  const interns = accounts.filter((u) => u.role === "Intern").length;
 
   return (
     <AppShell
       title="User Accounts"
-      description="Manage teacher accounts, roles, and personal information."
+      description="Manage staff and intern accounts, roles, and personal information."
     >
       {/* Metric cards */}
       <section className="grid gap-4 grid-cols-2 xl:grid-cols-4 shrink-0">
@@ -1197,7 +1312,8 @@ export default function UsersPage() {
                 tab === "Admins" ? admins :
                   tab === "Lead Teachers" ? leads :
                     tab === "Assistants" ? assistants :
-                      onLeave;
+                      tab === "Interns" ? interns :
+                        onLeave;
             return (
               <button
                 key={tab}
@@ -1225,7 +1341,7 @@ export default function UsersPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search teachers…"
+              placeholder="Search staff and interns…"
               className="pl-9 pr-4 py-1.5 rounded-full border border-[#e2e8f0] bg-white text-[13px] font-semibold text-[#002f76] placeholder:text-[#b0bec5] outline-none focus:border-[#0050d5] focus:ring-2 focus:ring-[#0050d5]/15 transition-all w-44"
             />
           </div>
@@ -1277,6 +1393,12 @@ export default function UsersPage() {
           initial={editTarget ?? undefined}
           onClose={() => { setModalMode(null); setEditTarget(null); }}
           onSave={handleSave}
+        />
+      )}
+      {createdCredentials && (
+        <CreatedCredentialsModal
+          credentials={createdCredentials}
+          onClose={() => setCreatedCredentials(null)}
         />
       )}
       {deleteTarget && (

@@ -70,12 +70,12 @@ export default function Home() {
 
   const metrics = metricsData
     ? [
-        { label: "Total Teachers", value: metricsData.totalTeachers.value, meta: metricsData.totalTeachers.meta, type: "teachers" as const },
+        { label: "Total Staff", value: metricsData.totalTeachers.value, meta: metricsData.totalTeachers.meta, type: "teachers" as const },
         { label: "Punctuality Rate", value: metricsData.punctualityRate.value, meta: metricsData.punctualityRate.meta, type: "punctuality" as const },
         { label: "Total Clock-Ins", value: metricsData.totalClockIns.value, meta: metricsData.totalClockIns.meta, type: "clockins" as const },
       ]
     : [
-        { label: "Total Teachers", value: "–", meta: "Loading...", type: "teachers" as const },
+        { label: "Total Staff", value: "–", meta: "Loading...", type: "teachers" as const },
         { label: "Punctuality Rate", value: "–", meta: "Loading...", type: "punctuality" as const },
         { label: "Total Clock-Ins", value: "–", meta: "Loading...", type: "clockins" as const },
       ];
@@ -95,11 +95,11 @@ export default function Home() {
       };
     });
 
-  // Build teamMembers from ALL teacher + executive assistant accounts
+  // Build teamMembers from teacher, intern, and executive assistant accounts
   const teamMembers = accounts
     .filter((acc) => {
       const role = (acc.role || "").toLowerCase();
-      return role.includes("teacher") || role === "executive assistant" || role === "developer";
+      return role.includes("teacher") || role === "intern" || role === "executive assistant" || role === "developer";
     })
     .map((acc) => {
       const isDeveloper = (acc.role || "").toLowerCase() === "developer";

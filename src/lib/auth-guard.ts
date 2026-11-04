@@ -17,6 +17,7 @@ export type AppRole =
   | "teacher"
   | "lead teacher"
   | "assistant teacher"
+  | "intern"
   | "parent";
 
 export type AuthenticatedUser = {
@@ -147,7 +148,9 @@ export async function getAuthenticatedUser(
  */
 export async function requireInternalAuth(request: Request): Promise<NextResponse | null> {
   const result = await getAuthenticatedUser(request);
-  return result instanceof NextResponse ? result : null;
+  if (result instanceof NextResponse) return result;
+  if (result.role === "intern") return forbidden();
+  return null;
 }
 
 export async function requireRoles(

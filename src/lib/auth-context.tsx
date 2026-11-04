@@ -120,6 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (role === "parent") {
         document.cookie = `role=parent; path=/; max-age=${maxAge}`;
         router.push("/parent/dashboard");
+      } else if (role === "intern") {
+        document.cookie = `role=intern; path=/; max-age=${maxAge}`;
+        router.push("/teacher/clock");
       } else if (role === "executive assistant" || role === "developer") {
         // Executive Assistants and Developers are employees first — they clock in like teachers
         // but can also access the admin panel.

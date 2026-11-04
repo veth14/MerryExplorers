@@ -21,6 +21,7 @@ type SuspendedDay = {
 };
 
 type AccountDoc = {
+  id?: string;
   _id?: string;
   fullName?: string;
   role?: string;
@@ -87,7 +88,7 @@ export function WeeklyView({ weekStart, onWeekChange }: WeeklyViewProps) {
         setSuspendedDays(attJson.suspendedDays || []);
       }
       if (Array.isArray(accJson)) {
-        setAccounts(accJson.filter((a: AccountDoc) => a.role === "teacher" || a.role === "staff"));
+        setAccounts(accJson.filter((a: AccountDoc) => !["admin", "parent"].includes((a.role || "").toLowerCase())));
       }
     }).finally(() => setLoading(false));
   }, [startStr, endStr]);
@@ -102,7 +103,7 @@ export function WeeklyView({ weekStart, onWeekChange }: WeeklyViewProps) {
   // Unique staff from accounts + records
   const staffList = accounts.length
     ? accounts.map(a => ({ 
-        uid: (a._id || "") as string, 
+        uid: (a.id || a._id || "") as string,
         name: a.fullName || "Unknown", 
         color: a.avatarColor || "#005cc8", 
         room: a.assignedRoom || "—", 
