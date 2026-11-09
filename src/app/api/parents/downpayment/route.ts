@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin, requireParent } from "@/lib/auth-guard";
+import { hasDuplicatePaymentReference } from "@/lib/payment-reference";
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
     if ("response" in auth) return auth.response;
 
     const { db } = await connectToDatabase();
+    if (await hasDuplicatePaymentReference(db, referenceNumber)) {
+      return NextResponse.json({ error: "This reference number has already been used for another payment. Please check your receipt and submit the correct one." }, { status: 409 });
+    }
 
     // Save the downpayment submission on the parent's account
     await db.collection("parent_accounts").updateOne(

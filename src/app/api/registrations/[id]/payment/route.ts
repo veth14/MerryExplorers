@@ -7,6 +7,7 @@ import { allocateBalancePayment } from "@/lib/balance-payment";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
 import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
+import { hasDuplicatePaymentReference } from "@/lib/payment-reference";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,10 @@ export async function POST(
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
     }
 
+    if (await hasDuplicatePaymentReference(db, referenceNumber)) {
+      return NextResponse.json({ error: "This reference number has already been used for another payment. Please check your receipt and submit the correct one." }, { status: 409 });
+    }
+
     if (data.balancePayment === true) {
       if (!["approved", "active"].includes(registration.status)) {
         return NextResponse.json({ error: "This registration is not ready for a balance payment. Please contact Merry Explorers for help." }, { status: 409 });
@@ -76,11 +81,6 @@ export async function POST(
         return NextResponse.json({ error: "The receipt image is too large. Please use a smaller image." }, { status: 413 });
       }
 
-      const existingRefs = [registration.referenceNumber, ...(registration.balancePayments || []).map((p: any) => p.referenceNumber)]
-        .filter(Boolean).map((value: string) => value.replace(/\s+/g, "").toLowerCase());
-      if (existingRefs.includes(reference.replace(/\s+/g, "").toLowerCase())) {
-        return NextResponse.json({ error: "This reference number has already been submitted for this registration." }, { status: 409 });
-      }
       if ((registration.balancePayments || []).some((payment: any) => payment?.verified !== true && payment?.rejected !== true)) {
         return NextResponse.json({ error: "A balance payment is already waiting for verification. Please wait for it to be reviewed before submitting another." }, { status: 409 });
       }

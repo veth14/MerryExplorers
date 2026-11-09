@@ -712,6 +712,7 @@ function AdminPaymentsPageInner() {
   const prevCurNum = useRef<number | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailItem | null>(null);
+  const [removingReceipt, setRemovingReceipt] = useState(false);
   const [approvalPreviousBalance, setApprovalPreviousBalance] = useState("");
   const [approvalPreviousBalanceSaved, setApprovalPreviousBalanceSaved] = useState(false);
   const [savingApprovalPreviousBalance, setSavingApprovalPreviousBalance] = useState(false);
@@ -1924,6 +1925,32 @@ function AdminPaymentsPageInner() {
     return { ok: res.ok && data?.success !== false, error: (data?.error as string | undefined) || "", data };
   }
 
+  async function removeDuplicateReceipt(item: DetailItem) {
+    if (!user || removingReceipt) return;
+    const confirmed = window.confirm(
+      "Remove this duplicate receipt image? The payment record and reference number will stay in the history."
+    );
+    if (!confirmed) return;
+
+    setRemovingReceipt(true);
+    try {
+      const { ok, error } = await postJson("/api/payments/receipt", "DELETE", {
+        uid: item.uid,
+        paymentId: item.payment.id,
+        type: item.type,
+      });
+      if (!ok) {
+        showToast(error || "Could not remove this receipt.", "error");
+        return;
+      }
+      window.location.reload();
+    } catch {
+      showToast("Network error removing this receipt.", "error");
+    } finally {
+      setRemovingReceipt(false);
+    }
+  }
+
   // Emails the "payment received" confirmation to the parent (/api/payments/notify).
   // Only called after the payment was saved. For balance payments `result` is what the server returned,
   // so the email always shows the numbers that were actually stored.
@@ -2178,7 +2205,7 @@ function AdminPaymentsPageInner() {
         });
       });
     });
-    return rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail, accounts, registrations, tl, regAdvMap]);
 
@@ -2407,6 +2434,10 @@ function AdminPaymentsPageInner() {
           type === "session" ? "s-" + payment.id
             : type === "downpayment" ? payment.id
               : payment.id.replace(/^reg-/, "r-").replace(/^bal-/, "b-");
+        const orderedLedger = [...ledger].sort((a, b) =>
+          Number(b.key === currentLedgerKey) - Number(a.key === currentLedgerKey) ||
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
         const isDupRef = dupRefs.has(normRef(payment.referenceNumber));
 
         const rows: [string, string][] = [
@@ -2814,6 +2845,16 @@ function AdminPaymentsPageInner() {
                       </div>
                     )}
                   </div>
+                  {isDupRef && payment.receiptBase64 && (
+                    <button
+                      type="button"
+                      disabled={removingReceipt}
+                      onClick={() => void removeDuplicateReceipt(detail)}
+                      style={{ marginTop: "10px", padding: "8px 12px", border: "1px solid #fecaca", borderRadius: "9px", background: removingReceipt ? "#f8fafc" : "#fff1f2", color: "#be123c", fontSize: "12px", fontWeight: 800, cursor: removingReceipt ? "wait" : "pointer", opacity: removingReceipt ? 0.65 : 1 }}
+                    >
+                      {removingReceipt ? "Removing receipt…" : "Remove duplicate receipt"}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2826,7 +2867,7 @@ function AdminPaymentsPageInner() {
                   </div>
                   {ledger.length === 0 ? (
                     <div style={{ padding: "16px", fontSize: "13px", color: "#94a3b8" }}>No other payments found.</div>
-                  ) : ledger.map((l) => {
+                  ) : orderedLedger.map((l) => {
                     const adv = l.advNum;
                     if (l.verified) {
                       running += l.amount;

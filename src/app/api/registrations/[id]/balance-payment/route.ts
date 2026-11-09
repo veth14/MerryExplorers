@@ -10,6 +10,7 @@ import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRe
 import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { allocateBalancePayment } from "@/lib/balance-payment";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
+import { hasDuplicatePaymentReference } from "@/lib/payment-reference";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,6 @@ const MAX_RECEIPT_CHARS = 2_500_000; // base64 text; the page already compresses
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const peso = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const normRef = (s: unknown) => String(s ?? "").replace(/\s+/g, "").toLowerCase();
 
 function statusMessage(status: string): string {
     switch (status) {
@@ -107,16 +107,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return NextResponse.json({ error: statusMessage(String(reg.status)) }, { status: 409 });
         }
 
-        // ── duplicate reference on the same registration ──
-        const existingRefs: string[] = [
-            reg.referenceNumber,
-            ...(Array.isArray(reg.balancePayments) ? reg.balancePayments.map((b: any) => b.referenceNumber) : []),
-        ]
-            .filter(Boolean)
-            .map(normRef);
-        if (existingRefs.includes(normRef(reference))) {
+        // Reject a reused reference across all Adventures and payment types before uploading the receipt.
+        if (await hasDuplicatePaymentReference(db, reference)) {
             return NextResponse.json(
-                { error: "This reference number is already recorded for this registration. It looks like a duplicate." },
+                { error: "This reference number has already been used for another payment. Please check the receipt and enter the correct one." },
                 { status: 409 }
             );
         }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { sendPaymentSubmittedEmail, sendPaymentVerifiedEmail } from "@/lib/virtual-session-emails";
 import { requireAdmin, requireParent, requireRoles } from "@/lib/auth-guard";
+import { hasDuplicatePaymentReference } from "@/lib/payment-reference";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
     }
 
     const { db } = await connectToDatabase();
+    if (await hasDuplicatePaymentReference(db, referenceNumber)) {
+      return NextResponse.json({ error: "This reference number has already been used for another payment. Please check your receipt and submit the correct one." }, { status: 409 });
+    }
     const account = (await db.collection("parent_accounts").findOne({ _id: uid as any })) ||
                     (await db.collection("accounts").findOne({ _id: uid as any }));
     if (!account) {
