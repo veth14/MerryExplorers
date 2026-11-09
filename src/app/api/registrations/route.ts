@@ -48,7 +48,7 @@ export async function GET(request: Request) {
             creditBalance: 1, previousAdventureBalance: 1, referenceNumber: 1,
             receiptUrl: 1, signatureUrl: 1, photoConsent: 1,
             uniformOrdered: 1, welcomeKitOrdered: 1, isPioneer: 1,
-            customRate: 1, isNewFamily: 1, familyTypeOverride: 1,
+            customRate: 1, isNewFamily: 1, familyTypeOverride: 1, customDueDate: 1,
             reservedUntil: 1, paymentDeadline: 1, approvedAt: 1, approvedBy: 1,
             rejectionReason: 1, confirmationEmailSent: 1, earlyBirdAt: 1, earlyBirdBy: 1,
             paymentPortalOpen: 1, paymentPortalOpenedAt: 1,

@@ -290,7 +290,7 @@ export function calcRegistrationTerms(
     if (due != null) {
         reservation = Math.round(due * RESERVATION_RATE);
         balanceShare = due - reservation;
-        dueDate = getBalanceDueDate(student, skipDates);
+        dueDate = reg?.customDueDate ? String(reg.customDueDate).slice(0, 10) : getBalanceDueDate(student, skipDates);
         if (dueDate && balance && balance > 0) {
             mondays = countMondaysAfter(dueDate, asOf, skipDates);
             interest = Math.round(balance * WEEKLY_INTEREST_RATE * mondays);

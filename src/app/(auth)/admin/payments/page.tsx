@@ -716,11 +716,21 @@ function AdminPaymentsPageInner() {
   const [approvalPreviousBalanceSaved, setApprovalPreviousBalanceSaved] = useState(false);
   const [savingApprovalPreviousBalance, setSavingApprovalPreviousBalance] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  const [customDueDateInput, setCustomDueDateInput] = useState("");
+  const [savingCustomDueDate, setSavingCustomDueDate] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [rejectTarget, setRejectTarget] = useState<{ uid: string; paymentId: string | null; type: PaymentKind } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [reminderPreview, setReminderPreview] = useState<{ uid: string; to: string; subject: string; html: string } | null>(null);
-  const [confirmationPreview, setConfirmationPreview] = useState<{ uid: string; to: string; subject: string; html: string; adventureNumber?: number } | null>(null);
+  const [confirmationPreview, setConfirmationPreview] = useState<{
+    uid: string;
+    to: string;
+    subject: string;
+    html: string;
+    adventureNumber?: number;
+    kind?: "verified-payment" | "registration";
+    payload?: any;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -778,6 +788,7 @@ function AdminPaymentsPageInner() {
       ? String(registration.previousAdventureBalance)
       : "");
     setApprovalPreviousBalanceSaved(typeof registration?.previousAdventureBalance === "number");
+    setCustomDueDateInput(registration?.customDueDate ? String(registration.customDueDate).slice(0, 10) : "");
     setDetail(item);
     // when switching payments from the ledger, jump back to the top so the new info is visible
     modalRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -1325,6 +1336,35 @@ function AdminPaymentsPageInner() {
     }
   }
 
+  async function saveCustomDueDate(newDueDate: string | null) {
+    if (!detail || detail.type !== "registration") return;
+    setSavingCustomDueDate(true);
+    try {
+      const { ok, data, error } = await postJson(
+        `/api/registrations/${detail.uid}`,
+        "PATCH",
+        { customDueDate: newDueDate }
+      );
+      if (!ok) {
+        showToast(error || "Could not save the due date.", "error");
+        return;
+      }
+      const savedDate = data?.customDueDate ?? newDueDate ?? null;
+      setCustomDueDateInput(savedDate ? String(savedDate).slice(0, 10) : "");
+      setAllRegistrations((current) => current.map((registration) => String(registration.id) === String(detail.uid)
+        ? { ...registration, customDueDate: savedDate }
+        : registration));
+      setRegistrations((current) => current.map((registration) => String(registration.id) === String(detail.uid)
+        ? { ...registration, customDueDate: savedDate }
+        : registration));
+      showToast(savedDate ? `Interest due date updated to ${fmtDate(savedDate)}.` : "Due date reset to automatic (session 6).");
+    } catch {
+      showToast("Network error saving the due date.", "error");
+    } finally {
+      setSavingCustomDueDate(false);
+    }
+  }
+
   function handleAction(uid: string, paymentId: string | null, action: "verify" | "reject", type: PaymentKind) {
     if (action === "reject") {
       setRejectReason("");
@@ -1408,11 +1448,97 @@ function AdminPaymentsPageInner() {
     }
   }
 
+  async function previewPaymentEmail(
+    uid: string,
+    opts: {
+      to: string;
+      parentName?: string;
+      childName?: string;
+      programName?: string;
+      paymentLabel?: string;
+      amountPaid: number;
+      paymentMethod?: string;
+      referenceNumber?: string;
+      paidOn?: string | Date;
+      remainingBalance?: number | null;
+      dueNote?: string;
+      adventureNumber?: number | null;
+    }
+  ) {
+    if (!opts.to) {
+      showToast("This family has no parent email on record.", "error");
+      return;
+    }
+    const key = `${uid}-email-payment`;
+    setActioning(key);
+    try {
+      const payload = {
+        to: opts.to,
+        parentName: opts.parentName || "Parent / Guardian",
+        childName: opts.childName || "Explorer",
+        programName: opts.programName || "",
+        paymentLabel: opts.paymentLabel || "Registration Payment",
+        amountPaid: opts.amountPaid,
+        paymentMethod: opts.paymentMethod || "gcash",
+        referenceNumber: opts.referenceNumber || "",
+        paidOn: opts.paidOn ? new Date(opts.paidOn).toISOString() : new Date().toISOString(),
+        remainingBalance: opts.remainingBalance ?? null,
+        dueNote: opts.dueNote || "",
+        adventureNumber: opts.adventureNumber ?? null,
+        targetId: uid,
+      };
+
+      const { ok, data, error } = await postJson("/api/payments/notify", "POST", {
+        action: "preview",
+        ...payload,
+        ...ADMIN_ACTOR,
+      });
+
+      if (!ok || !data?.preview) {
+        showToast(error || data?.error || "The payment email preview could not be loaded.", "error");
+        return;
+      }
+
+      setConfirmationPreview({
+        uid,
+        to: data.preview.to,
+        subject: data.preview.subject,
+        html: data.preview.html,
+        adventureNumber: data.preview.adventureNumber || undefined,
+        kind: "verified-payment",
+        payload,
+      });
+    } catch {
+      showToast("Network error loading the payment email preview.", "error");
+    } finally {
+      setActioning(null);
+    }
+  }
+
   async function confirmSendConfirmation() {
     if (!confirmationPreview) return;
-    const { uid, adventureNumber } = confirmationPreview;
+    const { uid, adventureNumber, kind, payload } = confirmationPreview;
     setActioning(`${uid}-email-confirmation-send`);
     try {
+      if (kind === "verified-payment") {
+        const { ok, data, error } = await postJson(
+          "/api/payments/notify",
+          "POST",
+          {
+            ...payload,
+            action: "send",
+            ...ADMIN_ACTOR,
+          }
+        );
+        if (!ok) {
+          showToast(error || data?.error || "The email could not be sent.", "error");
+          return;
+        }
+        setConfirmationPreview(null);
+        showToast("Payment confirmation email sent.");
+        return;
+      }
+
       const { ok, data, error } = await postJson(
         `/api/registrations/${uid}/approve`,
         "POST",
@@ -2357,6 +2483,52 @@ function AdminPaymentsPageInner() {
                     </button>
                   )}
                   <button onClick={() => copyDetails(detail)} style={{ padding: "8px 12px", borderRadius: "10px", background: "#eff6ff", color: "#0050d5", fontSize: "12px", fontWeight: 700, border: "none", cursor: "pointer" }}>📋 Copy for SOA</button>
+                  {detailRegistration && (acc.email || detailRegistration.parentInfo?.email) && status === "verified" && (
+                    <button
+                      type="button"
+                      disabled={!!actioning}
+                      onClick={() => {
+                        const targetReg = detailRegistration;
+                        const remaining = bd?.balance ?? null;
+                        const progTitle = (PROGRAM_SLOTS as any)[targetReg.program]?.name || targetReg.program || acc.program || "";
+                        let dueNote = "";
+                        if (remaining && remaining > 0) {
+                          if (bd?.interest && bd.interest > 0) {
+                            dueNote = "A 4% weekly interest applies to overdue balances";
+                          } else if (bd?.dueDate) {
+                            dueNote = `Balance due on session ${BALANCE_DUE_SESSION} (${fmtDate(bd.dueDate)})`;
+                          }
+                        }
+                        void previewPaymentEmail(targetReg.id, {
+                          to: targetReg.parentInfo?.email || acc.email || "",
+                          parentName: acc.fullName || targetReg.parentInfo?.name,
+                          childName: acc.childName || `${targetReg.childInfo?.firstName ?? ""} ${targetReg.childInfo?.lastName ?? ""}`.trim(),
+                          programName: progTitle,
+                          paymentLabel: isBalanceRow(payment) ? "Registration Balance Payment" : "Registration Payment",
+                          amountPaid: Number(payment.amountPaid) || 0,
+                          paymentMethod: payment.paymentMethod,
+                          referenceNumber: payment.referenceNumber,
+                          paidOn: payment.submittedAt,
+                          remainingBalance: remaining,
+                          dueNote,
+                          adventureNumber: advThis || 2,
+                        });
+                      }}
+                      style={{ padding: "8px 12px", borderRadius: "10px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 800, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
+                    >
+                      {actioning === `${detailRegistration.id}-email-payment` ? "Preparing preview…" : "📧 Payment email"}
+                    </button>
+                  )}
+                  {detailRegistration && (acc.email || detailRegistration.parentInfo?.email) && bd?.balance != null && bd.balance > 0 && (
+                    <button
+                      type="button"
+                      disabled={!!actioning}
+                      onClick={() => void sendRegistrationEmail(detailRegistration.id, "reminder")}
+                      style={{ padding: "8px 12px", borderRadius: "10px", background: "#fff7ed", color: "#c2410c", fontSize: "12px", fontWeight: 800, border: "1px solid #fed7aa", cursor: actioning ? "wait" : "pointer" }}
+                    >
+                      {actioning === `${detailRegistration.id}-email-reminder` ? "Preparing preview…" : "📧 Reminder"}
+                    </button>
+                  )}
                   <button onClick={() => setDetail(null)} style={{ padding: "8px", borderRadius: "12px", color: "#64748b", fontWeight: "bold", border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
                 </div>
               </div>
@@ -2501,6 +2673,55 @@ function AdminPaymentsPageInner() {
                       >
                         {savingApprovalPreviousBalance ? "Saving…" : approvalPreviousBalanceSaved ? "Saved" : "Update"}
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {detailRegistration && (
+                  <div style={{ marginTop: "12px", padding: "12px 14px", borderRadius: "12px", background: "#f0f9ff", border: "1px solid #bae6fd", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                    <div style={{ flex: "1 1 300px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: "#0369a1", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>📅 Balance & Overdue Interest Due Date</span>
+                        {detailRegistration.customDueDate ? (
+                          <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "2px 8px", borderRadius: "12px", fontSize: "10px", fontWeight: 800, border: "1px solid #7dd3fc" }}>
+                            Custom date: {fmtDate(detailRegistration.customDueDate)}
+                          </span>
+                        ) : (
+                          <span style={{ background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "12px", fontSize: "10px", fontWeight: 700 }}>
+                            Automatic (Session 6: {bd?.dueDate ? fmtDate(bd.dueDate) : "not set"})
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#475569", marginTop: "3px" }}>
+                        Overdue interest (4% weekly) starts on the first Monday on or after this due date. Set a custom date here to override the automatic 6th session calculation.
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <input
+                        type="date"
+                        value={customDueDateInput}
+                        onChange={(e) => setCustomDueDateInput(e.target.value)}
+                        style={{ padding: "6px 10px", border: "1px solid #7dd3fc", borderRadius: "8px", background: "white", color: "#334155", fontSize: "13px", fontWeight: 700 }}
+                      />
+                      <button
+                        type="button"
+                        disabled={savingCustomDueDate || !customDueDateInput}
+                        onClick={() => void saveCustomDueDate(customDueDateInput)}
+                        style={{ padding: "7px 12px", borderRadius: "8px", border: "none", background: "#0284c7", color: "white", fontSize: "11px", fontWeight: 800, cursor: savingCustomDueDate || !customDueDateInput ? "not-allowed" : "pointer", opacity: savingCustomDueDate || !customDueDateInput ? 0.55 : 1 }}
+                      >
+                        {savingCustomDueDate ? "Saving…" : "Set due date"}
+                      </button>
+                      {detailRegistration.customDueDate && (
+                        <button
+                          type="button"
+                          disabled={savingCustomDueDate}
+                          onClick={() => void saveCustomDueDate(null)}
+                          title="Reset back to automatic session 6 calculation"
+                          style={{ padding: "7px 10px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", color: "#64748b", fontSize: "11px", fontWeight: 700, cursor: savingCustomDueDate ? "wait" : "pointer" }}
+                        >
+                          Reset to Auto
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3223,7 +3444,9 @@ function AdminPaymentsPageInner() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", padding: "18px 22px", borderBottom: "1px solid #e2e8f0" }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <div style={{ fontWeight: 800, fontSize: "18px", color: "#002f76" }}>Registration confirmation preview</div>
+                  <div style={{ fontWeight: 800, fontSize: "18px", color: "#002f76" }}>
+                    {confirmationPreview.kind === "verified-payment" ? "Payment confirmation email preview" : "Registration confirmation preview"}
+                  </div>
                   {confirmationPreview.adventureNumber && (
                     <span style={{ padding: "2px 8px", borderRadius: "12px", background: "#eff6ff", color: "#0050d5", fontSize: "11px", fontWeight: 800, border: "1px solid #dbeafe" }}>
                       Adventure {confirmationPreview.adventureNumber}
@@ -3243,7 +3466,7 @@ function AdminPaymentsPageInner() {
             </div>
             <div style={{ padding: "14px 18px", overflowY: "auto", background: "#f1f5f9" }}>
               <iframe
-                title="Registration confirmation email preview"
+                title={confirmationPreview.kind === "verified-payment" ? "Payment confirmation email preview" : "Registration confirmation email preview"}
                 srcDoc={confirmationPreview.html}
                 sandbox=""
                 style={{ display: "block", width: "100%", height: "560px", border: "1px solid #dbe3ef", borderRadius: "12px", background: "white" }}
@@ -3261,7 +3484,13 @@ function AdminPaymentsPageInner() {
                 onClick={() => void confirmSendConfirmation()}
                 disabled={!!actioning}
                 style={{ padding: "10px 18px", borderRadius: "10px", border: 0, background: "#0033a0", color: "white", fontSize: "13px", fontWeight: 800, cursor: actioning ? "wait" : "pointer" }}
-              >{actioning === `${confirmationPreview.uid}-email-confirmation-send` ? "Sending…" : "Send confirmation email"}</button>
+              >
+                {actioning === `${confirmationPreview.uid}-email-confirmation-send`
+                  ? "Sending…"
+                  : confirmationPreview.kind === "verified-payment"
+                    ? "Send payment email"
+                    : "Send confirmation email"}
+              </button>
             </div>
           </div>
         </div>
@@ -3629,11 +3858,43 @@ function AdminPaymentsPageInner() {
                           )}
                           {isRegistrationVerified(registration.status) && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(uid, "confirmation", items[0]?.advNum || (registration ? advOf(registration) : tl.curNum)); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const latestItem = items.find((i) => getStatus(i.payment) === "verified") || items[0];
+                                const pmt = latestItem?.payment || focus.payment;
+                                const remaining = summary?.balance ?? null;
+                                const progTitle = (registration ? (PROGRAM_SLOTS as any)[registration.program]?.name : undefined) || acc.program || registration?.program || "";
+                                let dueNote = "";
+                                if (remaining && remaining > 0) {
+                                  if (summary?.interest && summary.interest > 0) {
+                                    dueNote = "A 4% weekly interest applies to overdue balances";
+                                  } else {
+                                    const info = registration ? regInfo(registration) : null;
+                                    if (info?.terms?.dueDate) {
+                                      dueNote = `Balance due on session ${BALANCE_DUE_SESSION} (${fmtDate(info.terms.dueDate)})`;
+                                    }
+                                  }
+                                }
+                                void previewPaymentEmail(uid, {
+                                  to: registration?.parentInfo?.email || acc.email || "",
+                                  parentName: acc.fullName || registration?.parentInfo?.name,
+                                  childName: acc.childName || (registration ? `${registration.childInfo?.firstName ?? ""} ${registration.childInfo?.lastName ?? ""}`.trim() : ""),
+                                  programName: progTitle,
+                                  paymentLabel: items.length > 1 ? "Registration Balance Payment" : "Registration Payment",
+                                  amountPaid: Number(pmt.amountPaid) || Number(g.total) || 0,
+                                  paymentMethod: pmt.paymentMethod,
+                                  referenceNumber: pmt.referenceNumber,
+                                  paidOn: pmt.submittedAt,
+                                  remainingBalance: remaining,
+                                  dueNote,
+                                  adventureNumber: items[0]?.advNum || (registration ? advOf(registration) : tl.curNum),
+                                });
+                              }}
                               disabled={!!actioning}
+                              title="Preview and send payment received confirmation email"
                               style={{ padding: "6px 10px", borderRadius: "8px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 700, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
                             >
-                              {actioning === `${uid}-email-confirmation` ? "Preparing preview…" : "↻ Resend email"}
+                              {actioning === `${uid}-email-payment` ? "Preparing preview…" : "📧 Payment email"}
                             </button>
                           )}
                         </>
@@ -3903,11 +4164,40 @@ function AdminPaymentsPageInner() {
                                 </button>
                               )}
                               <button
-                                onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(r.id, "confirmation", advOf(r)); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const remaining = summary?.balance ?? null;
+                                  let dueNote = "";
+                                  if (remaining && remaining > 0) {
+                                    if (summary?.interest && summary.interest > 0) {
+                                      dueNote = "A 4% weekly interest applies to overdue balances";
+                                    } else {
+                                      const info = regInfo(r);
+                                      if (info?.terms?.dueDate) {
+                                        dueNote = `Balance due on session ${BALANCE_DUE_SESSION} (${fmtDate(info.terms.dueDate)})`;
+                                      }
+                                    }
+                                  }
+                                  void previewPaymentEmail(r.id, {
+                                    to: r.parentInfo?.email || acc.email || "",
+                                    parentName: acc.fullName || r.parentInfo?.name,
+                                    childName: childFull || acc.childName || "Explorer",
+                                    programName: programName,
+                                    paymentLabel: "Next Adventure Registration Payment",
+                                    amountPaid: amtPaid,
+                                    paymentMethod: r.paymentMethod,
+                                    referenceNumber: ref,
+                                    paidOn: r.submittedAt,
+                                    remainingBalance: remaining,
+                                    dueNote,
+                                    adventureNumber: advOf(r) || advNumbers.next,
+                                  });
+                                }}
                                 disabled={!!actioning}
+                                title="Preview and send payment received confirmation email"
                                 style={{ padding: "6px 10px", borderRadius: "8px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 700, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
                               >
-                                {actioning === `${r.id}-email-confirmation` ? "Preparing preview…" : "↻ Resend email"}
+                                {actioning === `${r.id}-email-payment` ? "Preparing preview…" : "📧 Payment email"}
                               </button>
                             </>
                           )}

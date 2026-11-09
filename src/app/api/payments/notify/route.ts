@@ -35,8 +35,10 @@ function buildEmailHtml(p: {
     dueNote: string;
     // set when this payment settles (or reduces) the remaining balance of a registration
     settlement: Settlement | null;
+    adventureNumber?: number | null;
 }): string {
-    const paidOnStr = p.paidOn.toLocaleDateString("en-US", {
+    const paidDate = p.paidOn && !isNaN(p.paidOn.getTime()) ? p.paidOn : new Date();
+    const paidOnStr = paidDate.toLocaleDateString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
@@ -88,6 +90,7 @@ function buildEmailHtml(p: {
 
     const rows: [string, string][] = [
         ["Student", p.childName || "—"],
+        ...(p.adventureNumber ? [["Adventure", `Adventure ${p.adventureNumber}`] as [string, string]] : []),
         ["Program", p.programName || "—"],
         ["Payment for", p.paymentLabel],
         ["Payment method", METHOD_LABELS[p.paymentMethod] || p.paymentMethod.toUpperCase() || "—"],
@@ -124,7 +127,7 @@ function buildEmailHtml(p: {
 
       <!-- Header gradient -->
       <tr><td style="background:linear-gradient(135deg,#0033A0 0%,#0055cc 60%,#1a75ff 100%);padding:36px 40px 28px;text-align:center;">
-        <p style="margin:0 0 6px;font-size:11px;font-weight:800;letter-spacing:0.18em;color:rgba(255,255,255,0.6);text-transform:uppercase;">Merry Explorers Playgroup</p>
+        <p style="margin:0 0 6px;font-size:11px;font-weight:800;letter-spacing:0.18em;color:rgba(255,255,255,0.6);text-transform:uppercase;">Merry Explorers Playgroup${p.adventureNumber ? ` · Adventure ${p.adventureNumber}` : ""}</p>
         <h1 style="margin:0;font-size:28px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">${esc(title)}</h1>
         <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.8);">${esc(p.paymentLabel)}</p>
       </td></tr>
@@ -181,7 +184,7 @@ export async function POST(request: Request) {
     if (deny) return deny;
 
     try {
-        const data = await request.json();
+        const data = await request.json().catch(() => ({}));
         const {
             to,
             parentName,
@@ -198,11 +201,52 @@ export async function POST(request: Request) {
             targetId,
             actorUid,
             actorName,
+            adventureNumber,
+            action,
         } = data;
 
         const amount = Number(amountPaid);
         if (!to || !/^\S+@\S+\.\S+$/.test(String(to)) || !(amount > 0)) {
             return NextResponse.json({ error: "Missing parent email or amount" }, { status: 400 });
+        }
+
+        const emailSubject = settlement
+            ? `✅ ${Number(remainingBalance) === 0 ? "Balance settled" : "Payment applied to your balance"} — ${peso(amount)}${adventureNumber ? ` (Adventure ${adventureNumber})` : ""} · Merry Explorers`
+            : `✅ Payment received — ${peso(amount)}${adventureNumber ? ` (Adventure ${adventureNumber})` : ""} · Merry Explorers`;
+
+        const emailHtml = buildEmailHtml({
+            parentName: parentName || "",
+            childName: childName || "",
+            programName: programName || "",
+            paymentLabel: paymentLabel || "Payment",
+            amountPaid: amount,
+            paymentMethod: String(paymentMethod || ""),
+            referenceNumber: String(referenceNumber || ""),
+            paidOn: paidOn ? new Date(paidOn) : new Date(),
+            remainingBalance: remainingBalance == null ? null : Number(remainingBalance),
+            dueNote: dueNote || "",
+            settlement: settlement
+                ? {
+                    previousBalance: Number(settlement.previousBalance) || 0,
+                    interest: Number(settlement.interest) || 0,
+                    totalPayable: Number(settlement.totalPayable) || 0,
+                    interestWaived: Number(settlement.interestWaived) || 0,
+                    creditAdded: Number(settlement.creditAdded) || 0,
+                }
+                : null,
+            adventureNumber: adventureNumber ? Number(adventureNumber) : null,
+        });
+
+        if (action === "preview") {
+            return NextResponse.json({
+                success: true,
+                preview: {
+                    to,
+                    subject: emailSubject,
+                    html: emailHtml,
+                    adventureNumber: adventureNumber ? Number(adventureNumber) : null,
+                },
+            });
         }
 
         // Same Gmail setup as the photo-albums email route
@@ -217,30 +261,8 @@ export async function POST(request: Request) {
         await transporter.sendMail({
             from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
             to,
-            subject: settlement
-                ? `✅ ${Number(remainingBalance) === 0 ? "Balance settled" : "Payment applied to your balance"} — ${peso(amount)} · Merry Explorers`
-                : `✅ Payment received — ${peso(amount)} · Merry Explorers`,
-            html: buildEmailHtml({
-                parentName: parentName || "",
-                childName: childName || "",
-                programName: programName || "",
-                paymentLabel: paymentLabel || "Payment",
-                amountPaid: amount,
-                paymentMethod: String(paymentMethod || ""),
-                referenceNumber: String(referenceNumber || ""),
-                paidOn: paidOn ? new Date(paidOn) : new Date(),
-                remainingBalance: remainingBalance == null ? null : Number(remainingBalance),
-                dueNote: dueNote || "",
-                settlement: settlement
-                    ? {
-                        previousBalance: Number(settlement.previousBalance) || 0,
-                        interest: Number(settlement.interest) || 0,
-                        totalPayable: Number(settlement.totalPayable) || 0,
-                        interestWaived: Number(settlement.interestWaived) || 0,
-                        creditAdded: Number(settlement.creditAdded) || 0,
-                    }
-                    : null,
-            }),
+            subject: emailSubject,
+            html: emailHtml,
         });
 
         // Audit log (same shape as the photo-albums route)

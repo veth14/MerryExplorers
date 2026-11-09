@@ -99,6 +99,7 @@ export async function GET(
     const publicData = {
       id: registration._id.toString(),
       status: registration.status,
+      customDueDate: registration.customDueDate || null,
       ...(reservationIsExpired ? { parentEmail: String(registration.parentInfo?.email || "").trim() } : {}),
       program: registration.program,
       classTime: registration.classTime,
@@ -153,6 +154,19 @@ export async function PATCH(
         updateFields.isNewFamily = false;
         updateFields.familyTypeOverride = false;
         updateFields.welcomeKitOrdered = false;
+      }
+    }
+
+    if (body.customDueDate !== undefined) {
+      const val = body.customDueDate;
+      if (!val || val === "") {
+        updateFields.customDueDate = null;
+      } else if (typeof val === "string") {
+        const trimmed = val.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+          return NextResponse.json({ error: "Invalid date format. Expected YYYY-MM-DD." }, { status: 400 });
+        }
+        updateFields.customDueDate = trimmed;
       }
     }
 
