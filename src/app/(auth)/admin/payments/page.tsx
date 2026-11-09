@@ -720,6 +720,7 @@ function AdminPaymentsPageInner() {
   const [rejectTarget, setRejectTarget] = useState<{ uid: string; paymentId: string | null; type: PaymentKind } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [reminderPreview, setReminderPreview] = useState<{ uid: string; to: string; subject: string; html: string } | null>(null);
+  const [confirmationPreview, setConfirmationPreview] = useState<{ uid: string; to: string; subject: string; html: string; adventureNumber?: number } | null>(null);
 
   // the page is "loading" until the main data AND the Renewals records are in, so rows never jump between tabs
   const loading = mainLoading || renewalsFeed === "loading";
@@ -1364,7 +1365,7 @@ function AdminPaymentsPageInner() {
     finally { setActioning(null); }
   }
 
-  async function sendRegistrationEmail(uid: string, emailAction: "reminder" | "confirmation") {
+  async function sendRegistrationEmail(uid: string, emailAction: "reminder" | "confirmation", targetAdventure?: number) {
     const key = `${uid}-email-${emailAction}`;
     setActioning(key);
     try {
@@ -1375,7 +1376,11 @@ function AdminPaymentsPageInner() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(emailAction === "reminder" ? { action: "preview" } : { emailAction: "resendConfirmation" }),
+          body: JSON.stringify(
+            emailAction === "reminder"
+              ? { action: "preview" }
+              : { emailAction: "previewConfirmation", adventureNumber: targetAdventure }
+          ),
         }
       );
       const data = await res.json().catch(() => ({}));
@@ -1387,11 +1392,42 @@ function AdminPaymentsPageInner() {
         setReminderPreview({ uid, ...data.preview });
         return;
       }
+      if (emailAction === "confirmation") {
+        if (!res.ok || !data.preview) {
+          showToast(data.error || "The confirmation preview could not be loaded.", "error");
+          return;
+        }
+        setConfirmationPreview({ uid, ...data.preview });
+        return;
+      }
+    } catch {
+      showToast("Network error loading the email preview.", "error");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function confirmSendConfirmation() {
+    if (!confirmationPreview) return;
+    const { uid, adventureNumber } = confirmationPreview;
+    setActioning(`${uid}-email-confirmation-send`);
+    try {
+      const res = await fetch(`/api/registrations/${uid}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailAction: "resendConfirmation",
+          adventureNumber,
+          ...ADMIN_ACTOR,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.emailSent) {
         showToast(data.error || "The email could not be sent.", "error");
         return;
       }
-      showToast("Corrected confirmation email sent.");
+      setConfirmationPreview(null);
+      showToast("Registration confirmation email sent.");
     } catch {
       showToast("Network error sending the email.", "error");
     } finally {
@@ -3179,6 +3215,59 @@ function AdminPaymentsPageInner() {
         </div>
       )}
 
+      {confirmationPreview && (
+        <div
+          onClick={() => !actioning && setConfirmationPreview(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 62, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "760px", maxHeight: "92vh", display: "flex", flexDirection: "column", background: "white", borderRadius: "20px", boxShadow: "0 20px 40px rgba(0,0,0,0.25)", overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", padding: "18px 22px", borderBottom: "1px solid #e2e8f0" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ fontWeight: 800, fontSize: "18px", color: "#002f76" }}>Registration confirmation preview</div>
+                  {confirmationPreview.adventureNumber && (
+                    <span style={{ padding: "2px 8px", borderRadius: "12px", background: "#eff6ff", color: "#0050d5", fontSize: "11px", fontWeight: 800, border: "1px solid #dbeafe" }}>
+                      Adventure {confirmationPreview.adventureNumber}
+                    </span>
+                  )}
+                </div>
+                <div style={{ marginTop: "5px", fontSize: "12px", color: "#64748b", overflowWrap: "anywhere" }}>To: {confirmationPreview.to}</div>
+                <div style={{ marginTop: "4px", fontSize: "12px", color: "#334155" }}>Subject: <strong>{confirmationPreview.subject}</strong></div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmationPreview(null)}
+                disabled={!!actioning}
+                aria-label="Close confirmation preview"
+                style={{ border: 0, background: "transparent", color: "#64748b", fontSize: "22px", lineHeight: 1, cursor: actioning ? "wait" : "pointer" }}
+              >×</button>
+            </div>
+            <div style={{ padding: "14px 18px", overflowY: "auto", background: "#f1f5f9" }}>
+              <iframe
+                title="Registration confirmation email preview"
+                srcDoc={confirmationPreview.html}
+                sandbox=""
+                style={{ display: "block", width: "100%", height: "560px", border: "1px solid #dbe3ef", borderRadius: "12px", background: "white" }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 22px", borderTop: "1px solid #e2e8f0" }}>
+              <button
+                type="button"
+                onClick={() => setConfirmationPreview(null)}
+                disabled={!!actioning}
+                style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "white", color: "#475569", fontSize: "13px", fontWeight: 700, cursor: actioning ? "wait" : "pointer" }}
+              >Cancel</button>
+              <button
+                type="button"
+                onClick={() => void confirmSendConfirmation()}
+                disabled={!!actioning}
+                style={{ padding: "10px 18px", borderRadius: "10px", border: 0, background: "#0033a0", color: "white", fontSize: "13px", fontWeight: 800, cursor: actioning ? "wait" : "pointer" }}
+              >{actioning === `${confirmationPreview.uid}-email-confirmation-send` ? "Sending…" : "Send confirmation email"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reject reason modal (replaces window.prompt) */}
       {rejectTarget && (
         <div onClick={() => setRejectTarget(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
@@ -3541,11 +3630,11 @@ function AdminPaymentsPageInner() {
                           )}
                           {isRegistrationVerified(registration.status) && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(uid, "confirmation"); }}
+                              onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(uid, "confirmation", items[0]?.advNum || (registration ? advOf(registration) : tl.curNum)); }}
                               disabled={!!actioning}
                               style={{ padding: "6px 10px", borderRadius: "8px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 700, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
                             >
-                              {actioning === `${uid}-email-confirmation` ? "Sending…" : "↻ Resend email"}
+                              {actioning === `${uid}-email-confirmation` ? "Preparing preview…" : "↻ Resend email"}
                             </button>
                           )}
                         </>
@@ -3815,11 +3904,11 @@ function AdminPaymentsPageInner() {
                                 </button>
                               )}
                               <button
-                                onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(r.id, "confirmation"); }}
+                                onClick={(e) => { e.stopPropagation(); void sendRegistrationEmail(r.id, "confirmation", advOf(r)); }}
                                 disabled={!!actioning}
                                 style={{ padding: "6px 10px", borderRadius: "8px", background: "#f0fdf4", color: "#15803d", fontSize: "12px", fontWeight: 700, border: "1px solid #bbf7d0", cursor: actioning ? "wait" : "pointer" }}
                               >
-                                {actioning === `${r.id}-email-confirmation` ? "Sending…" : "↻ Resend email"}
+                                {actioning === `${r.id}-email-confirmation` ? "Preparing preview…" : "↻ Resend email"}
                               </button>
                             </>
                           )}

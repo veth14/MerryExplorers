@@ -103,6 +103,7 @@ export async function POST(
     const body = await request.json();
     const { actorUid, actorName, actorRole } = body;
     const resendConfirmation = body.emailAction === "resendConfirmation";
+    const previewConfirmation = body.emailAction === "previewConfirmation";
 
     const { db } = await connectToDatabase();
 
@@ -134,23 +135,25 @@ export async function POST(
       );
     }
 
-    if (registration.status === "approved" && !resendConfirmation) {
+    if (registration.status === "approved" && !resendConfirmation && !previewConfirmation) {
       return NextResponse.json({ error: "Already approved" }, { status: 409 });
     }
-    if (resendConfirmation && !isRegistrationVerified(registration.status)) {
+    if ((resendConfirmation || previewConfirmation) && !isRegistrationVerified(registration.status)) {
       return NextResponse.json({ error: "Only approved registrations can receive a confirmation email." }, { status: 409 });
     }
 
     const settingsDoc = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
     const adventureSettings = settingsDoc?.programs || [];
     const adventureSetting = getProgramAdventureSetting(registration.program, adventureSettings);
-    const adventureNumber = adventureSetting
-      ? getRegistrationAdventureNumber({
-          adventureNumber: registration.adventureNumber,
-          period: registration.period,
-          submittedAt: registration.submittedAt,
-        }, registration.program, adventureSettings)
-      : null;
+    const adventureNumber = Number(body.adventureNumber) || (
+      adventureSetting
+        ? getRegistrationAdventureNumber({
+            adventureNumber: registration.adventureNumber,
+            period: registration.period,
+            submittedAt: registration.submittedAt,
+          }, registration.program, adventureSettings)
+        : null
+    ) || Number(registration.adventureNumber) || 2;
     const adventureStartDate = registration.adventureStartDate || (
       adventureSetting
         ? getAdventureStartDateForNumber(registration.program, adventureNumber, adventureSettings)
@@ -158,7 +161,7 @@ export async function POST(
     );
 
     const { childInfo, parentInfo, emergencyContact, program, classTime, uniformOrdered, lanyardOrdered } = registration;
-    if (!resendConfirmation) {
+    if (!resendConfirmation && !previewConfirmation) {
       // Update status
       await db.collection("student_registrations").updateOne(
         { _id: new ObjectId(id) },
@@ -256,12 +259,8 @@ export async function POST(
       const totalRemaining = sessionBalance + remainingPrevious;
       const isFullyPaid = totalRemaining <= 0;
 
-      await transporter.sendMail({
-        from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
-        to: parentInfo.email,
-        subject: `🎉 ${childInfo.firstName} is Officially Registered at Merry Explorers!${adventureNumber !== null ? ` (Adventure ${adventureNumber})` : ""}`,
-
-        html: `
+      const emailSubject = `🎉 ${childInfo.firstName} is Officially Registered at Merry Explorers!${adventureNumber !== null ? ` (Adventure ${adventureNumber})` : ""}`;
+      const emailHtml = `
           <!DOCTYPE html>
           <html>
           <body style="margin: 0; padding: 0; background-color: #eaf4ff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
@@ -367,7 +366,25 @@ export async function POST(
             </table>
           </body>
           </html>
-        `,
+        `;
+
+      if (previewConfirmation) {
+        return NextResponse.json({
+          success: true,
+          preview: {
+            to: parentInfo.email,
+            subject: emailSubject,
+            html: emailHtml,
+            adventureNumber,
+          },
+        });
+      }
+
+      await transporter.sendMail({
+        from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
+        to: parentInfo.email,
+        subject: emailSubject,
+        html: emailHtml,
       });
       emailSent = true;
 
@@ -375,6 +392,19 @@ export async function POST(
         { _id: new ObjectId(id) },
         { $set: { confirmationEmailSent: true } }
       );
+
+      if (actorUid && resendConfirmation) {
+        await db.collection("audit_log").insertOne({
+          actorUid,
+          actorName: actorName || "Unknown",
+          actorRole: actorRole || "admin",
+          action: "RESEND_CONFIRMATION_EMAIL",
+          category: "registration",
+          targetId: id,
+          details: `Resent registration confirmation email for ${childInfo?.firstName} ${childInfo?.lastName} (Adventure ${adventureNumber}) to ${parentInfo.email}`,
+          createdAt: new Date(),
+        });
+      }
     } catch (emailErr) {
       console.warn("[approve] Failed to send confirmation email:", emailErr);
     }
