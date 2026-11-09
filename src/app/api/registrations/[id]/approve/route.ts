@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
-import { getCurrentAdventureNumber, getCurrentAdventureStartDate, getProgramAdventureSetting, getRegistrationAdventureNumber, getAdventureStartDateForNumber } from "@/lib/adventure-cycle";
+import { getProgramAdventureSetting, getRegistrationAdventureNumber, getAdventureStartDateForNumber } from "@/lib/adventure-cycle";
 import { FALLBACK_PIONEER_RATES, getRegistrationTotal, isRegistrationVerified } from "@/lib/payment-terms";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
@@ -100,7 +100,7 @@ export async function POST(
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { actorUid, actorName, actorRole } = body;
     const resendConfirmation = body.emailAction === "resendConfirmation";
     const previewConfirmation = body.emailAction === "previewConfirmation";
@@ -223,17 +223,20 @@ export async function POST(
     // Send confirmation email to parent
     let emailSent = false;
     try {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      });
+      const childFirstName = childInfo?.firstName || "Explorer";
+      const childLastName = childInfo?.lastName || "";
+      const parentDisplayName = parentInfo?.name || "there";
+      const recipientEmail = (parentInfo?.email || "").toLowerCase().trim();
+
+      if (!recipientEmail && (previewConfirmation || resendConfirmation)) {
+        return NextResponse.json({ error: "Parent email is missing from this registration." }, { status: 400 });
+      }
 
       const prog = (PROGRAM_SLOTS as Record<string, any>)[program];
       const programName = PROGRAM_NAMES[program] || program;
       const schedule = PROGRAM_SCHEDULES[program] || "";
       const classTimeDisplay = formatClassTime(program, classTime);
       const startDateDisplay = formatStartDate(adventureStartDate);
-      const parentEmailRegex = new RegExp(`^${parentEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
       const pricingRegistration = {
         ...registration,
         isPioneer: isPioneerRegistration,
@@ -245,7 +248,7 @@ export async function POST(
         (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, prog?.rate || 0) || 0) +
         (uniformOrdered ? 650 : 0);
       const balancePaid = Array.isArray(registration.balancePayments)
-        ? registration.balancePayments.reduce((sum: number, payment: any) => sum + (Number(payment.amountPaid) || 0), 0)
+        ? registration.balancePayments.reduce((sum: number, payment: any) => sum + (Number(payment?.amountPaid) || 0), 0)
         : 0;
       const amountPaid = (Number(registration.amountPaid) || 0) + balancePaid;
       // previousAdventureBalance = unpaid carried over from the previous Adventure cycle (e.g. Adventure 1)
@@ -259,7 +262,7 @@ export async function POST(
       const totalRemaining = sessionBalance + remainingPrevious;
       const isFullyPaid = totalRemaining <= 0;
 
-      const emailSubject = `🎉 ${childInfo.firstName} is Officially Registered at Merry Explorers!${adventureNumber !== null ? ` (Adventure ${adventureNumber})` : ""}`;
+      const emailSubject = `🎉 ${childFirstName} is Officially Registered at Merry Explorers!${adventureNumber !== null ? ` (Adventure ${adventureNumber})` : ""}`;
       const emailHtml = `
           <!DOCTYPE html>
           <html>
@@ -296,17 +299,17 @@ export async function POST(
                           <span style="font-size: 48px;">🎊</span>
                         </p>
                         <h2 style="color: #1e293b; font-size: 24px; margin: 0 0 4px 0; text-align: center;">Congratulations!</h2>
-                        <p style="color: #0033A0; font-size: 16px; font-weight: 700; margin: 0 0 26px 0; text-align: center;">${childInfo.firstName} is officially an Explorer!</p>
+                        <p style="color: #0033A0; font-size: 16px; font-weight: 700; margin: 0 0 26px 0; text-align: center;">${childFirstName} is officially an Explorer!</p>
 
                         <p style="color: #475569; font-size: 16px; line-height: 1.7; margin: 0 0 26px 0;">
-                          Hi <strong>${parentInfo.name}</strong>! We're thrilled to confirm that your payment has been verified and <strong>${childInfo.firstName}</strong> is now officially registered at Merry Explorers${adventureNumber !== null ? ` for <strong>Adventure ${adventureNumber}</strong>` : ""}. 🎉
+                          Hi <strong>${parentDisplayName}</strong>! We're thrilled to confirm that your payment has been verified and <strong>${childFirstName}</strong> is now officially registered at Merry Explorers${adventureNumber !== null ? ` for <strong>Adventure ${adventureNumber}</strong>` : ""}. 🎉
                         </p>
 
                         <!-- Registration details card -->
                         <div style="background-color: #f8fbff; border: 1.5px solid #dbeafe; border-radius: 16px; padding: 22px 24px; margin: 0 0 20px 0;">
                           <p style="margin: 0 0 14px 0; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">📋 Registration Details</p>
                           <table width="100%" cellpadding="0" cellspacing="0">
-                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600; width: 40%;">Explorer</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${childInfo.firstName} ${childInfo.lastName}</td></tr>
+                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600; width: 40%;">Explorer</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${childFirstName} ${childLastName}</td></tr>
                             ${adventureNumber !== null ? `<tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Adventure</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">Adventure ${adventureNumber}</td></tr>` : ""}
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Program</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${programName}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Class</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${classTimeDisplay}</td></tr>
@@ -346,7 +349,7 @@ export async function POST(
                         </div>
 
                         <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0;">
-                          We can't wait to see <strong>${childInfo.firstName}</strong> start this amazing adventure! If you have any questions, message us on Facebook. 💛
+                          We can't wait to see <strong>${childFirstName}</strong> start this amazing adventure! If you have any questions, message us on Facebook. 💛
                         </p>
                       </td>
                     </tr>
@@ -372,7 +375,7 @@ export async function POST(
         return NextResponse.json({
           success: true,
           preview: {
-            to: parentInfo.email,
+            to: recipientEmail,
             subject: emailSubject,
             html: emailHtml,
             adventureNumber,
@@ -380,9 +383,14 @@ export async function POST(
         });
       }
 
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      });
+
       await transporter.sendMail({
         from: `"Merry Explorers" <${process.env.EMAIL_USER}>`,
-        to: parentInfo.email,
+        to: recipientEmail,
         subject: emailSubject,
         html: emailHtml,
       });
@@ -401,12 +409,15 @@ export async function POST(
           action: "RESEND_CONFIRMATION_EMAIL",
           category: "registration",
           targetId: id,
-          details: `Resent registration confirmation email for ${childInfo?.firstName} ${childInfo?.lastName} (Adventure ${adventureNumber}) to ${parentInfo.email}`,
+          details: `Resent registration confirmation email for ${childFirstName} ${childLastName} (Adventure ${adventureNumber}) to ${recipientEmail}`,
           createdAt: new Date(),
         });
       }
-    } catch (emailErr) {
+    } catch (emailErr: any) {
       console.warn("[approve] Failed to send confirmation email:", emailErr);
+      if (previewConfirmation) {
+        return NextResponse.json({ error: emailErr?.message || "Failed to generate preview" }, { status: 500 });
+      }
     }
 
       return NextResponse.json({ success: true, emailSent });

@@ -722,6 +722,13 @@ function AdminPaymentsPageInner() {
   const [reminderPreview, setReminderPreview] = useState<{ uid: string; to: string; subject: string; html: string } | null>(null);
   const [confirmationPreview, setConfirmationPreview] = useState<{ uid: string; to: string; subject: string; html: string; adventureNumber?: number } | null>(null);
 
+  useEffect(() => {
+    if (user) {
+      ADMIN_ACTOR.actorUid = user.uid;
+      ADMIN_ACTOR.actorName = user.displayName || user.email || "Admin";
+    }
+  }, [user]);
+
   // the page is "loading" until the main data AND the Renewals records are in, so rows never jump between tabs
   const loading = mainLoading || renewalsFeed === "loading";
 
@@ -1369,32 +1376,26 @@ function AdminPaymentsPageInner() {
     const key = `${uid}-email-${emailAction}`;
     setActioning(key);
     try {
-      const res = await fetch(
+      const { ok, data, error } = await postJson(
         emailAction === "reminder"
           ? `/api/registrations/${uid}/send-reminder`
           : `/api/registrations/${uid}/approve`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            emailAction === "reminder"
-              ? { action: "preview" }
-              : { emailAction: "previewConfirmation", adventureNumber: targetAdventure }
-          ),
-        }
+        "POST",
+        emailAction === "reminder"
+          ? { action: "preview" }
+          : { emailAction: "previewConfirmation", adventureNumber: targetAdventure }
       );
-      const data = await res.json().catch(() => ({}));
       if (emailAction === "reminder") {
-        if (!res.ok || !data.preview) {
-          showToast(data.error || "The reminder preview could not be loaded.", "error");
+        if (!ok || !data?.preview) {
+          showToast(error || data?.error || "The reminder preview could not be loaded.", "error");
           return;
         }
         setReminderPreview({ uid, ...data.preview });
         return;
       }
       if (emailAction === "confirmation") {
-        if (!res.ok || !data.preview) {
-          showToast(data.error || "The confirmation preview could not be loaded.", "error");
+        if (!ok || !data?.preview) {
+          showToast(error || data?.error || "The confirmation preview could not be loaded.", "error");
           return;
         }
         setConfirmationPreview({ uid, ...data.preview });
@@ -1412,18 +1413,17 @@ function AdminPaymentsPageInner() {
     const { uid, adventureNumber } = confirmationPreview;
     setActioning(`${uid}-email-confirmation-send`);
     try {
-      const res = await fetch(`/api/registrations/${uid}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { ok, data, error } = await postJson(
+        `/api/registrations/${uid}/approve`,
+        "POST",
+        {
           emailAction: "resendConfirmation",
           adventureNumber,
           ...ADMIN_ACTOR,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.emailSent) {
-        showToast(data.error || "The email could not be sent.", "error");
+        }
+      );
+      if (!ok || !data?.emailSent) {
+        showToast(error || data?.error || "The email could not be sent.", "error");
         return;
       }
       setConfirmationPreview(null);
@@ -1440,14 +1440,13 @@ function AdminPaymentsPageInner() {
     const { uid } = reminderPreview;
     setActioning(`${uid}-email-reminder-send`);
     try {
-      const res = await fetch(`/api/registrations/${uid}/send-reminder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send" }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.emailSent) {
-        showToast(data.error || "The email could not be sent.", "error");
+      const { ok, data, error } = await postJson(
+        `/api/registrations/${uid}/send-reminder`,
+        "POST",
+        { action: "send" }
+      );
+      if (!ok || !data?.emailSent) {
+        showToast(error || data?.error || "The email could not be sent.", "error");
         return;
       }
       setReminderPreview(null);
