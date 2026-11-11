@@ -7,14 +7,13 @@ import {
   BODY_PARTS,
   DEFAULT_AVATARS,
   CHEER_PHRASES,
-  type BodyPartItem,
-  type BodyPartId,
-} from "@/data/body-parts-game";
+} from "../data";
+import type { BodyPartItem, BodyPartId } from "../types";
 import { GameAudio } from "@/lib/game-audio";
-import { ExplorerCharacter } from "@/components/admin/activities/body-parts/ExplorerCharacter";
-import { ConfettiEffect } from "@/components/admin/activities/body-parts/ConfettiEffect";
-import { BodyPartAnswerPicture } from "@/components/admin/activities/body-parts/BodyPartAnswerPicture";
-import { RacePetPicture } from "@/components/admin/activities/body-parts/RacePetPicture";
+import { ExplorerCharacter } from "./ExplorerCharacter";
+import { ConfettiEffect } from "./ConfettiEffect";
+import { BodyPartAnswerPicture } from "./BodyPartAnswerPicture";
+import { RacePetPicture } from "./RacePetPicture";
 
 type GamePlayer = {
   studentId: string | null;

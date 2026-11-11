@@ -47,3 +47,4 @@ export function rankPlayers(players: GamePlayer[]): GamePlayer[] {
     rank: idx + 1,
   }));
 }
+

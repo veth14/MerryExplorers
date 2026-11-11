@@ -96,7 +96,7 @@ export default function AdminNumberTrailPage() {
 
 | Game ID | Name | Target Ages | Key Concepts | Location |
 | :--- | :--- | :--- | :--- | :--- |
-| `body-parts` | Body Parts Adventure | Ages 2–5 | Body parts recognition, action prompts | `src/components/admin/activities/body-parts/` |
+| `body-parts` | Body Parts Adventure | Ages 2–5 | Body parts recognition, action prompts | `src/games/body-parts/` |
 | `number-trail` | Number Trail Adventure | Ages 2–6 | Recognition, count & match, sequence, more or less | `src/games/number-trail/` |
 
 ---
@@ -107,3 +107,4 @@ To verify all games pass strict TypeScript checking at any time:
 ```bash
 npx tsc --noEmit
 ```
+

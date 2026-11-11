@@ -1,6 +1,6 @@
 "use client";
 
-import type { BodyPartId } from "@/data/body-parts-game";
+import type { BodyPartId } from "../types";
 
 type Props = {
   onSelectPart: (partId: BodyPartId) => void;

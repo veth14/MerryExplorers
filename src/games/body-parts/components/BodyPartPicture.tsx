@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from "react";
-import type { BodyPartId } from "@/data/body-parts-game";
+import type { BodyPartId } from "../types";
 
 const HIGHLIGHTS: Record<BodyPartId, ReactNode> = {
   head: <ellipse cx="100" cy="49" rx="34" ry="39" />,

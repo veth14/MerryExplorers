@@ -58,58 +58,58 @@ export function ConfettiEffect({ count = 80 }: { count?: number }) {
       });
     }
 
-    let animId: number;
-    function render() {
-      if (!ctx || !canvas) return;
+    let animationFrameId: number;
+
+    const render = () => {
       ctx.clearRect(0, 0, width, height);
 
-      let alive = false;
+      let aliveCount = 0;
       for (const p of pieces) {
         if (p.alpha <= 0) continue;
-        alive = true;
+        aliveCount++;
 
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.22; // gravity
-        p.vx *= 0.98; // air resistance
+        p.vy += 0.25; // gravity
         p.rotation += p.rotationSpeed;
-        p.alpha = Math.max(0, p.alpha - p.decay);
+        p.alpha -= p.decay;
 
         ctx.save();
-        ctx.globalAlpha = p.alpha;
         ctx.translate(p.x, p.y);
         ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.globalAlpha = Math.max(0, p.alpha);
         ctx.fillStyle = p.color;
 
         if (p.shape === "circle") {
           ctx.beginPath();
           ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
           ctx.fill();
-        } else if (p.shape === "square") {
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        } else if (p.shape === "strip") {
+          ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
         } else {
-          ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2.5);
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
         }
 
         ctx.restore();
       }
 
-      if (alive) {
-        animId = requestAnimationFrame(render);
+      if (aliveCount > 0) {
+        animationFrameId = requestAnimationFrame(render);
       }
-    }
+    };
 
-    animId = requestAnimationFrame(render);
+    animationFrameId = requestAnimationFrame(render);
 
     const handleResize = () => {
       if (!canvas) return;
       width = canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
       height = canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
     };
+
     window.addEventListener("resize", handleResize);
 
     return () => {
-      cancelAnimationFrame(animId);
+      cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", handleResize);
     };
   }, [count]);
@@ -117,8 +117,8 @@ export function ConfettiEffect({ count = 80 }: { count?: number }) {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 z-50 h-full w-full"
+      className="pointer-events-none absolute inset-0 z-30 h-full w-full"
+      aria-hidden="true"
     />
   );
 }
-

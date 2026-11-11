@@ -1,4 +1,4 @@
-import type { BodyPartId } from "@/data/body-parts-game";
+import type { BodyPartId } from "../types";
 
 const BODY_PART_IMAGES: Record<BodyPartId, string> = {
   head: "HEAD1.png",

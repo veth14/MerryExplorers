@@ -114,3 +114,4 @@ export type LeaderboardEntry = {
   gamesPlayed: number;
   wins: number;
 };
+
