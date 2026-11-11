@@ -328,6 +328,11 @@ export function GamesAnalyticsDashboard() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Bulk Selection State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // Table Pagination State
   const [tableFilterGame, setTableFilterGame] = useState<"all" | "body-parts" | "number-trail">("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -378,15 +383,65 @@ export function GamesAnalyticsDashboard() {
       const result = await res.json();
       if (result.success) {
         setDeleteConfirmId(null);
-        if (selectedSession?.id === sessionId) {
-          setSelectedSession(null);
-        }
+        if (selectedSession?.id === sessionId) setSelectedSession(null);
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sessionId);
+          return next;
+        });
         await fetchAnalytics();
+      } else {
+        console.error("Delete failed:", result.error);
       }
     } catch (err) {
       console.error("Failed to delete session:", err);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      const headers = await getAuthHeaders();
+      const ids = Array.from(selectedIds).join(",");
+      const res = await fetch(`/api/admin/activities/analytics?ids=${encodeURIComponent(ids)}`, {
+        method: "DELETE",
+        headers,
+      });
+      const result = await res.json();
+      if (result.success) {
+        setSelectedIds(new Set());
+        setBulkDeleteConfirm(false);
+        setSelectedSession(null);
+        await fetchAnalytics();
+      } else {
+        console.error("Bulk delete failed:", result.error);
+      }
+    } catch (err) {
+      console.error("Failed to bulk delete sessions:", err);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const toggleSelectId = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (sessions: SessionRecord[]) => {
+    const allIds = sessions.map((s) => s.id).filter(Boolean);
+    const allSelected = allIds.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allIds));
     }
   };
 
@@ -1630,11 +1685,47 @@ export function GamesAnalyticsDashboard() {
                   </div>
                 </div>
 
+                {/* Bulk Action Bar */}
+                {selectedIds.size > 0 && (
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-red-200 bg-red-50/60 px-4 py-2.5">
+                    <span className="text-xs font-black text-red-700">
+                      {selectedIds.size} session{selectedIds.size > 1 ? "s" : ""} selected
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIds(new Set())}
+                        className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100 transition"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkDeleteConfirm(true)}
+                        className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition"
+                      >
+                        Delete Selected ({selectedIds.size})
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-5 overflow-x-auto rounded-2xl border border-[#e1eaf5]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#f8fafd] text-[11px] font-black uppercase tracking-wider text-[#6480a4]">
                       <tr>
-                        <th className="px-4 py-3.5">Date & Time</th>
+                        <th className="w-10 px-4 py-3.5">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded accent-[#002f76] cursor-pointer"
+                            checked={
+                              paginatedSessions.length > 0 &&
+                              paginatedSessions.every((s) => selectedIds.has(s.id))
+                            }
+                            onChange={() => toggleSelectAll(paginatedSessions)}
+                          />
+                        </th>
+                        <th className="px-4 py-3.5">Date &amp; Time</th>
                         <th className="px-4 py-3.5">Game Title</th>
                         <th className="px-4 py-3.5">Facilitator</th>
                         <th className="px-4 py-3.5">Explorers</th>
@@ -1646,8 +1737,12 @@ export function GamesAnalyticsDashboard() {
                     <tbody className="divide-y divide-[#edf3fa] font-semibold text-[#002f76]">
                       {paginatedSessions.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-10 text-center text-xs font-bold text-slate-400">
-                            No matching game sessions found.
+                          <td colSpan={8} className="py-12 text-center">
+                            <div className="flex flex-col items-center gap-2">
+                              <GamepadIcon className="h-8 w-8 text-[#c8d8ec]" />
+                              <span className="text-sm font-black text-[#8ba2be]">No game sessions recorded yet</span>
+                              <span className="text-xs font-semibold text-[#aabcce]">Play a game from the Teacher Game Hub to see data here</span>
+                            </div>
                           </td>
                         </tr>
                       ) : (
@@ -1664,7 +1759,18 @@ export function GamesAnalyticsDashboard() {
                           });
 
                           return (
-                            <tr key={session.id} className="hover:bg-[#f8fafd] transition">
+                            <tr
+                              key={session.id}
+                              className={`transition ${selectedIds.has(session.id) ? "bg-blue-50/60" : "hover:bg-[#f8fafd]"}`}
+                            >
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded accent-[#002f76] cursor-pointer"
+                                  checked={selectedIds.has(session.id)}
+                                  onChange={() => toggleSelectId(session.id)}
+                                />
+                              </td>
                               <td className="px-4 py-3.5 whitespace-nowrap">
                                 <div className="font-black text-[#002f76]">{dateFormatted}</div>
                                 <div className="text-[10px] text-[#637d9f]">{timeFormatted}</div>
@@ -2107,6 +2213,53 @@ export function GamesAnalyticsDashboard() {
                       className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
                     >
                       {isDeleting ? "Deleting…" : "Confirm Delete"}
+                    </button>
+                  </div>
+                </m.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* ─── MODAL: Bulk Delete Confirmation ─── */}
+          <AnimatePresence>
+            {bulkDeleteConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <m.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-[#002f76]/40 backdrop-blur-xs transition-opacity"
+                  onClick={() => setBulkDeleteConfirm(false)}
+                />
+                <m.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative w-full max-w-md rounded-[28px] border border-red-200 bg-white p-6 shadow-2xl z-10 space-y-4"
+                >
+                  <h3 className="text-lg font-black text-red-600">
+                    Delete {selectedIds.size} Session{selectedIds.size > 1 ? "s" : ""}?
+                  </h3>
+                  <p className="text-xs text-[#57719b] leading-relaxed">
+                    This will permanently remove {selectedIds.size} recorded game session{selectedIds.size > 1 ? "s" : ""} and cannot be undone. Student score totals and audit logs will be updated.
+                  </p>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={isBulkDeleting}
+                      onClick={() => setBulkDeleteConfirm(false)}
+                      className="rounded-xl border border-[#d3dfed] px-4 py-2 text-xs font-bold text-[#57719b] hover:bg-[#f0f4fa] disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBulkDeleting}
+                      onClick={handleBulkDelete}
+                      className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {isBulkDeleting ? "Deleting…" : `Delete ${selectedIds.size} Session${selectedIds.size > 1 ? "s" : ""}`}
                     </button>
                   </div>
                 </m.div>

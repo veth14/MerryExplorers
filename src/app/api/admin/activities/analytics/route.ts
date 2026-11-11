@@ -32,94 +32,6 @@ type RawSession = {
   recordedByUid?: string;
 };
 
-// Generates high-fidelity demonstration data when database is fresh / empty
-function generateRealisticSampleData(): RawSession[] {
-  const students = [
-    { name: "Gelo", avatar: "Bear Cub", color: "#f59e0b" },
-    { name: "Dari", avatar: "Fox Scout", color: "#ef4444" },
-    { name: "Gavinne", avatar: "Wise Owl", color: "#6366f1" },
-    { name: "Kaili", avatar: "Rabbit Explorer", color: "#10b981" },
-    { name: "Misha", avatar: "Panda Friend", color: "#14b8a6" },
-    { name: "Ram", avatar: "Lion Cub", color: "#f97316" },
-    { name: "Zane", avatar: "Koala Buddy", color: "#06b6d4" },
-  ];
-
-  const sessions: RawSession[] = [];
-  const now = new Date();
-
-  // Create 18 classroom sessions spanning recent days
-  const sessionConfigs = [
-    { dayOffset: 0, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [0, 1, 3], teacher: "angel@merryexplorers.com", notes: "Count & Match review with animal counters" },
-    { dayOffset: 0, hour: 14, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 3, studentIndices: [2, 4, 5, 6], teacher: "kyle@merryexplorers.com", notes: "Interactive body map pointing practice" },
-    { dayOffset: 1, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 2, 0], teacher: "angel@merryexplorers.com", notes: "Sequencing numbers 1 through 10" },
-    { dayOffset: 1, hour: 11, game: "body-parts", title: "Body Parts Race - Picture Match", rounds: 3, studentIndices: [3, 4, 6], teacher: "jasmin@merryexplorers.com", notes: "Word-to-numeral matching practice" },
-    { dayOffset: 2, hour: 10, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 4, studentIndices: [0, 5, 1], teacher: "kyle@merryexplorers.com", notes: "Sensory organs and movement recognition" },
-    { dayOffset: 3, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [2, 3, 5], teacher: "angel@merryexplorers.com", notes: "More or Less comparisons race" },
-    { dayOffset: 4, hour: 13, game: "body-parts", title: "Body Parts Race - Picture Match", rounds: 3, studentIndices: [4, 6, 0], teacher: "jasmin@merryexplorers.com", notes: "Head shoulders knees and toes review" },
-    { dayOffset: 5, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 5, 6], teacher: "angel@merryexplorers.com", notes: "Trail race to 5 points with cheer boosts" },
-    { dayOffset: 6, hour: 9, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 3, studentIndices: [2, 0, 3], teacher: "kyle@merryexplorers.com", notes: "Fine motor & facial features match" },
-    { dayOffset: 7, hour: 11, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [4, 1, 2], teacher: "jasmin@merryexplorers.com", notes: "High five for numbers 1 to 5" },
-    { dayOffset: 8, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [0, 3, 6], teacher: "angel@merryexplorers.com", notes: "Weekly numbers championship race" },
-    { dayOffset: 9, hour: 9, game: "body-parts", title: "Body Parts Race - Picture Match", rounds: 4, studentIndices: [5, 4, 1], teacher: "kyle@merryexplorers.com", notes: "Arm and hand gestures coordination" },
-    { dayOffset: 10, hour: 14, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [2, 6, 0], teacher: "angel@merryexplorers.com", notes: "What comes next sequence training" },
-    { dayOffset: 11, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 3, 4], teacher: "jasmin@merryexplorers.com", notes: "Preschool counting circle game" },
-    { dayOffset: 12, hour: 11, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 3, studentIndices: [0, 2, 5], teacher: "kyle@merryexplorers.com", notes: "Smile, eyes and ears recognition" },
-    { dayOffset: 13, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [6, 1, 3], teacher: "angel@merryexplorers.com", notes: "Speed counting friendly race" },
-  ];
-
-  sessionConfigs.forEach((cfg, idx) => {
-    const sessionDate = new Date(now);
-    sessionDate.setDate(now.getDate() - cfg.dayOffset);
-    sessionDate.setHours(cfg.hour, 15 + (idx % 30), 0, 0);
-
-    const participatingStudents = cfg.studentIndices.map((i) => students[i]);
-    const maxScore = cfg.rounds;
-
-    const sessionPlayers: RawPlayer[] = participatingStudents.map((st, pIdx) => {
-      const score = Math.max(1, maxScore - ((pIdx * 2 + idx) % 3));
-      const mistakes = (idx + pIdx) % 3 === 0 ? 1 : 0;
-      const correct = score;
-      const streak = Math.min(score, 3 + ((idx + pIdx) % 3));
-
-      return {
-        studentId: `std-mock-${st.name.toLowerCase()}`,
-        name: st.name,
-        avatar: st.avatar,
-        color: st.color,
-        score,
-        correctCount: correct,
-        mistakesCount: mistakes,
-        streak,
-        rank: pIdx + 1,
-      };
-    });
-
-    sessionPlayers.sort((a, b) => (b.score || 0) - (a.score || 0));
-    sessionPlayers.forEach((p, rIdx) => {
-      p.rank = rIdx + 1;
-    });
-
-    const winner = sessionPlayers[0];
-
-    sessions.push({
-      _id: `demo-session-${idx + 1}`,
-      gameType: cfg.game,
-      gameTitle: cfg.title,
-      roundsTotal: cfg.rounds,
-      playersCount: sessionPlayers.length,
-      players: sessionPlayers,
-      winner,
-      notes: cfg.notes,
-      playedAt: sessionDate,
-      playedAtStr: sessionDate.toISOString(),
-      recordedByEmail: cfg.teacher,
-      recordedByUid: "teacher-uid",
-    });
-  });
-
-  return sessions;
-}
-
 export async function GET(request: Request) {
   const auth = await requireRoles(request, [
     "admin",
@@ -135,11 +47,13 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const timeRange = url.searchParams.get("timeRange") || "all";
     const gameFilter = url.searchParams.get("gameType") || "all";
-    const limitParam = Math.min(Number(url.searchParams.get("limit") || 200), 500);
+    const limitParam = Math.min(Number(url.searchParams.get("limit") || 500), 1000);
 
     const { db } = await connectToDatabase();
 
-    // Query real sessions
+    // ──────────────────────────────────────────────────────────────────────────
+    // 1. Strictly Query Live Sessions from Database (Zero Invented Data)
+    // ──────────────────────────────────────────────────────────────────────────
     const query: Record<string, unknown> = {};
     if (gameFilter !== "all") {
       query.gameType = gameFilter;
@@ -152,22 +66,23 @@ export async function GET(request: Request) {
       .limit(limitParam)
       .toArray();
 
-    const isDemoData = realDocs.length === 0;
-    const rawSessions: RawSession[] = isDemoData
-      ? generateRealisticSampleData().filter((s) => gameFilter === "all" || s.gameType === gameFilter)
-      : realDocs.map((doc) => ({
-          _id: doc._id.toString(),
-          gameType: doc.gameType,
-          gameTitle: doc.gameTitle || (doc.gameType === "number-trail" ? "Number Trail Adventure" : "Body Parts Explorer"),
-          roundsTotal: doc.roundsTotal || 3,
-          playersCount: doc.playersCount || (doc.players ? doc.players.length : 0),
-          players: doc.players || [],
-          winner: doc.winner || (doc.players && doc.players.length > 0 ? [...doc.players].sort((a: RawPlayer, b: RawPlayer) => (b.score || 0) - (a.score || 0))[0] : null),
-          notes: doc.notes || "",
-          playedAt: doc.playedAt || doc.playedAtStr,
-          playedAtStr: doc.playedAt ? new Date(doc.playedAt).toISOString() : new Date().toISOString(),
-          recordedByEmail: doc.recordedByEmail || "teacher@merryexplorers.com",
-        }));
+    const rawSessions: RawSession[] = realDocs.map((doc) => ({
+      _id: doc._id.toString(),
+      gameType: doc.gameType,
+      gameTitle: doc.gameTitle || (doc.gameType === "number-trail" ? "Number Trail Adventure" : "Body Parts Explorer"),
+      roundsTotal: doc.roundsTotal || 3,
+      playersCount: doc.playersCount || (doc.players ? doc.players.length : 0),
+      players: doc.players || [],
+      winner:
+        doc.winner ||
+        (doc.players && doc.players.length > 0
+          ? [...doc.players].sort((a: RawPlayer, b: RawPlayer) => (b.score || 0) - (a.score || 0))[0]
+          : null),
+      notes: doc.notes || "",
+      playedAt: doc.playedAt || doc.playedAtStr,
+      playedAtStr: doc.playedAt ? new Date(doc.playedAt).toISOString() : new Date().toISOString(),
+      recordedByEmail: doc.recordedByEmail || "teacher@merryexplorers.com",
+    }));
 
     // Filter by time range if requested
     const now = new Date();
@@ -190,7 +105,7 @@ export async function GET(request: Request) {
     });
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 1. Calculate Aggregated Executive KPIs
+    // 2. Calculate Aggregated Executive KPIs (Live Real Numbers Only)
     // ──────────────────────────────────────────────────────────────────────────
     const totalSessions = filteredSessions.length;
     let totalPlayersEngaged = 0;
@@ -251,33 +166,50 @@ export async function GET(request: Request) {
 
     const playerStatsMap = new Map<string, StudentEntry>();
 
-    // Daily Timeline Grouping (Key: YYYY-MM-DD)
-    const timelineMap = new Map<
-      string,
-      {
-        date: string;
-        label: string;
-        dayOfWeek: string;
-        sessions: number;
-        stars: number;
-        bodyParts: number;
-        numberTrail: number;
-        players: number;
-        correct: number;
-        mistakes: number;
-      }
-    >();
+    const scoreBuckets: Record<string, number> = {
+      "1–2 Stars": 0,
+      "3–4 Stars": 0,
+      "5–7 Stars": 0,
+      "8+ Stars": 0,
+    };
 
-    // Pre-populate continuous timeline days
-    const timelineSpanDays = timeRange === "today" ? 1 : timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 14;
-    for (let i = timelineSpanDays - 1; i >= 0; i--) {
+    const streakBuckets: Record<string, number> = {
+      "1–2 Combo": 0,
+      "3–4 Combo": 0,
+      "5+ Master": 0,
+    };
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 3. Construct Continuous Date Timeline (Zero Baseline)
+    // ──────────────────────────────────────────────────────────────────────────
+    type TimelinePoint = {
+      date: string;
+      label: string;
+      dayOfWeek: string;
+      sessions: number;
+      stars: number;
+      bodyParts: number;
+      numberTrail: number;
+      players: number;
+      correct: number;
+      mistakes: number;
+    };
+
+    const timelineMap = new Map<string, TimelinePoint>();
+
+    const daysCount =
+      timeRange === "today" ? 1 : timeRange === "7d" ? 7 : timeRange === "14d" ? 14 : timeRange === "30d" ? 30 : 14;
+
+    for (let i = daysCount - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
       const dateKey = d.toISOString().split("T")[0];
+      const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const dayOfWeek = d.toLocaleDateString("en-US", { weekday: "short" });
       timelineMap.set(dateKey, {
         date: dateKey,
-        label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        dayOfWeek: d.toLocaleDateString("en-US", { weekday: "short" }),
+        label,
+        dayOfWeek,
         sessions: 0,
         stars: 0,
         bodyParts: 0,
@@ -288,40 +220,39 @@ export async function GET(request: Request) {
       });
     }
 
-    // Score & Streak Distribution Buckets
-    const scoreBuckets = {
-      "1–2 Stars": 0,
-      "3–4 Stars": 0,
-      "5–7 Stars": 0,
-      "8+ Stars": 0,
-    };
-
-    const streakBuckets = {
-      "1–2 Combo": 0,
-      "3–4 Combo": 0,
-      "5+ Master": 0,
-    };
-
+    // Process all live sessions
     for (const s of filteredSessions) {
-      totalRounds += s.roundsTotal || 0;
-      const gType = s.gameType || "body-parts";
-      const gTitle = s.gameTitle || "";
-
+      const gType = s.gameType === "number-trail" ? "number-trail" : "body-parts";
       if (!gameCounts[gType]) {
-        gameCounts[gType] = { sessions: 0, stars: 0, title: s.gameTitle || gType };
+        gameCounts[gType] = {
+          sessions: 0,
+          stars: 0,
+          title: s.gameTitle || (gType === "number-trail" ? "Number Trail" : "Body Parts"),
+        };
       }
       gameCounts[gType].sessions += 1;
+      totalRounds += s.roundsTotal || 3;
 
-      // Group date for timeline
-      const sDate = new Date(s.playedAt || s.playedAtStr || now);
-      const dateKey = sDate.toISOString().split("T")[0];
-      const dateLabel = sDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const dayOfWeek = sDate.toLocaleDateString("en-US", { weekday: "short" });
+      // Classify challenge mode
+      let masteryKey = "number-trail-main";
+      if (gType === "body-parts") {
+        if (s.gameTitle.toLowerCase().includes("map")) masteryKey = "body-parts-map";
+        else masteryKey = "body-parts-pic";
+      }
+      if (masteryMap[masteryKey]) {
+        masteryMap[masteryKey].sessions += 1;
+      }
 
-      if (!timelineMap.has(dateKey)) {
-        timelineMap.set(dateKey, {
-          date: dateKey,
-          label: dateLabel,
+      // Date key for timeline
+      const sDateObj = new Date(s.playedAt || s.playedAtStr || now);
+      const sDateKey = sDateObj.toISOString().split("T")[0];
+      const label = sDateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const dayOfWeek = sDateObj.toLocaleDateString("en-US", { weekday: "short" });
+
+      if (!timelineMap.has(sDateKey)) {
+        timelineMap.set(sDateKey, {
+          date: sDateKey,
+          label,
           dayOfWeek,
           sessions: 0,
           stars: 0,
@@ -332,21 +263,12 @@ export async function GET(request: Request) {
           mistakes: 0,
         });
       }
-      const dayData = timelineMap.get(dateKey)!;
+
+      const dayData = timelineMap.get(sDateKey)!;
       dayData.sessions += 1;
-      if (gType === "number-trail") dayData.numberTrail += 1;
       if (gType === "body-parts") dayData.bodyParts += 1;
+      else if (gType === "number-trail") dayData.numberTrail += 1;
 
-      // Categorize for Challenge Mode Mastery
-      let masteryKey = "body-parts-pic";
-      if (gType === "number-trail") {
-        masteryKey = "number-trail-main";
-      } else if (gTitle.toLowerCase().includes("body map")) {
-        masteryKey = "body-parts-map";
-      }
-      masteryMap[masteryKey].sessions += 1;
-
-      // Iterate players in session
       const pList = s.players || [];
       totalPlayersEngaged += pList.length;
       dayData.players += pList.length;
@@ -365,8 +287,10 @@ export async function GET(request: Request) {
         dayData.mistakes += pMistakes;
         gameCounts[gType].stars += pScore;
 
-        masteryMap[masteryKey].correct += pCorrect;
-        masteryMap[masteryKey].mistakes += pMistakes;
+        if (masteryMap[masteryKey]) {
+          masteryMap[masteryKey].correct += pCorrect;
+          masteryMap[masteryKey].mistakes += pMistakes;
+        }
 
         // Bucketing scores
         if (pScore <= 2) scoreBuckets["1–2 Stars"] += 1;
@@ -448,7 +372,7 @@ export async function GET(request: Request) {
       .map((entry) => {
         const winRate = entry.sessionsPlayed > 0 ? Math.round((entry.wins / entry.sessionsPlayed) * 100) : 0;
         const totalAttempts = entry.correctAnswers + entry.mistakes;
-        const accuracy = totalAttempts > 0 ? Math.round((entry.correctAnswers / totalAttempts) * 100) : 100;
+        const accuracy = totalAttempts > 0 ? Math.round((entry.correctAnswers / totalAttempts) * 100) : 0;
         const avgScore = entry.sessionsPlayed > 0 ? Math.round(entry.totalStars / entry.sessionsPlayed) : 0;
 
         let favoriteGame = "Body Parts";
@@ -482,17 +406,17 @@ export async function GET(request: Request) {
 
     // Accuracy Calculation
     const overallAttempts = totalCorrectAnswers + totalMistakes;
-    const overallAccuracy = overallAttempts > 0 ? Math.round((totalCorrectAnswers / overallAttempts) * 100) : 88;
+    const overallAccuracy = overallAttempts > 0 ? Math.round((totalCorrectAnswers / overallAttempts) * 100) : 0;
 
     const avgStarsPerSession = totalSessions > 0 ? Math.round(totalStars / totalSessions) : 0;
     const avgScorePerPlayer = totalPlayersEngaged > 0 ? Math.round(totalStars / totalPlayersEngaged) : 0;
     const avgRoundsPerSession = totalSessions > 0 ? Number((totalRounds / totalSessions).toFixed(1)) : 0;
 
     // Determine Most Popular Game
-    let topGame = "Body Parts Explorer";
+    let topGame = totalSessions > 0 ? "Body Parts Explorer" : "None";
     let maxGameSessions = -1;
     for (const val of Object.values(gameCounts)) {
-      if (val.sessions > maxGameSessions) {
+      if (val.sessions > maxGameSessions && val.sessions > 0) {
         maxGameSessions = val.sessions;
         topGame = val.title;
       }
@@ -509,7 +433,7 @@ export async function GET(request: Request) {
         percentage:
           totalGameSessions > 0
             ? Math.round(((gameCounts["body-parts"]?.sessions || 0) / totalGameSessions) * 100)
-            : 100,
+            : 0,
         color: "#0284c7",
         accentColor: "#0369a1",
         badge: "Anatomy & Science",
@@ -532,18 +456,18 @@ export async function GET(request: Request) {
     // Challenge Mode Mastery Distribution
     const challengeModesMastery = Object.values(masteryMap).map((m) => {
       const attempts = m.correct + m.mistakes;
-      const acc = attempts > 0 ? Math.round((m.correct / attempts) * 100) : (m.sessions > 0 ? 92 : 0);
+      const acc = attempts > 0 ? Math.round((m.correct / attempts) * 100) : 0;
       return {
         mode: m.title,
         category: m.category,
         accuracy: acc,
-        attempts: attempts > 0 ? attempts : (m.sessions > 0 ? m.sessions * 4 : 0),
+        attempts,
         sessions: m.sessions,
         status: attempts === 0 && m.sessions === 0 ? "Awaiting matches" : acc >= 90 ? "Mastered" : "Proficient",
       };
     });
 
-    // Class Roster Participation Analysis
+    // Class Roster Participation Analysis (from live students collection)
     const rawRoster = await db
       .collection("students")
       .find({
@@ -552,40 +476,58 @@ export async function GET(request: Request) {
           { programName: { $regex: /trailblazer|brave/i } },
         ],
       })
-      .toArray()
-      .catch(() => []);
+      .toArray();
 
-    const defaultRoster = ["Gelo", "Dari", "Gavinne", "Kaili", "Misha", "Ram", "Zane"];
-    const allRosterNames = rawRoster.length > 0
-      ? Array.from(new Set(rawRoster.map((s: { childInfo?: { firstName?: string; nickname?: string }; firstName?: string; name?: string }) => s.childInfo?.nickname || s.childInfo?.firstName || s.firstName || s.name).filter(Boolean) as string[]))
-      : defaultRoster;
+    const seenStudentNames = new Set<string>();
+    const realRosterStudents: { id: string; name: string }[] = [];
+    for (const s of rawRoster) {
+      const child = s.childInfo || {};
+      const firstName = (child.firstName || "").trim();
+      const lastName = (child.lastName || "").trim();
+      const nickname = (child.nickname || "").trim() || firstName;
+      const fullName = [firstName, lastName].filter(Boolean).join(" ");
+      if (!fullName) continue;
 
-    const playedNamesSet = new Set(leaderboard.map((s) => s.name.toLowerCase()));
-    const unplayedRoster = allRosterNames.filter((name) => !playedNamesSet.has(name.toLowerCase()));
+      const norm = fullName.toLowerCase();
+      if (seenStudentNames.has(norm)) continue;
+      seenStudentNames.add(norm);
+
+      realRosterStudents.push({
+        id: s._id.toString(),
+        name: nickname,
+      });
+    }
+
+    const activeCount = leaderboard.length;
+    const totalRosterCount = realRosterStudents.length || activeCount;
+    const unplayed = realRosterStudents.filter((r) => {
+      const rKey = r.name.toLowerCase();
+      return !uniqueStudentsSet.has(rKey) && !uniqueStudentsSet.has(r.id);
+    });
+    const unplayedNames = unplayed.map((u) => u.name);
+    const participationRate = totalRosterCount > 0 ? Math.round((activeCount / totalRosterCount) * 100) : 0;
 
     const rosterParticipation = {
-      totalRoster: allRosterNames.length,
-      activeStudents: leaderboard.length,
-      unplayedCount: unplayedRoster.length,
-      participationRate: allRosterNames.length > 0 ? Math.round((leaderboard.length / allRosterNames.length) * 100) : 100,
-      unplayedStudents: unplayedRoster,
+      totalRoster: totalRosterCount,
+      activeStudents: activeCount,
+      unplayedStudents: unplayed.length,
+      participationRate,
+      unplayedNames,
     };
 
     return NextResponse.json({
       success: true,
-      isDemoData,
       timeRange,
       gameFilter,
+      isDemoData: false,
       kpis: {
         totalSessions,
         totalPlayersEngaged,
-        uniqueStudents: uniqueStudentsSet.size,
+        activePlayers: uniqueStudentsSet.size,
         totalStars,
         avgStarsPerSession,
         avgScorePerPlayer,
         overallAccuracy,
-        totalCorrectAnswers,
-        totalMistakes,
         totalRounds,
         avgRoundsPerSession,
         topGame,
@@ -625,27 +567,85 @@ export async function DELETE(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const id = url.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ success: false, error: "Session ID is required" }, { status: 400 });
-    }
+    const idParam = url.searchParams.get("id");
+    const idsParam = url.searchParams.get("ids");
+    const deleteAllParam = url.searchParams.get("deleteAll") === "true";
+    const gameTypeParam = url.searchParams.get("gameType");
 
-    if (id.startsWith("demo-session-")) {
-      return NextResponse.json({ success: true, message: "Demo session dismissed" });
+    let body: { id?: string; ids?: string[]; deleteAll?: boolean; gameType?: string } = {};
+    if (request.headers.get("content-type")?.includes("application/json")) {
+      try {
+        body = await request.json();
+      } catch {
+        // empty body ok
+      }
     }
 
     const { db } = await connectToDatabase();
-    await db.collection("activity_game_scores").deleteOne({ _id: new ObjectId(id) });
+
+    // 1. Delete All Sessions (with optional gameType filter)
+    if (deleteAllParam || body.deleteAll) {
+      const filter: Record<string, unknown> = {};
+      const targetGame = gameTypeParam || body.gameType;
+      if (targetGame && targetGame !== "all") {
+        filter.gameType = targetGame;
+      }
+
+      const deleteResult = await db.collection("activity_game_scores").deleteMany(filter);
+
+      await db.collection("audit_log").insertOne({
+        action: "delete_all_activity_game_sessions",
+        category: "Activities",
+        details: `Deleted all (${deleteResult.deletedCount}) activity game sessions${
+          targetGame ? ` for gameType: ${targetGame}` : ""
+        }`,
+        performedBy: auth.user.email,
+        timestamp: new Date().toISOString(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Permanently deleted all ${deleteResult.deletedCount} activity session(s)`,
+        deletedCount: deleteResult.deletedCount,
+      });
+    }
+
+    // 2. Single or Bulk IDs Deletion
+    const candidateIds: string[] = [];
+    if (idParam) candidateIds.push(idParam);
+    if (body.id) candidateIds.push(body.id);
+    if (idsParam) candidateIds.push(...idsParam.split(","));
+    if (Array.isArray(body.ids)) candidateIds.push(...body.ids);
+
+    const validObjectIds = candidateIds
+      .map((s) => s.trim())
+      .filter((s) => ObjectId.isValid(s))
+      .map((s) => new ObjectId(s));
+
+    if (validObjectIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "No valid activity session IDs found to delete" },
+        { status: 400 }
+      );
+    }
+
+    const deleteResult = await db
+      .collection("activity_game_scores")
+      .deleteMany({ _id: { $in: validObjectIds } });
 
     await db.collection("audit_log").insertOne({
-      action: "delete_activity_game_session",
+      action: "delete_activity_game_sessions",
       category: "Activities",
-      details: `Deleted activity game score session ${id}`,
+      details: `Deleted ${deleteResult.deletedCount} activity game session(s): [${validObjectIds.join(", ")}]`,
       performedBy: auth.user.email,
       timestamp: new Date().toISOString(),
     });
 
-    return NextResponse.json({ success: true, message: "Activity session deleted successfully" });
+    return NextResponse.json({
+      success: true,
+      message: `Successfully deleted ${deleteResult.deletedCount} session(s)`,
+      deletedCount: deleteResult.deletedCount,
+    });
   } catch (error) {
     console.error("[api/admin/activities/analytics] DELETE error:", error);
     return NextResponse.json(
