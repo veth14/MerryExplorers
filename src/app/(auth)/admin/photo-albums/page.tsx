@@ -248,10 +248,43 @@ function DeleteConfirm({
   );
 }
 
+function BulkDeleteConfirm({
+  count, onConfirm, onCancel, isDeleting,
+}: {
+  count: number; onConfirm: () => void; onCancel: () => void; isDeleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={isDeleting ? undefined : onCancel} />
+      <m.div
+        initial={{ opacity: 0, scale: 0.93, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative z-10 w-full max-w-sm overflow-hidden rounded-[1.75rem] bg-white shadow-2xl"
+      >
+        <div className="border-b border-red-100 bg-red-50 px-7 py-6">
+          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-red-100"><span className="text-xl">🗑️</span></div>
+          <h3 className="font-headline text-[17px] font-extrabold text-[#1a0a0a]">Delete {count} selected albums?</h3>
+          <p className="mt-1 text-[13px] text-[#64748b]">This permanently deletes the selected archived albums and their photos. This cannot be undone.</p>
+        </div>
+        <div className="flex gap-3 px-7 py-5">
+          <button onClick={onCancel} disabled={isDeleting}
+            className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-[14px] font-bold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={isDeleting}
+            className="flex-1 rounded-xl bg-red-500 py-2.5 text-[14px] font-bold text-white shadow-md shadow-red-500/25 hover:bg-red-600 disabled:opacity-60 transition-all">
+            {isDeleting ? "Deleting…" : `Delete ${count}`}
+          </button>
+        </div>
+      </m.div>
+    </div>
+  );
+}
+
 // ─── Album Card ───────────────────────────────────────────────────────────────
 
 function AlbumCard({
-  album, onDelete, onSendEmail, isSending, onView, onEdit
+  album, onDelete, onSendEmail, isSending, onView, onEdit, selectable, selected, onToggleSelect
 }: {
   album: PhotoAlbum;
   onDelete: (album: PhotoAlbum) => void;
@@ -259,6 +292,9 @@ function AlbumCard({
   isSending: boolean;
   onView?: (album: PhotoAlbum) => void;
   onEdit: (album: PhotoAlbum) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (album: PhotoAlbum) => void;
 }) {
   const expiry = timeUntilExpiry(album.expiresAt);
   const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || "");
@@ -277,7 +313,7 @@ function AlbumCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       onClick={() => onView?.(album)}
-      className={`rounded-[1.5rem] bg-white border shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer relative ${
+      className={`rounded-[1.5rem] bg-white border shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer relative ${selected ? "ring-2 ring-[#0050d5] ring-offset-1" : ""} ${
         isTesting
           ? "border-amber-400 bg-amber-50/20 hover:border-amber-500"
           : "border-slate-100 hover:border-[#0033A0]/30"
@@ -309,6 +345,24 @@ function AlbumCard({
           </div>
         )}
       </div>
+
+      {selectable && (
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); onToggleSelect?.(album); }}
+          aria-label={`${selected ? "Deselect" : "Select"} ${album.childFirstName}'s album`}
+          aria-pressed={!!selected}
+          title={selected ? "Deselect album" : "Select album"}
+          className={`absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border shadow-md transition-all ${selected
+            ? "border-[#0050d5] bg-[#0050d5] text-white"
+            : "border-white/80 bg-white/90 text-transparent hover:border-white hover:bg-white"
+            }`}
+        >
+          <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+            <path d="m4.5 10.5 3.5 3.5 7.5-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
 
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-2 mb-2.5">
@@ -1884,6 +1938,8 @@ export default function PhotoAlbumsPage() {
   const [viewTarget, setViewTarget] = useState<PhotoAlbum | null>(null);
   const [editTarget, setEditTarget] = useState<PhotoAlbum | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PhotoAlbum | null>(null);
+  const [selectedAlbumIds, setSelectedAlbumIds] = useState<string[]>([]);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -1918,6 +1974,10 @@ export default function PhotoAlbumsPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  useEffect(() => {
+    setSelectedAlbumIds([]);
+  }, [activeTab, filter, programFilter, timeFilter]);
+
   async function handleDelete() {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -1938,6 +1998,33 @@ export default function PhotoAlbumsPage() {
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedAlbumIds.length === 0) return;
+    setIsDeleting(true);
+    try {
+      const params = new URLSearchParams({
+        ids: selectedAlbumIds.join(","),
+        actorUid: user?.uid || "",
+        actorName: userProfile?.fullName || user?.email || "",
+      });
+      const res = await fetch(`/api/photo-albums?${params.toString()}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        const deletedIds = new Set(selectedAlbumIds);
+        setAlbums((prev) => prev.filter((album) => !deletedIds.has(album.id)));
+        setToast({ msg: `${data.deletedCount} album${data.deletedCount === 1 ? "" : "s"} deleted 🗑️`, type: "success" });
+        setSelectedAlbumIds([]);
+        setShowBulkDelete(false);
+      } else {
+        setToast({ msg: data.error || "Failed to delete selected albums", type: "error" });
+      }
+    } catch {
+      setToast({ msg: "Network error deleting selected albums", type: "error" });
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -1999,6 +2086,21 @@ export default function PhotoAlbumsPage() {
 
     return textMatch && progMatch && timeMatch;
   });
+  const allVisibleSelected = filteredAlbums.length > 0 && filteredAlbums.every((album) => selectedAlbumIds.includes(album.id));
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedAlbumIds((prev) => prev.filter((id) => !filteredAlbums.some((album) => album.id === id)));
+      return;
+    }
+    setSelectedAlbumIds((prev) => [...new Set([...prev, ...filteredAlbums.map((album) => album.id)])]);
+  }
+
+  function toggleAlbumSelection(album: PhotoAlbum) {
+    setSelectedAlbumIds((prev) => prev.includes(album.id)
+      ? prev.filter((id) => id !== album.id)
+      : [...prev, album.id]);
+  }
 
   const programOptions = [
     { value: "ALL", label: "All Programs" },
@@ -2078,6 +2180,31 @@ export default function PhotoAlbumsPage() {
           </div>
         </div>
 
+        {activeTab === "archive" && filteredAlbums.length > 0 && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#dbeafe] bg-[#f8fbff] px-3.5 py-2.5">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-1.5 text-[12px] font-bold text-[#334155] hover:bg-slate-50"
+              >
+                {allVisibleSelected ? "Clear selection" : `Select all ${filteredAlbums.length}`}
+              </button>
+              <span className="rounded-full bg-[#e8f1ff] px-2.5 py-1 text-[12px] font-bold text-[#174ea6]">
+                {selectedAlbumIds.length} selected
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBulkDelete(true)}
+              disabled={selectedAlbumIds.length === 0 || isDeleting}
+              className="rounded-lg bg-red-500 px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Delete selected{selectedAlbumIds.length ? ` (${selectedAlbumIds.length})` : ""}
+            </button>
+          </div>
+        )}
+
         {/* Info banner */}
         <div className="mb-5 flex items-start gap-3 rounded-2xl bg-[#fff8e1] border border-[#fde68a] px-4 py-3">
           <span className="text-lg shrink-0">⏰</span>
@@ -2114,6 +2241,9 @@ export default function PhotoAlbumsPage() {
                   isSending={sendingId === album.id}
                   onView={setViewTarget}
                   onEdit={setEditTarget}
+                  selectable={activeTab === "archive"}
+                  selected={selectedAlbumIds.includes(album.id)}
+                  onToggleSelect={toggleAlbumSelection}
                 />
               ))}
             </AnimatePresence>
@@ -2183,6 +2313,15 @@ export default function PhotoAlbumsPage() {
           album={deleteTarget}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
+          isDeleting={isDeleting}
+        />
+      )}
+
+      {showBulkDelete && (
+        <BulkDeleteConfirm
+          count={selectedAlbumIds.length}
+          onConfirm={handleBulkDelete}
+          onCancel={() => setShowBulkDelete(false)}
           isDeleting={isDeleting}
         />
       )}

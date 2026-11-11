@@ -313,64 +313,104 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const idsParam = searchParams.get("ids");
     const actorUid = searchParams.get("actorUid");
     const actorName = searchParams.get("actorName") || "Admin";
 
-    if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    const ids = idsParam
+      ? [...new Set(idsParam.split(",").map((value) => value.trim()).filter(Boolean))]
+      : id ? [id] : [];
+    if (ids.length === 0 || ids.length > 200 || ids.some((value) => !ObjectId.isValid(value))) {
+      return NextResponse.json({ error: "Provide between 1 and 200 valid album IDs" }, { status: 400 });
     }
 
     const { db } = await connectToDatabase();
 
-    const album = await db.collection("student_photo_albums").findOne({ _id: new ObjectId(id) });
-    if (!album) {
-      return NextResponse.json({ error: "Album not found" }, { status: 404 });
+    const albums = await db.collection("student_photo_albums")
+      .find({ _id: { $in: ids.map((value) => new ObjectId(value)) } })
+      .toArray();
+    if (albums.length !== ids.length) {
+      return NextResponse.json({ error: "One or more albums were not found; nothing was deleted" }, { status: 404 });
     }
 
-    // Delete from MongoDB immediately — don't make the user wait for Cloudinary.
-    await db.collection("student_photo_albums").deleteOne({ _id: new ObjectId(id) });
+    // Bulk deletion is intended for the Archive. Keep active albums protected
+    // even if a bulk request is sent outside the page UI.
+    if (idsParam && albums.some((album: any) => new Date(album.expiresAt).getTime() > Date.now())) {
+      return NextResponse.json({ error: "Only expired albums can be deleted in bulk" }, { status: 400 });
+    }
 
-    // Then clean up Cloudinary assets in parallel (fire-and-forget is fine here;
-    // a failed Cloudinary delete does NOT affect the user-facing result).
-    if (Array.isArray(album.photos)) {
-      const publicIds = album.photos
+    // Clean up Cloudinary first and wait for the result. Fire-and-forget cleanup
+    // can be cut off when a route handler finishes, leaving the photos behind.
+    const publicIds = albums.flatMap((album: any) => Array.isArray(album.photos)
+      ? album.photos
         .map((p: any) => p.cloudinaryPublicId)
-        .filter(Boolean) as string[];
+        .filter(Boolean) as string[]
+      : []);
 
-      if (publicIds.length > 0) {
-        // Cloudinary's delete_resources accepts up to 100 IDs in a single API call.
-        // For albums > 100 photos we chunk, but MAX_PHOTOS is 30 so one call covers it.
-        const CHUNK = 100;
-        const chunks: string[][] = [];
-        for (let i = 0; i < publicIds.length; i += CHUNK) {
-          chunks.push(publicIds.slice(i, i + CHUNK));
+    if (publicIds.length > 0) {
+      // Cloudinary's delete_resources accepts up to 100 IDs in a single API call.
+      const CHUNK = 100;
+      const chunks: string[][] = [];
+      for (let i = 0; i < publicIds.length; i += CHUNK) {
+        chunks.push(publicIds.slice(i, i + CHUNK));
+      }
+      const cleanupResults = await Promise.allSettled(chunks.map(async (chunk) => {
+        const result = await cloudinary.api.delete_resources(chunk, {
+          resource_type: "image",
+          type: "upload",
+          invalidate: true,
+        });
+        const deleted = result?.deleted as Record<string, string> | undefined;
+        const unconfirmedIds = chunk.filter((publicId) => deleted?.[publicId] !== "deleted");
+        if (unconfirmedIds.length > 0) {
+          throw new Error(`Cloudinary did not confirm deletion for ${unconfirmedIds.length} photo(s)`);
         }
-        // Intentionally not awaited — runs after response is sent.
-        Promise.allSettled(
-          chunks.map((chunk) =>
-            cloudinary.api.delete_resources(chunk).catch((e) =>
-              console.warn("[photo-albums DELETE] Cloudinary bulk delete failed:", e?.message)
-            )
-          )
+        return result;
+      }));
+      const cleanupFailures = cleanupResults.filter((result) => result.status === "rejected");
+      if (cleanupFailures.length > 0) {
+        for (const failure of cleanupFailures) {
+          if (failure.status === "rejected") {
+            console.error("[photo-albums DELETE] Cloudinary bulk delete failed:", failure.reason?.message || failure.reason);
+          }
+        }
+        return NextResponse.json(
+          { error: "Photo storage cleanup failed. The albums were kept so you can safely retry." },
+          { status: 502 }
         );
       }
     }
 
-    // Audit log
-    if (actorUid) {
-      await db.collection("audit_log").insertOne({
-        actorUid,
-        actorName,
-        actorRole: "admin",
-        action: "DELETE",
-        category: "photo_albums",
-        targetId: id,
-        details: `Deleted photo album for ${album.childFirstName} (${album.sessionLabel})`,
-        createdAt: new Date(),
-      });
+    // Remove album records only after photo storage confirms its cleanup.
+    const deleteResult = await db.collection("student_photo_albums").deleteMany({
+      _id: { $in: ids.map((value) => new ObjectId(value)) },
+    });
+    if (deleteResult.deletedCount !== albums.length) {
+      return NextResponse.json(
+        { error: "The album list changed while deleting. Refresh the archive and retry." },
+        { status: 409 }
+      );
     }
 
-    return NextResponse.json({ success: true });
+    // Audit log
+    if (actorUid) {
+      try {
+        await db.collection("audit_log").insertMany(albums.map((album: any) => ({
+          actorUid,
+          actorName,
+          actorRole: "admin",
+          action: "DELETE",
+          category: "photo_albums",
+          targetId: String(album._id),
+          details: `Deleted photo album for ${album.childFirstName} (${album.sessionLabel})`,
+          createdAt: new Date(),
+        })));
+      } catch (auditError: any) {
+        console.warn("[photo-albums DELETE] Audit log write failed after deletion:", auditError?.message);
+      }
+    }
+
+    return NextResponse.json({ success: true, deletedCount: albums.length });
   } catch (error: any) {
     console.error("[photo-albums DELETE]", error);
     return NextResponse.json({ error: error.message || "Failed to delete" }, { status: 500 });
