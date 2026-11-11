@@ -82,12 +82,26 @@ export function NumberCard({
     ? "animate-[shake_0.4s_ease-in-out]"
     : "hover:-translate-y-1.5 hover:shadow-xl";
 
+  const text = String(choice.label || choice.numeral);
+  const isWord = isNaN(Number(text));
+
+  let fontClass = "text-5xl sm:text-6xl";
+  if (isWord) {
+    if (text.length > 7) {
+      fontClass = "text-xl sm:text-2xl tracking-tight";
+    } else if (text.length > 4) {
+      fontClass = "text-2xl sm:text-3xl tracking-wide";
+    } else {
+      fontClass = "text-3xl sm:text-4xl tracking-wider";
+    }
+  }
+
   return (
     <button
       type="button"
       onClick={() => onSelect(choice)}
       disabled={disabled}
-      className={`group relative flex min-h-[100px] sm:min-h-[125px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] p-3 sm:p-5 transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffb800] disabled:cursor-not-allowed ${stateClasses}`}
+      className={`group relative flex min-h-[105px] sm:min-h-[125px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] p-3 sm:p-5 transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffb800] disabled:cursor-not-allowed ${stateClasses}`}
       style={appliedStyle}
       aria-label={`Choose number ${choice.numeral}${choice.sublabel ? ` (${choice.sublabel})` : ""}`}
     >
@@ -98,15 +112,19 @@ export function NumberCard({
         aria-hidden="true"
       />
 
-      {/* Main Numeral */}
-      <span className="relative font-[family-name:var(--font-fredoka)] text-5xl sm:text-6xl font-black tracking-tight select-none drop-shadow-sm leading-none">
+      {/* Main Label (Word e.g. "TEN" or Numeral e.g. "10") */}
+      <span className={`relative font-[family-name:var(--font-fredoka)] font-black select-none drop-shadow-sm leading-tight text-center ${fontClass}`}>
         {choice.label || choice.numeral}
       </span>
 
-      {/* Word Sublabel (e.g. "FIVE") */}
+      {/* Sublabel */}
       {choice.sublabel && (
         <span
-          className="relative mt-1 text-[11px] sm:text-xs font-black uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity"
+          className={
+            isWord
+              ? "relative mt-1.5 inline-flex items-center justify-center rounded-full bg-white/75 px-2.5 py-0.5 text-xs font-black text-slate-700 shadow-2xs group-hover:bg-white"
+              : "relative mt-1 text-[11px] sm:text-xs font-black uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity"
+          }
         >
           {choice.sublabel}
         </span>

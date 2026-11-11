@@ -1,5 +1,7 @@
 export type NumberDifficulty = "easy" | "medium" | "explorer";
 
+export type ChoiceDisplayFormat = "words" | "digits";
+
 export type ChallengeMode =
   | "recognition"
   | "count_match"

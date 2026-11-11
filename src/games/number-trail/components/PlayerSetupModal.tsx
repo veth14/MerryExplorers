@@ -6,6 +6,7 @@ import {
   TrailblazerStudent,
   ChallengeMode,
   NumberDifficulty,
+  ChoiceDisplayFormat,
 } from "../types";
 import {
   DEFAULT_AVATARS,
@@ -38,6 +39,8 @@ type PlayerSetupModalProps = {
   onDifficultyChange: (diff: NumberDifficulty) => void;
   selectedModes: ChallengeMode[];
   onModesChange: (modes: ChallengeMode[]) => void;
+  cardFormat?: ChoiceDisplayFormat;
+  onCardFormatChange?: (format: ChoiceDisplayFormat) => void;
   soundEnabled: boolean;
   onSoundToggle: () => void;
   speechEnabled: boolean;
@@ -69,6 +72,8 @@ export function PlayerSetupModal({
   onDifficultyChange,
   selectedModes,
   onModesChange,
+  cardFormat = "words",
+  onCardFormatChange,
   soundEnabled,
   onSoundToggle,
   speechEnabled,
@@ -432,6 +437,65 @@ export function PlayerSetupModal({
               })}
             </div>
           </div>
+
+          {/* Card Display Format: Words vs Digits */}
+          {onCardFormatChange && (
+            <div className="rounded-[28px] border border-[#dbe4f1] bg-white p-5 shadow-xs">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#002f76] mb-1">
+                Answer Card Display Style
+              </h3>
+              <p className="text-[11px] text-[#64748b] mb-3">
+                Choose how answer cards present numbers to reinforce memorization
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => onCardFormatChange("words")}
+                  className={`text-left rounded-2xl border-2 p-3 transition ${
+                    cardFormat === "words"
+                      ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400/20"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-black text-xs text-[#1e293b]">Number Words</span>
+                    <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5">
+                      Recommended
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 font-[family-name:var(--font-fredoka)]">
+                    <span>ONE</span> • <span>TWO</span> • <span>TEN</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#64748b]">
+                    Helps students memorize word spelling and connect words with quantities.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onCardFormatChange("digits")}
+                  className={`text-left rounded-2xl border-2 p-3 transition ${
+                    cardFormat === "digits"
+                      ? "border-blue-500 bg-blue-50/70 ring-2 ring-blue-400/20"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-black text-xs text-[#1e293b]">Numerals</span>
+                    <span className="rounded-full bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5">
+                      Beginner
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-black text-blue-700 font-[family-name:var(--font-fredoka)]">
+                    <span>1</span> • <span>2</span> • <span>10</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#64748b]">
+                    Basic numeral digits for younger learners just starting math.
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Trail Challenges Included */}
           <div className="rounded-[28px] border border-[#dbe4f1] bg-white p-6 shadow-xs">
