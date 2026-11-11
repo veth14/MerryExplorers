@@ -848,8 +848,8 @@ export function GamesAnalyticsDashboard() {
                 </div>
               )}
 
-              {/* Dynamic 3D Pedestal Stage for Top Students */}
-              {data?.leaderboard && data.leaderboard.length > 0 && (
+              {/* Dynamic 3D Pedestal Stage for Top Students (shown when at least 1 student has match records) */}
+              {data?.leaderboard && data.leaderboard.length > 0 && data.leaderboard.some((s) => s.sessionsPlayed > 0) && (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {/* 1st Place (Gold Champion Pedestal) */}
                   <m.div
@@ -1023,27 +1023,36 @@ export function GamesAnalyticsDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#edf3fa] font-semibold text-[#002f76]">
-                      {data?.leaderboard.map((student) => (
-                        <tr
-                          key={student.name}
-                          onClick={() => setSelectedStudent(student)}
-                          className="hover:bg-[#f6f9fc] transition cursor-pointer group"
-                        >
-                          <td className="px-4 py-3 text-center font-black">
-                            <span
-                              className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                                student.rank === 1
-                                  ? "bg-amber-400 text-amber-950 font-black"
-                                  : student.rank === 2
-                                  ? "bg-slate-300 text-slate-800 font-bold"
-                                  : student.rank === 3
-                                  ? "bg-amber-200 text-amber-900 font-bold"
-                                  : "bg-[#edf3fa] text-[#557196]"
-                              }`}
-                            >
-                              {student.rank}
-                            </span>
+                      {!data?.leaderboard || data.leaderboard.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="py-8 text-center text-xs font-bold text-slate-400">
+                            No student explorers found in the class roster.
                           </td>
+                        </tr>
+                      ) : (
+                        data.leaderboard.map((student) => (
+                          <tr
+                            key={student.name}
+                            onClick={() => setSelectedStudent(student)}
+                            className="hover:bg-[#f6f9fc] transition cursor-pointer group"
+                          >
+                            <td className="px-4 py-3 text-center font-black">
+                              <span
+                                className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                                  student.sessionsPlayed === 0
+                                    ? "bg-[#f1f5f9] text-[#7891ad] font-semibold"
+                                    : student.rank === 1
+                                    ? "bg-amber-400 text-amber-950 font-black"
+                                    : student.rank === 2
+                                    ? "bg-slate-300 text-slate-800 font-bold"
+                                    : student.rank === 3
+                                    ? "bg-amber-200 text-amber-900 font-bold"
+                                    : "bg-[#edf3fa] text-[#557196]"
+                                }`}
+                              >
+                                {student.sessionsPlayed === 0 ? "–" : student.rank}
+                              </span>
+                            </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
                               <div
@@ -1076,7 +1085,7 @@ export function GamesAnalyticsDashboard() {
                             {student.accuracy}%
                           </td>
                           <td className="px-4 py-3 text-center font-black text-emerald-600">
-                            {student.maxStreak} streak
+                            {student.maxStreak > 0 ? `${student.maxStreak} streak` : "0"}
                           </td>
                           <td className="px-4 py-3 text-[#537096]">{student.favoriteGame}</td>
                           <td className="px-4 py-3 text-right">
@@ -1085,7 +1094,8 @@ export function GamesAnalyticsDashboard() {
                             </span>
                           </td>
                         </tr>
-                      ))}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

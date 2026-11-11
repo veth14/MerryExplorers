@@ -164,7 +164,71 @@ export async function GET(request: Request) {
       }[];
     };
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // 2. Query Live Class Roster Students (Trailblazers / Brave Explorers)
+    // ──────────────────────────────────────────────────────────────────────────
+    const rawRoster = await db
+      .collection("students")
+      .find({
+        $or: [
+          { program: { $regex: /trailblazer|brave/i } },
+          { programName: { $regex: /trailblazer|brave/i } },
+        ],
+      })
+      .sort({ "childInfo.firstName": 1 })
+      .toArray();
+
+    const DEFAULT_COLORS = ["#0284c7", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4"];
+    const DEFAULT_AVATARS = [
+      "Puppy Explorer",
+      "Kitten Explorer",
+      "Bear Explorer",
+      "Fox Explorer",
+      "Lion Explorer",
+      "Bunny Explorer",
+      "Panda Explorer",
+    ];
+
+    const seenRosterNames = new Set<string>();
+    const realRosterStudents: { id: string; name: string }[] = [];
     const playerStatsMap = new Map<string, StudentEntry>();
+
+    // Prepopulate playerStatsMap with all available students from live class roster (0 baseline)
+    rawRoster.forEach((s, idx) => {
+      const child = (s.childInfo as Record<string, string>) || {};
+      const firstName = (child.firstName || "").trim();
+      const lastName = (child.lastName || "").trim();
+      const nickname = (child.nickname || "").trim() || firstName;
+      const fullName = [firstName, lastName].filter(Boolean).join(" ");
+      if (!fullName && !nickname) return;
+
+      const normName = (nickname || firstName).toLowerCase();
+      if (seenRosterNames.has(normName)) return;
+      seenRosterNames.add(normName);
+
+      const sId = s._id.toString();
+      realRosterStudents.push({ id: sId, name: nickname });
+
+      playerStatsMap.set(normName, {
+        name: nickname,
+        studentId: sId,
+        avatar: child.favoriteCharacter || DEFAULT_AVATARS[idx % DEFAULT_AVATARS.length],
+        color: child.favoriteColor || DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+        totalStars: 0,
+        sessionsPlayed: 0,
+        wins: 0,
+        correctAnswers: 0,
+        mistakes: 0,
+        maxStreak: 0,
+        bodyPartsStars: 0,
+        bodyPartsMatches: 0,
+        numberTrailStars: 0,
+        numberTrailMatches: 0,
+        lastPlayedAt: "",
+        gameDistribution: {},
+        history: [],
+      });
+    });
 
     const scoreBuckets: Record<string, number> = {
       "1–2 Stars": 0,
@@ -303,11 +367,22 @@ export async function GET(request: Request) {
         else if (pStreak <= 4) streakBuckets["3–4 Combo"] += 1;
         else streakBuckets["5+ Master"] += 1;
 
-        // Player key
-        const studentKey = p.studentId || p.name.trim().toLowerCase();
-        uniqueStudentsSet.add(studentKey);
+        // Player key matching: try studentId first, then normalized name
+        const pNameKey = p.name ? p.name.trim().toLowerCase() : "";
+        let matchedKey = pNameKey;
 
-        const existing: StudentEntry = playerStatsMap.get(studentKey) || {
+        if (p.studentId) {
+          for (const [key, entry] of playerStatsMap.entries()) {
+            if (entry.studentId === p.studentId) {
+              matchedKey = key;
+              break;
+            }
+          }
+        }
+
+        uniqueStudentsSet.add(matchedKey);
+
+        const existing: StudentEntry = playerStatsMap.get(matchedKey) || {
           name: p.name,
           studentId: p.studentId || null,
           avatar: p.avatar || "Explorer Mascot",
@@ -322,11 +397,14 @@ export async function GET(request: Request) {
           bodyPartsMatches: 0,
           numberTrailStars: 0,
           numberTrailMatches: 0,
-          lastPlayedAt: s.playedAt ? new Date(s.playedAt).toISOString() : new Date().toISOString(),
+          lastPlayedAt: "",
           gameDistribution: {},
           history: [],
         };
 
+        if (p.avatar) existing.avatar = p.avatar;
+        if (p.color) existing.color = p.color;
+        existing.lastPlayedAt = s.playedAt ? new Date(s.playedAt).toISOString() : existing.lastPlayedAt;
         existing.totalStars += pScore;
         existing.sessionsPlayed += 1;
         existing.correctAnswers += pCorrect;
@@ -360,7 +438,7 @@ export async function GET(request: Request) {
           facilitator: s.recordedByEmail?.split("@")[0] || "teacher",
         });
 
-        playerStatsMap.set(studentKey, existing);
+        playerStatsMap.set(matchedKey, existing);
       }
     }
 
@@ -375,19 +453,23 @@ export async function GET(request: Request) {
         const accuracy = totalAttempts > 0 ? Math.round((entry.correctAnswers / totalAttempts) * 100) : 0;
         const avgScore = entry.sessionsPlayed > 0 ? Math.round(entry.totalStars / entry.sessionsPlayed) : 0;
 
-        let favoriteGame = "Body Parts";
-        if (entry.numberTrailMatches > entry.bodyPartsMatches) {
-          favoriteGame = "Number Trail";
+        let favoriteGame = "–";
+        if (entry.sessionsPlayed > 0) {
+          favoriteGame = entry.numberTrailMatches > entry.bodyPartsMatches ? "Number Trail" : "Body Parts";
         }
 
         // Award Skill Badges
         const skillBadges: string[] = [];
-        if (accuracy >= 90) skillBadges.push("Precision Ace");
-        if (entry.maxStreak >= 4) skillBadges.push("Streak Master");
-        if (entry.wins >= 3) skillBadges.push("Champion Racer");
-        if (entry.sessionsPlayed >= 5) skillBadges.push("Dedicated Explorer");
-        if (entry.totalStars >= 1000) skillBadges.push("Star Voyager");
-        if (skillBadges.length === 0) skillBadges.push("Trailblazer");
+        if (entry.sessionsPlayed === 0) {
+          skillBadges.push("Explorer");
+        } else {
+          if (accuracy >= 90) skillBadges.push("Precision Ace");
+          if (entry.maxStreak >= 4) skillBadges.push("Streak Master");
+          if (entry.wins >= 3) skillBadges.push("Champion Racer");
+          if (entry.sessionsPlayed >= 5) skillBadges.push("Dedicated Explorer");
+          if (entry.totalStars >= 1000) skillBadges.push("Star Voyager");
+          if (skillBadges.length === 0) skillBadges.push("Trailblazer");
+        }
 
         // Sort student's individual history descending
         entry.history.sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime());
@@ -401,7 +483,11 @@ export async function GET(request: Request) {
           skillBadges,
         };
       })
-      .sort((a, b) => b.totalStars - a.totalStars)
+      .sort((a, b) => {
+        if (b.totalStars !== a.totalStars) return b.totalStars - a.totalStars;
+        if (b.sessionsPlayed !== a.sessionsPlayed) return b.sessionsPlayed - a.sessionsPlayed;
+        return a.name.localeCompare(b.name);
+      })
       .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
     // Accuracy Calculation
@@ -467,43 +553,10 @@ export async function GET(request: Request) {
       };
     });
 
-    // Class Roster Participation Analysis (from live students collection)
-    const rawRoster = await db
-      .collection("students")
-      .find({
-        $or: [
-          { program: { $regex: /trailblazer|brave/i } },
-          { programName: { $regex: /trailblazer|brave/i } },
-        ],
-      })
-      .toArray();
-
-    const seenStudentNames = new Set<string>();
-    const realRosterStudents: { id: string; name: string }[] = [];
-    for (const s of rawRoster) {
-      const child = s.childInfo || {};
-      const firstName = (child.firstName || "").trim();
-      const lastName = (child.lastName || "").trim();
-      const nickname = (child.nickname || "").trim() || firstName;
-      const fullName = [firstName, lastName].filter(Boolean).join(" ");
-      if (!fullName) continue;
-
-      const norm = fullName.toLowerCase();
-      if (seenStudentNames.has(norm)) continue;
-      seenStudentNames.add(norm);
-
-      realRosterStudents.push({
-        id: s._id.toString(),
-        name: nickname,
-      });
-    }
-
-    const activeCount = leaderboard.length;
-    const totalRosterCount = realRosterStudents.length || activeCount;
-    const unplayed = realRosterStudents.filter((r) => {
-      const rKey = r.name.toLowerCase();
-      return !uniqueStudentsSet.has(rKey) && !uniqueStudentsSet.has(r.id);
-    });
+    // Class Roster Participation Analysis
+    const activeCount = Array.from(playerStatsMap.values()).filter((e) => e.sessionsPlayed > 0).length;
+    const totalRosterCount = realRosterStudents.length || playerStatsMap.size;
+    const unplayed = Array.from(playerStatsMap.values()).filter((e) => e.sessionsPlayed === 0);
     const unplayedNames = unplayed.map((u) => u.name);
     const participationRate = totalRosterCount > 0 ? Math.round((activeCount / totalRosterCount) * 100) : 0;
 
@@ -523,7 +576,7 @@ export async function GET(request: Request) {
       kpis: {
         totalSessions,
         totalPlayersEngaged,
-        activePlayers: uniqueStudentsSet.size,
+        activePlayers: activeCount,
         totalStars,
         avgStarsPerSession,
         avgScorePerPlayer,
