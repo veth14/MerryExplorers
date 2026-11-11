@@ -9,7 +9,7 @@ export type ChallengeMode =
 export type NumberItem = {
   numeral: number; // 1 to 20
   word: string; // "One", "Two", etc.
-  dotsEmoji: string; // emoji icon for counting (e.g. "⭐", "🍎", "🎈")
+  iconId: string; // "apple", "star", etc.
   funFact: string; // kid-friendly fact
   praise: string; // celebration phrase
 };
@@ -30,7 +30,7 @@ export type SequenceItem = {
 export type ComparisonGroup = {
   id: "A" | "B";
   count: number;
-  emoji: string;
+  iconId: string;
   label: string;
 };
 
@@ -43,7 +43,7 @@ export type NumberChallenge = {
   choices: NumberChoice[];
   // Mode-specific extras:
   dotCount?: number;
-  dotEmoji?: string;
+  dotIconId?: string;
   sequence?: SequenceItem[];
   missingIndex?: number;
   comparison?: {
@@ -55,7 +55,7 @@ export type NumberChallenge = {
 };
 
 export type PlayerAvatar = {
-  emoji: string;
+  id: string;
   name: string;
   color: string;
   bgLight: string;
@@ -65,7 +65,7 @@ export type PlayerAvatar = {
 export type GamePlayer = {
   studentId: string | null;
   name: string;
-  avatar: string;
+  avatar: string; // avatar identifier or icon id
   petName: string;
   color: string;
   bgLight: string;
@@ -114,4 +114,3 @@ export type LeaderboardEntry = {
   gamesPlayed: number;
   wins: number;
 };
-

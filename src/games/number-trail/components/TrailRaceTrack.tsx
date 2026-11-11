@@ -1,6 +1,7 @@
 "use client";
 
 import { GamePlayer } from "../types";
+import { FlagIcon, TrophyIcon, AnimalAvatarBadge } from "./GameIcons";
 
 type TrailRaceTrackProps = {
   players: GamePlayer[];
@@ -13,31 +14,35 @@ export function TrailRaceTrack({
   totalSteps,
   activePlayerIndex,
 }: TrailRaceTrackProps) {
-  // If no players or 0 steps, provide fallback
   const steps = Math.max(totalSteps, 3);
 
   return (
-    <div className="w-full overflow-hidden rounded-3xl border border-[#dbe4f1] bg-gradient-to-b from-[#f8fafc] to-[#eef2f6] p-4 sm:p-6 shadow-inner">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#002f76] text-white text-xs font-black">
-            🏁
+    <div className="w-full overflow-hidden rounded-[32px] border border-[#dbe4f1] bg-gradient-to-b from-[#f8fafc] to-[#edf2f7] p-5 sm:p-7 shadow-inner">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#002f76] text-white shadow-xs">
+            <FlagIcon className="h-4.5 w-4.5" />
           </span>
-          <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#002f76]">
-            Number Trail Race
-          </span>
+          <div>
+            <span className="block text-xs sm:text-sm font-black uppercase tracking-wider text-[#002f76]">
+              Number Trail Race Arena
+            </span>
+            <span className="text-[11px] font-semibold text-[#64748b]">
+              Correct answers advance your explorer towards the victory trophy
+            </span>
+          </div>
         </div>
-        <span className="text-xs font-bold text-[#57719b]">
-          Goal: {steps} steps to the Trophy 🏆
-        </span>
+
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-1.5 text-xs font-black text-amber-900">
+          <TrophyIcon className="h-4 w-4 text-amber-600" />
+          <span>Trail Goal: {steps} Steps to Win</span>
+        </div>
       </div>
 
-      {/* Stepping stones bar */}
-      <div className="relative pt-1 pb-2">
-        {/* Track Line */}
-        <div className="absolute top-[22px] left-4 right-4 h-2 rounded-full bg-[#cbd5e1]" />
+      {/* Stepping stones trail header line */}
+      <div className="relative pt-2 pb-3">
+        <div className="absolute top-[26px] left-6 right-6 h-2 rounded-full bg-[#cbd5e1]" />
 
-        {/* Stone markers */}
         <div className="relative flex justify-between px-2">
           {Array.from({ length: steps + 1 }).map((_, stepIdx) => {
             const isStart = stepIdx === 0;
@@ -45,17 +50,23 @@ export function TrailRaceTrack({
             return (
               <div key={stepIdx} className="flex flex-col items-center">
                 <div
-                  className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border-2 text-xs font-black shadow-sm transition-all ${
+                  className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-2xl border-2 text-xs font-black shadow-xs transition-all ${
                     isFinish
-                      ? "border-[#f59e0b] bg-[#fef3c7] text-[#b45309] scale-110"
+                      ? "border-[#f59e0b] bg-[#fef3c7] text-[#b45309] scale-110 shadow-md ring-2 ring-amber-300"
                       : isStart
                       ? "border-[#002f76] bg-white text-[#002f76]"
                       : "border-[#94a3b8] bg-white text-[#475569]"
                   }`}
                 >
-                  {isFinish ? "🏆" : isStart ? "🏁" : stepIdx}
+                  {isFinish ? (
+                    <TrophyIcon className="h-5 w-5 text-amber-600" />
+                  ) : isStart ? (
+                    <FlagIcon className="h-4.5 w-4.5 text-[#002f76]" />
+                  ) : (
+                    stepIdx
+                  )}
                 </div>
-                <span className="mt-1 text-[10px] font-bold text-[#64748b]">
+                <span className="mt-1.5 text-[10px] font-bold text-[#64748b]">
                   {isFinish ? "Goal" : isStart ? "Start" : `S${stepIdx}`}
                 </span>
               </div>
@@ -64,8 +75,8 @@ export function TrailRaceTrack({
         </div>
       </div>
 
-      {/* Players lanes */}
-      <div className="mt-4 space-y-2 border-t border-[#e2e8f0] pt-3">
+      {/* Players tracks */}
+      <div className="mt-5 space-y-2.5 border-t border-[#e2e8f0] pt-4">
         {players.map((player, idx) => {
           const isActive = idx === activePlayerIndex;
           const currentStep = Math.min(player.correctCount, steps);
@@ -74,17 +85,23 @@ export function TrailRaceTrack({
           return (
             <div
               key={player.name + idx}
-              className={`relative flex items-center rounded-2xl border px-3 py-2 transition-all ${
+              className={`relative flex items-center rounded-2xl border-2 p-2.5 sm:px-4 transition-all ${
                 isActive
-                  ? "border-[#3b82f6] bg-white shadow-md ring-2 ring-[#3b82f6]/20"
-                  : "border-transparent bg-white/60 hover:bg-white"
+                  ? "border-[#3b82f6] bg-white shadow-md ring-4 ring-[#3b82f6]/15"
+                  : "border-slate-200/80 bg-white/70 hover:bg-white"
               }`}
             >
-              {/* Player identifier tag */}
-              <div className="flex w-28 sm:w-36 shrink-0 items-center gap-2">
-                <span className="text-xl sm:text-2xl">{player.avatar}</span>
+              {/* Player identity info */}
+              <div className="flex w-36 sm:w-48 shrink-0 items-center gap-3">
+                <AnimalAvatarBadge
+                  name={player.petName || player.name}
+                  color={player.color}
+                  bgLight={player.bgLight}
+                  borderColor={player.borderColor}
+                  className="h-10 w-10 sm:h-11 sm:w-11"
+                />
                 <div className="min-w-0">
-                  <span className="block truncate text-xs sm:text-sm font-extrabold text-[#1e293b]">
+                  <span className="block truncate text-xs sm:text-sm font-black text-[#1e293b]">
                     {player.name}
                   </span>
                   <span className="text-[10px] font-semibold text-[#64748b]">
@@ -93,9 +110,9 @@ export function TrailRaceTrack({
                 </div>
               </div>
 
-              {/* Player Trail Progress Track */}
-              <div className="relative mx-3 sm:mx-4 flex-1 h-8 flex items-center">
-                <div className="w-full h-2.5 rounded-full bg-[#e2e8f0] overflow-hidden">
+              {/* Player track progress bar */}
+              <div className="relative mx-3 sm:mx-6 flex-1 h-10 flex items-center">
+                <div className="w-full h-3 rounded-full bg-[#e2e8f0] overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500 ease-out"
                     style={{
@@ -105,36 +122,33 @@ export function TrailRaceTrack({
                   />
                 </div>
 
-                {/* Hopping Animal Token */}
+                {/* Hopping Animal Avatar Token */}
                 <div
                   className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-500 ease-out z-10"
                   style={{ left: `${Math.max(4, Math.min(96, percent))}%` }}
                 >
-                  <span
-                    className={`inline-flex items-center justify-center rounded-full text-base sm:text-lg p-0.5 border-2 shadow-md ${
-                      isActive ? "animate-bounce ring-2 ring-yellow-400" : ""
-                    }`}
-                    style={{
-                      backgroundColor: player.bgLight || "#fef3c7",
-                      borderColor: player.borderColor || player.color || "#f59e0b",
-                    }}
-                    title={`${player.name} (${currentStep}/${steps} steps)`}
-                  >
-                    {player.avatar}
-                  </span>
+                  <div className={isActive ? "animate-bounce" : ""}>
+                    <AnimalAvatarBadge
+                      name={player.petName || player.name}
+                      color={player.color}
+                      bgLight={player.bgLight}
+                      borderColor={player.borderColor}
+                      className="h-9 w-9 sm:h-10 sm:w-10 shadow-lg ring-2 ring-white"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Active indicator */}
-              <div className="w-16 sm:w-20 text-right shrink-0">
+              {/* Status indicator */}
+              <div className="w-20 sm:w-24 text-right shrink-0">
                 {isActive ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-black uppercase text-[#1d4ed8]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb] animate-ping" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#dbeafe] px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-[#1d4ed8]">
+                    <span className="h-2 w-2 rounded-full bg-[#2563eb] animate-ping" />
                     Turn
                   </span>
                 ) : (
-                  <span className="text-[11px] font-bold text-[#64748b]">
-                    {percent}%
+                  <span className="text-xs font-bold text-[#64748b]">
+                    {percent}% ({currentStep}/{steps})
                   </span>
                 )}
               </div>
@@ -145,4 +159,3 @@ export function TrailRaceTrack({
     </div>
   );
 }
-

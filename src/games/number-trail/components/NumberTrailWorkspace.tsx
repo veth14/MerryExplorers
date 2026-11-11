@@ -25,6 +25,16 @@ import { ChallengeDisplay } from "./ChallengeDisplay";
 import { NumberCard } from "./NumberCard";
 import { PlayerSetupModal } from "./PlayerSetupModal";
 import { GameOverPodium } from "./GameOverPodium";
+import {
+  ArrowLeftIcon,
+  SpeakerIcon,
+  MuteIcon,
+  VoiceIcon,
+  VoiceOffIcon,
+  StarIcon,
+  FlameIcon,
+  AnimalAvatarBadge,
+} from "./GameIcons";
 
 type NumberTrailWorkspaceProps = {
   mode: "admin" | "teacher";
@@ -180,7 +190,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
       GameAudio.playPop();
     }
 
-    // Generate first question
     nextTurnChallenge(0);
   };
 
@@ -195,7 +204,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     const timeTaken = Date.now() - questionStartTimeRef.current;
 
     if (choice.isCorrect) {
-      // ── CORRECT ──
       setCardStatus({ [choice.id]: "correct" });
 
       const newStreak = activePlayer.streak + 1;
@@ -219,7 +227,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
         GameAudio.speakText(scoreCalc.cheerPhrase);
       }
 
-      // Update player
       const updatedPlayers = players.map((p, idx) => {
         if (idx !== activePlayerIndex) return p;
         return {
@@ -233,12 +240,10 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
       setPlayers(updatedPlayers);
 
-      // Check win condition: Has this player reached the trail goal?
       const willReachGoal = activePlayer.correctCount + 1 >= roundsPerPlayer;
 
       setTimeout(() => {
         if (willReachGoal) {
-          // Finish game!
           if (soundEnabled) {
             GameAudio.playVictoryFanfare();
           }
@@ -246,23 +251,20 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
           setPlayers(ranked);
           setPhase("game_over");
         } else {
-          // Advance turn to next explorer
           const nextIndex = (activePlayerIndex + 1) % updatedPlayers.length;
           setActivePlayerIndex(nextIndex);
           nextTurnChallenge(nextIndex);
         }
       }, 1400);
     } else {
-      // ── WRONG / RETRY ──
       setCardStatus({ [choice.id]: "wrong" });
 
       if (soundEnabled) {
         GameAudio.playOops();
       }
 
-      setCheerBanner("Nice try! Let's pass the torch to the next explorer!");
+      setCheerBanner("Nice try! Passing the turn to the next explorer!");
 
-      // Update player mistakes & reset streak
       const updatedPlayers = players.map((p, idx) => {
         if (idx !== activePlayerIndex) return p;
         return {
@@ -274,7 +276,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
       setPlayers(updatedPlayers);
 
       setTimeout(() => {
-        // Advance turn to keep game moving without embarrassing the child
         const nextIndex = (activePlayerIndex + 1) % updatedPlayers.length;
         setActivePlayerIndex(nextIndex);
         nextTurnChallenge(nextIndex);
@@ -282,19 +283,16 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     }
   };
 
-  // ─── Play Again With Same Players ──────────────────────────────────────────
   const handlePlayAgain = () => {
     handleStartGame();
   };
 
-  // ─── Back to Setup ─────────────────────────────────────────────────────────
   const handleNewGameSetup = () => {
     setPhase("setup");
     setCardStatus({});
     setCheerBanner(null);
   };
 
-  // ─── Save Session to MongoDB ───────────────────────────────────────────────
   const handleSaveSession = async (notes: string): Promise<boolean> => {
     if (players.length === 0 || isSavingSession || hasSavedSession) return false;
 
@@ -335,7 +333,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     }
   };
 
-  // ─── Delete Session (Admin) ────────────────────────────────────────────────
   const handleDeleteSession = async (id: string) => {
     if (!confirm("Are you sure you want to delete this recorded session?")) return;
 
@@ -365,19 +362,20 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
           ? "Number Trail Analytics"
           : "Number Trail Adventure"
       }
-      description="Fun preschool number learning, counting races, and skill challenges."
+      description="Preschool number recognition, counting races, and skill challenges."
     >
       {showConfetti && <ConfettiEffect count={100} />}
 
       <div className="w-full space-y-6 pb-8">
-        {/* Top Control Bar & Breadcrumb */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbe4f1] bg-white p-3.5 shadow-sm">
+        {/* Top Control Bar & Breadcrumb (Full Width) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbe4f1] bg-white p-3.5 shadow-2xs">
           <div className="flex items-center gap-3">
             <Link
               href={activityHomePath}
-              className="flex items-center gap-1.5 rounded-xl border border-[#cbd5e1] bg-white px-3 py-1.5 text-xs font-black text-[#002f76] hover:bg-[#f8fafc] transition"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#cbd5e1] bg-white px-3.5 py-2 text-xs font-black text-[#002f76] hover:bg-[#f8fafc] transition shadow-2xs"
             >
-              ← Back to Games
+              <ArrowLeftIcon className="h-3.5 w-3.5" />
+              <span>Back to Games</span>
             </Link>
 
             {/* Admin Tabs */}
@@ -386,63 +384,83 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                 <button
                   type="button"
                   onClick={() => setActiveTab("game")}
-                  className={`rounded-lg px-3 py-1 text-xs font-black transition ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
                     activeTab === "game"
                       ? "bg-white text-[#002f76] shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  🎮 Play Trail
+                  Play Trail
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("history")}
-                  className={`rounded-lg px-3 py-1 text-xs font-black transition ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
                     activeTab === "history"
                       ? "bg-white text-[#002f76] shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  📊 Scores & History
+                  Scores & History
                 </button>
               </div>
             )}
           </div>
 
-          {/* Quick Sound Toggles */}
+          {/* Quick Audio Controls with SVGs */}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
                 soundEnabled
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : "border-slate-200 bg-slate-50 text-slate-500"
               }`}
               title="Toggle Sound Effects"
             >
-              {soundEnabled ? "🔊 Sound" : "🔇 Muted"}
+              {soundEnabled ? (
+                <>
+                  <SpeakerIcon className="h-3.5 w-3.5" />
+                  <span>Sound</span>
+                </>
+              ) : (
+                <>
+                  <MuteIcon className="h-3.5 w-3.5" />
+                  <span>Muted</span>
+                </>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setSpeechEnabled(!speechEnabled)}
-              className={`rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
                 speechEnabled
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  ? "border-blue-200 bg-blue-50 text-blue-800"
                   : "border-slate-200 bg-slate-50 text-slate-500"
               }`}
               title="Toggle Voice Speech"
             >
-              {speechEnabled ? "🗣️ Voice" : "💬 Silent"}
+              {speechEnabled ? (
+                <>
+                  <VoiceIcon className="h-3.5 w-3.5" />
+                  <span>Voice</span>
+                </>
+              ) : (
+                <>
+                  <VoiceOffIcon className="h-3.5 w-3.5" />
+                  <span>Silent</span>
+                </>
+              )}
             </button>
           </div>
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 1: GAMEPLAY WORKSPACE                                           */}
+        {/* TAB 1: GAMEPLAY WORKSPACE (Full Width)                              */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "game" && (
-          <div>
+          <div className="w-full">
             {/* Phase 1: Setup */}
             {phase === "setup" && (
               <PlayerSetupModal
@@ -466,33 +484,38 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
             {/* Phase 2: Playing Turn */}
             {phase === "playing" && (
-              <div className="space-y-6">
-                {/* Active Player Banner */}
+              <div className="w-full space-y-6">
+                {/* Active Player Panoramic HUD */}
                 {activePlayer && (
                   <div
-                    className="relative flex flex-wrap items-center justify-between gap-4 rounded-3xl border-3 p-4 sm:p-5 shadow-sm transition-all"
+                    className="relative flex flex-wrap items-center justify-between gap-4 rounded-[28px] border-2 p-5 sm:p-6 shadow-xs transition-all w-full"
                     style={{
                       backgroundColor: activePlayer.bgLight || "#fef3c7",
                       borderColor: activePlayer.borderColor || "#f59e0b",
                     }}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-white text-3xl sm:text-4xl shadow-sm">
-                        {activePlayer.avatar}
-                      </span>
+                    <div className="flex items-center gap-4">
+                      <AnimalAvatarBadge
+                        name={activePlayer.petName || activePlayer.name}
+                        color={activePlayer.color}
+                        bgLight="#ffffff"
+                        borderColor={activePlayer.borderColor}
+                        className="h-16 w-16 sm:h-18 sm:w-18 shadow-md"
+                      />
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black uppercase tracking-wider text-[#475569]">
-                            Current Explorer
+                            Active Explorer
                           </span>
                           {activePlayer.streak > 1 && (
-                            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white animate-pulse">
-                              🔥 {activePlayer.streak} Streak!
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-black text-white animate-pulse shadow-2xs">
+                              <FlameIcon className="h-3.5 w-3.5" />
+                              <span>{activePlayer.streak} Streak!</span>
                             </span>
                           )}
                         </div>
                         <h2
-                          className="font-[family-name:var(--font-fredoka)] text-2xl sm:text-3xl font-black"
+                          className="font-[family-name:var(--font-fredoka)] text-2xl sm:text-3xl lg:text-4xl font-black leading-tight"
                           style={{ color: activePlayer.color || "#002f76" }}
                         >
                           {activePlayer.name}&apos;s Turn!
@@ -500,19 +523,20 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6">
                       <div className="text-right">
                         <span className="block text-xs font-bold text-[#64748b]">
-                          Score
+                          Stars Earned
                         </span>
-                        <span className="font-[family-name:var(--font-fredoka)] text-2xl font-black text-[#002f76]">
-                          ⭐ {activePlayer.score}
-                        </span>
+                        <div className="inline-flex items-center gap-1.5 font-[family-name:var(--font-fredoka)] text-2xl sm:text-3xl font-black text-[#002f76]">
+                          <StarIcon className="h-6 w-6" />
+                          <span>{activePlayer.score}</span>
+                        </div>
                       </div>
                       <button
                         type="button"
                         onClick={handleNewGameSetup}
-                        className="rounded-xl border border-slate-300 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-white"
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                       >
                         Exit Game
                       </button>
@@ -520,9 +544,9 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                   </div>
                 )}
 
-                {/* Challenge Display & Question Prompt */}
+                {/* Challenge Display & Choices Arena (Full Width) */}
                 {currentChallenge && (
-                  <div className="rounded-[32px] border border-[#dbe4f1] bg-white p-6 sm:p-8 shadow-sm">
+                  <div className="rounded-[36px] border border-[#dbe4f1] bg-white p-6 sm:p-10 shadow-xs w-full">
                     <ChallengeDisplay
                       challenge={currentChallenge}
                       onSpeakPrompt={() => {
@@ -532,22 +556,22 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                       }}
                     />
 
-                    {/* Cheer / Feedback Banner */}
+                    {/* Celebration / Feedback Banner */}
                     {cheerBanner && (
-                      <div className="mt-4 rounded-2xl bg-gradient-to-r from-amber-100 to-emerald-100 border border-emerald-300/50 p-3 text-center animate-fade-in">
+                      <div className="mt-6 rounded-2xl bg-gradient-to-r from-amber-50 via-emerald-50 to-amber-50 border border-emerald-300/60 p-3.5 text-center animate-fade-in shadow-2xs">
                         <span className="text-sm font-black text-[#065f46]">
                           {cheerBanner}
                         </span>
                       </div>
                     )}
 
-                    {/* Answer Choice Cards Grid */}
+                    {/* Answer Choice Cards Grid (Expands to full width) */}
                     <div
-                      className={`mt-6 grid gap-3 sm:gap-4 ${
+                      className={`mt-8 grid gap-4 sm:gap-6 w-full ${
                         currentChallenge.choices.length === 2
-                          ? "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto"
+                          ? "grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto"
                           : currentChallenge.choices.length === 3
-                          ? "grid-cols-1 sm:grid-cols-3 max-w-3xl mx-auto"
+                          ? "grid-cols-1 sm:grid-cols-3 max-w-5xl mx-auto"
                           : "grid-cols-2 sm:grid-cols-4"
                       }`}
                     >
@@ -564,7 +588,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                   </div>
                 )}
 
-                {/* Trail Race Track */}
+                {/* Trail Race Track (Full Width) */}
                 <TrailRaceTrack
                   players={players}
                   totalSteps={roundsPerPlayer}
@@ -573,7 +597,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
               </div>
             )}
 
-            {/* Phase 3: Game Over Podium */}
+            {/* Phase 3: Victory Podium (Full Width) */}
             {phase === "game_over" && (
               <GameOverPodium
                 players={players}
@@ -589,57 +613,61 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 2: HISTORY & LEADERBOARD (ADMIN)                                */}
+        {/* TAB 2: HISTORY & LEADERBOARD (Full Width)                           */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "history" && mode === "admin" && (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             {/* Top Explorers Leaderboard */}
-            <div className="rounded-3xl border border-[#dbe4f1] bg-white p-5 sm:p-6 shadow-sm">
+            <div className="rounded-[28px] border border-[#dbe4f1] bg-white p-6 shadow-xs w-full">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-black text-[#002f76]">
                     Number Trail All-Time Leaderboard
                   </h2>
                   <p className="text-xs text-[#64748b]">
-                    Top scoring explorers across all classroom games
+                    Top scoring explorers across all recorded classroom sessions
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={fetchHistory}
                   disabled={isLoadingHistory}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                 >
-                  {isLoadingHistory ? "Refreshing..." : "🔄 Refresh"}
+                  {isLoadingHistory ? "Refreshing..." : "Refresh Scores"}
                 </button>
               </div>
 
               {leaderboard.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
-                  No scores recorded yet. Play a game and save the session to populate the leaderboard!
+                  No sessions recorded yet. Play a game and save the score to build the leaderboard!
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {leaderboard.map((entry, idx) => (
                     <div
                       key={entry.name + idx}
-                      className="flex items-center justify-between rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] p-3 shadow-xs"
+                      className="flex items-center justify-between rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] p-3.5 shadow-xs"
                     >
                       <div className="flex items-center gap-3">
                         <span
-                          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black ${
                             idx === 0
-                              ? "bg-amber-400 text-white"
+                              ? "bg-amber-400 text-white shadow-xs"
                               : idx === 1
-                              ? "bg-slate-300 text-slate-700"
+                              ? "bg-slate-300 text-slate-800"
                               : idx === 2
                               ? "bg-amber-700/60 text-white"
-                              : "bg-slate-100 text-slate-500"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
                           {idx + 1}
                         </span>
-                        <span className="text-2xl">{entry.avatar}</span>
+                        <AnimalAvatarBadge
+                          name={entry.name}
+                          color="#0284c7"
+                          className="h-9 w-9"
+                        />
                         <div>
                           <span className="block font-black text-sm text-[#1e293b]">
                             {entry.name}
@@ -650,8 +678,9 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="block font-black text-sm text-[#002f76]">
-                          ⭐ {entry.totalStars}
+                        <span className="inline-flex items-center gap-1 text-sm font-black text-[#002f76]">
+                          <StarIcon className="h-4 w-4" />
+                          <span>{entry.totalStars}</span>
                         </span>
                       </div>
                     </div>
@@ -661,8 +690,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
             </div>
 
             {/* Recent Sessions History */}
-            <div className="rounded-3xl border border-[#dbe4f1] bg-white p-5 sm:p-6 shadow-sm">
-              <h2 className="text-base font-black text-[#002f76] mb-3">
+            <div className="rounded-[28px] border border-[#dbe4f1] bg-white p-6 shadow-xs w-full">
+              <h2 className="text-base font-black text-[#002f76] mb-4">
                 Recorded Sessions ({historySessions.length})
               </h2>
 
@@ -681,8 +710,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                         <div className="flex items-center gap-2">
                           <span className="font-black text-sm text-[#1e293b]">
                             {session.winner
-                              ? `🏆 Winner: ${session.winner.name} (${session.winner.score} pts)`
-                              : "Game Session"}
+                              ? `Winner: ${session.winner.name} (${session.winner.score} pts)`
+                              : "Classroom Session"}
                           </span>
                           <span className="text-xs text-[#64748b]">
                             • {session.playersCount} players • {session.roundsTotal} steps
@@ -699,18 +728,18 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                           {session.recordedByEmail && ` • Recorded by ${session.recordedByEmail}`}
                         </p>
                         {session.notes && (
-                          <p className="mt-1.5 rounded-lg bg-amber-50 border border-amber-200/50 p-2 text-xs text-amber-900">
-                            📝 {session.notes}
+                          <p className="mt-2 rounded-xl bg-amber-50/80 border border-amber-200/60 p-2.5 text-xs text-amber-900">
+                            {session.notes}
                           </p>
                         )}
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="mt-2.5 flex flex-wrap gap-2">
                           {session.players.map((p, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700"
                             >
-                              <span>{p.avatar}</span>
-                              <span>{p.name}: {p.score} pts</span>
+                              <span>{p.name}:</span>
+                              <span className="text-[#002f76] font-black">{p.score} pts</span>
                             </span>
                           ))}
                         </div>
@@ -719,7 +748,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                       <button
                         type="button"
                         onClick={() => handleDeleteSession(session.id)}
-                        className="self-start sm:self-center text-xs font-bold text-red-500 hover:text-red-700 p-1"
+                        className="self-start sm:self-center text-xs font-bold text-red-500 hover:text-red-700 p-1.5 transition"
                       >
                         Delete
                       </button>

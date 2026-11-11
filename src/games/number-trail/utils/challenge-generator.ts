@@ -25,7 +25,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 /**
- * Generate 3 or 4 unique options including the correct number
+ * Generate unique options including the correct number
  */
 function generateNumeralChoices(
   correctNum: number,
@@ -45,8 +45,6 @@ function generateNumeralChoices(
     chosen.add(num);
   }
 
-  // If range was smaller than count (e.g. 1-5 with count 4 is fine, but just in case),
-  // pick anything reasonable
   let fallback = 1;
   while (chosen.size < Math.min(count, max - min + 1)) {
     if (!chosen.has(fallback)) chosen.add(fallback);
@@ -85,7 +83,7 @@ export function generateNumberChallenge(
   const numData = NUMBERS_DATA[targetNum] || {
     numeral: targetNum,
     word: String(targetNum),
-    dotsEmoji: "⭐",
+    iconId: "star",
     funFact: "",
     praise: "Great job!",
   };
@@ -118,14 +116,13 @@ export function generateNumberChallenge(
       spokenPrompt: `How many ${obj.name} are there? Let's count them!`,
       choices,
       dotCount: targetNum,
-      dotEmoji: obj.emoji,
+      dotIconId: obj.id,
     };
   }
 
   // 3. SEQUENCE MODE ("What Comes Next?")
   if (selectedMode === "sequence") {
     const seqLength = difficulty === "easy" ? 3 : 4;
-    // Choose start so that start + seqLength - 1 <= max
     const maxStart = Math.max(min, max - seqLength + 1);
     const start = randomInt(min, maxStart);
 
@@ -161,7 +158,6 @@ export function generateNumberChallenge(
   }
 
   // 4. MORE OR LESS MODE
-  // Pick two distinct counts
   let countA = randomInt(min, max);
   let countB = randomInt(min, max);
   while (countB === countA) {
@@ -170,7 +166,7 @@ export function generateNumberChallenge(
 
   const objA = COUNTING_OBJECTS[Math.floor(Math.random() * COUNTING_OBJECTS.length)];
   let objB = COUNTING_OBJECTS[Math.floor(Math.random() * COUNTING_OBJECTS.length)];
-  while (objB.name === objA.name) {
+  while (objB.id === objA.id) {
     objB = COUNTING_OBJECTS[Math.floor(Math.random() * COUNTING_OBJECTS.length)];
   }
 
@@ -188,13 +184,13 @@ export function generateNumberChallenge(
     {
       id: "choice-A",
       numeral: countA,
-      label: `Group A: ${countA} ${objA.name}`,
+      label: `Group A: ${countA} ${objA.label}`,
       isCorrect: correctGroupId === "A",
     },
     {
       id: "choice-B",
       numeral: countB,
-      label: `Group B: ${countB} ${objB.name}`,
+      label: `Group B: ${countB} ${objB.label}`,
       isCorrect: correctGroupId === "B",
     },
   ];
@@ -207,11 +203,10 @@ export function generateNumberChallenge(
     spokenPrompt: `Which group has ${comparisonType}? Group A or Group B?`,
     choices,
     comparison: {
-      groupA: { id: "A", count: countA, emoji: objA.emoji, label: objA.name },
-      groupB: { id: "B", count: countB, emoji: objB.emoji, label: objB.name },
+      groupA: { id: "A", count: countA, iconId: objA.id, label: objA.label },
+      groupB: { id: "B", count: countB, iconId: objB.id, label: objB.label },
       comparisonType,
       correctGroupId,
     },
   };
 }
-

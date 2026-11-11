@@ -17,4 +17,5 @@ export { ChallengeDisplay } from "./components/ChallengeDisplay";
 export { PlayerSetupModal } from "./components/PlayerSetupModal";
 export { GameOverPodium } from "./components/GameOverPodium";
 export { ConfettiEffect } from "./components/ConfettiEffect";
+export * from "./components/GameIcons";
 

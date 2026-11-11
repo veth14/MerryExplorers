@@ -235,10 +235,10 @@ export function GamesHub({ mode }: GamesHubProps) {
               {/* Visual Preview Trail Chips */}
               <div className="relative mt-6 grid grid-cols-4 gap-2 rounded-2xl bg-black/15 p-2.5 backdrop-blur-xs">
                 {[
-                  { text: "1", sub: "🦁", bg: "bg-[#fef3c7] text-[#b45309]" },
-                  { text: "2", sub: "🐰", bg: "bg-[#fce7f3] text-[#db2777]" },
-                  { text: "3", sub: "🦊", bg: "bg-[#ffedd5] text-[#ea580c]" },
-                  { text: "🏆", sub: "Goal", bg: "bg-[#d1fae5] text-[#065f46]" },
+                  { text: "1", sub: "Start", bg: "bg-[#fef3c7] text-[#b45309]" },
+                  { text: "2", sub: "Path", bg: "bg-[#fce7f3] text-[#db2777]" },
+                  { text: "3", sub: "Sprint", bg: "bg-[#ffedd5] text-[#ea580c]" },
+                  { text: "Goal", sub: "Finish", bg: "bg-[#d1fae5] text-[#065f46]" },
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -247,14 +247,18 @@ export function GamesHub({ mode }: GamesHubProps) {
                     <span className="font-[family-name:var(--font-fredoka)] text-xl sm:text-2xl font-black">
                       {item.text}
                     </span>
-                    <span className="text-xs font-bold leading-none">{item.sub}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider leading-none mt-0.5">{item.sub}</span>
                   </div>
                 ))}
               </div>
 
               <div className="relative mt-6 flex items-center justify-between border-t border-white/10 pt-4">
                 <span className="inline-flex items-center gap-2 rounded-xl bg-[#ffbf1f] px-4 py-2.5 text-xs font-black text-[#173764] shadow-sm transition group-hover:bg-[#ffd04a]">
-                  Start counting →
+                  <span>Start counting</span>
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 stroke-current stroke-2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
                 </span>
                 <span className="text-[11px] font-bold text-emerald-200">
                   1 to 6 Players • Trail Race
