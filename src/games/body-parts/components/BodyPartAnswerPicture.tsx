@@ -28,3 +28,4 @@ export function BodyPartAnswerPicture({ part, className = "" }: { part: BodyPart
     </div>
   );
 }
+

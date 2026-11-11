@@ -207,3 +207,4 @@ export function ExplorerCharacter({ onSelectPart, disabled, compact = false }: P
     </div>
   );
 }
+

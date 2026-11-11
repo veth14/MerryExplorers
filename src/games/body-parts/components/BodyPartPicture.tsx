@@ -83,3 +83,4 @@ export function BodyPartPicture({ part, className = "", focus = false, showHighl
     </svg>
   );
 }
+

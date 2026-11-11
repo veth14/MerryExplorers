@@ -61,3 +61,4 @@ export function RacePetPicture({ name, color, background = "#fff", className = "
     </svg>
   );
 }
+

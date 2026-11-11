@@ -68,3 +68,4 @@ export type GameSessionRecord = {
   playedAt: string;
   recordedByEmail?: string;
 };
+

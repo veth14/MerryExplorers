@@ -122,3 +122,4 @@ export function ConfettiEffect({ count = 80 }: { count?: number }) {
     />
   );
 }
+
