@@ -133,8 +133,8 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const timeRange = url.searchParams.get("timeRange") || "all"; // "all" | "30d" | "14d" | "7d" | "today"
-    const gameFilter = url.searchParams.get("gameType") || "all"; // "all" | "body-parts" | "number-trail"
+    const timeRange = url.searchParams.get("timeRange") || "all";
+    const gameFilter = url.searchParams.get("gameType") || "all";
     const limitParam = Math.min(Number(url.searchParams.get("limit") || 200), 500);
 
     const { db } = await connectToDatabase();
@@ -215,23 +215,41 @@ export async function GET(request: Request) {
       "number-trail-main": { title: "Number Recognition & Trail", category: "Number Trail Adventure", correct: 0, mistakes: 0, sessions: 0 },
     };
 
-    // Leaderboard Aggregations
-    const playerStatsMap = new Map<
-      string,
-      {
-        name: string;
-        studentId: string | null;
-        avatar: string;
-        color: string;
-        totalStars: number;
-        sessionsPlayed: number;
-        wins: number;
-        correctAnswers: number;
-        mistakes: number;
-        maxStreak: number;
-        gameDistribution: Record<string, number>;
-      }
-    >();
+    // Student Intelligence & History Map
+    type StudentEntry = {
+      name: string;
+      studentId: string | null;
+      avatar: string;
+      color: string;
+      totalStars: number;
+      sessionsPlayed: number;
+      wins: number;
+      correctAnswers: number;
+      mistakes: number;
+      maxStreak: number;
+      bodyPartsStars: number;
+      bodyPartsMatches: number;
+      numberTrailStars: number;
+      numberTrailMatches: number;
+      lastPlayedAt: string;
+      gameDistribution: Record<string, number>;
+      history: {
+        sessionId: string;
+        gameTitle: string;
+        gameType: string;
+        playedAt: string;
+        score: number;
+        correctCount: number;
+        mistakesCount: number;
+        streak: number;
+        rank: number;
+        roundsTotal: number;
+        notes?: string;
+        facilitator?: string;
+      }[];
+    };
+
+    const playerStatsMap = new Map<string, StudentEntry>();
 
     // Daily Timeline Grouping (Key: YYYY-MM-DD)
     const timelineMap = new Map<
@@ -250,7 +268,7 @@ export async function GET(request: Request) {
       }
     >();
 
-    // Pre-populate continuous timeline days so charts have smooth continuity
+    // Pre-populate continuous timeline days
     const timelineSpanDays = timeRange === "today" ? 1 : timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 14;
     for (let i = timelineSpanDays - 1; i >= 0; i--) {
       const d = new Date(now);
@@ -365,7 +383,7 @@ export async function GET(request: Request) {
         const studentKey = p.studentId || p.name.trim().toLowerCase();
         uniqueStudentsSet.add(studentKey);
 
-        const existing = playerStatsMap.get(studentKey) || {
+        const existing: StudentEntry = playerStatsMap.get(studentKey) || {
           name: p.name,
           studentId: p.studentId || null,
           avatar: p.avatar || "Explorer Mascot",
@@ -376,7 +394,13 @@ export async function GET(request: Request) {
           correctAnswers: 0,
           mistakes: 0,
           maxStreak: 0,
+          bodyPartsStars: 0,
+          bodyPartsMatches: 0,
+          numberTrailStars: 0,
+          numberTrailMatches: 0,
+          lastPlayedAt: s.playedAt ? new Date(s.playedAt).toISOString() : new Date().toISOString(),
           gameDistribution: {},
+          history: [],
         };
 
         existing.totalStars += pScore;
@@ -386,7 +410,32 @@ export async function GET(request: Request) {
         existing.maxStreak = Math.max(existing.maxStreak, pStreak);
         if (p.rank === 1) existing.wins += 1;
 
+        if (gType === "body-parts") {
+          existing.bodyPartsStars += pScore;
+          existing.bodyPartsMatches += 1;
+        } else if (gType === "number-trail") {
+          existing.numberTrailStars += pScore;
+          existing.numberTrailMatches += 1;
+        }
+
         existing.gameDistribution[gType] = (existing.gameDistribution[gType] || 0) + 1;
+
+        // Add to individual match history
+        existing.history.push({
+          sessionId: s._id ? s._id.toString() : "",
+          gameTitle: s.gameTitle,
+          gameType: s.gameType,
+          playedAt: s.playedAt ? new Date(s.playedAt).toISOString() : new Date().toISOString(),
+          score: pScore,
+          correctCount: pCorrect,
+          mistakesCount: pMistakes,
+          streak: pStreak,
+          rank: p.rank || 1,
+          roundsTotal: s.roundsTotal || 3,
+          notes: s.notes,
+          facilitator: s.recordedByEmail?.split("@")[0] || "teacher",
+        });
+
         playerStatsMap.set(studentKey, existing);
       }
     }
@@ -394,7 +443,7 @@ export async function GET(request: Request) {
     // Sort timeline chronologically (oldest to newest)
     const timeline = Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-    // Calculate leaderboard with win rate and accuracy
+    // Calculate leaderboard & student explorer profiles
     const leaderboard = Array.from(playerStatsMap.values())
       .map((entry) => {
         const winRate = entry.sessionsPlayed > 0 ? Math.round((entry.wins / entry.sessionsPlayed) * 100) : 0;
@@ -403,9 +452,21 @@ export async function GET(request: Request) {
         const avgScore = entry.sessionsPlayed > 0 ? Math.round(entry.totalStars / entry.sessionsPlayed) : 0;
 
         let favoriteGame = "Body Parts";
-        if ((entry.gameDistribution["number-trail"] || 0) > (entry.gameDistribution["body-parts"] || 0)) {
+        if (entry.numberTrailMatches > entry.bodyPartsMatches) {
           favoriteGame = "Number Trail";
         }
+
+        // Award Skill Badges
+        const skillBadges: string[] = [];
+        if (accuracy >= 90) skillBadges.push("Precision Ace");
+        if (entry.maxStreak >= 4) skillBadges.push("Streak Master");
+        if (entry.wins >= 3) skillBadges.push("Champion Racer");
+        if (entry.sessionsPlayed >= 5) skillBadges.push("Dedicated Explorer");
+        if (entry.totalStars >= 1000) skillBadges.push("Star Voyager");
+        if (skillBadges.length === 0) skillBadges.push("Trailblazer");
+
+        // Sort student's individual history descending
+        entry.history.sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime());
 
         return {
           ...entry,
@@ -413,6 +474,7 @@ export async function GET(request: Request) {
           accuracy,
           avgScore,
           favoriteGame,
+          skillBadges,
         };
       })
       .sort((a, b) => b.totalStars - a.totalStars)
@@ -448,7 +510,7 @@ export async function GET(request: Request) {
           totalGameSessions > 0
             ? Math.round(((gameCounts["body-parts"]?.sessions || 0) / totalGameSessions) * 100)
             : 100,
-        color: "#0284c7", // Sky/brand blue
+        color: "#0284c7",
         accentColor: "#0369a1",
         badge: "Anatomy & Science",
       },
@@ -461,13 +523,13 @@ export async function GET(request: Request) {
           totalGameSessions > 0
             ? Math.round(((gameCounts["number-trail"]?.sessions || 0) / totalGameSessions) * 100)
             : 0,
-        color: "#10b981", // Emerald green
+        color: "#10b981",
         accentColor: "#059669",
         badge: "Math & Counting",
       },
     ];
 
-    // Challenge Mode Mastery Distribution computed dynamically
+    // Challenge Mode Mastery Distribution
     const challengeModesMastery = Object.values(masteryMap).map((m) => {
       const attempts = m.correct + m.mistakes;
       const acc = attempts > 0 ? Math.round((m.correct / attempts) * 100) : (m.sessions > 0 ? 92 : 0);
@@ -477,9 +539,37 @@ export async function GET(request: Request) {
         accuracy: acc,
         attempts: attempts > 0 ? attempts : (m.sessions > 0 ? m.sessions * 4 : 0),
         sessions: m.sessions,
-        status: attempts === 0 && m.sessions === 0 ? "Awaiting matches" : acc >= 90 ? "Mastered" : "Practicing",
+        status: attempts === 0 && m.sessions === 0 ? "Awaiting matches" : acc >= 90 ? "Mastered" : "Proficient",
       };
     });
+
+    // Class Roster Participation Analysis
+    const rawRoster = await db
+      .collection("students")
+      .find({
+        $or: [
+          { program: { $regex: /trailblazer|brave/i } },
+          { programName: { $regex: /trailblazer|brave/i } },
+        ],
+      })
+      .toArray()
+      .catch(() => []);
+
+    const defaultRoster = ["Gelo", "Dari", "Gavinne", "Kaili", "Misha", "Ram", "Zane"];
+    const allRosterNames = rawRoster.length > 0
+      ? Array.from(new Set(rawRoster.map((s: { childInfo?: { firstName?: string; nickname?: string }; firstName?: string; name?: string }) => s.childInfo?.nickname || s.childInfo?.firstName || s.firstName || s.name).filter(Boolean) as string[]))
+      : defaultRoster;
+
+    const playedNamesSet = new Set(leaderboard.map((s) => s.name.toLowerCase()));
+    const unplayedRoster = allRosterNames.filter((name) => !playedNamesSet.has(name.toLowerCase()));
+
+    const rosterParticipation = {
+      totalRoster: allRosterNames.length,
+      activeStudents: leaderboard.length,
+      unplayedCount: unplayedRoster.length,
+      participationRate: allRosterNames.length > 0 ? Math.round((leaderboard.length / allRosterNames.length) * 100) : 100,
+      unplayedStudents: unplayedRoster,
+    };
 
     return NextResponse.json({
       success: true,
@@ -506,6 +596,7 @@ export async function GET(request: Request) {
       scoreBuckets,
       streakBuckets,
       leaderboard,
+      rosterParticipation,
       recentSessions: filteredSessions.map((s) => ({
         id: s._id ? s._id.toString() : "",
         gameType: s.gameType,
