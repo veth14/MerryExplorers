@@ -155,7 +155,7 @@ export function generateNumberChallenge(
   }
 
   // 4. MORE OR LESS MODE
-  let countA = randomInt(min, max);
+  const countA = randomInt(min, max);
   let countB = randomInt(min, max);
   while (countB === countA) {
     countB = randomInt(min, max);

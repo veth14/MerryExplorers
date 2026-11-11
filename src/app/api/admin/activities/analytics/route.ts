@@ -491,7 +491,7 @@ export async function GET(request: Request) {
     // Determine Most Popular Game
     let topGame = "Body Parts Explorer";
     let maxGameSessions = -1;
-    for (const [key, val] of Object.entries(gameCounts)) {
+    for (const val of Object.values(gameCounts)) {
       if (val.sessions > maxGameSessions) {
         maxGameSessions = val.sessions;
         topGame = val.title;

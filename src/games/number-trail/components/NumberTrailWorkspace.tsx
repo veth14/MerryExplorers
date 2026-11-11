@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
@@ -100,7 +100,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
   const [raceAnimationDone, setRaceAnimationDone] = useState(false);
 
   // Timing
-  const questionStartTimeRef = useRef<number>(Date.now());
+  const questionStartTimeRef = useRef<number>(0);
   const previousTargetRef = useRef<number | undefined>(undefined);
 
   // Roster & API
@@ -185,7 +185,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
   // ─── Challenge Generation ──────────────────────────────────────────────────
   const nextTurnChallenge = useCallback(
-    (playerIdx: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (_playerIdx?: number) => {
       const challenge = generateNumberChallenge(
         selectedModes,
         difficulty,

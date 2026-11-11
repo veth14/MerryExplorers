@@ -423,21 +423,23 @@ export function GamesAnalyticsDashboard() {
   }, [filteredRecentSessions, startIndex, endIndex]);
 
   const timelineMax = useMemo(() => {
-    if (!data?.timeline || data.timeline.length === 0) return 10;
-    const values = data.timeline.map((t) => (timelineMetric === "sessions" ? t.sessions : t.stars));
+    const timeline = data?.timeline;
+    if (!timeline || timeline.length === 0) return 10;
+    const values = timeline.map((t) => (timelineMetric === "sessions" ? t.sessions : t.stars));
     return Math.max(...values, timelineMetric === "sessions" ? 4 : 500);
-  }, [data?.timeline, timelineMetric]);
+  }, [data, timelineMetric]);
 
   const bodyPartsCount = useMemo(() => {
     return (data?.recentSessions || []).filter((s) => s.gameType === "body-parts").length;
-  }, [data?.recentSessions]);
+  }, [data]);
 
   const numberTrailCount = useMemo(() => {
     return (data?.recentSessions || []).filter((s) => s.gameType === "number-trail").length;
-  }, [data?.recentSessions]);
+  }, [data]);
 
   const { splinePath, areaPath, pointsCoords } = useMemo(() => {
-    if (!data?.timeline || data.timeline.length === 0) {
+    const timeline = data?.timeline;
+    if (!timeline || timeline.length === 0) {
       return { splinePath: "", areaPath: "", pointsCoords: [] };
     }
 
@@ -445,10 +447,10 @@ export function GamesAnalyticsDashboard() {
     const chartHeight = 165;
     const startX = 55;
     const baseY = 195;
-    const total = data.timeline.length;
+    const total = timeline.length;
     const step = chartWidth / Math.max(total, 1);
 
-    const coords = data.timeline.map((point, i) => {
+    const coords = timeline.map((point, i) => {
       const x = startX + i * step + step / 2;
       const val = timelineMetric === "sessions" ? point.sessions : point.stars;
       const h = (val / timelineMax) * chartHeight;
@@ -462,7 +464,7 @@ export function GamesAnalyticsDashboard() {
     const area = `${spline} L ${lastX} ${baseY} L ${firstX} ${baseY} Z`;
 
     return { splinePath: spline, areaPath: area, pointsCoords: coords };
-  }, [data?.timeline, timelineMetric, timelineMax]);
+  }, [data, timelineMetric, timelineMax]);
 
   return (
     <AppShell
@@ -587,6 +589,29 @@ export function GamesAnalyticsDashboard() {
                   }`}
                 >
                   {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Game Filter Selector */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+              <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-[#637d9f]">Game:</span>
+              {[
+                { id: "all", label: "All Activities" },
+                { id: "number-trail", label: "Number Trail" },
+                { id: "body-parts", label: "Body Parts" },
+              ].map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setGameFilter(g.id as typeof gameFilter)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                    gameFilter === g.id
+                      ? "bg-[#0284c7] text-white shadow-xs"
+                      : "text-[#476082] hover:bg-[#f0f4fa]"
+                  }`}
+                >
+                  {g.label}
                 </button>
               ))}
             </div>
@@ -1823,8 +1848,9 @@ export function GamesAnalyticsDashboard() {
                         </p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {selectedStudent.skillBadges.map((badge) => (
-                            <span key={badge} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-800 border border-blue-200">
-                              {badge}
+                            <span key={badge} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-800 border border-blue-200">
+                              <AwardIcon className="h-3 w-3" />
+                              <span>{badge}</span>
                             </span>
                           ))}
                         </div>

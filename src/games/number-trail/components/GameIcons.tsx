@@ -467,7 +467,6 @@ export function AnimalAvatarBadge({
   const isPanda = lower.includes("panda") || lower.includes("bear");
   const isFrog = lower.includes("frog");
   const isPenguin = lower.includes("penguin") || lower.includes("bird") || lower.includes("owl");
-  const isPuppy = lower.includes("puppy") || lower.includes("dog");
 
   return (
     <div

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GamePlayer } from "../types";
 import { ConfettiEffect } from "./ConfettiEffect";
-import { AnimalAvatarBadge, CheckIcon, FlameIcon, StarIcon, TrophyIcon } from "./GameIcons";
+import { AnimalAvatarBadge, CheckIcon, FlameIcon, TrophyIcon } from "./GameIcons";
 
 type GameOverPodiumProps = {
   players: GamePlayer[];
