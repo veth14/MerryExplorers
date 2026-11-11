@@ -54,12 +54,17 @@ interface FaceOverlayProps {
   faceDetected: boolean;
   /** Mirrored? Must match the video transform so points align with selfie feed. */
   mirrored?: boolean;
+  /** Intrinsic camera dimensions, used to align landmarks with a contained video. */
+  videoWidth?: number;
+  videoHeight?: number;
 }
 
 export function FaceOverlay({
   faceLandmarks,
   faceDetected,
   mirrored = true,
+  videoWidth = 0,
+  videoHeight = 0,
 }: FaceOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -67,9 +72,11 @@ export function FaceOverlay({
   const landmarksRef = useRef(faceLandmarks);
   const detectedRef = useRef(faceDetected);
   const mirroredRef = useRef(mirrored);
+  const videoSizeRef = useRef({ width: videoWidth, height: videoHeight });
   landmarksRef.current = faceLandmarks;
   detectedRef.current = faceDetected;
   mirroredRef.current = mirrored;
+  videoSizeRef.current = { width: videoWidth, height: videoHeight };
 
   // Track state transitions for success animations (ripple pulse)
   const prevDetectedRef = useRef(faceDetected);
@@ -118,9 +125,20 @@ export function FaceOverlay({
       const h = displayH;
       const timeSec = timeMs / 1000;
 
-      // Transform normalized coordinates
-      const lx = (lm: NormalizedLandmark) => (isMirrored ? (1 - lm.x) * w : lm.x * w);
-      const ly = (lm: NormalizedLandmark) => lm.y * h;
+      // Match object-contain's letterboxing so landmarks stay aligned without
+      // cropping or enlarging the camera image.
+      const { width: sourceW, height: sourceH } = videoSizeRef.current;
+      const fitScale = sourceW > 0 && sourceH > 0
+        ? Math.min(w / sourceW, h / sourceH)
+        : 1;
+      const contentW = sourceW > 0 ? sourceW * fitScale : w;
+      const contentH = sourceH > 0 ? sourceH * fitScale : h;
+      const offsetX = (w - contentW) / 2;
+      const offsetY = (h - contentH) / 2;
+
+      // Transform normalized coordinates into the contained video area.
+      const lx = (lm: NormalizedLandmark) => offsetX + (isMirrored ? 1 - lm.x : lm.x) * contentW;
+      const ly = (lm: NormalizedLandmark) => offsetY + lm.y * contentH;
 
       // ─── 1. NO FACE: Render Apple Face ID Alignment Guide & Laser Scan ───
       if (!landmarks || !isDetected) {

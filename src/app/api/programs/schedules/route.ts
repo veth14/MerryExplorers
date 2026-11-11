@@ -114,6 +114,7 @@ export async function GET(req: NextRequest) {
         holidaysMap,
         suspensionsMap: getProgramSuspensions(p.programKey),
         todayStr,
+        customSessions: p.customSessions,
       });
     });
 

@@ -187,6 +187,7 @@ export default function ClockPage() {
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [isCameraCovered, setIsCameraCovered] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [cameraSize, setCameraSize] = useState({ width: 0, height: 0 });
   const [scanSeconds, setScanSeconds] = useState(0);
   const [allowManualVerify, setAllowManualVerify] = useState(false);
 
@@ -347,6 +348,7 @@ export default function ClockPage() {
       const video = videoRef.current;
       video.srcObject = streamRef.current;
       video.onloadedmetadata = () => {
+        setCameraSize({ width: video.videoWidth, height: video.videoHeight });
         video.play().catch((err) => console.warn("Video play error on metadata:", err));
       };
       video.play().catch((err) => console.warn("Video play error:", err));
@@ -1250,7 +1252,7 @@ export default function ClockPage() {
                     autoPlay
                     playsInline
                     muted
-                    className="absolute inset-0 h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-contain"
                     style={{ transform: facingMode === "user" ? "scaleX(-1)" : "none" }}
                   />
 
@@ -1259,6 +1261,8 @@ export default function ClockPage() {
                     faceLandmarks={faceLandmarks}
                     faceDetected={faceDetected}
                     mirrored={facingMode === "user"}
+                    videoWidth={cameraSize.width}
+                    videoHeight={cameraSize.height}
                   />
 
                   {/* Cinematic Viewport Inner Vignette & Edge Shadow */}

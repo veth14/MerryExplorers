@@ -155,6 +155,15 @@ export const PROGRAM_SCHEDULE_CONFIGS: Record<string, ProgramScheduleConfig> = {
 
 export const PROGRAM_KEYS_LIST = Object.keys(PROGRAM_SCHEDULE_CONFIGS);
 
+export interface CustomSessionOverride {
+  sessionNumber: number;
+  dateStr: string;
+  isMakeUp?: boolean;
+  makeUpReason?: string;
+  isRescheduled?: boolean;
+  originalDateStr?: string;
+}
+
 export interface ProgramSessionItem {
   sessionNumber: number; // 1 to N
   totalSessions: number; // e.g. 8 or 12
@@ -167,6 +176,10 @@ export interface ProgramSessionItem {
   isCompleted: boolean; // dateStr < todayStr
   isToday: boolean; // dateStr === todayStr
   status: "completed" | "today" | "upcoming";
+  isMakeUp?: boolean;
+  makeUpReason?: string;
+  isRescheduled?: boolean;
+  originalDateStr?: string;
 }
 
 export interface SkippedDateItem {
@@ -195,6 +208,7 @@ export interface ProgramScheduleResult {
   skippedDates: SkippedDateItem[];
   config: ProgramScheduleConfig;
   hasStartDate: boolean;
+  hasCustomSchedule?: boolean;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -245,6 +259,7 @@ export function generateProgramSchedule({
   holidaysMap,
   suspensionsMap,
   todayStr = getManilaTodayStr(),
+  customSessions,
 }: {
   programKey: string;
   adventureNumber: number;
@@ -253,6 +268,7 @@ export function generateProgramSchedule({
   holidaysMap: Map<string, string> | Record<string, string>;
   suspensionsMap: Map<string, string> | Record<string, string>;
   todayStr?: string;
+  customSessions?: CustomSessionOverride[] | null;
 }): ProgramScheduleResult {
   const config = PROGRAM_SCHEDULE_CONFIGS[programKey] || {
     programKey,
@@ -277,7 +293,7 @@ export function generateProgramSchedule({
 
   const sessionsCount = Math.max(1, totalSessions || config.defaultSessions);
 
-  if (!startDateStr) {
+  if (!startDateStr && (!customSessions || customSessions.length === 0)) {
     return {
       programKey,
       shortName: config.shortName,
@@ -294,10 +310,119 @@ export function generateProgramSchedule({
       skippedDates: [],
       config,
       hasStartDate: false,
+      hasCustomSchedule: false,
     };
   }
 
-  const cleanStart = startDateStr.slice(0, 10);
+  // ── Custom Schedule Overrides (if admin rescheduled sessions) ──
+  if (customSessions && customSessions.length > 0) {
+    const customMap = new Map<number, CustomSessionOverride>();
+    for (const cs of customSessions) {
+      customMap.set(cs.sessionNumber, cs);
+    }
+
+    const sessions: ProgramSessionItem[] = [];
+    for (let sNum = 1; sNum <= sessionsCount; sNum++) {
+      const override = customMap.get(sNum);
+      if (override) {
+        const [y, m, d] = override.dateStr.split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+        const dow = dt.getUTCDay();
+        const isCompleted = override.dateStr < todayStr;
+        const isToday = override.dateStr === todayStr;
+
+        sessions.push({
+          sessionNumber: sNum,
+          totalSessions: sessionsCount,
+          adventureNumber,
+          programKey,
+          programShortName: config.shortName,
+          dateStr: override.dateStr,
+          dayName: DAY_NAMES[dow],
+          formattedDate: formatFullFriendlyDate(override.dateStr),
+          isCompleted,
+          isToday,
+          status: isCompleted ? "completed" : isToday ? "today" : "upcoming",
+          isMakeUp: override.isMakeUp,
+          makeUpReason: override.makeUpReason,
+          isRescheduled: override.isRescheduled,
+          originalDateStr: override.originalDateStr,
+        });
+      }
+    }
+
+    const sorted = [...sessions].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+    const startDate = sorted[0]?.dateStr || startDateStr?.slice(0, 10) || "";
+    const endDate = sorted[sorted.length - 1]?.dateStr || startDate;
+    const completedSessions = sessions.filter((s) => s.isCompleted).length;
+    const remainingSessions = sessionsCount - completedSessions;
+
+    const skippedDates: SkippedDateItem[] = [];
+    if (startDate && endDate) {
+      const meetingDays = config.days.length > 0 ? config.days : [1, 2, 3, 4, 5];
+      const [sy, sm, sd] = startDate.split("-").map(Number);
+      const [ey, em, ed] = endDate.split("-").map(Number);
+      const checkCur = new Date(Date.UTC(sy, sm - 1, sd, 0, 0, 0));
+      const checkEnd = new Date(Date.UTC(ey, em - 1, ed, 0, 0, 0));
+      const sessionDatesSet = new Set(sessions.map((s) => s.dateStr));
+
+      while (checkCur <= checkEnd) {
+        const cy = checkCur.getUTCFullYear();
+        const cm = String(checkCur.getUTCMonth() + 1).padStart(2, "0");
+        const cd = String(checkCur.getUTCDate()).padStart(2, "0");
+        const dStr = `${cy}-${cm}-${cd}`;
+        const dow = checkCur.getUTCDay();
+
+        if (meetingDays.includes(dow) && !sessionDatesSet.has(dStr)) {
+          const holidayReason = getReason(holidaysMap, dStr);
+          const suspensionReason = getReason(suspensionsMap, dStr);
+          if (holidayReason) {
+            skippedDates.push({
+              dateStr: dStr,
+              dayName: DAY_NAMES[dow],
+              formattedDate: formatFullFriendlyDate(dStr),
+              reason: holidayReason,
+              type: "holiday",
+              originalMeetingDay: true,
+              movedSessionNumber: 0,
+            });
+          } else if (suspensionReason) {
+            skippedDates.push({
+              dateStr: dStr,
+              dayName: DAY_NAMES[dow],
+              formattedDate: formatFullFriendlyDate(dStr),
+              reason: suspensionReason,
+              type: "suspension",
+              originalMeetingDay: true,
+              movedSessionNumber: 0,
+            });
+          }
+        }
+        checkCur.setUTCDate(checkCur.getUTCDate() + 1);
+      }
+    }
+
+    return {
+      programKey,
+      shortName: config.shortName,
+      slug: config.slug,
+      adventureNumber,
+      startDate,
+      formattedStartDate: formatFriendlyDate(startDate),
+      endDate,
+      formattedEndDate: formatFriendlyDate(endDate),
+      totalSessions: sessionsCount,
+      completedSessions,
+      remainingSessions,
+      sessions,
+      skippedDates,
+      config,
+      hasStartDate: true,
+      hasCustomSchedule: true,
+    };
+  }
+
+  const cleanStart = (startDateStr || "").slice(0, 10);
   const [sy, sm, sd] = cleanStart.split("-").map(Number);
   const cur = new Date(Date.UTC(sy, sm - 1, sd, 0, 0, 0));
 
@@ -389,6 +514,132 @@ export function generateProgramSchedule({
   };
 }
 
+/**
+ * Calculates a new sequence of session dates when Session K is moved to targetDateStr.
+ * - Sessions 1 to K-1 stay on their current dates.
+ * - Session K is set to targetDateStr (with optional Make-Up flag and reason).
+ * - If cascade === true:
+ *     Sessions K+1 to N are scheduled on the program's normal meeting days starting from
+ *     the day after targetDateStr, automatically skipping any dates in holidaysMap or suspensionsMap.
+ * - If cascade === false:
+ *     Only Session K is moved.
+ */
+export function cascadeScheduleAfterMove({
+  programKey,
+  sessionNumber,
+  targetDateStr,
+  isMakeUp = false,
+  makeUpReason = "",
+  cascade = true,
+  currentSessions,
+  holidaysMap,
+  suspensionsMap,
+  totalSessions,
+}: {
+  programKey: string;
+  sessionNumber: number;
+  targetDateStr: string;
+  isMakeUp?: boolean;
+  makeUpReason?: string;
+  cascade?: boolean;
+  currentSessions: ProgramSessionItem[];
+  holidaysMap: Map<string, string> | Record<string, string>;
+  suspensionsMap: Map<string, string> | Record<string, string>;
+  totalSessions?: number;
+}): CustomSessionOverride[] {
+  const config = PROGRAM_SCHEDULE_CONFIGS[programKey];
+  const meetingDays = config && config.days.length > 0 ? config.days : [1, 2, 3, 4, 5];
+  const count = totalSessions || currentSessions.length || config?.defaultSessions || 8;
+
+  const result: CustomSessionOverride[] = [];
+
+  const getReason = (map: Map<string, string> | Record<string, string>, date: string): string | undefined => {
+    return map instanceof Map ? map.get(date) : map[date];
+  };
+
+  // 1. Sessions before sessionNumber keep their current date
+  for (let s = 1; s < sessionNumber; s++) {
+    const existing = currentSessions.find((item) => item.sessionNumber === s);
+    if (existing) {
+      result.push({
+        sessionNumber: s,
+        dateStr: existing.dateStr,
+        isMakeUp: existing.isMakeUp,
+        makeUpReason: existing.makeUpReason,
+        isRescheduled: existing.isRescheduled,
+        originalDateStr: existing.originalDateStr,
+      });
+    }
+  }
+
+  // 2. Session K gets targetDateStr
+  const existingK = currentSessions.find((item) => item.sessionNumber === sessionNumber);
+  result.push({
+    sessionNumber,
+    dateStr: targetDateStr,
+    isMakeUp: Boolean(isMakeUp),
+    makeUpReason: makeUpReason || (isMakeUp ? "Make-Up Session" : undefined),
+    isRescheduled: true,
+    originalDateStr: existingK?.originalDateStr || existingK?.dateStr,
+  });
+
+  // 3. If NOT cascading, keep subsequent sessions as they were
+  if (!cascade) {
+    for (let s = sessionNumber + 1; s <= count; s++) {
+      const existing = currentSessions.find((item) => item.sessionNumber === s);
+      if (existing) {
+        result.push({
+          sessionNumber: s,
+          dateStr: existing.dateStr,
+          isMakeUp: existing.isMakeUp,
+          makeUpReason: existing.makeUpReason,
+          isRescheduled: existing.isRescheduled,
+          originalDateStr: existing.originalDateStr,
+        });
+      }
+    }
+    return result;
+  }
+
+  // 4. If cascading: iterate calendar starting day after targetDateStr
+  const [ty, tm, td] = targetDateStr.split("-").map(Number);
+  const cur = new Date(Date.UTC(ty, tm - 1, td, 0, 0, 0));
+  cur.setUTCDate(cur.getUTCDate() + 1); // day after targetDateStr
+
+  let nextSess = sessionNumber + 1;
+  let safety = 0;
+
+  while (nextSess <= count && safety < 365) {
+    safety++;
+    const y = cur.getUTCFullYear();
+    const m = String(cur.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(cur.getUTCDate()).padStart(2, "0");
+    const dateStr = `${y}-${m}-${d}`;
+    const dow = cur.getUTCDay();
+
+    if (meetingDays.includes(dow)) {
+      const holidayReason = getReason(holidaysMap, dateStr);
+      const suspensionReason = getReason(suspensionsMap, dateStr);
+
+      if (!holidayReason && !suspensionReason) {
+        const existingNext = currentSessions.find((item) => item.sessionNumber === nextSess);
+        result.push({
+          sessionNumber: nextSess,
+          dateStr,
+          isMakeUp: false,
+          isRescheduled: existingNext?.dateStr !== dateStr,
+          originalDateStr: existingNext?.originalDateStr || existingNext?.dateStr,
+        });
+        nextSess++;
+      }
+    }
+
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  return result;
+}
+
 export type ProgramRenewalEntryLike = {
   programKey: string;
   currentAdventure?: number | null;
@@ -426,6 +677,7 @@ export function getAllProgramsSchedules({
       holidaysMap,
       suspensionsMap,
       todayStr,
+      customSessions: (p as any).customSessions,
     });
   });
 }

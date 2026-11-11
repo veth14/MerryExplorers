@@ -254,6 +254,14 @@ function MonthGrid({
                       <div className="flex items-center gap-1 min-w-0 truncate">
                         <span className="text-[10px] shrink-0 leading-none">{cfg?.emoji || "🎒"}</span>
                         <span className="truncate font-black text-[9px] sm:text-[10px] tracking-tight">{chipName}</span>
+                        {s.isMakeUp && (
+                          <span
+                            className="shrink-0 text-[8.5px]"
+                            title={`Make-Up Session${s.makeUpReason ? `: ${s.makeUpReason}` : ""}`}
+                          >
+                            🔄
+                          </span>
+                        )}
                       </div>
                       <span
                         className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-black bg-white/95 border shadow-2xs"
@@ -1107,6 +1115,9 @@ function DayDrawer({
   onHide,
   sessionsByDate,
   showSessions,
+  onRefreshSessions,
+  getAuthHeader,
+  onDateChange,
 }: {
   dateStr: string;
   events: CalendarEvent[];
@@ -1117,10 +1128,166 @@ function DayDrawer({
   onHide: (e: CalendarEvent) => void;
   sessionsByDate?: Record<string, ProgramSessionItem[]>;
   showSessions?: boolean;
+  onRefreshSessions?: () => Promise<void>;
+  getAuthHeader?: () => Promise<Record<string, string>>;
+  onDateChange?: (newDateStr: string) => void;
 }) {
   const daySessions = showSessions && sessionsByDate
     ? (sessionsByDate[dateStr] || []).filter((s) => SESSION_CHIP_KEYS.has(s.programKey))
     : [];
+
+  // Reschedule state inside modal
+  const [movingSessionKey, setMovingSessionKey] = useState<string | null>(null);
+  const [targetDateStr, setTargetDateStr] = useState<string>("");
+  const [isMakeUp, setIsMakeUp] = useState<boolean>(false);
+  const [makeUpReason, setMakeUpReason] = useState<string>("");
+  const [cascade, setCascade] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  const [successMsg, setSuccessMsg] = useState<string>("");
+  const [resettingKey, setResettingKey] = useState<string | null>(null);
+
+  // Helper: Find earliest allowed date (after previous session)
+  const getMinAllowedDate = (s: ProgramSessionItem): string => {
+    if (!sessionsByDate || s.sessionNumber <= 1) return "";
+    for (const [dStr, list] of Object.entries(sessionsByDate)) {
+      const found = list.find(
+        (item) => item.programKey === s.programKey && item.sessionNumber === s.sessionNumber - 1
+      );
+      if (found) {
+        const [y, m, d] = dStr.split("-").map(Number);
+        const nextDay = new Date(y, m - 1, d + 1);
+        const yy = nextDay.getFullYear();
+        const mm = String(nextDay.getMonth() + 1).padStart(2, "0");
+        const dd = String(nextDay.getDate()).padStart(2, "0");
+        return `${yy}-${mm}-${dd}`;
+      }
+    }
+    return "";
+  };
+
+  const applyDateOffset = (days: number) => {
+    const base = targetDateStr || dateStr;
+    const [y, m, d] = base.split("-").map(Number);
+    const next = new Date(y, m - 1, d + days);
+    const yy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, "0");
+    const dd = String(next.getDate()).padStart(2, "0");
+    setTargetDateStr(`${yy}-${mm}-${dd}`);
+  };
+
+  const setNextSaturday = () => {
+    const base = targetDateStr || dateStr;
+    const [y, m, d] = base.split("-").map(Number);
+    const cur = new Date(y, m - 1, d);
+    const day = cur.getDay(); // 0 = Sun, 6 = Sat
+    const diff = (6 - day + 7) % 7 || 7; // Next Saturday
+    cur.setDate(cur.getDate() + diff);
+    const yy = cur.getFullYear();
+    const mm = String(cur.getMonth() + 1).padStart(2, "0");
+    const dd = String(cur.getDate()).padStart(2, "0");
+    setTargetDateStr(`${yy}-${mm}-${dd}`);
+    setIsMakeUp(true);
+    if (!makeUpReason) {
+      setMakeUpReason("Saturday Make-Up Session");
+    }
+  };
+
+  const handleConfirmMove = async (s: ProgramSessionItem) => {
+    if (!targetDateStr) {
+      setErrorMsg("Please select a valid target date.");
+      return;
+    }
+    setErrorMsg("");
+    setSuccessMsg("");
+    setIsSubmitting(true);
+
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(getAuthHeader ? await getAuthHeader() : {}),
+      };
+
+      const res = await fetch("/api/programs/reschedule-session", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          programKey: s.programKey,
+          adventureNumber: s.adventureNumber,
+          sessionNumber: s.sessionNumber,
+          targetDateStr,
+          isMakeUp,
+          makeUpReason: makeUpReason.trim(),
+          cascade,
+          action: "move",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to move session.");
+      }
+
+      setSuccessMsg(
+        `Session ${s.sessionNumber} moved to ${targetDateStr} successfully!${
+          isMakeUp ? " (Make-Up Session)" : ""
+        }`
+      );
+
+      if (onRefreshSessions) {
+        await onRefreshSessions();
+      }
+
+      setTimeout(() => {
+        setMovingSessionKey(null);
+        setSuccessMsg("");
+        if (onDateChange && targetDateStr !== dateStr) {
+          onDateChange(targetDateStr);
+        }
+      }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to move session.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetSchedule = async (programKey: string, progShortName: string) => {
+    if (!confirm(`Reset schedule for ${progShortName} back to default automatic calculation? Any manual date shifts will be cleared.`)) {
+      return;
+    }
+    setResettingKey(programKey);
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(getAuthHeader ? await getAuthHeader() : {}),
+      };
+
+      const res = await fetch("/api/programs/reschedule-session", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          programKey,
+          action: "reset",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to reset schedule.");
+      }
+
+      if (onRefreshSessions) {
+        await onRefreshSessions();
+      }
+      setSuccessMsg(`Reset ${progShortName} back to automatic schedule.`);
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err: any) {
+      alert(err.message || "Failed to reset schedule.");
+    } finally {
+      setResettingKey(null);
+    }
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
@@ -1224,6 +1391,234 @@ function DayDrawer({
                         {pct}% Complete
                       </span>
                     </div>
+
+                    {/* Make-Up & Rescheduled Badges */}
+                    {s.isMakeUp && (
+                      <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-[11px] font-black">
+                        <span>🔄</span>
+                        <span>MAKE-UP SESSION</span>
+                        {s.makeUpReason && (
+                          <span className="font-normal text-purple-700">· {s.makeUpReason}</span>
+                        )}
+                      </div>
+                    )}
+                    {s.isRescheduled && !s.isMakeUp && (
+                      <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-black">
+                        <span>📅</span>
+                        <span>Rescheduled</span>
+                        {s.originalDateStr && (
+                          <span className="font-normal text-blue-700">
+                            (originally {s.originalDateStr})
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action buttons: Move / Reschedule Session */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sKey = `${s.programKey}-s${s.sessionNumber}`;
+                          if (movingSessionKey === sKey) {
+                            setMovingSessionKey(null);
+                          } else {
+                            setMovingSessionKey(sKey);
+                            setTargetDateStr(s.dateStr);
+                            setIsMakeUp(Boolean(s.isMakeUp));
+                            setMakeUpReason(s.makeUpReason || "");
+                            setCascade(true);
+                            setErrorMsg("");
+                            setSuccessMsg("");
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0033a0] hover:bg-[#002270] text-white text-[11.5px] font-black shadow-xs transition-all cursor-pointer"
+                      >
+                        <span>📅</span>
+                        <span>
+                          {movingSessionKey === `${s.programKey}-s${s.sessionNumber}`
+                            ? "✕ Close Move Form"
+                            : "Move / Reschedule Date"}
+                        </span>
+                      </button>
+
+                      {(s.isMakeUp || s.isRescheduled) && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleResetSchedule(s.programKey, cfg?.shortName ?? s.programShortName)
+                          }
+                          disabled={resettingKey === s.programKey}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition-all disabled:opacity-50 cursor-pointer"
+                          title="Reset program schedule back to default automatic calculation"
+                        >
+                          <span>↺</span>
+                          <span>
+                            {resettingKey === s.programKey ? "Resetting…" : "Reset to Default"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Inline Reschedule Form */}
+                    {movingSessionKey === `${s.programKey}-s${s.sessionNumber}` && (
+                      <div className="mt-3 rounded-2xl bg-[#f0f5ff] border-2 border-[#0033a0]/30 p-3.5 space-y-3">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-blue-200/60">
+                          <span className="text-[12px] font-black text-[#002f76]">
+                            📅 Reschedule Session {s.sessionNumber} of {s.totalSessions}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">
+                            Current: {s.dateStr}
+                          </span>
+                        </div>
+
+                        {/* Date Input & Quick Shortcuts */}
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600">
+                            Select New Date
+                          </label>
+                          <input
+                            type="date"
+                            value={targetDateStr}
+                            min={getMinAllowedDate(s)}
+                            onChange={(e) => setTargetDateStr(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-[13px] font-bold text-[#002f76] focus:outline-none focus:ring-2 focus:ring-[#0033a0]/30"
+                          />
+                          {getMinAllowedDate(s) && (
+                            <p className="text-[10px] text-slate-500">
+                              Must be on or after {getMinAllowedDate(s)} (after Session {s.sessionNumber - 1}).
+                            </p>
+                          )}
+
+                          {/* Quick suggestion chips */}
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className="text-[10px] font-bold text-slate-400">Quick:</span>
+                            <button
+                              type="button"
+                              onClick={() => applyDateOffset(1)}
+                              className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10.5px] font-bold"
+                            >
+                              +1 Day
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => applyDateOffset(2)}
+                              className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10.5px] font-bold"
+                            >
+                              +2 Days
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => applyDateOffset(7)}
+                              className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10.5px] font-bold"
+                            >
+                              +1 Week
+                            </button>
+                            <button
+                              type="button"
+                              onClick={setNextSaturday}
+                              className="px-2 py-0.5 rounded-lg bg-purple-100 border border-purple-300 text-purple-900 hover:bg-purple-200 text-[10.5px] font-black"
+                              title="Pick upcoming Saturday and mark as Make-Up session"
+                            >
+                              🔄 Saturday Make-Up
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Make-Up Toggle & Reason */}
+                        <div className="rounded-xl bg-white p-2.5 border border-slate-200 space-y-2">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isMakeUp}
+                              onChange={(e) => setIsMakeUp(e.target.checked)}
+                              className="w-4 h-4 rounded text-[#0033a0] accent-[#0033a0]"
+                            />
+                            <span className="text-[12px] font-black text-[#002f76]">
+                              🔄 Mark as Make-Up Session
+                            </span>
+                          </label>
+                          {isMakeUp && (
+                            <div className="pt-1">
+                              <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                Reason for Make-Up (optional)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Typhoon Kristine suspension make-up, Nov 24 Holiday"
+                                value={makeUpReason}
+                                onChange={(e) => setMakeUpReason(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11.5px] font-medium text-slate-800 focus:outline-none focus:border-[#0033a0]"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Cascade Toggle */}
+                        <div className="rounded-xl bg-white p-2.5 border border-slate-200">
+                          <label className="flex items-start gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={cascade}
+                              onChange={(e) => setCascade(e.target.checked)}
+                              className="w-4 h-4 rounded text-[#0033a0] accent-[#0033a0] mt-0.5"
+                            />
+                            <div className="text-[11.5px]">
+                              <span className="font-black text-[#002f76] block">
+                                ⏭️ Shift subsequent sessions forward
+                              </span>
+                              <span className="text-slate-500 font-medium text-[10px] block mt-0.5">
+                                {s.sessionNumber < s.totalSessions
+                                  ? `Automatically shifts Sessions ${s.sessionNumber + 1} to ${s.totalSessions} to subsequent class days, skipping holidays and suspensions.`
+                                  : `This is the final session (Session ${s.sessionNumber}/${s.totalSessions}). No subsequent sessions to shift.`}
+                              </span>
+                            </div>
+                          </label>
+                        </div>
+
+                        {/* Error and Success alerts */}
+                        {errorMsg && (
+                          <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-[11.5px] font-bold text-red-700">
+                            ⚠️ {errorMsg}
+                          </div>
+                        )}
+                        {successMsg && (
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11.5px] font-bold text-emerald-800">
+                            ✓ {successMsg}
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setMovingSessionKey(null)}
+                            disabled={isSubmitting}
+                            className="px-3 py-1.5 rounded-xl text-[11.5px] font-bold text-slate-600 hover:bg-slate-200 transition-all disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmMove(s)}
+                            disabled={isSubmitting || !targetDateStr}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0033a0] hover:bg-[#002270] text-white text-[12px] font-black shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Moving Session…</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>✓</span>
+                                <span>Confirm &amp; Move Date</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1772,7 +2167,10 @@ export default function AdminAdventureCalendarPage() {
         </div>
 
         {calendarTab === "programs" ? (
-          <ProgramSessionsCalendar initialProgramKey={selectedProgramQuery} />
+          <ProgramSessionsCalendar
+            initialProgramKey={selectedProgramQuery}
+            onRefresh={loadProgramSessions}
+          />
         ) : (
           <>
         {/* ── Holiday Sync Notice ── */}
@@ -1998,6 +2396,14 @@ export default function AdminAdventureCalendarPage() {
           onHide={handleHideEvent}
           sessionsByDate={sessionsByDate}
           showSessions={showSessionChips}
+          onRefreshSessions={async () => {
+            await Promise.all([loadProgramSessions(), loadEvents(currentMonth)]);
+          }}
+          getAuthHeader={getAuthHeader}
+          onDateChange={(newDateStr) => {
+            const evts = eventsByDate[newDateStr] || [];
+            setDayDrawer({ date: newDateStr, events: evts });
+          }}
         />
       )}
 
