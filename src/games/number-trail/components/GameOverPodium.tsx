@@ -73,6 +73,11 @@ export function GameOverPodium({
                     />
                   </span>
                   <span className="max-w-24 truncate text-xs font-black text-amber-950">{player.name}</span>
+                  {(player.isTestAccount || /gelo/i.test(player.name)) && (
+                    <span className="rounded-full bg-amber-300 px-1.5 py-0.2 text-[8px] font-black uppercase text-amber-950">
+                      Testing
+                    </span>
+                  )}
                   <span className="text-[9px] font-black uppercase tracking-wide text-amber-800">Champion</span>
                 </div>
               ))}
@@ -108,7 +113,14 @@ export function GameOverPodium({
                     className="h-10 w-10 shrink-0"
                   />
                   <div className="min-w-0">
-                    <span className="block truncate text-sm font-black text-slate-800">{player.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="block truncate text-sm font-black text-slate-800">{player.name}</span>
+                      {(player.isTestAccount || /gelo/i.test(player.name)) && (
+                        <span className="rounded-full bg-amber-100 border border-amber-300 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-900 shrink-0">
+                          Testing
+                        </span>
+                      )}
+                    </div>
                     <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] font-medium text-slate-500 sm:text-xs">
                       <span>{player.correctCount} correct</span><span>·</span><span>{player.mistakesCount} hints</span>
                       {player.maxStreak > 1 && <><span>·</span><span className="inline-flex items-center gap-0.5 font-bold text-amber-600"><FlameIcon className="h-3 w-3" />{player.maxStreak} streak</span></>}

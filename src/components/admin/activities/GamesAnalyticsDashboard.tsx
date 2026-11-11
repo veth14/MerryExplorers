@@ -67,6 +67,7 @@ type LeaderboardStudent = {
   numberTrailStars: number;
   numberTrailMatches: number;
   lastPlayedAt: string;
+  isTestAccount?: boolean;
   skillBadges: string[];
   history: StudentSessionHistory[];
 };
@@ -1062,8 +1063,13 @@ export function GamesAnalyticsDashboard() {
                                 {student.name.slice(0, 2).toUpperCase()}
                               </div>
                               <div>
-                                <div className="font-black text-[#002f76] group-hover:text-[#0284c7] transition">
-                                  {student.name}
+                                <div className="flex items-center gap-1.5 font-black text-[#002f76] group-hover:text-[#0284c7] transition">
+                                  <span>{student.name}</span>
+                                  {(student.isTestAccount || /gelo/i.test(student.name)) && (
+                                    <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[9px] font-black uppercase text-amber-900 tracking-wider">
+                                      🧪 Testing Account
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[10px] text-[#5d779b]">{student.avatar}</div>
                               </div>
@@ -1953,8 +1959,13 @@ export function GamesAnalyticsDashboard() {
                         {selectedStudent.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-2xl font-black text-[#002f76]">{selectedStudent.name}</h3>
+                          {(selectedStudent.isTestAccount || /gelo/i.test(selectedStudent.name)) && (
+                            <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10px] font-black uppercase text-amber-900 tracking-wider">
+                              🧪 Testing Account
+                            </span>
+                          )}
                           <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900">
                             Rank #{selectedStudent.rank}
                           </span>
@@ -2142,7 +2153,14 @@ export function GamesAnalyticsDashboard() {
                               {idx + 1}
                             </span>
                             <div>
-                              <div className="font-black text-[#002f76]">{p.name}</div>
+                              <div className="flex items-center gap-1.5 font-black text-[#002f76]">
+                                <span>{p.name}</span>
+                                {/gelo/i.test(p.name) && (
+                                  <span className="rounded-full bg-amber-100 border border-amber-300 px-1.5 py-0.2 text-[8px] font-black uppercase text-amber-900 tracking-wider">
+                                    Testing
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-[#637d9f]">{p.avatar || "Explorer"}</div>
                             </div>
                           </div>

@@ -745,10 +745,15 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                             )}
                           </div>
                           <h2
-                            className="font-[family-name:var(--font-fredoka)] text-lg sm:text-2xl font-black leading-tight drop-shadow-xs"
+                            className="font-[family-name:var(--font-fredoka)] text-lg sm:text-2xl font-black leading-tight drop-shadow-xs flex items-center gap-2"
                             style={{ color: activePlayer.color || "#002f76" }}
                           >
-                            {activePlayer.name}&apos;s Turn!
+                            <span>{activePlayer.name}&apos;s Turn!</span>
+                            {(activePlayer.isTestAccount || /gelo/i.test(activePlayer.name)) && (
+                              <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900 tracking-wide">
+                                Testing
+                              </span>
+                            )}
                           </h2>
                         </div>
                       </div>

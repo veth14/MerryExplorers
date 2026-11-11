@@ -29,6 +29,7 @@ type GamePlayer = {
   streak: number;
   maxStreak: number;
   rank?: number;
+  isTestAccount?: boolean;
 };
 
 type TrailblazerStudent = {
@@ -40,6 +41,7 @@ type TrailblazerStudent = {
   displayName: string;
   program: string;
   status: string;
+  isTestAccount?: boolean;
 };
 
 type GameSessionRecord = {
@@ -348,6 +350,10 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
       }
       const avatarIdx = players.length % DEFAULT_AVATARS.length;
       const avatarInfo = DEFAULT_AVATARS[avatarIdx];
+      const isTest = Boolean(
+        student.isTestAccount ||
+        /gelo/i.test(student.nickname || student.firstName)
+      );
       const newPlayer: GamePlayer = {
         studentId: student.id,
         name: student.nickname || student.firstName,
@@ -361,6 +367,7 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
         mistakesCount: 0,
         streak: 0,
         maxStreak: 0,
+        isTestAccount: isTest,
       };
       setPlayers([...players, newPlayer]);
     }
@@ -943,9 +950,16 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                               {isSelected ? "✓" : "+"}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-black truncate leading-tight">
-                                {student.nickname || student.firstName}
-                              </p>
+                              <div className="flex items-center gap-1.5 truncate">
+                                <p className="text-xs font-black truncate leading-tight">
+                                  {student.nickname || student.firstName}
+                                </p>
+                                {(student.isTestAccount || /gelo/i.test(student.nickname || student.firstName)) && (
+                                  <span className="rounded-full bg-amber-200/90 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-950 border border-amber-400 shrink-0">
+                                    Testing
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-[10px] text-slate-400 truncate leading-tight">
                                 {student.fullName}
                               </p>
@@ -1280,9 +1294,16 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                           </span>
                         )}
                         <RacePetPicture name={p.petName} color={p.color} background={p.bgLight} className="mx-auto mt-1 h-12 w-20" />
-                        <p className="text-xs sm:text-sm font-black truncate mt-1" style={{ color: p.color }}>
-                          {p.name}
-                        </p>
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          <p className="text-xs sm:text-sm font-black truncate" style={{ color: p.color }}>
+                            {p.name}
+                          </p>
+                          {(p.isTestAccount || /gelo/i.test(p.name)) && (
+                            <span className="rounded-full bg-amber-200/90 px-1 py-0.2 text-[8px] font-black uppercase text-amber-950">
+                              Test
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs font-black text-amber-600 flex items-center justify-center gap-1">
                           <span>⭐</span>
                           <span>{p.score}</span>
@@ -1302,10 +1323,15 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                   <div className="flex w-full flex-col items-center justify-center gap-2 sm:flex-row sm:gap-3 lg:flex-col lg:gap-2">
                     <RacePetPicture name={currentPlayer.petName} color={currentPlayer.color} background={currentPlayer.bgLight} className="h-12 w-16 shrink-0 sm:h-14 sm:w-20" />
                     <h2
-                      className="text-xl leading-tight sm:text-2xl font-[family-name:var(--font-fredoka)] font-black [overflow-wrap:anywhere]"
+                      className="text-xl leading-tight sm:text-2xl font-[family-name:var(--font-fredoka)] font-black [overflow-wrap:anywhere] flex items-center justify-center gap-2"
                       style={{ color: currentPlayer.color }}
                     >
-                      It&apos;s {currentPlayer.name}&apos;s Turn!
+                      <span>It&apos;s {currentPlayer.name}&apos;s Turn!</span>
+                      {(currentPlayer.isTestAccount || /gelo/i.test(currentPlayer.name)) && (
+                        <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900 tracking-wide">
+                          Testing
+                        </span>
+                      )}
                     </h2>
                     {currentPlayer.streak >= 2 && (
                       <span className="rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-amber-950 shadow-sm animate-pulse">

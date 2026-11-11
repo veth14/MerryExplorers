@@ -77,6 +77,7 @@ export type GamePlayer = {
   streak: number;
   maxStreak: number;
   rank?: number;
+  isTestAccount?: boolean;
 };
 
 export type TrailblazerStudent = {
@@ -91,6 +92,7 @@ export type TrailblazerStudent = {
   favoriteCharacter?: string | null;
   program: string;
   status: string;
+  isTestAccount?: boolean;
 };
 
 export type GamePhase = "setup" | "playing" | "racing" | "game_over";

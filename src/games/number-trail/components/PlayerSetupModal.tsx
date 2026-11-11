@@ -112,6 +112,10 @@ export function PlayerSetupModal({
     if (selectedPlayers.some((p) => p.studentId === student.id)) return;
 
     const avatar = DEFAULT_AVATARS[selectedPlayers.length % DEFAULT_AVATARS.length];
+    const isTest = Boolean(
+      student.isTestAccount ||
+      /gelo/i.test(student.nickname || student.firstName)
+    );
     const newPlayer: GamePlayer = {
       studentId: student.id,
       name: student.nickname || student.firstName,
@@ -125,6 +129,7 @@ export function PlayerSetupModal({
       mistakesCount: 0,
       streak: 0,
       maxStreak: 0,
+      isTestAccount: isTest,
     };
     onPlayersChange([...selectedPlayers, newPlayer]);
   };
@@ -425,6 +430,11 @@ export function PlayerSetupModal({
                         <span className="text-blue-600 font-black">+</span>
                       )}
                       <span>{student.nickname || student.firstName}</span>
+                      {(student.isTestAccount || /gelo/i.test(student.nickname || student.firstName)) && (
+                        <span className="rounded-full bg-amber-200/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-950 border border-amber-400 shrink-0">
+                          Testing
+                        </span>
+                      )}
                     </button>
                   );
                 })}

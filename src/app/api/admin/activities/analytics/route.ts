@@ -148,6 +148,7 @@ export async function GET(request: Request) {
       numberTrailMatches: number;
       lastPlayedAt: string;
       gameDistribution: Record<string, number>;
+      isTestAccount?: boolean;
       history: {
         sessionId: string;
         gameTitle: string;
@@ -204,7 +205,18 @@ export async function GET(request: Request) {
 
       const normName = (nickname || firstName).toLowerCase();
       if (seenRosterNames.has(normName)) return;
+
+      // Exclude Kaili (now a Creative Explorer)
+      if (/kaili|suaverdez/i.test(fullName) || /kaili/i.test(nickname)) return;
+
       seenRosterNames.add(normName);
+
+      const isTest = Boolean(
+        s.isTestAccount ||
+        (s as Record<string, unknown>).testAccount ||
+        /gelo/i.test(nickname) ||
+        /ian\s+angelo\s+valmores/i.test(fullName)
+      );
 
       const sId = s._id.toString();
       realRosterStudents.push({ id: sId, name: nickname });
@@ -227,6 +239,7 @@ export async function GET(request: Request) {
         lastPlayedAt: "",
         gameDistribution: {},
         history: [],
+        isTestAccount: isTest,
       });
     });
 
@@ -400,6 +413,7 @@ export async function GET(request: Request) {
           lastPlayedAt: "",
           gameDistribution: {},
           history: [],
+          isTestAccount: Boolean(/gelo/i.test(p.name)),
         };
 
         if (p.avatar) existing.avatar = p.avatar;
@@ -481,6 +495,7 @@ export async function GET(request: Request) {
           avgScore,
           favoriteGame,
           skillBadges,
+          isTestAccount: Boolean(entry.isTestAccount || /gelo/i.test(entry.name)),
         };
       })
       .sort((a, b) => {

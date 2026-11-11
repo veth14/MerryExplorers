@@ -44,6 +44,7 @@ export type GamePlayer = {
   streak: number;
   maxStreak: number;
   rank?: number;
+  isTestAccount?: boolean;
 };
 
 export type TrailblazerStudent = {
@@ -55,6 +56,7 @@ export type TrailblazerStudent = {
   displayName: string;
   program: string;
   status: string;
+  isTestAccount?: boolean;
 };
 
 export type GameSessionRecord = {
