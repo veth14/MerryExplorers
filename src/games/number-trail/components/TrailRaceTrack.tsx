@@ -45,6 +45,35 @@ function buildTrailPath(points: TrailPoint[]) {
 }
 
 const TRAIL_PATH = buildTrailPath(TRAIL_POINTS);
+const TRAIL_PATH_SAMPLES = TRAIL_POINTS.flatMap((point, index) => {
+  if (index === 0) return [point];
+  const previous = TRAIL_POINTS[index - 1];
+  const beforePrevious = TRAIL_POINTS[Math.max(0, index - 2)];
+  const next = TRAIL_POINTS[Math.min(TRAIL_POINTS.length - 1, index + 1)];
+  const controlOne = {
+    x: previous.x + (point.x - beforePrevious.x) / 6,
+    y: previous.y + (point.y - beforePrevious.y) / 6,
+  };
+  const controlTwo = {
+    x: point.x - (next.x - previous.x) / 6,
+    y: point.y - (next.y - previous.y) / 6,
+  };
+  return Array.from({ length: 24 }, (_, sampleIndex) => {
+    const t = (sampleIndex + 1) / 24;
+    const inverseT = 1 - t;
+    return {
+      x: inverseT ** 3 * previous.x + 3 * inverseT ** 2 * t * controlOne.x + 3 * inverseT * t ** 2 * controlTwo.x + t ** 3 * point.x,
+      y: inverseT ** 3 * previous.y + 3 * inverseT ** 2 * t * controlOne.y + 3 * inverseT * t ** 2 * controlTwo.y + t ** 3 * point.y,
+    };
+  });
+});
+const TRAIL_CUMULATIVE_LENGTHS = TRAIL_PATH_SAMPLES.reduce<number[]>((lengths, point, index) => {
+  if (index === 0) return [0];
+  const previous = TRAIL_PATH_SAMPLES[index - 1];
+  const segmentLength = Math.hypot(point.x - previous.x, point.y - previous.y);
+  return [...lengths, lengths[index - 1] + segmentLength];
+}, []);
+const TRAIL_TOTAL_LENGTH = TRAIL_CUMULATIVE_LENGTHS[TRAIL_CUMULATIVE_LENGTHS.length - 1];
 
 function TrailAnimal({ name, color, className = "", walking = false }: { name: string; color: string; className?: string; walking?: boolean }) {
   const kind = name.toLowerCase();
@@ -103,11 +132,17 @@ function TrailAnimal({ name, color, className = "", walking = false }: { name: s
 }
 
 function pointAtProgress(progress: number): TrailPoint {
-  const scaledProgress = Math.max(0, Math.min(1, progress)) * (TRAIL_POINTS.length - 1);
-  const segmentIndex = Math.min(TRAIL_POINTS.length - 2, Math.floor(scaledProgress));
-  const segmentProgress = scaledProgress - segmentIndex;
-  const start = TRAIL_POINTS[segmentIndex];
-  const end = TRAIL_POINTS[segmentIndex + 1];
+  const targetLength = Math.max(0, Math.min(1, progress)) * TRAIL_TOTAL_LENGTH;
+  const segmentIndex = Math.min(
+    TRAIL_PATH_SAMPLES.length - 2,
+    Math.max(0, TRAIL_CUMULATIVE_LENGTHS.findIndex((length) => length >= targetLength) - 1)
+  );
+  const start = TRAIL_PATH_SAMPLES[segmentIndex];
+  const end = TRAIL_PATH_SAMPLES[segmentIndex + 1];
+  const segmentLength = TRAIL_CUMULATIVE_LENGTHS[segmentIndex + 1] - TRAIL_CUMULATIVE_LENGTHS[segmentIndex];
+  const segmentProgress = segmentLength === 0
+    ? 0
+    : (targetLength - TRAIL_CUMULATIVE_LENGTHS[segmentIndex]) / segmentLength;
   return {
     x: start.x + (end.x - start.x) * segmentProgress,
     y: start.y + (end.y - start.y) * segmentProgress,
@@ -127,6 +162,8 @@ export function TrailRaceTrack({
   const activePlayer = players[activePlayerIndex];
   const activeCount = raceAnimationStarted ? raceMotion.toCount : raceMotion.fromCount;
   const explorerPoint = pointAtProgress(activeCount / steps);
+  const isWalking = raceAnimationStarted && !raceAnimationDone;
+  const allExplorersFinished = players.length > 0 && players.every((player) => player.correctCount >= steps);
 
   return (
     <section className="number-trail-journey relative isolate flex h-full min-h-[460px] w-full flex-col overflow-hidden rounded-[32px] border border-white/70 shadow-[0_24px_70px_rgba(24,63,46,.24)]">
@@ -168,8 +205,10 @@ export function TrailRaceTrack({
               <span className="text-xs font-black text-emerald-800">{activePlayer?.name}&apos;s adventure</span>
             </div>
             <h2 className="mt-1 font-[family-name:var(--font-fredoka)] text-lg font-black leading-tight text-[#123f31] sm:text-2xl">
-              {raceAnimationDone && raceMotion.willReachGoal
-                ? "You reached the treasure!"
+              {raceAnimationDone && allExplorersFinished
+                ? "Your whole crew found the treasure!"
+                : raceAnimationDone && raceMotion.willReachGoal
+                  ? `${activePlayer?.name} finished their trail!`
                 : raceAnimationStarted
                   ? `Walking to Step ${raceMotion.toCount}!`
                   : "Ready… set… let’s explore!"}
@@ -190,7 +229,7 @@ export function TrailRaceTrack({
         </div>
       </header>
 
-      <div className="relative z-10 min-h-0 flex-1">
+      <div className="pointer-events-none absolute inset-0 z-[5]">
         {/* Milestones sit on the path; the active mascot travels between them. */}
         {Array.from({ length: steps + 1 }).map((_, index) => {
           const point = pointAtProgress(index / steps);
@@ -201,7 +240,7 @@ export function TrailRaceTrack({
             <div
               key={`milestone-${index}`}
               className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-              style={{ left: `${point.x / 10}%`, top: `${point.y / 5}%` }}
+              style={{ left: `${point.x / 10}%`, top: `calc(10% + ${point.y * 0.164}%)` }}
             >
               <span className={`flex h-9 w-9 items-center justify-center rounded-[38%_46%_40%_48%] border-[3px] text-xs font-black shadow-lg transition-all sm:h-12 sm:w-12 ${
                 isGoal
@@ -232,7 +271,7 @@ export function TrailRaceTrack({
             <div
               key={`companion-${player.studentId ?? player.name}-${index}`}
               className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `calc(${point.x / 10}% + ${horizontalSpread}%)`, top: `calc(${point.y / 5}% - ${index % 2 ? 32 : -32}px)` }}
+              style={{ left: `calc(${point.x / 10}% + ${horizontalSpread}%)`, top: `calc(10% + ${point.y * 0.164}% - ${index % 2 ? 32 : -32}px)` }}
               title={`${player.name}: ${player.correctCount} steps`}
             >
               <span className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/80 bg-white/90 px-2 py-0.5 text-[9px] font-black text-slate-800 shadow-sm">
@@ -243,42 +282,59 @@ export function TrailRaceTrack({
           );
         })}
 
-        <div
-          className="trail-explorer-mover absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-[left,top] duration-[1600ms] ease-in-out"
-          style={{ left: `${explorerPoint.x / 10}%`, top: `${explorerPoint.y / 5}%` }}
-        >
-          {activePlayer && (
-            <div className={`relative ${raceAnimationStarted ? "" : "pet-race-ready"}`}>
-              <span className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-white bg-white px-3 py-1 text-[10px] font-black text-emerald-900 shadow-lg sm:-top-6 sm:text-xs">
-                {activePlayer.name}
-              </span>
-              <TrailAnimal
-                name={activePlayer.petName || activePlayer.name}
-                color={activePlayer.color}
-                walking={raceAnimationStarted && !raceAnimationDone}
-                className="h-[72px] w-[96px] drop-shadow-2xl sm:h-[92px] sm:w-[124px]"
+        {activePlayer && (
+          <svg
+            role="img"
+            aria-label={`${activePlayer.name} walking along the forest trail`}
+            viewBox="0 0 1000 500"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-x-0 top-[10%] z-20 h-[82%] w-full overflow-visible"
+          >
+            <g transform={isWalking ? undefined : `translate(${explorerPoint.x} ${explorerPoint.y})`}>
+              <foreignObject x="-44" y="-58" width="88" height="92" overflow="visible">
+                <div xmlns="http://www.w3.org/1999/xhtml" className={`flex h-full w-full flex-col items-center justify-end ${isWalking ? "" : "pet-race-ready"}`}>
+                  <span className="mb-0.5 whitespace-nowrap rounded-full border border-white bg-white/95 px-2 py-0.5 text-[7px] font-black text-emerald-950 shadow-md">
+                    {activePlayer.name}
+                  </span>
+                  <TrailAnimal
+                    name={activePlayer.petName || activePlayer.name}
+                    color={activePlayer.color}
+                    walking={isWalking}
+                    className="h-[72px] w-[84px] drop-shadow-2xl"
+                  />
+                </div>
+              </foreignObject>
+              <animateMotion
+                key={`${raceMotion.fromCount}-${raceMotion.toCount}`}
+                path={TRAIL_PATH}
+                keyPoints={`${raceMotion.fromCount / steps};${raceMotion.fromCount / steps};${raceMotion.toCount / steps}`}
+                keyTimes="0;0.347;1"
+                calcMode="linear"
+                dur="2450ms"
+                begin="0s"
+                fill="freeze"
+                rotate="0"
               />
-              {raceAnimationStarted && !raceAnimationDone && (
-                <span aria-hidden="true" className="absolute bottom-2 left-0 h-2 w-2 rounded-full bg-amber-100 shadow-[0_0_14px_5px_rgba(255,239,148,.65)]" />
-              )}
-            </div>
-          )}
-        </div>
+            </g>
+          </svg>
+        )}
       </div>
 
       <footer className="relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 p-4 sm:p-6">
         <div className="rounded-2xl border border-white/75 bg-white/90 px-4 py-2.5 text-sm font-bold text-[#304e3b] shadow-lg backdrop-blur-md">
           {raceAnimationDone
-            ? raceMotion.willReachGoal
-              ? "Amazing exploring! You found the trail treasure!"
-              : "Great walking! Ready for the next explorer?"
+            ? allExplorersFinished
+              ? "Everyone reached the treasure together. You’re all trail champions!"
+              : raceMotion.willReachGoal
+                ? `${activePlayer?.name} finished their trail. Cheer on the next explorer!`
+                : "Great walking! Ready for the next explorer?"
             : raceAnimationStarted
               ? `${activePlayer?.name} is on the way to the next trail marker!`
               : "You got it right! Watch your explorer get ready to walk."}
         </div>
         {raceAnimationDone ? (
           <button type="button" onClick={onContinue} className="min-h-12 rounded-2xl border-b-4 border-emerald-950 bg-emerald-800 px-6 py-3 text-sm font-black text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-emerald-900 active:translate-y-1 active:border-b-0">
-            {raceMotion.willReachGoal ? "See the winners 🏆" : "Next explorer →"}
+            {allExplorersFinished ? "Celebrate together 🏆" : "Next explorer →"}
           </button>
         ) : (
           <span className="rounded-full border border-white/75 bg-emerald-100/95 px-5 py-3 text-sm font-black text-emerald-900 shadow-lg">

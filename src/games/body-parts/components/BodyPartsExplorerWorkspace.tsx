@@ -448,25 +448,12 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
     setIsSaving(true);
     try {
       const token = await user?.getIdToken();
-      const sorted = [...players].sort((a, b) => b.score - a.score);
-      const rankedPlayers = players.map((p) => {
-        const rank = sorted.findIndex((s) => s.name === p.name) + 1;
-        return { ...p, rank };
-      });
-
-      const finishLineWinners = [...players]
-        .filter((player) => player.correctCount >= roundsPerPlayer)
-        .sort((a, b) => b.score - a.score);
-      const winner = finishLineWinners[0]
-        ? { name: finishLineWinners[0].name, score: finishLineWinners[0].score, avatar: finishLineWinners[0].avatar }
-        : { name: "No finish-line winner", score: 0, avatar: "" };
-
       const payload = {
         gameType: "body-parts",
         gameTitle: gameMode === "pictures" ? "Body Parts Race - Picture Match" : "Body Parts Race - Body Map",
         roundsTotal: roundsPerPlayer,
-        players: rankedPlayers,
-        winner,
+        players,
+        winner: null,
         notes: `Played in ${gameMode === "pictures" ? "Picture Match" : "Body Map"} mode with ${players.length} Trailblazers across ${roundsPerPlayer} rounds per child.`,
       };
 
@@ -657,8 +644,8 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
   };
 
   const currentPlayer = players[currentPlayerIdx] || players[0];
-  const finishLineWinners = players.filter((player) => player.correctCount >= roundsPerPlayer);
-  const allPlayersFinished = players.length > 0 && finishLineWinners.length === players.length;
+  const finishedPlayers = players.filter((player) => player.correctCount >= roundsPerPlayer);
+  const allPlayersFinished = players.length > 0 && finishedPlayers.length === players.length;
   const selectedLearnPart = BODY_PARTS.find((part) => part.id === selectedLearnPartId) || BODY_PARTS[0];
   const activeLearnCategory = LEARN_CATEGORIES.find((category) => category.category === selectedLearnPart.category) || LEARN_CATEGORIES[0];
 
@@ -1169,7 +1156,7 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                       <div>
                         <span className="text-xs font-black uppercase tracking-[.16em] text-emerald-700">Correct answer!</span>
                         <h2 className="font-[family-name:var(--font-fredoka)] text-2xl font-black text-[#002f76] sm:text-4xl">{raceAnimationStarted ? `${currentPlayer.name}'s pet is racing!` : "Ready… set… watch it go!"}</h2>
-                        <p aria-live="polite" className="text-sm font-bold text-slate-600">{raceAnimationDone ? "You crossed the finish line! You are a winner!" : raceAnimationStarted ? "Your pet is racing toward the finish!" : "Get ready! Your pet is about to race!"}</p>
+                    <p aria-live="polite" className="text-sm font-bold text-slate-600">{raceAnimationDone ? `${currentPlayer.name} finished this round! The whole crew is getting there together.` : raceAnimationStarted ? "Your pet is racing toward the finish!" : "Get ready! Your pet is about to race!"}</p>
                       </div>
                     </div>
                     <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-5 py-3 text-center shadow-sm">
@@ -1196,7 +1183,7 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                           <div key={`${player.studentId ?? player.name}-${index}`} className={`relative rounded-2xl border-2 p-2.5 shadow-sm sm:p-3 ${index === raceMotion.playerIndex ? "border-amber-400 bg-amber-50/95 ring-2 ring-amber-200" : "border-white bg-white/85"}`}>
                             <div className="mb-1 flex items-center justify-between gap-2 px-1">
                               <span className="truncate text-sm font-black" style={{ color: player.color }}>{player.name}</span>
-                              <span className={`shrink-0 text-xs font-black ${isFinisher ? "text-emerald-700" : "text-slate-500"}`}>{isFinisher ? "FINISHED — WINNER" : `${count} of ${roundsPerPlayer}`}</span>
+                              <span className={`shrink-0 text-xs font-black ${isFinisher ? "text-emerald-700" : "text-slate-500"}`}>{isFinisher ? "FINISHED ✓" : `${count} of ${roundsPerPlayer}`}</span>
                             </div>
                             <div className="relative h-[82px] overflow-hidden rounded-full border-2 border-[#a96e39] shadow-inner sm:h-[92px]" style={{ backgroundImage: "repeating-linear-gradient(180deg, #d8a66b 0 23px, #c88e55 23px 46px)" }}>
                               <div aria-hidden="true" className="absolute inset-x-0 top-1/2 border-t-[3px] border-dashed border-white/90" />
@@ -1224,10 +1211,10 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                   </div>
 
                   <footer className="relative mt-5 flex flex-col items-center gap-3 rounded-3xl border-2 border-white/80 bg-white/90 p-4 text-center shadow-lg sm:flex-row sm:justify-between sm:text-left">
-                    <p className="text-sm font-bold text-slate-700">Every racer can win by reaching the finish line. The next turn starts when you are ready.</p>
+                    <p className="text-sm font-bold text-slate-700">Everyone gets to finish the full trail. Keep cheering each explorer on!</p>
                     {raceAnimationDone ? (
                       <button type="button" onClick={(event) => { event.stopPropagation(); continueAfterRace(); }} className="min-h-14 w-full touch-manipulation rounded-2xl border-b-4 border-emerald-800 bg-emerald-600 px-8 py-3 text-lg font-black text-white shadow-lg transition hover:bg-emerald-700 active:translate-y-1 active:border-b-0 sm:w-auto">
-                        {raceMotion.toCount >= roundsPerPlayer ? "Winner! Next racer" : "Next racer →"}
+                        {"Next explorer →"}
                       </button>
                     ) : (
                       <span className="inline-flex min-h-12 items-center rounded-2xl bg-sky-100 px-5 text-sm font-black text-sky-900">Watch the race…</span>
@@ -1406,99 +1393,44 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
             {/* PHASE 3: GAME OVER & TROPHY PODIUM                              */}
             {/* ─────────────────────────────────────────────────────────────── */}
             {phase === "game_over" && (
-              <div className="w-full space-y-6">
+              <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-stretch gap-4 py-2 lg:grid-cols-2">
                 {/* Podium Stage Card */}
-                <div className="rounded-3xl bg-white/95 backdrop-blur-md p-6 sm:p-8 border-4 border-amber-400 shadow-2xl text-center relative overflow-hidden">
-                  <h2 className="text-2xl sm:text-4xl font-[family-name:var(--font-fredoka)] font-black text-[#002f76] tracking-tight">
-                    {allPlayersFinished ? "Everyone crossed the finish line!" : finishLineWinners.length > 0 ? "Finish-line winners!" : "Race results"}
+                <div className="relative overflow-hidden rounded-3xl border-4 border-amber-300 bg-gradient-to-br from-[#074577] via-[#087c91] to-[#176e70] p-4 text-center text-white shadow-2xl sm:p-6">
+                  <span aria-hidden="true" className="pointer-events-none absolute -right-2 top-2 text-5xl opacity-40">✨</span>
+                  <span aria-hidden="true" className="pointer-events-none absolute bottom-2 left-3 text-4xl opacity-35">🌟</span>
+                  <h2 className="relative font-[family-name:var(--font-fredoka)] text-2xl font-black tracking-tight text-white sm:text-4xl">
+                    {allPlayersFinished ? "Everyone is a champion!" : "Keep exploring together!"}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-600 font-bold">
-                    {finishLineWinners.length === 0
-                      ? "No finish-line winners yet. Keep racing until every pet reaches the line!"
-                      : `${finishLineWinners.length} of ${players.length} racers crossed the finish. Every racer who reaches the line is a winner.`}
+                  <p className="relative mt-1 text-sm font-bold text-sky-50">
+                    {allPlayersFinished
+                      ? `All ${players.length} explorers finished every round together. You did it as a team!`
+                      : `${finishedPlayers.length} of ${players.length} explorers have finished so far. Keep going until everyone completes the trail.`}
                   </p>
 
                   {/* 1st, 2nd, 3rd Podium */}
-                  {finishLineWinners.length === 0 ? (
-                    <div className="mt-8 rounded-2xl bg-sky-50 p-6 text-center text-lg font-black text-sky-900">The race only ends when every pet crosses the finish line.</div>
-                  ) : (() => {
-                    const sorted = [...finishLineWinners].sort((a, b) => b.score - a.score);
-                    const first = sorted[0];
-                    const second = sorted[1];
-                    const third = sorted[2];
-
-                    return (
-                      <div className="mt-8 flex items-end justify-center gap-3 sm:gap-6 max-w-lg mx-auto">
-                        {/* 2nd Place */}
-                        {second && (
-                          <div className="flex-1 flex flex-col items-center">
-                            <RacePetPicture name={second.petName} color={second.color} background={second.bgLight} className="mb-1 h-14 w-20" />
-                            <p className="text-xs sm:text-sm font-black truncate max-w-[95px] text-slate-800">
-                              {second.name}
-                            </p>
-                            <span className="text-xs font-black text-amber-600">
-                              {second.score} pts
-                            </span>
-                            <div className="w-full h-24 sm:h-28 bg-gradient-to-t from-slate-300 to-slate-200 rounded-t-2xl mt-2 flex flex-col items-center justify-center border-t-4 border-slate-400 shadow-inner">
-                              <span className="text-3xl">🥈</span>
-                              <span className="text-xs font-black uppercase text-slate-700">2nd</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 1st Place Champion */}
-                        {first && (
-                          <div className="flex-1 flex flex-col items-center -mt-6">
-                            <RacePetPicture name={first.petName} color={first.color} background={first.bgLight} className="mb-1 h-16 w-24" />
-                            <p className="text-sm sm:text-base font-black truncate max-w-[120px] text-amber-700">
-                              {first.name}
-                            </p>
-                            <span className="text-sm font-black text-amber-600">
-                              {first.score} pts
-                            </span>
-                            <div className="w-full h-32 sm:h-38 bg-gradient-to-t from-amber-400 via-amber-300 to-yellow-200 rounded-t-2xl mt-2 flex flex-col items-center justify-center border-t-4 border-amber-500 shadow-md">
-                              <span className="text-4xl animate-pulse">🥇</span>
-                              <span className="text-xs sm:text-sm font-black uppercase text-amber-950">
-                                Champion
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 3rd Place */}
-                        {third && (
-                          <div className="flex-1 flex flex-col items-center">
-                            <RacePetPicture name={third.petName} color={third.color} background={third.bgLight} className="mb-1 h-14 w-20" />
-                            <p className="text-xs sm:text-sm font-black truncate max-w-[95px] text-slate-800">
-                              {third.name}
-                            </p>
-                            <span className="text-xs font-black text-amber-600">
-                              {third.score} pts
-                            </span>
-                            <div className="w-full h-20 sm:h-24 bg-gradient-to-t from-amber-200 to-amber-100 rounded-t-2xl mt-2 flex flex-col items-center justify-center border-t-4 border-amber-600 shadow-inner">
-                              <span className="text-3xl">🥉</span>
-                              <span className="text-xs font-black uppercase text-amber-900">3rd</span>
-                            </div>
-                          </div>
-                        )}
+                  <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {players.map((player, index) => (
+                      <div key={`${player.studentId ?? player.name}-${index}`} className="flex min-w-0 flex-col items-center rounded-2xl border border-amber-200 bg-gradient-to-b from-white/95 to-amber-50/95 px-2 py-3 shadow-sm">
+                        <span className="mb-1 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-amber-900">🏆 Champion</span>
+                        <RacePetPicture name={player.petName} color={player.color} background={player.bgLight} className="h-14 w-20 sm:h-16 sm:w-24" />
+                        <p className="mt-1 max-w-full truncate text-sm font-black text-slate-800">{player.name}</p>
+                        <span className="text-xs font-black text-amber-700">⭐ {player.score} pts</span>
                       </div>
-                    );
-                  })()}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Scorecard List */}
-                <div className="rounded-3xl bg-white/95 backdrop-blur-md p-5 sm:p-6 border-4 border-emerald-300 shadow-xl">
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 mb-3">
-                    🎖️ All Explorers Scorecard
+                <div className="rounded-3xl border-2 border-emerald-200 bg-gradient-to-br from-white via-white to-emerald-50/80 p-4 shadow-xl backdrop-blur-md sm:p-5">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-emerald-950">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100">🎖️</span> All Explorers Scorecard
                   </h3>
                   <div className="divide-y divide-slate-100">
-                    {[...players]
-                      .sort((a, b) => b.score - a.score)
-                      .map((p, idx) => (
-                        <div key={idx} className="py-3 flex items-center justify-between">
+                    {players.map((p, idx) => (
+                        <div key={idx} className="flex items-center justify-between rounded-2xl px-2 py-2.5 transition-colors hover:bg-emerald-50/80">
                           <div className="flex items-center gap-3">
                             <span className="w-6 text-sm font-black text-slate-400">
-                              #{idx + 1}
+                              🐾
                             </span>
                             <RacePetPicture name={p.petName} color={p.color} background={p.bgLight} className="h-12 w-16" />
                             <div>
@@ -1514,7 +1446,7 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                               <span>⭐</span> {p.score} pts
                             </span>
                             <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              {p.correctCount >= roundsPerPlayer ? "Finish-line winner" : "Super Explorer"}
+                              {p.correctCount >= roundsPerPlayer ? "Trail champion" : "Still exploring"}
                             </span>
                           </div>
                         </div>
@@ -1523,7 +1455,7 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                 </div>
 
                 {/* Save & Play Again Actions */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/95 backdrop-blur-md p-5 rounded-3xl border-4 border-sky-300 shadow-xl">
+                <div className="col-span-1 flex flex-col items-center justify-between gap-3 rounded-3xl border-4 border-sky-300 bg-white/95 p-4 shadow-xl backdrop-blur-md sm:flex-row lg:col-span-2">
                   <div className="flex items-center gap-2">
                     {saveSuccess ? (
                       <span className="text-xs font-black text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">

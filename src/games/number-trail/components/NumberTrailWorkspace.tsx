@@ -18,7 +18,7 @@ import {
 } from "../types";
 import { CHEER_PHRASES } from "../data";
 import { generateNumberChallenge } from "../utils/challenge-generator";
-import { calculateAnswerScore, rankPlayers } from "../utils/scoring";
+import { calculateAnswerScore } from "../utils/scoring";
 import { ConfettiEffect } from "./ConfettiEffect";
 import { TrailRaceTrack } from "./TrailRaceTrack";
 import { ChallengeDisplay } from "./ChallengeDisplay";
@@ -41,6 +41,14 @@ import {
 type NumberTrailWorkspaceProps = {
   mode: "admin" | "teacher";
 };
+
+function findNextUnfinishedPlayerIndex(players: GamePlayer[], currentIndex: number, stepsPerPlayer: number) {
+  for (let offset = 1; offset <= players.length; offset += 1) {
+    const candidateIndex = (currentIndex + offset) % players.length;
+    if (players[candidateIndex].correctCount < stepsPerPlayer) return candidateIndex;
+  }
+  return -1;
+}
 
 export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
   const { user } = useAuth();
@@ -227,20 +235,21 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
   // ─── Race Phase Handlers ───────────────────────────────────────────────────
   const handleContinueAfterRace = useCallback(() => {
     if (!raceMotion) return;
-    if (raceMotion.willReachGoal) {
+    const everyoneFinished = players.length > 0 && players.every((player) => player.correctCount >= roundsPerPlayer);
+    if (everyoneFinished) {
       if (soundEnabled) {
         GameAudio.playVictoryFanfare();
       }
-      const ranked = rankPlayers(players);
-      setPlayers(ranked);
       setPhase("game_over");
     } else {
-      const nextIndex = (raceMotion.playerIndex + 1) % players.length;
-      setActivePlayerIndex(nextIndex);
-      setPhase("playing");
-      nextTurnChallenge(nextIndex);
+      const nextIndex = findNextUnfinishedPlayerIndex(players, raceMotion.playerIndex, roundsPerPlayer);
+      if (nextIndex >= 0) {
+        setActivePlayerIndex(nextIndex);
+        setPhase("playing");
+        nextTurnChallenge(nextIndex);
+      }
     }
-  }, [raceMotion, soundEnabled, players, nextTurnChallenge]);
+  }, [raceMotion, soundEnabled, players, roundsPerPlayer, nextTurnChallenge]);
 
   useEffect(() => {
     if (phase !== "racing" || !raceMotion) return;
@@ -344,9 +353,11 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
       setPlayers(updatedPlayers);
 
       setTimeout(() => {
-        const nextIndex = (activePlayerIndex + 1) % updatedPlayers.length;
-        setActivePlayerIndex(nextIndex);
-        nextTurnChallenge(nextIndex);
+        const nextIndex = findNextUnfinishedPlayerIndex(updatedPlayers, activePlayerIndex, roundsPerPlayer);
+        if (nextIndex >= 0) {
+          setActivePlayerIndex(nextIndex);
+          nextTurnChallenge(nextIndex);
+        }
       }, 1400);
     }
   };
@@ -368,7 +379,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     setIsSavingSession(true);
     try {
       const headers = await getAuthHeaders();
-      const ranked = rankPlayers(players);
       const res = await fetch("/api/admin/activities/number-trail/scores", {
         method: "POST",
         headers: {
@@ -379,8 +389,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
           gameType: "number-trail",
           gameTitle: "Number Trail",
           roundsTotal: roundsPerPlayer,
-          players: ranked,
-          winner: ranked[0] || null,
+          players,
+          winner: null,
           notes,
         }),
       });
@@ -591,7 +601,9 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
             <div
               className={`relative z-10 mx-auto flex w-full flex-col justify-between p-3 sm:p-5 md:p-6 ${
-                isFullscreen ? "h-full max-w-none overflow-hidden px-3 py-2 sm:px-5 sm:py-3" : "min-h-[580px] max-w-6xl"
+                isFullscreen
+                  ? `h-full px-3 py-2 sm:px-5 sm:py-3 ${phase === "game_over" ? "max-w-7xl overflow-y-auto" : "max-w-none overflow-hidden"}`
+                  : "min-h-[580px] max-w-6xl"
               }`}
             >
               {/* Fullscreen Floating Controls Bar (Only visible in fullscreen) */}
@@ -785,7 +797,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
               {/* Phase 3: Victory Podium (Full Width) */}
               {phase === "game_over" && (
-                <div className="rounded-[36px] border-[4px] border-white/80 bg-white/95 backdrop-blur-md shadow-2xl p-4 sm:p-8 my-auto">
+                <div className="my-auto w-full rounded-[36px] border-[4px] border-white/80 bg-white/95 p-2 shadow-2xl backdrop-blur-md sm:p-4">
                   <GameOverPodium
                     players={players}
                     roundsTotal={roundsPerPlayer}
