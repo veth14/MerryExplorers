@@ -250,6 +250,26 @@ export async function GET(request: Request) {
       }
     >();
 
+    // Pre-populate continuous timeline days so charts have smooth continuity
+    const timelineSpanDays = timeRange === "today" ? 1 : timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 14;
+    for (let i = timelineSpanDays - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dateKey = d.toISOString().split("T")[0];
+      timelineMap.set(dateKey, {
+        date: dateKey,
+        label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        dayOfWeek: d.toLocaleDateString("en-US", { weekday: "short" }),
+        sessions: 0,
+        stars: 0,
+        bodyParts: 0,
+        numberTrail: 0,
+        players: 0,
+        correct: 0,
+        mistakes: 0,
+      });
+    }
+
     // Score & Streak Distribution Buckets
     const scoreBuckets = {
       "1–2 Stars": 0,

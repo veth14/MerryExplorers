@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 
@@ -230,6 +231,37 @@ function ChevronRightIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function FlameIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M12 2c-.6 2.3-2.5 4.5-4.1 6.5C6.3 10.6 5 13 5 15.5 5 19.1 7.9 22 11.5 22s6.5-2.9 6.5-6.5c0-1.6-.6-3.2-1.7-4.5-1.5-1.9-3.2-4.1-4.3-9z" />
+    </svg>
+  );
+}
+
+// ─── BEZIER CURVE GENERATOR FOR AREA CHARTS ───────────────────────────────────
+
+function generateSplinePath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 export function GamesAnalyticsDashboard() {
@@ -238,7 +270,7 @@ export function GamesAnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState<"all" | "30d" | "14d" | "7d" | "today">("14d");
   const [gameFilter, setGameFilter] = useState<"all" | "number-trail" | "body-parts">("all");
   const [timelineMetric, setTimelineMetric] = useState<"sessions" | "stars">("sessions");
-  const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -361,51 +393,96 @@ export function GamesAnalyticsDashboard() {
     return (data?.recentSessions || []).filter((s) => s.gameType === "number-trail").length;
   }, [data?.recentSessions]);
 
+  // Geometry computation for Spline Line & Area
+  const { splinePath, areaPath, pointsCoords } = useMemo(() => {
+    if (!data?.timeline || data.timeline.length === 0) {
+      return { splinePath: "", areaPath: "", pointsCoords: [] };
+    }
+
+    const chartWidth = 750;
+    const chartHeight = 165;
+    const startX = 55;
+    const baseY = 195;
+    const total = data.timeline.length;
+    const step = chartWidth / Math.max(total, 1);
+
+    const coords = data.timeline.map((point, i) => {
+      const x = startX + i * step + step / 2;
+      const val = timelineMetric === "sessions" ? point.sessions : point.stars;
+      const h = (val / timelineMax) * chartHeight;
+      const y = baseY - h;
+      return { x, y, val, point, step };
+    });
+
+    const spline = generateSplinePath(coords.map((c) => ({ x: c.x, y: c.y })));
+    const firstX = coords[0].x;
+    const lastX = coords[coords.length - 1].x;
+    const area = `${spline} L ${lastX} ${baseY} L ${firstX} ${baseY} Z`;
+
+    return { splinePath: spline, areaPath: area, pointsCoords: coords };
+  }, [data?.timeline, timelineMetric, timelineMax]);
+
   return (
     <AppShell
       title="Games Analytics"
       description="Classroom learning analytics, student mastery, and performance insights."
     >
-      <div className="w-full space-y-7 pb-16 sm:space-y-9">
-        {/* ─── Top Executive Header ─── */}
-        <header className="relative flex flex-col justify-between gap-5 rounded-[32px] border border-[#cbe0f5] bg-gradient-to-br from-[#002f76] via-[#003d99] to-[#014fb8] p-6 text-white shadow-[0_18px_45px_rgba(0,47,118,0.24)] sm:p-8 lg:flex-row lg:items-center">
-          <div className="relative z-10 max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-3.5 py-1 text-[11px] font-black uppercase tracking-[.18em] text-[#ffdd80] shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-[#ffb800] shadow-[0_0_8px_#ffb800]" />
-              Classroom & Learning Analytics
-            </span>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[40px] lg:leading-[1.12]">
-              Games & Activities Analytics
-            </h1>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-blue-100 sm:text-base">
-              Synchronized metrics across Number Trail Adventure and Body Parts Explorer. Live student performance, accuracy rates, and milestone achievements.
-            </p>
-          </div>
+      <div className="w-full space-y-8 pb-16 sm:space-y-10">
+        {/* ─── Hero Header Card ─── */}
+        <motion.header
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-[32px] border border-[#cbe0f5] bg-gradient-to-br from-[#002f76] via-[#003d99] to-[#014fb8] p-6 text-white shadow-[0_20px_50px_rgba(0,47,118,0.22)] sm:p-8 lg:p-9"
+        >
+          {/* Subtle decorative background light */}
+          <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 right-48 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
 
-          <div className="relative z-10 flex flex-wrap items-center gap-3">
-            <Link
-              href="/teacher/activities"
-              className="inline-flex items-center gap-2.5 rounded-2xl bg-[#ffbd22] px-5 py-3 text-xs font-black text-[#523500] shadow-[0_8px_20px_rgba(255,189,34,0.35)] transition duration-200 hover:brightness-110 active:scale-95"
-            >
-              <PlayIcon className="h-4 w-4" />
-              <span>Launch Teacher Game Hub</span>
-            </Link>
+          <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+            <div className="max-w-2xl">
+              <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-3.5 py-1 text-[11px] font-black uppercase tracking-[.18em] text-[#ffdd80] shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-[#ffb800] shadow-[0_0_10px_#ffb800] animate-pulse" />
+                Classroom & Learning Analytics
+              </span>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[42px] lg:leading-[1.12]">
+                Games & Activities Analytics
+              </h1>
+              <p className="mt-2.5 text-sm font-medium leading-relaxed text-blue-100/90 sm:text-base">
+                Live performance data across Number Trail Adventure & Body Parts Explorer. Real-time accuracy metrics, student mastery milestones, and session histories.
+              </p>
+            </div>
 
-            <button
-              type="button"
-              onClick={fetchAnalytics}
-              disabled={isLoading}
-              title="Refresh Analytics"
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-4 py-3 text-xs font-bold text-white shadow-xs backdrop-blur-sm transition hover:bg-white/20 active:scale-95 disabled:opacity-50"
-            >
-              <RefreshIcon className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/teacher/activities"
+                className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-r from-[#ffc83b] to-[#ffb800] px-5 py-3 text-xs font-black text-[#4d3200] shadow-[0_8px_24px_rgba(255,184,0,0.38)] transition duration-200 hover:brightness-105 active:scale-95"
+              >
+                <PlayIcon className="h-4 w-4 transition-transform group-hover:scale-110" />
+                <span>Launch Teacher Game Hub</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={fetchAnalytics}
+                disabled={isLoading}
+                title="Refresh Analytics"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-bold text-white shadow-xs backdrop-blur-md transition hover:bg-white/20 active:scale-95 disabled:opacity-50"
+              >
+                <RefreshIcon className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
           </div>
-        </header>
+        </motion.header>
 
         {/* ─── Filter Bar ─── */}
-        <div className="flex flex-col justify-between gap-4 rounded-3xl border border-[#dbe4f1] bg-white p-4 shadow-[0_6px_20px_rgba(0,47,118,0.04)] sm:flex-row sm:items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.05 }}
+          className="flex flex-col justify-between gap-4 rounded-3xl border border-[#dbe4f1] bg-white p-4 shadow-[0_6px_22px_rgba(0,47,118,0.04)] sm:flex-row sm:items-center"
+        >
           {/* Time Range Selector */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             <span className="mr-2 text-[11px] font-black uppercase tracking-wider text-[#637d9f]">Time Range:</span>
@@ -420,7 +497,7 @@ export function GamesAnalyticsDashboard() {
                 key={t.id}
                 type="button"
                 onClick={() => setTimeRange(t.id as typeof timeRange)}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
+                className={`relative rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
                   timeRange === t.id
                     ? "bg-[#002f76] text-white shadow-xs"
                     : "text-[#476082] hover:bg-[#f0f4fa]"
@@ -433,7 +510,7 @@ export function GamesAnalyticsDashboard() {
 
           {/* Game Filter Selector */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            <span className="mr-2 text-[11px] font-black uppercase tracking-wider text-[#637d9f]">Filter Activity:</span>
+            <span className="mr-2 text-[11px] font-black uppercase tracking-wider text-[#637d9f]">Activity:</span>
             {[
               { id: "all", label: "All Activities" },
               { id: "body-parts", label: "Body Parts" },
@@ -453,15 +530,20 @@ export function GamesAnalyticsDashboard() {
               </button>
             ))}
           </div>
-        </div>
+        </motion.div>
 
-        {/* ─── SECTION 1: Executive KPI Metrics Grid ─── */}
+        {/* ─── SECTION 1: Top Executive KPI Cards ─── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {/* KPI 1: Sessions */}
-          <div className="group rounded-[24px] border border-[#d6e3f2] bg-white p-5 shadow-[0_6px_20px_rgba(0,47,118,0.04)] transition hover:-translate-y-0.5 hover:shadow-md">
+          {/* Card 1: Total Sessions */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.08 }}
+            className="group rounded-[24px] border border-[#d6e3f2] bg-white p-5 shadow-[0_6px_20px_rgba(0,47,118,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,47,118,0.09)] hover:border-[#b8d4f4]"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black uppercase tracking-wider text-[#6480a4]">Total Sessions</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#eaf3fe] text-[#002f76]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#eaf3fe] text-[#002f76] transition-transform group-hover:scale-110">
                 <GamepadIcon className="h-4.5 w-4.5" />
               </span>
             </div>
@@ -469,15 +551,20 @@ export function GamesAnalyticsDashboard() {
               {isLoading ? "–" : (data?.kpis.totalSessions ?? 0).toLocaleString()}
             </div>
             <div className="mt-1 text-[11px] font-bold text-[#6680a3]">
-              Recorded classroom games
+              Classroom matches
             </div>
-          </div>
+          </motion.div>
 
-          {/* KPI 2: Total Stars */}
-          <div className="group rounded-[24px] border border-amber-200 bg-gradient-to-br from-[#fffdf5] via-white to-white p-5 shadow-[0_6px_20px_rgba(245,158,11,0.06)] transition hover:-translate-y-0.5 hover:shadow-md">
+          {/* Card 2: Total Stars */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.12 }}
+            className="group rounded-[24px] border border-amber-200 bg-gradient-to-br from-[#fffdf5] via-white to-white p-5 shadow-[0_6px_20px_rgba(245,158,11,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(245,158,11,0.12)] hover:border-amber-300"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black uppercase tracking-wider text-amber-800">Stars Earned</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 transition-transform group-hover:scale-110">
                 <StarIcon className="h-4.5 w-4.5" />
               </span>
             </div>
@@ -485,15 +572,20 @@ export function GamesAnalyticsDashboard() {
               {isLoading ? "–" : (data?.kpis.totalStars ?? 0).toLocaleString()}
             </div>
             <div className="mt-1 text-[11px] font-bold text-amber-800/80">
-              ~{(data?.kpis.avgStarsPerSession ?? 0).toLocaleString()} stars / session
+              ~{(data?.kpis.avgStarsPerSession ?? 0).toLocaleString()} / session
             </div>
-          </div>
+          </motion.div>
 
-          {/* KPI 3: Explorers */}
-          <div className="group rounded-[24px] border border-emerald-200 bg-gradient-to-br from-[#f6fdf9] via-white to-white p-5 shadow-[0_6px_20px_rgba(16,185,129,0.06)] transition hover:-translate-y-0.5 hover:shadow-md">
+          {/* Card 3: Active Explorers */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.16 }}
+            className="group rounded-[24px] border border-emerald-200 bg-gradient-to-br from-[#f6fdf9] via-white to-white p-5 shadow-[0_6px_20px_rgba(16,185,129,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(16,185,129,0.12)] hover:border-emerald-300"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800">Active Explorers</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 transition-transform group-hover:scale-110">
                 <UsersIcon className="h-4.5 w-4.5" />
               </span>
             </div>
@@ -503,13 +595,18 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-emerald-800/80">
               {data?.kpis.totalPlayersEngaged ?? 0} participant turns
             </div>
-          </div>
+          </motion.div>
 
-          {/* KPI 4: Overall Accuracy */}
-          <div className="group rounded-[24px] border border-indigo-200 bg-gradient-to-br from-[#f8f9ff] via-white to-white p-5 shadow-[0_6px_20px_rgba(99,102,241,0.06)] transition hover:-translate-y-0.5 hover:shadow-md">
+          {/* Card 4: Overall Accuracy */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.2 }}
+            className="group rounded-[24px] border border-indigo-200 bg-gradient-to-br from-[#f8f9ff] via-white to-white p-5 shadow-[0_6px_20px_rgba(99,102,241,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(99,102,241,0.12)] hover:border-indigo-300"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase tracking-wider text-indigo-800">Overall Accuracy</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+              <span className="text-[11px] font-black uppercase tracking-wider text-indigo-800">Accuracy Rate</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 transition-transform group-hover:scale-110">
                 <TargetIcon className="h-4.5 w-4.5" />
               </span>
             </div>
@@ -519,13 +616,18 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-indigo-800/80">
               {data?.kpis.totalCorrectAnswers ?? 0} correct answers
             </div>
-          </div>
+          </motion.div>
 
-          {/* KPI 5: Total Rounds */}
-          <div className="group rounded-[24px] border border-cyan-200 bg-gradient-to-br from-[#f4fbfc] via-white to-white p-5 shadow-[0_6px_20px_rgba(6,182,212,0.06)] transition hover:-translate-y-0.5 hover:shadow-md">
+          {/* Card 5: Total Rounds */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.24 }}
+            className="group rounded-[24px] border border-cyan-200 bg-gradient-to-br from-[#f4fbfc] via-white to-white p-5 shadow-[0_6px_20px_rgba(6,182,212,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(6,182,212,0.12)] hover:border-cyan-300"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black uppercase tracking-wider text-cyan-800">Total Rounds</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-600">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-600 transition-transform group-hover:scale-110">
                 <FlagIcon className="h-4.5 w-4.5" />
               </span>
             </div>
@@ -535,13 +637,18 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-cyan-800/80">
               ~{data?.kpis.avgRoundsPerSession ?? 0} rounds / match
             </div>
-          </div>
+          </motion.div>
 
-          {/* KPI 6: Top Game */}
-          <div className="group rounded-[24px] border border-violet-200 bg-gradient-to-br from-[#faf7ff] via-white to-white p-5 shadow-[0_6px_20px_rgba(139,92,246,0.06)] transition hover:-translate-y-0.5 hover:shadow-md">
+          {/* Card 6: Top Activity */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.28 }}
+            className="group rounded-[24px] border border-violet-200 bg-gradient-to-br from-[#faf7ff] via-white to-white p-5 shadow-[0_6px_20px_rgba(139,92,246,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(139,92,246,0.12)] hover:border-violet-300"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black uppercase tracking-wider text-violet-800">Top Activity</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 transition-transform group-hover:scale-110">
                 <TrophyIcon className="h-4.5 w-4.5" />
               </span>
             </div>
@@ -549,34 +656,40 @@ export function GamesAnalyticsDashboard() {
               {isLoading ? "–" : data?.kpis.topGame?.replace(" Adventure", "").replace(" Explorer", "") ?? "Body Parts"}
             </div>
             <div className="mt-1 text-[11px] font-bold text-violet-800/80">
-              Highest engagement
+              Most popular pick
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        {/* ─── SECTION 2: Timeline Volume & Game Share (Charts 1 & 2) ─── */}
+        {/* ─── SECTION 2: Hero Visualizations (Animated Spline & Layered Donut) ─── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* CHART 1: Timeline Volume & Performance (8 cols) */}
-          <div className="rounded-[28px] border border-[#d8e3f0] bg-white p-5 shadow-[0_6px_22px_rgba(0,47,118,0.05)] sm:p-7 lg:col-span-8 flex flex-col justify-between">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          {/* CHART 1: Animated Hybrid Spline + Stacked Capsule Bar Chart (8 cols) */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.45 }}
+            className="rounded-[30px] border border-[#d8e3f0] bg-white p-5 shadow-[0_8px_30px_rgba(0,47,118,0.06)] sm:p-7 lg:col-span-8 flex flex-col justify-between"
+          >
+            {/* Header & Metric Switcher */}
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center border-b border-[#edf3fa] pb-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#002f76]" />
-                  <h3 className="text-xl font-black text-[#002f76]">Activity Timeline</h3>
+                  <h3 className="text-xl font-black text-[#002f76]">Activity Timeline & Trend</h3>
                 </div>
                 <p className="mt-1 text-xs font-semibold text-[#5a769c]">
-                  Daily classroom sessions with color-coded activity breakdown
+                  Continuous daily classroom volume with stacked game distribution
                 </p>
               </div>
 
-              {/* Toggle metric */}
+              {/* Metric Toggle */}
               <div className="flex items-center gap-1 rounded-2xl bg-[#edf3fa] p-1.5 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setTimelineMetric("sessions")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition-all ${
                     timelineMetric === "sessions"
-                      ? "bg-white text-[#002f76] shadow-xs"
+                      ? "bg-white text-[#002f76] shadow-xs scale-102"
                       : "text-[#5a769c] hover:text-[#002f76]"
                   }`}
                 >
@@ -585,9 +698,9 @@ export function GamesAnalyticsDashboard() {
                 <button
                   type="button"
                   onClick={() => setTimelineMetric("stars")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition-all ${
                     timelineMetric === "stars"
-                      ? "bg-white text-amber-600 shadow-xs"
+                      ? "bg-white text-amber-600 shadow-xs scale-102"
                       : "text-[#5a769c] hover:text-amber-600"
                   }`}
                 >
@@ -596,17 +709,47 @@ export function GamesAnalyticsDashboard() {
               </div>
             </div>
 
-            {/* SVG Timeline Chart */}
-            <div className="mt-6 w-full">
+            {/* Interactive Animated SVG Stage */}
+            <div className="relative mt-6 w-full">
               {!data?.timeline || data.timeline.length === 0 ? (
-                <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs font-bold text-slate-400">
+                <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs font-bold text-slate-400">
                   No activity sessions recorded in this time range.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="relative h-60 w-full">
+                  <div className="relative h-64 w-full">
                     <svg viewBox="0 0 820 240" className="h-full w-full overflow-visible" preserveAspectRatio="none">
-                      {/* Grid Horizontal Guide Lines */}
+                      <defs>
+                        {/* Area Gradient Fill */}
+                        <linearGradient id="splineAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#0284c7" stopOpacity="0.28" />
+                          <stop offset="60%" stopColor="#0284c7" stopOpacity="0.08" />
+                          <stop offset="100%" stopColor="#0284c7" stopOpacity="0" />
+                        </linearGradient>
+
+                        <linearGradient id="starsAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.35" />
+                          <stop offset="70%" stopColor="#f59e0b" stopOpacity="0.08" />
+                          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+                        </linearGradient>
+
+                        <linearGradient id="bodyPartsBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#38bdf8" />
+                          <stop offset="100%" stopColor="#0284c7" />
+                        </linearGradient>
+
+                        <linearGradient id="numberTrailBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#34d399" />
+                          <stop offset="100%" stopColor="#059669" />
+                        </linearGradient>
+
+                        <linearGradient id="starsBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#fbbf24" />
+                          <stop offset="100%" stopColor="#d97706" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Grid Guide Lines */}
                       {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
                         const y = 195 - ratio * 165;
                         const labelVal = Math.round(ratio * timelineMax);
@@ -620,93 +763,119 @@ export function GamesAnalyticsDashboard() {
                         );
                       })}
 
-                      {/* Stacked Bar Columns for each day */}
-                      {data.timeline.map((point, index) => {
-                        const totalPoints = data.timeline.length;
-                        const availableWidth = 750;
-                        const step = availableWidth / Math.max(totalPoints, 1);
-                        const x = 55 + index * step + step / 2;
-                        const barWidth = Math.min(Math.max(step * 0.55, 20), 44);
+                      {/* Animated Spline Area Background */}
+                      {areaPath && (
+                        <motion.path
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                          d={areaPath}
+                          fill={timelineMetric === "sessions" ? "url(#splineAreaGrad)" : "url(#starsAreaGrad)"}
+                        />
+                      )}
+
+                      {/* Animated Spline Line */}
+                      {splinePath && (
+                        <motion.path
+                          initial={{ pathLength: 0, opacity: 0 }}
+                          animate={{ pathLength: 1, opacity: 1 }}
+                          transition={{ duration: 1, ease: "easeOut" }}
+                          d={splinePath}
+                          fill="none"
+                          stroke={timelineMetric === "sessions" ? "#0284c7" : "#d97706"}
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                        />
+                      )}
+
+                      {/* Stacked Capsule Bars for each day */}
+                      {pointsCoords.map((coord, index) => {
+                        const { x, point, step } = coord;
+                        const barWidth = Math.min(Math.max(step * 0.52, 14), 40);
 
                         const totalVal = timelineMetric === "sessions" ? point.sessions : point.stars;
                         const totalHeight = (totalVal / timelineMax) * 165;
                         const totalY = 195 - totalHeight;
 
-                        // Calculate split heights for sessions:
-                        // Number Trail: Emerald green (#10b981)
-                        // Body Parts: Sky/Brand blue (#0284c7)
                         let ntHeight = 0;
                         let bpHeight = 0;
 
                         if (timelineMetric === "sessions") {
                           ntHeight = (point.numberTrail / timelineMax) * 165;
                           bpHeight = (point.bodyParts / timelineMax) * 165;
-                        } else {
-                          // Stars metric: uniform golden amber bar
-                          ntHeight = totalHeight;
                         }
 
-                        const isHovered = hoveredPointIndex === index;
+                        const isHovered = hoveredIndex === index;
 
                         return (
                           <g
                             key={point.date}
                             className="cursor-pointer"
-                            onMouseEnter={() => setHoveredPointIndex(index)}
-                            onMouseLeave={() => setHoveredPointIndex(null)}
+                            onMouseEnter={() => setHoveredIndex(index)}
+                            onMouseLeave={() => setHoveredIndex(null)}
                           >
-                            {/* Column highlight on hover */}
+                            {/* Hover Column highlight */}
                             {isHovered && (
-                              <rect
+                              <motion.rect
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
                                 x={x - step / 2}
-                                y={30}
+                                y={25}
                                 width={step}
-                                height={170}
+                                height={175}
                                 fill="#002f76"
                                 fillOpacity="0.04"
-                                rx="8"
+                                rx="10"
                               />
                             )}
 
+                            {/* Baseline tick & resting dot for zero activity */}
+                            {totalVal === 0 && (
+                              <circle cx={x} cy={195} r="3" fill="#cbd5e1" opacity="0.6" />
+                            )}
+
+                            {/* Stacked Bars with animated entrance */}
                             {timelineMetric === "sessions" ? (
                               <>
                                 {/* Number Trail bottom segment */}
                                 {ntHeight > 0 && (
-                                  <rect
+                                  <motion.rect
+                                    initial={{ height: 0, y: 195 }}
+                                    animate={{ height: ntHeight, y: 195 - ntHeight }}
+                                    transition={{ type: "spring", stiffness: 220, damping: 22, delay: index * 0.02 }}
                                     x={x - barWidth / 2}
-                                    y={195 - ntHeight}
                                     width={barWidth}
-                                    height={ntHeight}
                                     rx={bpHeight === 0 ? barWidth / 3 : 0}
-                                    fill="#10b981"
-                                    className="transition-all duration-200"
+                                    fill="url(#numberTrailBarGrad)"
                                   />
                                 )}
 
                                 {/* Body Parts top segment */}
                                 {bpHeight > 0 && (
-                                  <rect
+                                  <motion.rect
+                                    initial={{ height: 0, y: 195 }}
+                                    animate={{ height: bpHeight, y: 195 - ntHeight - bpHeight }}
+                                    transition={{ type: "spring", stiffness: 220, damping: 22, delay: index * 0.02 + 0.04 }}
                                     x={x - barWidth / 2}
-                                    y={195 - ntHeight - bpHeight}
                                     width={barWidth}
-                                    height={bpHeight}
                                     rx={barWidth / 3}
-                                    fill="#0284c7"
-                                    className="transition-all duration-200"
+                                    fill="url(#bodyPartsBarGrad)"
                                   />
                                 )}
                               </>
                             ) : (
                               /* Stars earned bar */
-                              <rect
-                                x={x - barWidth / 2}
-                                y={totalY}
-                                width={barWidth}
-                                height={totalHeight}
-                                rx={barWidth / 3}
-                                fill="#f59e0b"
-                                className="transition-all duration-200"
-                              />
+                              totalHeight > 0 && (
+                                <motion.rect
+                                  initial={{ height: 0, y: 195 }}
+                                  animate={{ height: totalHeight, y: totalY }}
+                                  transition={{ type: "spring", stiffness: 220, damping: 22, delay: index * 0.02 }}
+                                  x={x - barWidth / 2}
+                                  width={barWidth}
+                                  rx={barWidth / 3}
+                                  fill="url(#starsBarGrad)"
+                                />
+                              )
                             )}
 
                             {/* Value label on top of bar */}
@@ -723,14 +892,27 @@ export function GamesAnalyticsDashboard() {
                               </text>
                             )}
 
+                            {/* Curve peak indicator dot */}
+                            {totalVal > 0 && (
+                              <circle
+                                cx={x}
+                                cy={coord.y}
+                                r={isHovered ? 5.5 : 3.5}
+                                fill={timelineMetric === "sessions" ? "#0284c7" : "#d97706"}
+                                stroke="#ffffff"
+                                strokeWidth="2"
+                                className="transition-all duration-200"
+                              />
+                            )}
+
                             {/* X-axis date label */}
                             <text
                               x={x}
                               y={220}
                               textAnchor="middle"
-                              fill="#6b84a2"
+                              fill={isHovered ? "#002f76" : "#6b84a2"}
                               fontSize="10"
-                              fontWeight="bold"
+                              fontWeight={isHovered ? "bold" : "600"}
                             >
                               {point.label}
                             </text>
@@ -739,31 +921,42 @@ export function GamesAnalyticsDashboard() {
                       })}
                     </svg>
 
-                    {/* Interactive Tooltip Card */}
-                    {hoveredPointIndex !== null && data.timeline[hoveredPointIndex] && (
-                      <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-2xl border border-[#c9dcf0] bg-white/95 px-4 py-2.5 shadow-xl backdrop-blur-md text-xs font-bold text-[#002f76]">
-                        <div className="flex items-center gap-2 border-b border-[#edf3fa] pb-1.5 mb-1.5">
-                          <span className="font-black text-[#002f76]">
-                            {data.timeline[hoveredPointIndex].label}
-                          </span>
-                          <span className="text-[#6480a4]">({data.timeline[hoveredPointIndex].dayOfWeek})</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-[11px]">
-                          <span className="inline-flex items-center gap-1.5 text-[#0284c7]">
-                            <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
-                            Body Parts: <strong>{data.timeline[hoveredPointIndex].bodyParts}</strong>
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                            <span className="h-2 w-2 rounded-full bg-[#10b981]" />
-                            Number Trail: <strong>{data.timeline[hoveredPointIndex].numberTrail}</strong>
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 text-amber-600">
-                            <span className="h-2 w-2 rounded-full bg-amber-500" />
-                            Stars: <strong>{data.timeline[hoveredPointIndex].stars.toLocaleString()}</strong>
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                    {/* Floating Crosshair Card */}
+                    <AnimatePresence>
+                      {hoveredIndex !== null && pointsCoords[hoveredIndex] && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-2xl border border-[#c9dcf0] bg-white/95 px-4 py-2.5 shadow-2xl backdrop-blur-md text-xs font-bold text-[#002f76] z-20"
+                        >
+                          <div className="flex items-center gap-2 border-b border-[#edf3fa] pb-1.5 mb-1.5">
+                            <span className="font-black text-[#002f76]">
+                              {pointsCoords[hoveredIndex].point.label}
+                            </span>
+                            <span className="text-[#6480a4]">({pointsCoords[hoveredIndex].point.dayOfWeek})</span>
+                            <span className="ml-auto rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700 font-extrabold">
+                              {pointsCoords[hoveredIndex].point.sessions} session{pointsCoords[hoveredIndex].point.sessions === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 text-[#0284c7]">
+                              <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                              Body Parts: <strong>{pointsCoords[hoveredIndex].point.bodyParts}</strong>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                              <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+                              Number Trail: <strong>{pointsCoords[hoveredIndex].point.numberTrail}</strong>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 text-amber-600">
+                              <span className="h-2 w-2 rounded-full bg-amber-500" />
+                              Stars: <strong>{pointsCoords[hoveredIndex].point.stars.toLocaleString()}</strong>
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Chart Legend with Color Accuracy */}
@@ -789,11 +982,16 @@ export function GamesAnalyticsDashboard() {
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
 
-          {/* CHART 2: Game Distribution Donut (4 cols) */}
-          <div className="rounded-[28px] border border-[#d8e3f0] bg-white p-5 shadow-[0_6px_22px_rgba(0,47,118,0.05)] sm:p-7 lg:col-span-4 flex flex-col justify-between">
-            <div>
+          {/* CHART 2: Layered Animated Game Share Donut (4 cols) */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.45, delay: 0.08 }}
+            className="rounded-[30px] border border-[#d8e3f0] bg-white p-5 shadow-[0_8px_30px_rgba(0,47,118,0.06)] sm:p-7 lg:col-span-4 flex flex-col justify-between"
+          >
+            <div className="border-b border-[#edf3fa] pb-4">
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#0284c7]" />
                 <h3 className="text-xl font-black text-[#002f76]">Game Share</h3>
@@ -803,54 +1001,64 @@ export function GamesAnalyticsDashboard() {
               </p>
             </div>
 
-            {/* SVG Donut Visual */}
+            {/* SVG Animated Donut Visual */}
             <div className="relative my-6 flex items-center justify-center">
-              <svg viewBox="0 0 180 180" className="h-48 w-48 -rotate-90 transform">
-                <circle cx="90" cy="90" r="66" stroke="#f0f4fa" strokeWidth="26" fill="none" />
+              <svg viewBox="0 0 200 200" className="h-52 w-52 -rotate-90 transform overflow-visible">
+                {/* Backing halo ring */}
+                <circle cx="100" cy="100" r="70" stroke="#f1f5fa" strokeWidth="26" fill="none" />
+
                 {(() => {
-                  const circumference = 2 * Math.PI * 66; // ~414.69
+                  const circumference = 2 * Math.PI * 70; // ~439.82
                   let cumulativeOffset = 0;
 
-                  return data?.gameDistribution.map((game) => {
+                  return data?.gameDistribution.map((game, idx) => {
                     const strokeDasharray = `${(game.percentage / 100) * circumference} ${circumference}`;
                     const strokeDashoffset = -cumulativeOffset;
                     cumulativeOffset += (game.percentage / 100) * circumference;
 
                     return (
-                      <circle
+                      <motion.circle
                         key={game.id}
-                        cx="90"
-                        cy="90"
-                        r="66"
+                        initial={{ strokeDashoffset: circumference }}
+                        animate={{ strokeDashoffset }}
+                        transition={{ duration: 1, ease: "easeOut", delay: idx * 0.15 }}
+                        cx="100"
+                        cy="100"
+                        r="70"
                         stroke={game.color}
                         strokeWidth="26"
                         strokeDasharray={strokeDasharray}
-                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
                         fill="none"
-                        className="transition-all duration-500 hover:opacity-85"
+                        className="transition-all duration-300 hover:opacity-80"
                       />
                     );
                   });
                 })()}
               </svg>
 
-              {/* Donut Center Label */}
+              {/* Center Stage Counter */}
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-3xl font-black text-[#002f76]">
+                <motion.span
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-3xl font-black text-[#002f76]"
+                >
                   {data?.kpis.totalSessions ?? 0}
-                </span>
+                </motion.span>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#6480a4]">
                   Total Matches
                 </span>
               </div>
             </div>
 
-            {/* Legend / Breakdown List with Direct Play Buttons */}
+            {/* Interactive Breakdown List with Action Link */}
             <div className="space-y-2.5 border-t border-[#edf2f8] pt-4">
               {data?.gameDistribution.map((game) => (
                 <div
                   key={game.id}
-                  className="flex items-center justify-between rounded-2xl border border-[#edf3fa] bg-[#f9fbfe] p-3 text-xs"
+                  className="flex items-center justify-between rounded-2xl border border-[#edf3fa] bg-[#f9fbfe] p-3 text-xs transition hover:border-[#cbdff4]"
                 >
                   <div className="flex items-center gap-2.5">
                     <span className="h-3.5 w-3.5 rounded-lg shadow-xs" style={{ backgroundColor: game.color }} />
@@ -866,15 +1074,20 @@ export function GamesAnalyticsDashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        {/* ─── SECTION 3: Deep Dive Analytics (Charts 3 & 4) ─── */}
+        {/* ─── SECTION 3: Challenge Mastery & Streak Distribution ─── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* CHART 3: Challenge Mode Mastery Progress (6 cols) */}
-          <div className="rounded-[28px] border border-[#d8e3f0] bg-white p-5 shadow-[0_6px_22px_rgba(0,47,118,0.05)] sm:p-7 lg:col-span-6 flex flex-col justify-between">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="rounded-[30px] border border-[#d8e3f0] bg-white p-5 shadow-[0_8px_30px_rgba(0,47,118,0.06)] sm:p-7 lg:col-span-6 flex flex-col justify-between"
+          >
             <div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-[#edf3fa] pb-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -890,8 +1103,8 @@ export function GamesAnalyticsDashboard() {
               </div>
 
               <div className="mt-6 space-y-4">
-                {data?.challengeModesMastery.map((item) => (
-                  <div key={item.mode} className="rounded-2xl border border-[#e8eff8] bg-[#f8fafd] p-3.5 space-y-2">
+                {data?.challengeModesMastery.map((item, idx) => (
+                  <div key={item.mode} className="rounded-2xl border border-[#e8eff8] bg-[#f8fafd] p-4 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <div>
                         <span className="font-black text-[#002f76]">{item.mode}</span>
@@ -899,13 +1112,17 @@ export function GamesAnalyticsDashboard() {
                       </div>
                       <span className="font-black text-emerald-600 text-sm">{item.accuracy}%</span>
                     </div>
-                    {/* Progress track */}
-                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e3ecf7]">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#0284c7] to-[#10b981] transition-all duration-500"
-                        style={{ width: `${item.accuracy}%` }}
+
+                    {/* Animated Progress track */}
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-[#e3ecf7]">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${item.accuracy}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut", delay: idx * 0.1 }}
+                        className="h-full rounded-full bg-gradient-to-r from-[#0284c7] to-[#10b981]"
                       />
                     </div>
+
                     <div className="flex justify-between text-[10px] font-bold text-[#6d87a7]">
                       <span>{item.sessions ?? 0} matches recorded</span>
                       <span className="text-emerald-700 font-black">{item.status || "Mastered"}</span>
@@ -916,49 +1133,71 @@ export function GamesAnalyticsDashboard() {
             </div>
 
             <p className="mt-4 text-[11px] font-semibold text-[#6682a5]">
-              Accuracy is derived from verified correct answers versus hints and mistakes during classroom turns.
+              Accuracy is calculated from correct responses vs hints and errors during student classroom turns.
             </p>
-          </div>
+          </motion.div>
 
           {/* CHART 4: Accomplishment & Streak Distribution (6 cols) */}
-          <div className="rounded-[28px] border border-[#d8e3f0] bg-white p-5 shadow-[0_6px_22px_rgba(0,47,118,0.05)] sm:p-7 lg:col-span-6 flex flex-col justify-between">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.08 }}
+            className="rounded-[30px] border border-[#d8e3f0] bg-white p-5 shadow-[0_8px_30px_rgba(0,47,118,0.06)] sm:p-7 lg:col-span-6 flex flex-col justify-between"
+          >
             <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                <h3 className="text-xl font-black text-[#002f76]">Score & Streak Dynamics</h3>
-              </div>
-              <p className="mt-1 text-xs font-semibold text-[#5a769c]">
-                Classroom student achievement tiers and consecutive answer combos
-              </p>
-            </div>
-
-            {/* Score Buckets Bar Histogram */}
-            <div className="my-5 space-y-4">
-              <div>
-                <span className="mb-2 block text-[11px] font-black uppercase tracking-wider text-[#637d9f]">
-                  Star Score Tiers Awarded
-                </span>
-                <div className="grid grid-cols-4 gap-2.5 text-center">
-                  {Object.entries(data?.scoreBuckets || { "1–2 Stars": 0, "3–4 Stars": 0, "5–7 Stars": 0, "8+ Stars": 14 }).map(([tier, count]) => (
-                    <div key={tier} className="rounded-2xl border border-[#d9e6f5] bg-gradient-to-b from-[#f8fafd] to-white p-3.5 shadow-xs">
-                      <span className="block text-2xl font-black text-[#002f76]">{count}</span>
-                      <span className="mt-1 block text-[10px] font-black text-[#5c7799] uppercase">{tier}</span>
-                    </div>
-                  ))}
+              <div className="border-b border-[#edf3fa] pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                  <h3 className="text-xl font-black text-[#002f76]">Score & Streak Dynamics</h3>
                 </div>
+                <p className="mt-1 text-xs font-semibold text-[#5a769c]">
+                  Classroom student achievement tiers and consecutive answer combos
+                </p>
               </div>
 
-              <div>
-                <span className="mb-2 block text-[11px] font-black uppercase tracking-wider text-[#637d9f]">
-                  Unbroken Answer Combos
-                </span>
-                <div className="grid grid-cols-3 gap-2.5 text-center">
-                  {Object.entries(data?.streakBuckets || { "1–2 Combo": 0, "3–4 Combo": 4, "5+ Master": 10 }).map(([streak, count]) => (
-                    <div key={streak} className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/70 to-white p-3.5 shadow-xs">
-                      <span className="block text-2xl font-black text-amber-700">{count}</span>
-                      <span className="mt-1 block text-[10px] font-black text-amber-900 uppercase">{streak}</span>
-                    </div>
-                  ))}
+              {/* Score Buckets Bar Histogram */}
+              <div className="my-5 space-y-4">
+                <div>
+                  <span className="mb-2 block text-[11px] font-black uppercase tracking-wider text-[#637d9f]">
+                    Star Score Tiers Awarded
+                  </span>
+                  <div className="grid grid-cols-4 gap-2.5 text-center">
+                    {Object.entries(data?.scoreBuckets || { "1–2 Stars": 0, "3–4 Stars": 0, "5–7 Stars": 0, "8+ Stars": 14 }).map(([tier, count], idx) => (
+                      <motion.div
+                        key={tier}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="rounded-2xl border border-[#d9e6f5] bg-gradient-to-b from-[#f8fafd] to-white p-3.5 shadow-xs transition hover:border-[#b8d4f4]"
+                      >
+                        <span className="block text-2xl font-black text-[#002f76]">{count}</span>
+                        <span className="mt-1 block text-[10px] font-black text-[#5c7799] uppercase">{tier}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="mb-2 block text-[11px] font-black uppercase tracking-wider text-[#637d9f]">
+                    Unbroken Answer Combos
+                  </span>
+                  <div className="grid grid-cols-3 gap-2.5 text-center">
+                    {Object.entries(data?.streakBuckets || { "1–2 Combo": 0, "3–4 Combo": 4, "5+ Master": 10 }).map(([streak, count], idx) => (
+                      <motion.div
+                        key={streak}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.2 + idx * 0.05 }}
+                        className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/70 to-white p-3.5 shadow-xs transition hover:border-amber-300"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <FlameIcon className="h-4 w-4 text-amber-500" />
+                          <span className="text-2xl font-black text-amber-700">{count}</span>
+                        </div>
+                        <span className="mt-1 block text-[10px] font-black text-amber-900 uppercase">{streak}</span>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -966,12 +1205,17 @@ export function GamesAnalyticsDashboard() {
             <p className="text-[11px] font-semibold text-[#6682a5]">
               Combos grant celebratory audio fanfare and advance student explorers toward the victory podium.
             </p>
-          </div>
+          </motion.div>
         </div>
 
         {/* ─── SECTION 4: Explorer Hall of Fame (Student Leaderboard) ─── */}
-        <div className="rounded-[28px] border border-[#d8e3f0] bg-white p-5 shadow-[0_6px_22px_rgba(0,47,118,0.05)] sm:p-7">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="rounded-[30px] border border-[#d8e3f0] bg-white p-5 shadow-[0_8px_30px_rgba(0,47,118,0.06)] sm:p-8"
+        >
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center border-b border-[#edf3fa] pb-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
@@ -985,86 +1229,101 @@ export function GamesAnalyticsDashboard() {
             </div>
 
             <div className="flex items-center gap-2 text-xs font-bold text-[#446083]">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>{data?.leaderboard.length || 0} active student explorers</span>
             </div>
           </div>
 
-          {/* Dynamic Podium Display (Adapts to 1, 2, or 3+ students) */}
+          {/* Dynamic 3D Pedestal Stage (Adapts to 1, 2, or 3+ students) */}
           {data?.leaderboard && data.leaderboard.length > 0 && (
-            <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {/* 1st Place (Gold Champion) */}
-              <div className="flex flex-col items-center rounded-2xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 via-white to-white p-5 text-center shadow-md relative">
-                <span className="absolute -top-3 flex items-center gap-1 rounded-full bg-amber-400 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-950 shadow-xs">
-                  <TrophyIcon className="h-3 w-3" />
+            <div className="my-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {/* 1st Place (Gold Champion Pedestal) */}
+              <motion.div
+                initial={{ opacity: 0, y: 25 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.1 }}
+                className="flex flex-col items-center rounded-[28px] border-2 border-amber-300 bg-gradient-to-b from-[#fff9e6] via-white to-white p-6 text-center shadow-lg relative sm:-translate-y-2 hover:shadow-xl transition-all"
+              >
+                <span className="absolute -top-3.5 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 px-4 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-md">
+                  <TrophyIcon className="h-3.5 w-3.5" />
                   Champion
                 </span>
-                <span className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-amber-950">
+                <span className="mt-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-amber-950 shadow-xs">
                   1
                 </span>
                 <div
-                  className="mt-2 flex h-14 w-14 items-center justify-center rounded-2xl border-2 font-black text-white shadow-sm ring-4 ring-amber-200/60 text-lg"
+                  className="mt-3 flex h-16 w-16 items-center justify-center rounded-2xl border-2 font-black text-white shadow-md ring-4 ring-amber-200/70 text-xl"
                   style={{ backgroundColor: data.leaderboard[0].color || "#f59e0b" }}
                 >
                   {data.leaderboard[0].name.slice(0, 2).toUpperCase()}
                 </div>
-                <h4 className="mt-2 text-lg font-black text-[#002f76]">{data.leaderboard[0].name}</h4>
-                <span className="text-[11px] font-bold text-[#5a769c]">{data.leaderboard[0].avatar}</span>
-                <div className="mt-3 flex items-center gap-1.5 text-xl font-black text-amber-600">
+                <h4 className="mt-3 text-xl font-black text-[#002f76]">{data.leaderboard[0].name}</h4>
+                <span className="text-xs font-bold text-[#5a769c]">{data.leaderboard[0].avatar}</span>
+                <div className="mt-3.5 flex items-center gap-1.5 text-2xl font-black text-amber-600">
                   <StarIcon className="h-5 w-5" />
                   <span>{data.leaderboard[0].totalStars.toLocaleString()} stars</span>
                 </div>
-                <span className="mt-1 text-[11px] font-bold text-amber-900">
+                <span className="mt-1 text-xs font-bold text-amber-900">
                   {data.leaderboard[0].sessionsPlayed} matches · {data.leaderboard[0].winRate}% win rate
                 </span>
-              </div>
+              </motion.div>
 
-              {/* 2nd Place (Silver) */}
+              {/* 2nd Place (Silver Pedestal) */}
               {data.leaderboard.length >= 2 && (
-                <div className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-gradient-to-b from-slate-50 via-white to-white p-5 text-center shadow-xs">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-300 text-xs font-black text-slate-800">
+                <motion.div
+                  initial={{ opacity: 0, y: 25 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.15 }}
+                  className="flex flex-col items-center rounded-[28px] border-2 border-slate-200 bg-gradient-to-b from-[#f8fafc] via-white to-white p-6 text-center shadow-md hover:shadow-lg transition-all"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-300 text-xs font-black text-slate-800 shadow-xs">
                     2
                   </span>
                   <div
-                    className="mt-2 flex h-14 w-14 items-center justify-center rounded-2xl border-2 font-black text-white shadow-xs text-lg"
+                    className="mt-3 flex h-14 w-14 items-center justify-center rounded-2xl border-2 font-black text-white shadow-xs text-lg"
                     style={{ backgroundColor: data.leaderboard[1].color || "#ef4444" }}
                   >
                     {data.leaderboard[1].name.slice(0, 2).toUpperCase()}
                   </div>
-                  <h4 className="mt-2 text-lg font-black text-[#002f76]">{data.leaderboard[1].name}</h4>
-                  <span className="text-[11px] font-bold text-[#5a769c]">{data.leaderboard[1].avatar}</span>
+                  <h4 className="mt-3 text-lg font-black text-[#002f76]">{data.leaderboard[1].name}</h4>
+                  <span className="text-xs font-bold text-[#5a769c]">{data.leaderboard[1].avatar}</span>
                   <div className="mt-3 flex items-center gap-1.5 text-xl font-black text-amber-600">
-                    <StarIcon className="h-4 w-4" />
+                    <StarIcon className="h-4.5 w-4.5" />
                     <span>{data.leaderboard[1].totalStars.toLocaleString()} stars</span>
                   </div>
-                  <span className="mt-1 text-[11px] font-bold text-slate-600">
+                  <span className="mt-1 text-xs font-bold text-slate-600">
                     {data.leaderboard[1].sessionsPlayed} matches · {data.leaderboard[1].winRate}% win rate
                   </span>
-                </div>
+                </motion.div>
               )}
 
-              {/* 3rd Place (Bronze) */}
+              {/* 3rd Place (Bronze Pedestal) */}
               {data.leaderboard.length >= 3 && (
-                <div className="flex flex-col items-center rounded-2xl border-2 border-amber-700/20 bg-gradient-to-b from-amber-100/30 via-white to-white p-5 text-center shadow-xs">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-200 text-xs font-black text-amber-900">
+                <motion.div
+                  initial={{ opacity: 0, y: 25 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.2 }}
+                  className="flex flex-col items-center rounded-[28px] border-2 border-amber-700/20 bg-gradient-to-b from-[#fef8f3] via-white to-white p-6 text-center shadow-md hover:shadow-lg transition-all"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-200 text-xs font-black text-amber-900 shadow-xs">
                     3
                   </span>
                   <div
-                    className="mt-2 flex h-14 w-14 items-center justify-center rounded-2xl border-2 font-black text-white shadow-xs text-lg"
+                    className="mt-3 flex h-14 w-14 items-center justify-center rounded-2xl border-2 font-black text-white shadow-xs text-lg"
                     style={{ backgroundColor: data.leaderboard[2].color || "#6366f1" }}
                   >
                     {data.leaderboard[2].name.slice(0, 2).toUpperCase()}
                   </div>
-                  <h4 className="mt-2 text-lg font-black text-[#002f76]">{data.leaderboard[2].name}</h4>
-                  <span className="text-[11px] font-bold text-[#5a769c]">{data.leaderboard[2].avatar}</span>
+                  <h4 className="mt-3 text-lg font-black text-[#002f76]">{data.leaderboard[2].name}</h4>
+                  <span className="text-xs font-bold text-[#5a769c]">{data.leaderboard[2].avatar}</span>
                   <div className="mt-3 flex items-center gap-1.5 text-xl font-black text-amber-600">
-                    <StarIcon className="h-4 w-4" />
+                    <StarIcon className="h-4.5 w-4.5" />
                     <span>{data.leaderboard[2].totalStars.toLocaleString()} stars</span>
                   </div>
-                  <span className="mt-1 text-[11px] font-bold text-slate-600">
+                  <span className="mt-1 text-xs font-bold text-slate-600">
                     {data.leaderboard[2].sessionsPlayed} matches · {data.leaderboard[2].winRate}% win rate
                   </span>
-                </div>
+                </motion.div>
               )}
             </div>
           )}
@@ -1140,18 +1399,23 @@ export function GamesAnalyticsDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </motion.div>
 
         {/* ─── SECTION 5: Recorded Game Sessions Table WITH PAGINATION ─── */}
-        <div className="rounded-[28px] border border-[#d8e3f0] bg-white p-5 shadow-[0_6px_22px_rgba(0,47,118,0.05)] sm:p-7">
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="rounded-[30px] border border-[#d8e3f0] bg-white p-5 shadow-[0_8px_30px_rgba(0,47,118,0.06)] sm:p-8"
+        >
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center border-b border-[#edf3fa] pb-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#002f76]" />
                 <h3 className="text-xl font-black text-[#002f76]">Recorded Game Sessions</h3>
               </div>
               <p className="mt-1 text-xs font-semibold text-[#5a769c]">
-                Classroom session histories, student scores, and teacher notes
+                Classroom session histories, student scores, and facilitator notes
               </p>
             </div>
 
@@ -1316,7 +1580,6 @@ export function GamesAnalyticsDashboard() {
           {/* ─── PAGINATION CONTROLS ─── */}
           {totalItems > 0 && (
             <div className="mt-5 flex flex-col justify-between gap-4 border-t border-[#edf2f8] pt-4 sm:flex-row sm:items-center text-xs">
-              {/* Status info & Rows per page */}
               <div className="flex items-center gap-4 text-[#5a769c] font-semibold">
                 <span>
                   Showing <strong className="text-[#002f76]">{startIndex + 1}</strong> to{" "}
@@ -1380,134 +1643,156 @@ export function GamesAnalyticsDashboard() {
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* ─── MODAL: Session Details Inspector ─── */}
-        {selectedSession && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-[#002f76]/35 backdrop-blur-xs transition-opacity"
-              onClick={() => setSelectedSession(null)}
-            />
-            <div className="relative w-full max-w-xl rounded-[32px] border border-[#d6e3f2] bg-white p-6 shadow-2xl z-10 space-y-5">
-              <div className="flex items-center justify-between border-b border-[#edf3fa] pb-4">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-[#637d9f]">
-                    Classroom Match Details
-                  </span>
-                  <h3 className="text-xl font-black text-[#002f76]">{selectedSession.gameTitle}</h3>
-                  <p className="text-xs text-[#5a769c]">
-                    Facilitated by {selectedSession.recordedByEmail} on{" "}
-                    {new Date(selectedSession.playedAt).toLocaleString()}
-                  </p>
+        <AnimatePresence>
+          {selectedSession && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-[#002f76]/40 backdrop-blur-xs transition-opacity"
+                onClick={() => setSelectedSession(null)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.2 }}
+                className="relative w-full max-w-xl rounded-[32px] border border-[#d6e3f2] bg-white p-6 shadow-2xl z-10 space-y-5"
+              >
+                <div className="flex items-center justify-between border-b border-[#edf3fa] pb-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#637d9f]">
+                      Classroom Match Details
+                    </span>
+                    <h3 className="text-xl font-black text-[#002f76]">{selectedSession.gameTitle}</h3>
+                    <p className="text-xs text-[#5a769c]">
+                      Facilitated by {selectedSession.recordedByEmail} on{" "}
+                      {new Date(selectedSession.playedAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSession(null)}
+                    className="rounded-xl border border-[#d3dfed] p-2 text-[#5a769c] hover:bg-[#f0f4fa] transition font-bold"
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedSession(null)}
-                  className="rounded-xl border border-[#d3dfed] p-2 text-[#5a769c] hover:bg-[#f0f4fa] transition font-bold"
-                >
-                  ✕
-                </button>
-              </div>
 
-              {/* Session Player Breakdown */}
-              <div className="space-y-3">
-                <span className="text-xs font-black uppercase tracking-wider text-[#637d9f]">
-                  Participant Explorers ({selectedSession.players.length})
-                </span>
-                <div className="space-y-2.5">
-                  {selectedSession.players.map((p, idx) => (
-                    <div
-                      key={p.name}
-                      className="flex items-center justify-between rounded-2xl border border-[#e2eaf5] bg-[#f8fafd] p-3.5 text-xs"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${
-                            idx === 0
-                              ? "bg-amber-400 text-amber-950"
-                              : "bg-slate-200 text-slate-700"
-                          }`}
-                        >
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <div className="font-black text-[#002f76]">{p.name}</div>
-                          <div className="text-[10px] text-[#637d9f]">{p.avatar || "Explorer"}</div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="font-black text-amber-600">{p.score} Stars</div>
-                          <div className="text-[10px] text-[#6682a5]">
-                            {p.correctCount ?? p.score} correct · {p.mistakesCount ?? 0} errors
+                {/* Session Player Breakdown */}
+                <div className="space-y-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#637d9f]">
+                    Participant Explorers ({selectedSession.players.length})
+                  </span>
+                  <div className="space-y-2.5">
+                    {selectedSession.players.map((p, idx) => (
+                      <div
+                        key={p.name}
+                        className="flex items-center justify-between rounded-2xl border border-[#e2eaf5] bg-[#f8fafd] p-3.5 text-xs"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${
+                              idx === 0
+                                ? "bg-amber-400 text-amber-950"
+                                : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <div className="font-black text-[#002f76]">{p.name}</div>
+                            <div className="text-[10px] text-[#637d9f]">{p.avatar || "Explorer"}</div>
                           </div>
                         </div>
-                        {p.streak && p.streak > 1 && (
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
-                            {p.streak}x combo
-                          </span>
-                        )}
+
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="font-black text-amber-600">{p.score} Stars</div>
+                            <div className="text-[10px] text-[#6682a5]">
+                              {p.correctCount ?? p.score} correct · {p.mistakesCount ?? 0} errors
+                            </div>
+                          </div>
+                          {p.streak && p.streak > 1 && (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
+                              {p.streak}x combo
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Notes */}
-              {selectedSession.notes && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-900">
-                  <strong>Facilitator Notes:</strong> {selectedSession.notes}
+                {/* Notes */}
+                {selectedSession.notes && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-900">
+                    <strong>Facilitator Notes:</strong> {selectedSession.notes}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSession(null)}
+                    className="rounded-2xl bg-[#002f76] px-6 py-2.5 text-xs font-black text-white hover:bg-[#0047b3] transition shadow-xs"
+                  >
+                    Close Inspection
+                  </button>
                 </div>
-              )}
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedSession(null)}
-                  className="rounded-2xl bg-[#002f76] px-6 py-2.5 text-xs font-black text-white hover:bg-[#0047b3] transition shadow-xs"
-                >
-                  Close Inspection
-                </button>
-              </div>
+              </motion.div>
             </div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
 
         {/* ─── MODAL: Delete Confirmation ─── */}
-        {deleteConfirmId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-[#002f76]/35 backdrop-blur-xs transition-opacity"
-              onClick={() => setDeleteConfirmId(null)}
-            />
-            <div className="relative w-full max-w-md rounded-[28px] border border-red-200 bg-white p-6 shadow-2xl z-10 space-y-4">
-              <h3 className="text-lg font-black text-red-600">Delete Activity Session?</h3>
-              <p className="text-xs text-[#57719b] leading-relaxed">
-                Are you sure you want to delete this recorded session? This action will remove the session from student score totals and audit logs.
-              </p>
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={() => setDeleteConfirmId(null)}
-                  className="rounded-xl border border-[#d3dfed] px-4 py-2 text-xs font-bold text-[#57719b] hover:bg-[#f0f4fa]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={() => handleDeleteSession(deleteConfirmId)}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
-                >
-                  {isDeleting ? "Deleting…" : "Confirm Delete"}
-                </button>
-              </div>
+        <AnimatePresence>
+          {deleteConfirmId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-[#002f76]/40 backdrop-blur-xs transition-opacity"
+                onClick={() => setDeleteConfirmId(null)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.2 }}
+                className="relative w-full max-w-md rounded-[28px] border border-red-200 bg-white p-6 shadow-2xl z-10 space-y-4"
+              >
+                <h3 className="text-lg font-black text-red-600">Delete Activity Session?</h3>
+                <p className="text-xs text-[#57719b] leading-relaxed">
+                  Are you sure you want to delete this recorded session? This action will remove the session from student score totals and audit logs.
+                </p>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="rounded-xl border border-[#d3dfed] px-4 py-2 text-xs font-bold text-[#57719b] hover:bg-[#f0f4fa]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => handleDeleteSession(deleteConfirmId)}
+                    className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+                  >
+                    {isDeleting ? "Deleting…" : "Confirm Delete"}
+                  </button>
+                </div>
+              </motion.div>
             </div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
       </div>
     </AppShell>
   );
