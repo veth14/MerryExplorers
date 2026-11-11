@@ -283,40 +283,25 @@ export function TrailRaceTrack({
         })}
 
         {activePlayer && (
-          <svg
-            role="img"
+          <div
+            key={`active-${raceMotion.fromCount}-${raceMotion.toCount}`}
             aria-label={`${activePlayer.name} walking along the forest trail`}
-            viewBox="0 0 1000 500"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-x-0 top-[10%] z-20 h-[82%] w-full overflow-visible"
+            className="trail-explorer-mover pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2"
+            style={{
+              left: `${explorerPoint.x / 10}%`,
+              top: `calc(10% + ${explorerPoint.y * 0.164}%)`,
+            }}
           >
-            <g transform={isWalking ? undefined : `translate(${explorerPoint.x} ${explorerPoint.y})`}>
-              <foreignObject x="-44" y="-58" width="88" height="92" overflow="visible">
-                <div className={`flex h-full w-full flex-col items-center justify-end ${isWalking ? "" : "pet-race-ready"}`}>
-                  <span className="mb-0.5 whitespace-nowrap rounded-full border border-white bg-white/95 px-2 py-0.5 text-[7px] font-black text-emerald-950 shadow-md">
-                    {activePlayer.name}
-                  </span>
-                  <TrailAnimal
-                    name={activePlayer.petName || activePlayer.name}
-                    color={activePlayer.color}
-                    walking={isWalking}
-                    className="h-[72px] w-[84px] drop-shadow-2xl"
-                  />
-                </div>
-              </foreignObject>
-              <animateMotion
-                key={`${raceMotion.fromCount}-${raceMotion.toCount}`}
-                path={TRAIL_PATH}
-                keyPoints={`${raceMotion.fromCount / steps};${raceMotion.fromCount / steps};${raceMotion.toCount / steps}`}
-                keyTimes="0;0.347;1"
-                calcMode="linear"
-                dur="2450ms"
-                begin="0s"
-                fill="freeze"
-                rotate="0"
-              />
-            </g>
-          </svg>
+            <span className="mb-0.5 block whitespace-nowrap text-center rounded-full border border-white bg-white/95 px-2 py-0.5 text-[7px] font-black text-emerald-950 shadow-md">
+              {activePlayer.name}
+            </span>
+            <TrailAnimal
+              name={activePlayer.petName || activePlayer.name}
+              color={activePlayer.color}
+              walking={isWalking}
+              className="h-[72px] w-[84px] drop-shadow-2xl"
+            />
+          </div>
         )}
       </div>
 

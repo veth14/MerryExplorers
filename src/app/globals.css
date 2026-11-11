@@ -260,6 +260,10 @@ html.menu-open {
   transition: left 2600ms cubic-bezier(.16, .72, .18, 1);
 }
 
+.trail-explorer-mover {
+  transition: left 2450ms cubic-bezier(.16, .72, .18, 1), top 2450ms cubic-bezier(.16, .72, .18, 1);
+}
+
 @keyframes body-part-picture-float {
   0%, 100% { transform: translateY(0) rotate(-1deg); }
   50% { transform: translateY(-4px) rotate(1deg); }
