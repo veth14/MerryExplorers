@@ -47,26 +47,24 @@ function generateRealisticSampleData(): RawSession[] {
   const sessions: RawSession[] = [];
   const now = new Date();
 
-  // Create 18 classroom sessions spanning the past 14 days
+  // Create 18 classroom sessions spanning recent days
   const sessionConfigs = [
     { dayOffset: 0, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [0, 1, 3], teacher: "angel@merryexplorers.com", notes: "Count & Match review with animal counters" },
-    { dayOffset: 0, hour: 14, game: "body-parts", title: "Body Parts Explorer", rounds: 3, studentIndices: [2, 4, 5, 6], teacher: "kyle@merryexplorers.com", notes: "Interactive body map pointing practice" },
+    { dayOffset: 0, hour: 14, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 3, studentIndices: [2, 4, 5, 6], teacher: "kyle@merryexplorers.com", notes: "Interactive body map pointing practice" },
     { dayOffset: 1, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 2, 0], teacher: "angel@merryexplorers.com", notes: "Sequencing numbers 1 through 10" },
-    { dayOffset: 1, hour: 11, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [3, 4, 6], teacher: "jasmin@merryexplorers.com", notes: "Word-to-numeral matching practice" },
-    { dayOffset: 2, hour: 10, game: "body-parts", title: "Body Parts Explorer", rounds: 4, studentIndices: [0, 5, 1], teacher: "kyle@merryexplorers.com", notes: "Sensory organs and movement recognition" },
+    { dayOffset: 1, hour: 11, game: "body-parts", title: "Body Parts Race - Picture Match", rounds: 3, studentIndices: [3, 4, 6], teacher: "jasmin@merryexplorers.com", notes: "Word-to-numeral matching practice" },
+    { dayOffset: 2, hour: 10, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 4, studentIndices: [0, 5, 1], teacher: "kyle@merryexplorers.com", notes: "Sensory organs and movement recognition" },
     { dayOffset: 3, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [2, 3, 5], teacher: "angel@merryexplorers.com", notes: "More or Less comparisons race" },
-    { dayOffset: 3, hour: 13, game: "body-parts", title: "Body Parts Explorer", rounds: 3, studentIndices: [4, 6, 0], teacher: "jasmin@merryexplorers.com", notes: "Head shoulders knees and toes review" },
-    { dayOffset: 4, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 5, 6], teacher: "angel@merryexplorers.com", notes: "Trail race to 5 points with cheer boosts" },
-    { dayOffset: 5, hour: 9, game: "body-parts", title: "Body Parts Explorer", rounds: 3, studentIndices: [2, 0, 3], teacher: "kyle@merryexplorers.com", notes: "Fine motor & facial features match" },
-    { dayOffset: 6, hour: 11, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [4, 1, 2], teacher: "jasmin@merryexplorers.com", notes: "High five for numbers 1 to 5" },
-    { dayOffset: 7, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [0, 3, 6], teacher: "angel@merryexplorers.com", notes: "Weekly numbers championship race" },
-    { dayOffset: 8, hour: 9, game: "body-parts", title: "Body Parts Explorer", rounds: 4, studentIndices: [5, 4, 1], teacher: "kyle@merryexplorers.com", notes: "Arm and hand gestures coordination" },
-    { dayOffset: 9, hour: 14, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [2, 6, 0], teacher: "angel@merryexplorers.com", notes: "What comes next sequence training" },
-    { dayOffset: 10, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 3, 4], teacher: "jasmin@merryexplorers.com", notes: "Preschool counting circle game" },
-    { dayOffset: 11, hour: 11, game: "body-parts", title: "Body Parts Explorer", rounds: 3, studentIndices: [0, 2, 5], teacher: "kyle@merryexplorers.com", notes: "Smile, eyes and ears recognition" },
-    { dayOffset: 12, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [6, 1, 3], teacher: "angel@merryexplorers.com", notes: "Speed counting friendly race" },
-    { dayOffset: 13, hour: 13, game: "body-parts", title: "Body Parts Explorer", rounds: 3, studentIndices: [4, 5, 2], teacher: "jasmin@merryexplorers.com", notes: "Foot and leg movement game" },
-    { dayOffset: 14, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [0, 4, 6], teacher: "angel@merryexplorers.com", notes: "Trailblazer math warmup" },
+    { dayOffset: 4, hour: 13, game: "body-parts", title: "Body Parts Race - Picture Match", rounds: 3, studentIndices: [4, 6, 0], teacher: "jasmin@merryexplorers.com", notes: "Head shoulders knees and toes review" },
+    { dayOffset: 5, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 5, 6], teacher: "angel@merryexplorers.com", notes: "Trail race to 5 points with cheer boosts" },
+    { dayOffset: 6, hour: 9, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 3, studentIndices: [2, 0, 3], teacher: "kyle@merryexplorers.com", notes: "Fine motor & facial features match" },
+    { dayOffset: 7, hour: 11, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [4, 1, 2], teacher: "jasmin@merryexplorers.com", notes: "High five for numbers 1 to 5" },
+    { dayOffset: 8, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [0, 3, 6], teacher: "angel@merryexplorers.com", notes: "Weekly numbers championship race" },
+    { dayOffset: 9, hour: 9, game: "body-parts", title: "Body Parts Race - Picture Match", rounds: 4, studentIndices: [5, 4, 1], teacher: "kyle@merryexplorers.com", notes: "Arm and hand gestures coordination" },
+    { dayOffset: 10, hour: 14, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [2, 6, 0], teacher: "angel@merryexplorers.com", notes: "What comes next sequence training" },
+    { dayOffset: 11, hour: 10, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [1, 3, 4], teacher: "jasmin@merryexplorers.com", notes: "Preschool counting circle game" },
+    { dayOffset: 12, hour: 11, game: "body-parts", title: "Body Parts Race - Body Map", rounds: 3, studentIndices: [0, 2, 5], teacher: "kyle@merryexplorers.com", notes: "Smile, eyes and ears recognition" },
+    { dayOffset: 13, hour: 9, game: "number-trail", title: "Number Trail Adventure", rounds: 5, studentIndices: [6, 1, 3], teacher: "angel@merryexplorers.com", notes: "Speed counting friendly race" },
   ];
 
   sessionConfigs.forEach((cfg, idx) => {
@@ -78,7 +76,6 @@ function generateRealisticSampleData(): RawSession[] {
     const maxScore = cfg.rounds;
 
     const sessionPlayers: RawPlayer[] = participatingStudents.map((st, pIdx) => {
-      // Deterministic realistic scores
       const score = Math.max(1, maxScore - ((pIdx * 2 + idx) % 3));
       const mistakes = (idx + pIdx) % 3 === 0 ? 1 : 0;
       const correct = score;
@@ -97,7 +94,6 @@ function generateRealisticSampleData(): RawSession[] {
       };
     });
 
-    // Sort by score desc to determine rank
     sessionPlayers.sort((a, b) => (b.score || 0) - (a.score || 0));
     sessionPlayers.forEach((p, rIdx) => {
       p.rank = rIdx + 1;
@@ -139,7 +135,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const timeRange = url.searchParams.get("timeRange") || "all"; // "all" | "30d" | "14d" | "7d" | "today"
     const gameFilter = url.searchParams.get("gameType") || "all"; // "all" | "body-parts" | "number-trail"
-    const limitParam = Math.min(Number(url.searchParams.get("limit") || 100), 200);
+    const limitParam = Math.min(Number(url.searchParams.get("limit") || 200), 500);
 
     const { db } = await connectToDatabase();
 
@@ -162,11 +158,11 @@ export async function GET(request: Request) {
       : realDocs.map((doc) => ({
           _id: doc._id.toString(),
           gameType: doc.gameType,
-          gameTitle: doc.gameTitle,
+          gameTitle: doc.gameTitle || (doc.gameType === "number-trail" ? "Number Trail Adventure" : "Body Parts Explorer"),
           roundsTotal: doc.roundsTotal || 3,
           playersCount: doc.playersCount || (doc.players ? doc.players.length : 0),
           players: doc.players || [],
-          winner: doc.winner || null,
+          winner: doc.winner || (doc.players && doc.players.length > 0 ? [...doc.players].sort((a: RawPlayer, b: RawPlayer) => (b.score || 0) - (a.score || 0))[0] : null),
           notes: doc.notes || "",
           playedAt: doc.playedAt || doc.playedAtStr,
           playedAtStr: doc.playedAt ? new Date(doc.playedAt).toISOString() : new Date().toISOString(),
@@ -209,6 +205,16 @@ export async function GET(request: Request) {
       "body-parts": { sessions: 0, stars: 0, title: "Body Parts Explorer" },
     };
 
+    // Challenge Mastery Dynamic Accumulator
+    const masteryMap: Record<
+      string,
+      { title: string; category: string; correct: number; mistakes: number; sessions: number }
+    > = {
+      "body-parts-map": { title: "Body Map Match", category: "Body Parts Explorer", correct: 0, mistakes: 0, sessions: 0 },
+      "body-parts-pic": { title: "Picture Match", category: "Body Parts Explorer", correct: 0, mistakes: 0, sessions: 0 },
+      "number-trail-main": { title: "Number Recognition & Trail", category: "Number Trail Adventure", correct: 0, mistakes: 0, sessions: 0 },
+    };
+
     // Leaderboard Aggregations
     const playerStatsMap = new Map<
       string,
@@ -233,6 +239,7 @@ export async function GET(request: Request) {
       {
         date: string;
         label: string;
+        dayOfWeek: string;
         sessions: number;
         stars: number;
         bodyParts: number;
@@ -245,21 +252,22 @@ export async function GET(request: Request) {
 
     // Score & Streak Distribution Buckets
     const scoreBuckets = {
-      "1-2 Stars": 0,
-      "3-4 Stars": 0,
-      "5-7 Stars": 0,
+      "1–2 Stars": 0,
+      "3–4 Stars": 0,
+      "5–7 Stars": 0,
       "8+ Stars": 0,
     };
 
     const streakBuckets = {
-      "1-2 Combo": 0,
-      "3-4 Combo": 0,
+      "1–2 Combo": 0,
+      "3–4 Combo": 0,
       "5+ Master": 0,
     };
 
     for (const s of filteredSessions) {
       totalRounds += s.roundsTotal || 0;
-      const gType = s.gameType || "number-trail";
+      const gType = s.gameType || "body-parts";
+      const gTitle = s.gameTitle || "";
 
       if (!gameCounts[gType]) {
         gameCounts[gType] = { sessions: 0, stars: 0, title: s.gameTitle || gType };
@@ -270,11 +278,13 @@ export async function GET(request: Request) {
       const sDate = new Date(s.playedAt || s.playedAtStr || now);
       const dateKey = sDate.toISOString().split("T")[0];
       const dateLabel = sDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const dayOfWeek = sDate.toLocaleDateString("en-US", { weekday: "short" });
 
       if (!timelineMap.has(dateKey)) {
         timelineMap.set(dateKey, {
           date: dateKey,
           label: dateLabel,
+          dayOfWeek,
           sessions: 0,
           stars: 0,
           bodyParts: 0,
@@ -289,6 +299,15 @@ export async function GET(request: Request) {
       if (gType === "number-trail") dayData.numberTrail += 1;
       if (gType === "body-parts") dayData.bodyParts += 1;
 
+      // Categorize for Challenge Mode Mastery
+      let masteryKey = "body-parts-pic";
+      if (gType === "number-trail") {
+        masteryKey = "number-trail-main";
+      } else if (gTitle.toLowerCase().includes("body map")) {
+        masteryKey = "body-parts-map";
+      }
+      masteryMap[masteryKey].sessions += 1;
+
       // Iterate players in session
       const pList = s.players || [];
       totalPlayersEngaged += pList.length;
@@ -296,7 +315,7 @@ export async function GET(request: Request) {
 
       for (const p of pList) {
         const pScore = Number(p.score) || 0;
-        const pCorrect = Number(p.correctCount) || pScore;
+        const pCorrect = Number(p.correctCount) || (pScore > 10 ? Math.round(pScore / 100) : pScore);
         const pMistakes = Number(p.mistakesCount) || 0;
         const pStreak = Number(p.streak) || 0;
 
@@ -308,15 +327,18 @@ export async function GET(request: Request) {
         dayData.mistakes += pMistakes;
         gameCounts[gType].stars += pScore;
 
+        masteryMap[masteryKey].correct += pCorrect;
+        masteryMap[masteryKey].mistakes += pMistakes;
+
         // Bucketing scores
-        if (pScore <= 2) scoreBuckets["1-2 Stars"] += 1;
-        else if (pScore <= 4) scoreBuckets["3-4 Stars"] += 1;
-        else if (pScore <= 7) scoreBuckets["5-7 Stars"] += 1;
+        if (pScore <= 2) scoreBuckets["1–2 Stars"] += 1;
+        else if (pScore <= 4) scoreBuckets["3–4 Stars"] += 1;
+        else if (pScore <= 7) scoreBuckets["5–7 Stars"] += 1;
         else scoreBuckets["8+ Stars"] += 1;
 
         // Bucketing streaks
-        if (pStreak <= 2) streakBuckets["1-2 Combo"] += 1;
-        else if (pStreak <= 4) streakBuckets["3-4 Combo"] += 1;
+        if (pStreak <= 2) streakBuckets["1–2 Combo"] += 1;
+        else if (pStreak <= 4) streakBuckets["3–4 Combo"] += 1;
         else streakBuckets["5+ Master"] += 1;
 
         // Player key
@@ -358,12 +380,11 @@ export async function GET(request: Request) {
         const winRate = entry.sessionsPlayed > 0 ? Math.round((entry.wins / entry.sessionsPlayed) * 100) : 0;
         const totalAttempts = entry.correctAnswers + entry.mistakes;
         const accuracy = totalAttempts > 0 ? Math.round((entry.correctAnswers / totalAttempts) * 100) : 100;
-        const avgScore = entry.sessionsPlayed > 0 ? Number((entry.totalStars / entry.sessionsPlayed).toFixed(1)) : 0;
+        const avgScore = entry.sessionsPlayed > 0 ? Math.round(entry.totalStars / entry.sessionsPlayed) : 0;
 
-        // Determine favorite game
-        let favoriteGame = "Number Trail";
-        if ((entry.gameDistribution["body-parts"] || 0) > (entry.gameDistribution["number-trail"] || 0)) {
-          favoriteGame = "Body Parts";
+        let favoriteGame = "Body Parts";
+        if ((entry.gameDistribution["number-trail"] || 0) > (entry.gameDistribution["body-parts"] || 0)) {
+          favoriteGame = "Number Trail";
         }
 
         return {
@@ -379,14 +400,14 @@ export async function GET(request: Request) {
 
     // Accuracy Calculation
     const overallAttempts = totalCorrectAnswers + totalMistakes;
-    const overallAccuracy = overallAttempts > 0 ? Math.round((totalCorrectAnswers / overallAttempts) * 100) : 92;
+    const overallAccuracy = overallAttempts > 0 ? Math.round((totalCorrectAnswers / overallAttempts) * 100) : 88;
 
     const avgStarsPerSession = totalSessions > 0 ? Math.round(totalStars / totalSessions) : 0;
-    const avgScorePerPlayer = totalPlayersEngaged > 0 ? Number((totalStars / totalPlayersEngaged).toFixed(1)) : 0;
+    const avgScorePerPlayer = totalPlayersEngaged > 0 ? Math.round(totalStars / totalPlayersEngaged) : 0;
     const avgRoundsPerSession = totalSessions > 0 ? Number((totalRounds / totalSessions).toFixed(1)) : 0;
 
     // Determine Most Popular Game
-    let topGame = "Number Trail Adventure";
+    let topGame = "Body Parts Explorer";
     let maxGameSessions = -1;
     for (const [key, val] of Object.entries(gameCounts)) {
       if (val.sessions > maxGameSessions) {
@@ -396,43 +417,49 @@ export async function GET(request: Request) {
     }
 
     // Game Share Data for Donut Chart
+    const totalGameSessions = (gameCounts["number-trail"]?.sessions || 0) + (gameCounts["body-parts"]?.sessions || 0);
     const gameDistributionList = [
-      {
-        id: "number-trail",
-        title: "Number Trail Adventure",
-        sessions: gameCounts["number-trail"]?.sessions || 0,
-        stars: gameCounts["number-trail"]?.stars || 0,
-        percentage:
-          totalSessions > 0
-            ? Math.round(((gameCounts["number-trail"]?.sessions || 0) / totalSessions) * 100)
-            : 65,
-        color: "#10b981", // Emerald
-        accentColor: "#059669",
-        badge: "Math & Counting",
-      },
       {
         id: "body-parts",
         title: "Body Parts Explorer",
         sessions: gameCounts["body-parts"]?.sessions || 0,
         stars: gameCounts["body-parts"]?.stars || 0,
         percentage:
-          totalSessions > 0
-            ? Math.round(((gameCounts["body-parts"]?.sessions || 0) / totalSessions) * 100)
-            : 35,
-        color: "#0284c7", // Sky blue
+          totalGameSessions > 0
+            ? Math.round(((gameCounts["body-parts"]?.sessions || 0) / totalGameSessions) * 100)
+            : 100,
+        color: "#0284c7", // Sky/brand blue
         accentColor: "#0369a1",
         badge: "Anatomy & Science",
       },
+      {
+        id: "number-trail",
+        title: "Number Trail Adventure",
+        sessions: gameCounts["number-trail"]?.sessions || 0,
+        stars: gameCounts["number-trail"]?.stars || 0,
+        percentage:
+          totalGameSessions > 0
+            ? Math.round(((gameCounts["number-trail"]?.sessions || 0) / totalGameSessions) * 100)
+            : 0,
+        color: "#10b981", // Emerald green
+        accentColor: "#059669",
+        badge: "Math & Counting",
+      },
     ];
 
-    // Challenge Mode Mastery Distribution
-    const challengeModesMastery = [
-      { mode: "Find the Number", category: "Number Trail", accuracy: 94, attempts: Math.round(totalCorrectAnswers * 0.32), icon: "search" },
-      { mode: "Count & Match", category: "Number Trail", accuracy: 89, attempts: Math.round(totalCorrectAnswers * 0.28), icon: "counter" },
-      { mode: "What Comes Next?", category: "Number Trail", accuracy: 84, attempts: Math.round(totalCorrectAnswers * 0.22), icon: "sequence" },
-      { mode: "Picture Match", category: "Body Parts", accuracy: 96, attempts: Math.round(totalCorrectAnswers * 0.18), icon: "image" },
-      { mode: "Interactive Body Map", category: "Body Parts", accuracy: 91, attempts: Math.round(totalCorrectAnswers * 0.15), icon: "map" },
-    ];
+    // Challenge Mode Mastery Distribution computed dynamically
+    const challengeModesMastery = Object.values(masteryMap).map((m) => {
+      const attempts = m.correct + m.mistakes;
+      const acc = attempts > 0 ? Math.round((m.correct / attempts) * 100) : (m.sessions > 0 ? 92 : 0);
+      return {
+        mode: m.title,
+        category: m.category,
+        accuracy: acc,
+        attempts: attempts > 0 ? attempts : (m.sessions > 0 ? m.sessions * 4 : 0),
+        sessions: m.sessions,
+        status: attempts === 0 && m.sessions === 0 ? "Awaiting matches" : acc >= 90 ? "Mastered" : "Practicing",
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -458,8 +485,8 @@ export async function GET(request: Request) {
       challengeModesMastery,
       scoreBuckets,
       streakBuckets,
-      leaderboard: leaderboard.slice(0, 15),
-      recentSessions: filteredSessions.slice(0, 50).map((s) => ({
+      leaderboard,
+      recentSessions: filteredSessions.map((s) => ({
         id: s._id ? s._id.toString() : "",
         gameType: s.gameType,
         gameTitle: s.gameTitle,
@@ -492,7 +519,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Session ID is required" }, { status: 400 });
     }
 
-    // Ignore mock demo sessions
     if (id.startsWith("demo-session-")) {
       return NextResponse.json({ success: true, message: "Demo session dismissed" });
     }

@@ -232,6 +232,45 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     nextTurnChallenge(0);
   };
 
+  // ─── Auto-Save Session on Game Completion ─────────────────────────────────
+  const autoSaveSession = useCallback(
+    async (currentPlayers: GamePlayer[]) => {
+      if (currentPlayers.length === 0 || hasSavedSession) return;
+      setIsSavingSession(true);
+      try {
+        const headers = await getAuthHeaders();
+        const sorted = [...currentPlayers].sort((a, b) => b.score - a.score);
+        const winner = sorted[0] || null;
+
+        const res = await fetch("/api/admin/activities/number-trail/scores", {
+          method: "POST",
+          headers: {
+            ...headers,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            gameType: "number-trail",
+            gameTitle: "Number Trail Adventure",
+            roundsTotal: roundsPerPlayer,
+            players: currentPlayers,
+            winner,
+            notes: `Played Number Trail with ${currentPlayers.length} Trailblazers across ${roundsPerPlayer} rounds.`,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          setHasSavedSession(true);
+        }
+      } catch (err) {
+        console.error("[NumberTrail] Auto-save error:", err);
+      } finally {
+        setIsSavingSession(false);
+      }
+    },
+    [getAuthHeaders, hasSavedSession, roundsPerPlayer]
+  );
+
   // ─── Race Phase Handlers ───────────────────────────────────────────────────
   const handleContinueAfterRace = useCallback(() => {
     if (!raceMotion) return;
@@ -241,6 +280,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
         GameAudio.playVictoryFanfare();
       }
       setPhase("game_over");
+      autoSaveSession(players);
     } else {
       const nextIndex = findNextUnfinishedPlayerIndex(players, raceMotion.playerIndex, roundsPerPlayer);
       if (nextIndex >= 0) {
@@ -249,7 +289,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
         nextTurnChallenge(nextIndex);
       }
     }
-  }, [raceMotion, soundEnabled, players, roundsPerPlayer, nextTurnChallenge]);
+  }, [raceMotion, soundEnabled, players, roundsPerPlayer, nextTurnChallenge, autoSaveSession]);
 
   useEffect(() => {
     if (phase !== "racing" || !raceMotion) return;
