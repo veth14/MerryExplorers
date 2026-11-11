@@ -1,5 +1,5 @@
-import { GamesHub } from "@/components/activities/GamesHub";
+import { GamesAnalyticsDashboard } from "@/components/admin/activities/GamesAnalyticsDashboard";
 
-export default function AdminGamesPage() {
-  return <GamesHub mode="admin" />;
+export default function AdminGamesAnalyticsPage() {
+  return <GamesAnalyticsDashboard />;
 }

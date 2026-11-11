@@ -292,7 +292,7 @@ export function TrailRaceTrack({
           >
             <g transform={isWalking ? undefined : `translate(${explorerPoint.x} ${explorerPoint.y})`}>
               <foreignObject x="-44" y="-58" width="88" height="92" overflow="visible">
-                <div xmlns="http://www.w3.org/1999/xhtml" className={`flex h-full w-full flex-col items-center justify-end ${isWalking ? "" : "pet-race-ready"}`}>
+                <div className={`flex h-full w-full flex-col items-center justify-end ${isWalking ? "" : "pet-race-ready"}`}>
                   <span className="mb-0.5 whitespace-nowrap rounded-full border border-white bg-white/95 px-2 py-0.5 text-[7px] font-black text-emerald-950 shadow-md">
                     {activePlayer.name}
                   </span>
