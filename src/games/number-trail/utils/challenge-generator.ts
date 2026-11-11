@@ -4,7 +4,6 @@ import {
   NumberChallenge,
   NumberChoice,
   SequenceItem,
-  ChoiceDisplayFormat,
 } from "../types";
 import {
   NUMBERS_DATA,
@@ -26,14 +25,13 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 /**
- * Generate unique options including the correct number
+ * Generate unique numeral options including the correct number
  */
 function generateNumeralChoices(
   correctNum: number,
   min: number,
   max: number,
-  count = 4,
-  format: ChoiceDisplayFormat = "words"
+  count = 4
 ): NumberChoice[] {
   const chosen = new Set<number>([correctNum]);
   const possible = [];
@@ -54,32 +52,18 @@ function generateNumeralChoices(
   }
 
   const numbersArray = shuffleArray(Array.from(chosen));
-  return numbersArray.map((num) => {
-    const word = NUMBERS_DATA[num]?.word || String(num);
-    if (format === "words") {
-      return {
-        id: `opt-${num}`,
-        numeral: num,
-        label: word.toUpperCase(),
-        sublabel: String(num),
-        isCorrect: num === correctNum,
-      };
-    }
-    return {
-      id: `opt-${num}`,
-      numeral: num,
-      label: String(num),
-      sublabel: word.toUpperCase(),
-      isCorrect: num === correctNum,
-    };
-  });
+  return numbersArray.map((num) => ({
+    id: `opt-${num}`,
+    numeral: num,
+    label: String(num),
+    isCorrect: num === correctNum,
+  }));
 }
 
 export function generateNumberChallenge(
   modes: ChallengeMode[],
   difficulty: NumberDifficulty,
-  previousTarget?: number,
-  choiceFormat: ChoiceDisplayFormat = "words"
+  previousTarget?: number
 ): NumberChallenge {
   const activeModes = modes.length > 0 ? modes : ["recognition", "count_match"];
   const selectedMode = activeModes[Math.floor(Math.random() * activeModes.length)];
@@ -105,17 +89,16 @@ export function generateNumberChallenge(
 
   const challengeId = `ch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-  // 1. RECOGNITION MODE ("Find the Word / Number")
+  // 1. RECOGNITION MODE ("Find the Number" from the Word)
   if (selectedMode === "recognition") {
-    const choices = generateNumeralChoices(targetNum, min, max, difficulty === "easy" ? 3 : 4, choiceFormat);
+    const choices = generateNumeralChoices(targetNum, min, max, difficulty === "easy" ? 3 : 4);
     return {
       id: challengeId,
       mode: "recognition",
       targetNumber: targetNum,
-      promptText: choiceFormat === "words" ? `Find the word for ${targetNum}` : `Find the number ${targetNum}`,
-      spokenPrompt: choiceFormat === "words"
-        ? `Can you find the word for ${targetNum}? ${numData.word}!`
-        : `Find the number ${targetNum}! ${numData.word}!`,
+      targetWord: numData.word.toUpperCase(),
+      promptText: "Find the number",
+      spokenPrompt: numData.word, // In audio, just say the number! E.g. "Fifteen"
       choices,
     };
   }
@@ -123,14 +106,14 @@ export function generateNumberChallenge(
   // 2. COUNT & MATCH MODE
   if (selectedMode === "count_match") {
     const obj = COUNTING_OBJECTS[Math.floor(Math.random() * COUNTING_OBJECTS.length)];
-    const choices = generateNumeralChoices(targetNum, min, max, difficulty === "easy" ? 3 : 4, choiceFormat);
+    const choices = generateNumeralChoices(targetNum, min, max, difficulty === "easy" ? 3 : 4);
 
     return {
       id: challengeId,
       mode: "count_match",
       targetNumber: targetNum,
       promptText: `How many ${obj.name} do you count?`,
-      spokenPrompt: `How many ${obj.name} are there? Let's count them!`,
+      spokenPrompt: `How many ${obj.name}?`,
       choices,
       dotCount: targetNum,
       dotIconId: obj.id,
@@ -157,17 +140,14 @@ export function generateNumberChallenge(
       }
     }
 
-    const choices = generateNumeralChoices(missingValue, min, max, difficulty === "easy" ? 3 : 4, choiceFormat);
-    const spokenSeq = sequence
-      .map((s) => (s.value !== null ? String(s.value) : "what comes next?"))
-      .join(", ");
+    const choices = generateNumeralChoices(missingValue, min, max, difficulty === "easy" ? 3 : 4);
 
     return {
       id: challengeId,
       mode: "sequence",
       targetNumber: missingValue,
       promptText: "What comes next on the trail?",
-      spokenPrompt: `${spokenSeq}`,
+      spokenPrompt: "What comes next?",
       choices,
       sequence,
       missingIndex,

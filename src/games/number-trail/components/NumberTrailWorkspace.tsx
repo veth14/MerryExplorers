@@ -11,7 +11,6 @@ import {
   TrailblazerStudent,
   ChallengeMode,
   NumberDifficulty,
-  ChoiceDisplayFormat,
   NumberChallenge,
   NumberChoice,
   GameSessionRecord,
@@ -69,7 +68,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     "more_or_less",
   ]);
   const [roundsPerPlayer, setRoundsPerPlayer] = useState<number>(5);
-  const [cardFormat, setCardFormat] = useState<ChoiceDisplayFormat>("words");
 
   // Audio & Accessibility Settings
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -178,13 +176,11 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
   // ─── Challenge Generation ──────────────────────────────────────────────────
   const nextTurnChallenge = useCallback(
-    (playerIdx: number, formatOverride?: ChoiceDisplayFormat) => {
-      const activeFormat = formatOverride || cardFormat;
+    (playerIdx: number) => {
       const challenge = generateNumberChallenge(
         selectedModes,
         difficulty,
-        previousTargetRef.current,
-        activeFormat
+        previousTargetRef.current
       );
       previousTargetRef.current = challenge.targetNumber;
       setCurrentChallenge(challenge);
@@ -193,14 +189,12 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
       setCheerBanner(null);
       questionStartTimeRef.current = Date.now();
 
-      // Audio narration
+      // Audio narration: in the audio, just say the number!
       if (speechEnabled) {
-        const activeP = players[playerIdx];
-        const turnPrefix = activeP ? `${activeP.name}'s turn! ` : "";
-        GameAudio.speakText(`${turnPrefix}${challenge.spokenPrompt}`);
+        GameAudio.speakText(challenge.spokenPrompt);
       }
     },
-    [selectedModes, difficulty, speechEnabled, players, cardFormat]
+    [selectedModes, difficulty, speechEnabled]
   );
 
   // ─── Start Game ────────────────────────────────────────────────────────────
@@ -468,22 +462,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
           {/* Quick Audio Controls with SVGs & Fullscreen */}
           <div className="flex items-center gap-2">
-            {/* Word / Digit Cards Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                const next = cardFormat === "words" ? "digits" : "words";
-                setCardFormat(next);
-                if (phase === "playing") {
-                  nextTurnChallenge(activePlayerIndex, next);
-                }
-              }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-900 hover:bg-indigo-100 transition shadow-2xs"
-              title="Toggle between Word Cards (TEN, TWO) and Digit Cards (10, 2)"
-            >
-              <span>{cardFormat === "words" ? "🔤 Words" : "🔢 Digits"}</span>
-            </button>
-
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
@@ -602,20 +580,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        const next = cardFormat === "words" ? "digits" : "words";
-                        setCardFormat(next);
-                        if (phase === "playing") {
-                          nextTurnChallenge(activePlayerIndex, next);
-                        }
-                      }}
-                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-900 hover:bg-indigo-100 transition"
-                      title="Switch between Words and Digits"
-                    >
-                      {cardFormat === "words" ? "🔤 Words" : "🔢 Digits"}
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setSoundEnabled(!soundEnabled)}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                     >
@@ -654,8 +618,6 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                     onDifficultyChange={setDifficulty}
                     selectedModes={selectedModes}
                     onModesChange={setSelectedModes}
-                    cardFormat={cardFormat}
-                    onCardFormatChange={setCardFormat}
                     soundEnabled={soundEnabled}
                     onSoundToggle={() => setSoundEnabled(!soundEnabled)}
                     speechEnabled={speechEnabled}

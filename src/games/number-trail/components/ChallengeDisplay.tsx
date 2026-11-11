@@ -1,7 +1,7 @@
 "use client";
 
 import { NumberChallenge } from "../types";
-import { MODE_METADATA } from "../data";
+import { MODE_METADATA, NUMBERS_DATA } from "../data";
 import { DotGrid } from "./DotGrid";
 import {
   SpeakerIcon,
@@ -73,20 +73,20 @@ export function ChallengeDisplay({
 
       {/* Mode-Specific Presentation */}
       <div className="mt-3 sm:mt-4 w-full">
-        {/* 1. RECOGNITION */}
+        {/* 1. RECOGNITION (Word to Number matching) */}
         {challenge.mode === "recognition" && (
           <div className="flex flex-col items-center justify-center py-1">
-            <div className="relative inline-flex items-center justify-center rounded-[28px] border-[3px] border-sky-300 bg-gradient-to-b from-white via-sky-50 to-blue-100 px-10 py-4 shadow-[0_8px_24px_rgba(37,99,235,0.14)]">
+            <div className="relative inline-flex items-center justify-center rounded-[28px] border-[3.5px] border-sky-300 bg-gradient-to-b from-white via-sky-50 to-blue-100 px-10 py-5 shadow-[0_8px_24px_rgba(37,99,235,0.14)] min-w-[220px]">
               {/* Decorative corner stars */}
               <StarIcon className="absolute -top-2.5 -left-2.5 h-6 w-6 text-amber-400 drop-shadow animate-pulse" />
               <StarIcon className="absolute -bottom-2.5 -right-2.5 h-6 w-6 text-amber-400 drop-shadow animate-pulse" />
-              <span className="font-[family-name:var(--font-fredoka)] text-5xl sm:text-6xl md:text-7xl font-black text-[#1d4ed8] drop-shadow-sm leading-none">
-                {challenge.targetNumber}
+              <span className="font-[family-name:var(--font-fredoka)] text-3xl sm:text-4xl md:text-5xl font-black text-[#1d4ed8] drop-shadow-sm leading-none tracking-wide uppercase select-none">
+                {challenge.targetWord || NUMBERS_DATA[challenge.targetNumber]?.word || challenge.targetNumber}
               </span>
             </div>
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-100/80 px-3 py-1 text-[11px] sm:text-xs font-black text-sky-900 shadow-2xs">
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100/80 px-3.5 py-1 text-[11px] sm:text-xs font-black text-sky-900 shadow-2xs">
               <SparklesIcon className="h-3.5 w-3.5 text-sky-600" />
-              <span>Spot and tap the matching number card below!</span>
+              <span>Read the word above, then tap the matching number below!</span>
             </p>
           </div>
         )}
