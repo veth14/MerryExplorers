@@ -92,7 +92,7 @@ export type TrailblazerStudent = {
   status: string;
 };
 
-export type GamePhase = "setup" | "playing" | "game_over";
+export type GamePhase = "setup" | "playing" | "racing" | "game_over";
 
 export type GameSessionRecord = {
   id: string;

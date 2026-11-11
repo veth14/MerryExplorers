@@ -87,26 +87,26 @@ export function NumberCard({
       type="button"
       onClick={() => onSelect(choice)}
       disabled={disabled}
-      className={`group relative flex min-h-[160px] w-full flex-col items-center justify-center rounded-[28px] border-[3px] p-6 sm:p-8 transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffb800] disabled:cursor-not-allowed ${stateClasses}`}
+      className={`group relative flex min-h-[100px] sm:min-h-[125px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] p-3 sm:p-5 transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffb800] disabled:cursor-not-allowed ${stateClasses}`}
       style={appliedStyle}
       aria-label={`Choose number ${choice.numeral}${choice.sublabel ? ` (${choice.sublabel})` : ""}`}
     >
       {/* Gloss highlight blob */}
       <span
-        className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full opacity-50 transition-transform group-hover:scale-125"
+        className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full opacity-50 transition-transform group-hover:scale-125"
         style={{ background: "radial-gradient(circle, #ffffff 0%, transparent 70%)" }}
         aria-hidden="true"
       />
 
       {/* Main Numeral */}
-      <span className="relative font-[family-name:var(--font-fredoka)] text-6xl sm:text-7xl lg:text-8xl font-black tracking-tight select-none drop-shadow-sm">
+      <span className="relative font-[family-name:var(--font-fredoka)] text-5xl sm:text-6xl font-black tracking-tight select-none drop-shadow-sm leading-none">
         {choice.label || choice.numeral}
       </span>
 
       {/* Word Sublabel (e.g. "FIVE") */}
       {choice.sublabel && (
         <span
-          className="relative mt-2 text-xs sm:text-sm font-extrabold uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity"
+          className="relative mt-1 text-[11px] sm:text-xs font-black uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity"
         >
           {choice.sublabel}
         </span>
@@ -114,13 +114,13 @@ export function NumberCard({
 
       {/* Status icon badge */}
       {isCorrect && (
-        <span className="absolute -top-3.5 -right-3.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#10b981] text-white shadow-lg animate-bounce">
-          <CheckIcon className="h-5 w-5" />
+        <span className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#10b981] text-white shadow-lg animate-bounce">
+          <CheckIcon className="h-4.5 w-4.5" />
         </span>
       )}
       {isWrong && (
-        <span className="absolute -top-3.5 -right-3.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#ef4444] text-white shadow-lg">
-          <CloseIcon className="h-5 w-5" />
+        <span className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#ef4444] text-white shadow-lg">
+          <CloseIcon className="h-4.5 w-4.5" />
         </span>
       )}
     </button>

@@ -36,6 +36,7 @@ import {
   AnimalAvatarBadge,
   MaximizeIcon,
   MinimizeIcon,
+  SparklesIcon,
 } from "./GameIcons";
 
 type NumberTrailWorkspaceProps = {
@@ -82,6 +83,12 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [cheerBanner, setCheerBanner] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [raceMotion, setRaceMotion] = useState<{
+    playerIndex: number;
+    fromCount: number;
+    toCount: number;
+    willReachGoal: boolean;
+  } | null>(null);
 
   // Timing
   const questionStartTimeRef = useRef<number>(Date.now());
@@ -209,6 +216,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     setActivePlayerIndex(0);
     setHasSavedSession(false);
     setPhase("playing");
+    setRaceMotion(null);
 
     if (soundEnabled) {
       GameAudio.playPop();
@@ -216,6 +224,32 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
     nextTurnChallenge(0);
   };
+
+  // ─── Race Phase Handlers ───────────────────────────────────────────────────
+  const handleContinueAfterRace = useCallback(() => {
+    if (!raceMotion) return;
+    if (raceMotion.willReachGoal) {
+      if (soundEnabled) {
+        GameAudio.playVictoryFanfare();
+      }
+      const ranked = rankPlayers(players);
+      setPlayers(ranked);
+      setPhase("game_over");
+    } else {
+      const nextIndex = (raceMotion.playerIndex + 1) % players.length;
+      setActivePlayerIndex(nextIndex);
+      setPhase("playing");
+      nextTurnChallenge(nextIndex);
+    }
+  }, [raceMotion, soundEnabled, players, nextTurnChallenge]);
+
+  useEffect(() => {
+    if (phase !== "racing" || !raceMotion) return;
+    const timer = setTimeout(() => {
+      handleContinueAfterRace();
+    }, 3200);
+    return () => clearTimeout(timer);
+  }, [phase, raceMotion, handleContinueAfterRace]);
 
   // ─── Handle Card Click / Answer ────────────────────────────────────────────
   const handleSelectChoice = (choice: NumberChoice) => {
@@ -251,12 +285,15 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
         GameAudio.speakText(scoreCalc.cheerPhrase);
       }
 
+      const newCount = activePlayer.correctCount + 1;
+      const willReachGoal = newCount >= roundsPerPlayer;
+
       const updatedPlayers = players.map((p, idx) => {
         if (idx !== activePlayerIndex) return p;
         return {
           ...p,
           score: p.score + scoreCalc.points,
-          correctCount: p.correctCount + 1,
+          correctCount: newCount,
           streak: newStreak,
           maxStreak: Math.max(p.maxStreak, newStreak),
         };
@@ -264,22 +301,15 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
       setPlayers(updatedPlayers);
 
-      const willReachGoal = activePlayer.correctCount + 1 >= roundsPerPlayer;
-
       setTimeout(() => {
-        if (willReachGoal) {
-          if (soundEnabled) {
-            GameAudio.playVictoryFanfare();
-          }
-          const ranked = rankPlayers(updatedPlayers);
-          setPlayers(ranked);
-          setPhase("game_over");
-        } else {
-          const nextIndex = (activePlayerIndex + 1) % updatedPlayers.length;
-          setActivePlayerIndex(nextIndex);
-          nextTurnChallenge(nextIndex);
-        }
-      }, 1400);
+        setRaceMotion({
+          playerIndex: activePlayerIndex,
+          fromCount: activePlayer.correctCount,
+          toCount: newCount,
+          willReachGoal,
+        });
+        setPhase("racing");
+      }, 700);
     } else {
       setCardStatus({ [choice.id]: "wrong" });
 
@@ -303,7 +333,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
         const nextIndex = (activePlayerIndex + 1) % updatedPlayers.length;
         setActivePlayerIndex(nextIndex);
         nextTurnChallenge(nextIndex);
-      }, 1600);
+      }, 1400);
     }
   };
 
@@ -315,6 +345,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     setPhase("setup");
     setCardStatus({});
     setCheerBanner(null);
+    setRaceMotion(null);
   };
 
   const handleSaveSession = async (notes: string): Promise<boolean> => {
@@ -532,13 +563,13 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
             </div>
 
             <div
-              className={`relative z-10 mx-auto flex w-full max-w-7xl flex-col justify-start gap-5 p-3.5 sm:p-6 md:p-8 ${
-                isFullscreen ? "min-h-full" : "min-h-[640px]"
+              className={`relative z-10 mx-auto flex w-full max-w-6xl flex-col justify-between p-3 sm:p-5 md:p-6 ${
+                isFullscreen ? "h-full overflow-hidden" : "min-h-[580px]"
               }`}
             >
               {/* Fullscreen Floating Controls Bar (Only visible in fullscreen) */}
               {isFullscreen && (
-                <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-white/60 p-3 shadow-lg">
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-white/60 px-4 py-2.5 shadow-md shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-[family-name:var(--font-fredoka)] text-base font-black text-[#002f76]">
                       Number Trail Adventure
@@ -552,21 +583,21 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                     <button
                       type="button"
                       onClick={() => setSoundEnabled(!soundEnabled)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                     >
                       {soundEnabled ? "Sound ON" : "Muted"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setSpeechEnabled(!speechEnabled)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                     >
                       {speechEnabled ? "Voice ON" : "Silent"}
                     </button>
                     <button
                       type="button"
                       onClick={toggleGameFullscreen}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-[#002f76] hover:bg-slate-50 transition shadow-2xs"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-black text-[#002f76] hover:bg-slate-50 transition shadow-2xs"
                     >
                       <MinimizeIcon className="h-3.5 w-3.5" />
                       <span>Exit Fullscreen</span>
@@ -577,59 +608,63 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
               {/* Phase 1: Setup */}
               {phase === "setup" && (
-                <PlayerSetupModal
-                  roster={roster}
-                  isLoadingRoster={isLoadingRoster}
-                  selectedPlayers={players}
-                  onPlayersChange={setPlayers}
-                  roundsPerPlayer={roundsPerPlayer}
-                  onRoundsChange={setRoundsPerPlayer}
-                  difficulty={difficulty}
-                  onDifficultyChange={setDifficulty}
-                  selectedModes={selectedModes}
-                  onModesChange={setSelectedModes}
-                  soundEnabled={soundEnabled}
-                  onSoundToggle={() => setSoundEnabled(!soundEnabled)}
-                  speechEnabled={speechEnabled}
-                  onSpeechToggle={() => setSpeechEnabled(!speechEnabled)}
-                  onStartGame={handleStartGame}
-                />
+                <div className="overflow-y-auto w-full">
+                  <PlayerSetupModal
+                    roster={roster}
+                    isLoadingRoster={isLoadingRoster}
+                    selectedPlayers={players}
+                    onPlayersChange={setPlayers}
+                    roundsPerPlayer={roundsPerPlayer}
+                    onRoundsChange={setRoundsPerPlayer}
+                    difficulty={difficulty}
+                    onDifficultyChange={setDifficulty}
+                    selectedModes={selectedModes}
+                    onModesChange={setSelectedModes}
+                    soundEnabled={soundEnabled}
+                    onSoundToggle={() => setSoundEnabled(!soundEnabled)}
+                    speechEnabled={speechEnabled}
+                    onSpeechToggle={() => setSpeechEnabled(!speechEnabled)}
+                    onStartGame={handleStartGame}
+                  />
+                </div>
               )}
 
-              {/* Phase 2: Playing Turn */}
+              {/* Phase 2: Playing Turn (Clean Academoo-style, fits 100% on screen with ZERO scrolling) */}
               {phase === "playing" && (
-                <div className="w-full space-y-6">
-                  {/* Active Player Panoramic HUD */}
+                <div className="w-full max-w-4xl mx-auto flex flex-col justify-center gap-3 sm:gap-4 my-auto">
+                  {/* Active Player Compact Pill Header */}
                   {activePlayer && (
                     <div
-                      className="relative flex flex-wrap items-center justify-between gap-4 rounded-[28px] border-[3.5px] p-5 sm:p-7 shadow-2xl transition-all w-full bg-white/95 backdrop-blur-md"
+                      className="relative flex items-center justify-between gap-3 rounded-2xl border-[2.5px] px-4 py-2 sm:py-2.5 shadow-md transition-all w-full bg-white/95 backdrop-blur-md shrink-0"
                       style={{
                         borderColor: activePlayer.borderColor || "#f59e0b",
-                        boxShadow: `0 16px 36px ${activePlayer.color || "#0284c7"}26`,
                       }}
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <AnimalAvatarBadge
                           name={activePlayer.petName || activePlayer.name}
                           color={activePlayer.color}
                           bgLight="#ffffff"
                           borderColor={activePlayer.borderColor}
-                          className="h-16 w-16 sm:h-20 sm:w-20 shadow-lg ring-4 ring-white"
+                          className="h-10 w-10 sm:h-11 sm:w-11 shadow-md ring-2 ring-white"
                         />
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-black uppercase tracking-wider text-[#475569]">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-[#64748b]">
                               Active Explorer
                             </span>
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900">
+                              Step {activePlayer.correctCount + 1} of {roundsPerPlayer}
+                            </span>
                             {activePlayer.streak > 1 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-black text-white animate-pulse shadow-2xs">
-                                <FlameIcon className="h-3.5 w-3.5" />
-                                <span>{activePlayer.streak} Streak!</span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white animate-pulse">
+                                <FlameIcon className="h-3 w-3" />
+                                <span>{activePlayer.streak}</span>
                               </span>
                             )}
                           </div>
                           <h2
-                            className="font-[family-name:var(--font-fredoka)] text-3xl sm:text-4xl lg:text-5xl font-black leading-tight drop-shadow-xs"
+                            className="font-[family-name:var(--font-fredoka)] text-lg sm:text-2xl font-black leading-tight drop-shadow-xs"
                             style={{ color: activePlayer.color || "#002f76" }}
                           >
                             {activePlayer.name}&apos;s Turn!
@@ -637,30 +672,30 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <span className="block text-xs font-bold text-[#64748b]">
-                            Stars Earned
+                          <span className="block text-[10px] font-bold text-[#64748b]">
+                            Stars
                           </span>
-                          <div className="inline-flex items-center gap-2 font-[family-name:var(--font-fredoka)] text-3xl sm:text-4xl font-black text-[#002f76]">
-                            <StarIcon className="h-7 w-7 text-amber-500" />
+                          <div className="inline-flex items-center gap-1 font-[family-name:var(--font-fredoka)] text-xl sm:text-2xl font-black text-[#002f76]">
+                            <StarIcon className="h-5 w-5 text-amber-500" />
                             <span>{activePlayer.score}</span>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={handleNewGameSetup}
-                          className="rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 transition shadow-sm active:scale-95"
+                          className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs active:scale-95"
                         >
-                          Exit Game
+                          Exit
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Challenge Display & Choices Arena (Full Width) */}
+                  {/* Academoo-style Challenge Card */}
                   {currentChallenge && (
-                    <div className="rounded-[36px] border-[4px] border-white/80 bg-white/95 backdrop-blur-md p-6 sm:p-10 shadow-2xl w-full relative">
+                    <div className="rounded-[28px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md p-4 sm:p-6 shadow-2xl w-full flex flex-col justify-between">
                       <ChallengeDisplay
                         challenge={currentChallenge}
                         onSpeakPrompt={() => {
@@ -672,20 +707,20 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
                       {/* Celebration / Feedback Banner */}
                       {cheerBanner && (
-                        <div className="mt-6 rounded-2xl bg-gradient-to-r from-amber-50 via-emerald-50 to-amber-50 border-2 border-emerald-300 p-4 text-center animate-fade-in shadow-md">
-                          <span className="font-[family-name:var(--font-fredoka)] text-base sm:text-lg font-black text-[#065f46]">
+                        <div className="my-2 rounded-xl bg-gradient-to-r from-amber-50 via-emerald-50 to-amber-50 border-2 border-emerald-300 p-2 text-center animate-fade-in shadow-xs">
+                          <span className="font-[family-name:var(--font-fredoka)] text-sm sm:text-base font-black text-[#065f46]">
                             {cheerBanner}
                           </span>
                         </div>
                       )}
 
-                      {/* Answer Choice Cards Grid (Expands to full width with vibrant palettes) */}
+                      {/* Answer Choice Cards Grid (Compact & fitted) */}
                       <div
-                        className={`mt-8 grid gap-4 sm:gap-6 w-full ${
+                        className={`mt-4 grid gap-3 sm:gap-4 w-full ${
                           currentChallenge.choices.length === 2
-                            ? "grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto"
+                            ? "grid-cols-2 max-w-2xl mx-auto"
                             : currentChallenge.choices.length === 3
-                            ? "grid-cols-1 sm:grid-cols-3 max-w-5xl mx-auto"
+                            ? "grid-cols-3 max-w-3xl mx-auto"
                             : "grid-cols-2 sm:grid-cols-4"
                         }`}
                       >
@@ -702,21 +737,76 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* Trail Race Track (Full Width Glassmorphic) */}
-                  <div className="rounded-[32px] border-[3.5px] border-white/80 bg-white/95 backdrop-blur-md shadow-2xl p-2 sm:p-3">
+              {/* Phase 2.5: Racing Stage (Appears only after answer!) */}
+              {phase === "racing" && raceMotion && (
+                <div className="w-full max-w-5xl mx-auto space-y-4 my-auto animate-fade-in">
+                  {/* Race Celebration Header */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-[28px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md p-4 sm:p-5 shadow-xl">
+                    <div className="flex items-center gap-3.5">
+                      <div className="animate-bounce">
+                        <AnimalAvatarBadge
+                          name={players[raceMotion.playerIndex]?.petName || players[raceMotion.playerIndex]?.name || "Explorer"}
+                          color={players[raceMotion.playerIndex]?.color || "#0284c7"}
+                          bgLight="#ffffff"
+                          borderColor={players[raceMotion.playerIndex]?.borderColor}
+                          className="h-14 w-14 sm:h-16 sm:w-16 shadow-lg ring-4 ring-white"
+                        />
+                      </div>
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-black uppercase tracking-wider text-emerald-800">
+                          <SparklesIcon className="h-3.5 w-3.5 text-emerald-600" />
+                          Correct Answer!
+                        </span>
+                        <h2 className="font-[family-name:var(--font-fredoka)] text-2xl sm:text-3xl font-black text-[#002f76]">
+                          {players[raceMotion.playerIndex]?.name}&apos;s Mascot is Racing!
+                        </h2>
+                        <p className="text-xs sm:text-sm font-bold text-slate-600">
+                          {raceMotion.willReachGoal
+                            ? "Crossed the finish line! Trail champion!"
+                            : "Advancing closer to the victory trophy on the trail!"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-5 py-2.5 text-center shadow-xs">
+                      <span className="block text-xs font-black uppercase tracking-wide text-amber-800">Trail Progress</span>
+                      <span className="font-[family-name:var(--font-fredoka)] text-2xl font-black text-amber-950">
+                        Step {raceMotion.toCount} of {roundsPerPlayer}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Race Track */}
+                  <div className="rounded-[32px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md shadow-2xl p-3 sm:p-5">
                     <TrailRaceTrack
                       players={players}
                       totalSteps={roundsPerPlayer}
-                      activePlayerIndex={activePlayerIndex}
+                      activePlayerIndex={raceMotion.playerIndex}
                     />
+                  </div>
+
+                  {/* Race Footer Action */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/95 backdrop-blur-md p-3.5 shadow-lg">
+                    <span className="text-xs sm:text-sm font-bold text-slate-600 text-center sm:text-left">
+                      Every explorer can win by reaching the trail goal. Turn advances automatically or tap next.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleContinueAfterRace}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#002f76] px-6 py-3 text-sm font-black text-white shadow-md hover:bg-[#002358] active:scale-95 transition"
+                    >
+                      <span>{raceMotion.willReachGoal ? "Victory! View Results 🏆" : "Next Explorer's Turn ➜"}</span>
+                    </button>
                   </div>
                 </div>
               )}
 
               {/* Phase 3: Victory Podium (Full Width) */}
               {phase === "game_over" && (
-                <div className="rounded-[36px] border-[4px] border-white/80 bg-white/95 backdrop-blur-md shadow-2xl p-4 sm:p-8">
+                <div className="rounded-[36px] border-[4px] border-white/80 bg-white/95 backdrop-blur-md shadow-2xl p-4 sm:p-8 my-auto">
                   <GameOverPodium
                     players={players}
                     roundsTotal={roundsPerPlayer}
