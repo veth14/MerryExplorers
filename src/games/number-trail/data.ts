@@ -175,7 +175,7 @@ export const DIFFICULTY_RANGES: Record<
     max: 20,
     label: "Trail Champions (1–20)",
     badge: "Ages 4–6",
-    desc: "Full number mastery up to 20 for advanced preschool learners",
+    desc: "Explore numbers up to 20 with a bigger challenge",
   },
 };
 

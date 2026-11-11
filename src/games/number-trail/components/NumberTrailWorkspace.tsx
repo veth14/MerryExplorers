@@ -89,6 +89,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
     toCount: number;
     willReachGoal: boolean;
   } | null>(null);
+  const [raceAnimationStarted, setRaceAnimationStarted] = useState(false);
+  const [raceAnimationDone, setRaceAnimationDone] = useState(false);
 
   // Timing
   const questionStartTimeRef = useRef<number>(Date.now());
@@ -243,10 +245,23 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
   useEffect(() => {
     if (phase !== "racing" || !raceMotion) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const startTimer = window.setTimeout(
+      () => setRaceAnimationStarted(true),
+      reducedMotion ? 0 : 850
+    );
+    const finishAnimationTimer = window.setTimeout(
+      () => setRaceAnimationDone(true),
+      reducedMotion ? 0 : 2450
+    );
     const timer = setTimeout(() => {
       handleContinueAfterRace();
-    }, 3200);
-    return () => clearTimeout(timer);
+    }, reducedMotion ? 120 : 3200);
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(finishAnimationTimer);
+      clearTimeout(timer);
+    };
   }, [phase, raceMotion, handleContinueAfterRace]);
 
   // ─── Handle Card Click / Answer ────────────────────────────────────────────
@@ -300,6 +315,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
       setPlayers(updatedPlayers);
 
       setTimeout(() => {
+        setRaceAnimationStarted(false);
+        setRaceAnimationDone(false);
         setRaceMotion({
           playerIndex: activePlayerIndex,
           fromCount: activePlayer.correctCount,
@@ -415,7 +432,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
           ? "Number Trail Analytics"
           : "Number Trail Adventure"
       }
-      description="Preschool number recognition, counting races, and skill challenges."
+      description="A playful number adventure for Trailblazer playgroup friends."
     >
       {showConfetti && <ConfettiEffect count={100} />}
 
@@ -536,9 +553,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
             ref={gamePanelRef}
             className={`relative w-full overflow-hidden shadow-2xl transition-all ${
               isFullscreen
-                ? phase === "playing"
-                  ? "h-dvh overflow-y-auto rounded-none"
-                  : "min-h-dvh overflow-y-auto rounded-none"
+              ? "h-dvh overflow-hidden rounded-none"
                 : "rounded-3xl"
             }`}
           >
@@ -549,26 +564,41 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
               <div className="forest-cloud forest-cloud-two absolute right-[24%] top-20 hidden h-11 w-32 rounded-full sm:block" />
               <div className="forest-mountain forest-mountain-left absolute bottom-[14%] -left-[6%] h-[38%] w-[34%]" />
               <div className="forest-mountain forest-mountain-right absolute bottom-[12%] -right-[5%] h-[43%] w-[38%]" />
+              <div className="forest-foothill absolute bottom-[11%] -left-[10%] h-[28%] w-[62%]" />
+              <div className="forest-foothill forest-foothill-right absolute bottom-[11%] -right-[10%] h-[30%] w-[64%]" />
+              <div className="forest-tree forest-oak absolute bottom-[12%] left-[27%]" />
+              <div className="forest-tree forest-oak forest-oak-light absolute bottom-[13%] right-[24%]" />
               <div className="forest-tree forest-tree-small absolute bottom-[13%] left-[1%]" />
               <div className="forest-tree forest-tree-medium absolute bottom-[12%] left-[10%]" />
               <div className="forest-tree forest-tree-small absolute bottom-[17%] left-[21%]" />
               <div className="forest-tree forest-tree-medium absolute bottom-[11%] right-[11%]" />
               <div className="forest-tree forest-tree-small absolute bottom-[15%] right-[2%]" />
               <div className="forest-ground absolute -bottom-14 -left-[8%] h-[27%] w-[116%] rounded-[50%_50%_0_0]" />
+              <svg aria-hidden="true" viewBox="0 0 1000 460" preserveAspectRatio="none" className="pointer-events-none absolute -bottom-[4%] left-0 z-[4] h-[38%] w-full overflow-hidden">
+                <defs>
+                  <linearGradient id="forestTrailDirt" x1="0" x2="0.2" y1="0" y2="1">
+                    <stop offset="0" stopColor="#d9b77f" />
+                    <stop offset="1" stopColor="#a9794e" />
+                  </linearGradient>
+                </defs>
+                <path d="M 465 0 C 505 92 625 130 600 218 C 570 310 300 348 112 460 L 888 460 C 710 350 630 310 646 218 C 665 130 535 92 535 0 Z" fill="#825a3e" opacity=".82" />
+                <path d="M 477 0 C 520 92 630 132 608 218 C 580 305 326 350 145 460 L 855 460 C 690 350 620 305 638 218 C 658 132 527 92 523 0 Z" fill="url(#forestTrailDirt)" />
+                <path d="M 500 0 C 540 92 640 132 623 218 C 605 302 500 348 500 460" fill="none" stroke="#f4d9a6" strokeDasharray="4 22" strokeLinecap="round" strokeWidth="5" opacity=".56" />
+              </svg>
               <span className="forest-firefly absolute left-[31%] top-[58%]" />
               <span className="forest-firefly absolute right-[34%] top-[43%] [animation-delay:1.3s]" />
               <span className="forest-firefly absolute right-[12%] top-[64%] [animation-delay:2.1s]" />
             </div>
 
             <div
-              className={`relative z-10 mx-auto flex w-full max-w-6xl flex-col justify-between p-3 sm:p-5 md:p-6 ${
-                isFullscreen ? "h-full overflow-hidden" : "min-h-[580px]"
+              className={`relative z-10 mx-auto flex w-full flex-col justify-between p-3 sm:p-5 md:p-6 ${
+                isFullscreen ? "h-full max-w-none overflow-hidden px-3 py-2 sm:px-5 sm:py-3" : "min-h-[580px] max-w-6xl"
               }`}
             >
               {/* Fullscreen Floating Controls Bar (Only visible in fullscreen) */}
               {isFullscreen && (
-                <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-white/60 px-4 py-2.5 shadow-md shrink-0">
-                  <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md sm:px-5 sm:py-2.5">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <span className="font-[family-name:var(--font-fredoka)] text-base font-black text-[#002f76]">
                       Number Trail Adventure
                     </span>
@@ -577,25 +607,25 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 rounded-xl bg-slate-100/80 p-1 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => setSoundEnabled(!soundEnabled)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                      className="min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:text-xs"
                     >
                       {soundEnabled ? "Sound ON" : "Muted"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setSpeechEnabled(!speechEnabled)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                      className="min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:text-xs"
                     >
                       {speechEnabled ? "Voice ON" : "Silent"}
                     </button>
                     <button
                       type="button"
                       onClick={toggleGameFullscreen}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-black text-[#002f76] hover:bg-slate-50 transition shadow-2xs"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-[#002f76] px-3 py-1.5 text-[11px] font-black text-white shadow-sm transition hover:bg-[#002358] sm:text-xs"
                     >
                       <MinimizeIcon className="h-3.5 w-3.5" />
                       <span>Exit Fullscreen</span>
@@ -606,7 +636,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
               {/* Phase 1: Setup */}
               {phase === "setup" && (
-                <div className="overflow-y-auto w-full">
+                <div className={`w-full ${isFullscreen ? "min-h-0 flex-1 overflow-hidden pt-3 sm:pt-4" : "overflow-y-auto"}`}>
                   <PlayerSetupModal
                     roster={roster}
                     isLoadingRoster={isLoadingRoster}
@@ -623,17 +653,18 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                     speechEnabled={speechEnabled}
                     onSpeechToggle={() => setSpeechEnabled(!speechEnabled)}
                     onStartGame={handleStartGame}
+                    isFullscreen={isFullscreen}
                   />
                 </div>
               )}
 
               {/* Phase 2: Playing Turn (Clean Academoo-style, fits 100% on screen with ZERO scrolling) */}
               {phase === "playing" && (
-                <div className="w-full max-w-4xl mx-auto flex flex-col justify-center gap-3 sm:gap-4 my-auto">
+                <div className="w-full max-w-5xl mx-auto flex flex-col justify-center gap-3 sm:gap-4 my-auto">
                   {/* Active Player Compact Pill Header */}
                   {activePlayer && (
                     <div
-                      className="relative flex items-center justify-between gap-3 rounded-2xl border-[2.5px] px-4 py-2 sm:py-2.5 shadow-md transition-all w-full bg-white/95 backdrop-blur-md shrink-0"
+                      className="relative flex items-center justify-between gap-3 rounded-[24px] border-2 px-4 py-2.5 shadow-[0_12px_28px_rgba(24,65,52,.16)] ring-1 ring-white/80 transition-all w-full bg-gradient-to-r from-white via-white/95 to-emerald-50/95 backdrop-blur-md shrink-0"
                       style={{
                         borderColor: activePlayer.borderColor || "#f59e0b",
                       }}
@@ -693,7 +724,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
                   {/* Academoo-style Challenge Card */}
                   {currentChallenge && (
-                    <div className="rounded-[28px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md p-4 sm:p-6 shadow-2xl w-full flex flex-col justify-between">
+                    <div className="number-trail-challenge-card w-full rounded-[32px] border-[3px] border-white/90 p-4 backdrop-blur-md sm:p-6">
                       <ChallengeDisplay
                         challenge={currentChallenge}
                         onSpeakPrompt={() => {
@@ -740,7 +771,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
               {/* Phase 2.5: Racing Stage (Appears only after answer!) */}
               {phase === "racing" && raceMotion && (
-                <div className="w-full max-w-5xl mx-auto space-y-4 my-auto animate-fade-in">
+                <div className="w-full max-w-7xl mx-auto space-y-3 sm:space-y-4 my-auto animate-fade-in">
                   {/* Race Celebration Header */}
                   <div className="flex flex-wrap items-center justify-between gap-4 rounded-[28px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md p-4 sm:p-5 shadow-xl">
                     <div className="flex items-center gap-3.5">
@@ -759,12 +790,16 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                           Correct Answer!
                         </span>
                         <h2 className="font-[family-name:var(--font-fredoka)] text-2xl sm:text-3xl font-black text-[#002f76]">
-                          {players[raceMotion.playerIndex]?.name}&apos;s Mascot is Racing!
+                          {raceAnimationStarted
+                            ? `${players[raceMotion.playerIndex]?.name}'s Mascot is Racing!`
+                            : "Ready… set… watch it go!"}
                         </h2>
                         <p className="text-xs sm:text-sm font-bold text-slate-600">
-                          {raceMotion.willReachGoal
+                          {raceAnimationDone && raceMotion.willReachGoal
                             ? "Crossed the finish line! Trail champion!"
-                            : "Advancing closer to the victory trophy on the trail!"}
+                            : raceAnimationStarted
+                              ? "Advancing closer to the victory trophy on the trail!"
+                              : "Get ready! Your mascot is about to race!"}
                         </p>
                       </div>
                     </div>
@@ -783,6 +818,8 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                       players={players}
                       totalSteps={roundsPerPlayer}
                       activePlayerIndex={raceMotion.playerIndex}
+                      raceMotion={raceMotion}
+                      raceAnimationStarted={raceAnimationStarted}
                     />
                   </div>
 
@@ -791,13 +828,17 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                     <span className="text-xs sm:text-sm font-bold text-slate-600 text-center sm:text-left">
                       Every explorer can win by reaching the trail goal. Turn advances automatically or tap next.
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleContinueAfterRace}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#002f76] px-6 py-3 text-sm font-black text-white shadow-md hover:bg-[#002358] active:scale-95 transition"
-                    >
-                      <span>{raceMotion.willReachGoal ? "Victory! View Results 🏆" : "Next Explorer's Turn ➜"}</span>
-                    </button>
+                    {raceAnimationDone ? (
+                      <button
+                        type="button"
+                        onClick={handleContinueAfterRace}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#002f76] px-6 py-3 text-sm font-black text-white shadow-md hover:bg-[#002358] active:scale-95 transition"
+                      >
+                        <span>{raceMotion.willReachGoal ? "Victory! View Results 🏆" : "Next Explorer's Turn ➜"}</span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex min-h-11 items-center rounded-xl bg-sky-100 px-5 text-sm font-black text-sky-900">Watch the race…</span>
+                    )}
                   </div>
                 </div>
               )}

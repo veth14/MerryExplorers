@@ -94,7 +94,7 @@ export function ChallengeDisplay({
         {/* 2. COUNT & MATCH */}
         {challenge.mode === "count_match" && (
           <div className="flex flex-col items-center justify-center w-full">
-            <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-b from-white via-emerald-50/50 to-emerald-100/30 p-2 sm:p-3.5 shadow-inner w-full flex justify-center">
+            <div className="number-trail-counting-meadow w-full rounded-[26px] border-2 border-white/90 p-2.5 shadow-inner sm:p-3.5">
               <DotGrid
                 count={challenge.dotCount || challenge.targetNumber}
                 iconId={challenge.dotIconId || "star"}

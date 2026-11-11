@@ -70,7 +70,7 @@ export function DotGrid({
   return (
     <div className="flex w-full flex-col items-center">
       <div
-        className="flex flex-wrap justify-center gap-3 sm:gap-4.5 py-3 w-full"
+        className="flex w-full flex-wrap justify-center gap-2.5 py-2.5 sm:gap-3.5 sm:py-3"
         role="group"
         aria-label={`Visual group of ${count} items`}
       >
@@ -85,11 +85,11 @@ export function DotGrid({
               className={`relative flex items-center justify-center rounded-2xl border-2 transition-all duration-200 select-none shadow-xs ${
                 isLg
                   ? "h-16 w-16 sm:h-20 sm:w-20 p-2.5"
-                  : "h-12 w-12 sm:h-14 sm:w-14 p-1.5"
+                  : "h-14 w-14 sm:h-16 sm:w-16 p-2"
               } ${
                 isTapped
                   ? "border-[#10b981] bg-[#ecfdf5] scale-110 shadow-md ring-4 ring-[#10b981]/25"
-                  : "border-[#e2e8f0] bg-white hover:scale-105 hover:border-[#94a3b8] hover:shadow-sm"
+                  : "border-[#e2e8f0] bg-white hover:-translate-y-1 hover:scale-105 hover:border-sky-300 hover:shadow-md active:scale-95"
               }`}
             >
               {renderVectorItem(iconId, isLg ? "h-full w-full" : "h-full w-full")}

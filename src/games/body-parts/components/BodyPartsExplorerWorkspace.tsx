@@ -158,10 +158,13 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
   useEffect(() => {
     if (phase !== "racing" || !raceMotion) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const frame = window.requestAnimationFrame(() => setRaceAnimationStarted(true));
-    const finishTimer = window.setTimeout(() => setRaceAnimationDone(true), reducedMotion ? 120 : 3000);
+    const startTimer = window.setTimeout(
+      () => setRaceAnimationStarted(true),
+      reducedMotion ? 0 : 850
+    );
+    const finishTimer = window.setTimeout(() => setRaceAnimationDone(true), reducedMotion ? 120 : 3600);
     return () => {
-      window.cancelAnimationFrame(frame);
+      window.clearTimeout(startTimer);
       window.clearTimeout(finishTimer);
     };
   }, [phase, raceMotion]);
@@ -1165,8 +1168,8 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                       <RacePetPicture name={currentPlayer.petName} color={currentPlayer.color} background={currentPlayer.bgLight} className="h-16 w-24 shrink-0 sm:h-20 sm:w-28" />
                       <div>
                         <span className="text-xs font-black uppercase tracking-[.16em] text-emerald-700">Correct answer!</span>
-                        <h2 className="font-[family-name:var(--font-fredoka)] text-2xl font-black text-[#002f76] sm:text-4xl">{currentPlayer.name}&apos;s pet is racing!</h2>
-                        <p className="text-sm font-bold text-slate-600">{raceMotion.toCount >= roundsPerPlayer ? (raceAnimationDone ? "You crossed the finish line! You are a winner!" : "Your pet is racing toward the finish!") : "Watch your pet race closer to the finish."}</p>
+                        <h2 className="font-[family-name:var(--font-fredoka)] text-2xl font-black text-[#002f76] sm:text-4xl">{raceAnimationStarted ? `${currentPlayer.name}'s pet is racing!` : "Ready… set… watch it go!"}</h2>
+                        <p aria-live="polite" className="text-sm font-bold text-slate-600">{raceAnimationDone ? "You crossed the finish line! You are a winner!" : raceAnimationStarted ? "Your pet is racing toward the finish!" : "Get ready! Your pet is about to race!"}</p>
                       </div>
                     </div>
                     <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-5 py-3 text-center shadow-sm">
@@ -1204,7 +1207,12 @@ export function BodyPartsExplorerWorkspace({ mode }: { mode: WorkspaceMode }) {
                                 className="race-lane-runner absolute top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2"
                                 style={{ left: `calc(5% + ${progress * 0.85}%)` }}
                               >
-                                <div className={isMoving ? "pet-race-bounce drop-shadow-xl" : "drop-shadow-md"}>
+                                <div className={isMoving ? "pet-race-bounce drop-shadow-xl" : index === raceMotion.playerIndex && !raceAnimationStarted ? "pet-race-ready drop-shadow-xl" : "drop-shadow-md"}>
+                                  {index === raceMotion.playerIndex && !raceAnimationStarted && (
+                                    <span className="absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-amber-300 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-900 shadow-md animate-pulse">
+                                      Ready… set…
+                                    </span>
+                                  )}
                                   <RacePetPicture name={player.petName} color={player.color} background={player.bgLight} className="h-[68px] w-[96px] sm:h-[76px] sm:w-[108px]" />
                                 </div>
                               </div>

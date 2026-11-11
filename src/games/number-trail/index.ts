@@ -1,7 +1,7 @@
 /**
  * Number Trail Game Module
  * Version: 1.0.0
- * Learning Objective: Preschool Number Recognition, Counting, Sequence, and Comparison (Ages 2-6)
+ * Learning Objective: Trailblazer playgroup number recognition, counting, sequence, and comparison (Ages 2–6)
  */
 
 export * from "./types";

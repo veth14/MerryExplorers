@@ -207,7 +207,7 @@ export function GameOverPodium({
           <span className="text-xs font-bold text-[#64748b]">
             {hasSaved
               ? "✓ Session recorded in database!"
-              : "Save this session to track student progress."}
+              : "Save this session to track your playgroup’s progress."}
           </span>
           <button
             type="button"
