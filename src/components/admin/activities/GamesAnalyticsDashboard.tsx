@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 
@@ -427,9 +427,10 @@ export function GamesAnalyticsDashboard() {
       title="Games Analytics"
       description="Classroom learning analytics, student mastery, and performance insights."
     >
-      <div className="w-full space-y-8 pb-16 sm:space-y-10">
+      <LazyMotion features={domAnimation}>
+        <div className="w-full space-y-8 pb-16 sm:space-y-10">
         {/* ─── Hero Header Card ─── */}
-        <motion.header
+        <m.header
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -474,10 +475,10 @@ export function GamesAnalyticsDashboard() {
               </button>
             </div>
           </div>
-        </motion.header>
+        </m.header>
 
         {/* ─── Filter Bar ─── */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.05 }}
@@ -530,12 +531,12 @@ export function GamesAnalyticsDashboard() {
               </button>
             ))}
           </div>
-        </motion.div>
+        </m.div>
 
         {/* ─── SECTION 1: Top Executive KPI Cards ─── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {/* Card 1: Total Sessions */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.08 }}
@@ -553,10 +554,10 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-[#6680a3]">
               Classroom matches
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 2: Total Stars */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.12 }}
@@ -574,10 +575,10 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-amber-800/80">
               ~{(data?.kpis.avgStarsPerSession ?? 0).toLocaleString()} / session
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 3: Active Explorers */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.16 }}
@@ -595,10 +596,10 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-emerald-800/80">
               {data?.kpis.totalPlayersEngaged ?? 0} participant turns
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 4: Overall Accuracy */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.2 }}
@@ -616,10 +617,10 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-indigo-800/80">
               {data?.kpis.totalCorrectAnswers ?? 0} correct answers
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 5: Total Rounds */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.24 }}
@@ -637,10 +638,10 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-cyan-800/80">
               ~{data?.kpis.avgRoundsPerSession ?? 0} rounds / match
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 6: Top Activity */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.28 }}
@@ -658,13 +659,13 @@ export function GamesAnalyticsDashboard() {
             <div className="mt-1 text-[11px] font-bold text-violet-800/80">
               Most popular pick
             </div>
-          </motion.div>
+          </m.div>
         </div>
 
         {/* ─── SECTION 2: Hero Visualizations (Animated Spline & Layered Donut) ─── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* CHART 1: Animated Hybrid Spline + Stacked Capsule Bar Chart (8 cols) */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.45 }}
@@ -765,7 +766,7 @@ export function GamesAnalyticsDashboard() {
 
                       {/* Animated Spline Area Background */}
                       {areaPath && (
-                        <motion.path
+                        <m.path
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
@@ -776,7 +777,7 @@ export function GamesAnalyticsDashboard() {
 
                       {/* Animated Spline Line */}
                       {splinePath && (
-                        <motion.path
+                        <m.path
                           initial={{ pathLength: 0, opacity: 0 }}
                           animate={{ pathLength: 1, opacity: 1 }}
                           transition={{ duration: 1, ease: "easeOut" }}
@@ -816,7 +817,7 @@ export function GamesAnalyticsDashboard() {
                           >
                             {/* Hover Column highlight */}
                             {isHovered && (
-                              <motion.rect
+                              <m.rect
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 x={x - step / 2}
@@ -839,7 +840,7 @@ export function GamesAnalyticsDashboard() {
                               <>
                                 {/* Number Trail bottom segment */}
                                 {ntHeight > 0 && (
-                                  <motion.rect
+                                  <m.rect
                                     initial={{ height: 0, y: 195 }}
                                     animate={{ height: ntHeight, y: 195 - ntHeight }}
                                     transition={{ type: "spring", stiffness: 220, damping: 22, delay: index * 0.02 }}
@@ -852,7 +853,7 @@ export function GamesAnalyticsDashboard() {
 
                                 {/* Body Parts top segment */}
                                 {bpHeight > 0 && (
-                                  <motion.rect
+                                  <m.rect
                                     initial={{ height: 0, y: 195 }}
                                     animate={{ height: bpHeight, y: 195 - ntHeight - bpHeight }}
                                     transition={{ type: "spring", stiffness: 220, damping: 22, delay: index * 0.02 + 0.04 }}
@@ -866,7 +867,7 @@ export function GamesAnalyticsDashboard() {
                             ) : (
                               /* Stars earned bar */
                               totalHeight > 0 && (
-                                <motion.rect
+                                <m.rect
                                   initial={{ height: 0, y: 195 }}
                                   animate={{ height: totalHeight, y: totalY }}
                                   transition={{ type: "spring", stiffness: 220, damping: 22, delay: index * 0.02 }}
@@ -924,7 +925,7 @@ export function GamesAnalyticsDashboard() {
                     {/* Floating Crosshair Card */}
                     <AnimatePresence>
                       {hoveredIndex !== null && pointsCoords[hoveredIndex] && (
-                        <motion.div
+                        <m.div
                           initial={{ opacity: 0, y: -6, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.95 }}
@@ -954,7 +955,7 @@ export function GamesAnalyticsDashboard() {
                               Stars: <strong>{pointsCoords[hoveredIndex].point.stars.toLocaleString()}</strong>
                             </span>
                           </div>
-                        </motion.div>
+                        </m.div>
                       )}
                     </AnimatePresence>
                   </div>
@@ -982,10 +983,10 @@ export function GamesAnalyticsDashboard() {
                 </div>
               )}
             </div>
-          </motion.div>
+          </m.div>
 
           {/* CHART 2: Layered Animated Game Share Donut (4 cols) */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.45, delay: 0.08 }}
@@ -1017,7 +1018,7 @@ export function GamesAnalyticsDashboard() {
                     cumulativeOffset += (game.percentage / 100) * circumference;
 
                     return (
-                      <motion.circle
+                      <m.circle
                         key={game.id}
                         initial={{ strokeDashoffset: circumference }}
                         animate={{ strokeDashoffset }}
@@ -1039,14 +1040,14 @@ export function GamesAnalyticsDashboard() {
 
               {/* Center Stage Counter */}
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <motion.span
+                <m.span
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.3 }}
                   className="text-3xl font-black text-[#002f76]"
                 >
                   {data?.kpis.totalSessions ?? 0}
-                </motion.span>
+                </m.span>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#6480a4]">
                   Total Matches
                 </span>
@@ -1074,13 +1075,13 @@ export function GamesAnalyticsDashboard() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
         </div>
 
         {/* ─── SECTION 3: Challenge Mastery & Streak Distribution ─── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* CHART 3: Challenge Mode Mastery Progress (6 cols) */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
@@ -1115,7 +1116,7 @@ export function GamesAnalyticsDashboard() {
 
                     {/* Animated Progress track */}
                     <div className="h-3 w-full overflow-hidden rounded-full bg-[#e3ecf7]">
-                      <motion.div
+                      <m.div
                         initial={{ width: 0 }}
                         animate={{ width: `${item.accuracy}%` }}
                         transition={{ duration: 0.8, ease: "easeOut", delay: idx * 0.1 }}
@@ -1135,10 +1136,10 @@ export function GamesAnalyticsDashboard() {
             <p className="mt-4 text-[11px] font-semibold text-[#6682a5]">
               Accuracy is calculated from correct responses vs hints and errors during student classroom turns.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* CHART 4: Accomplishment & Streak Distribution (6 cols) */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.08 }}
@@ -1163,7 +1164,7 @@ export function GamesAnalyticsDashboard() {
                   </span>
                   <div className="grid grid-cols-4 gap-2.5 text-center">
                     {Object.entries(data?.scoreBuckets || { "1–2 Stars": 0, "3–4 Stars": 0, "5–7 Stars": 0, "8+ Stars": 14 }).map(([tier, count], idx) => (
-                      <motion.div
+                      <m.div
                         key={tier}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1172,7 +1173,7 @@ export function GamesAnalyticsDashboard() {
                       >
                         <span className="block text-2xl font-black text-[#002f76]">{count}</span>
                         <span className="mt-1 block text-[10px] font-black text-[#5c7799] uppercase">{tier}</span>
-                      </motion.div>
+                      </m.div>
                     ))}
                   </div>
                 </div>
@@ -1183,7 +1184,7 @@ export function GamesAnalyticsDashboard() {
                   </span>
                   <div className="grid grid-cols-3 gap-2.5 text-center">
                     {Object.entries(data?.streakBuckets || { "1–2 Combo": 0, "3–4 Combo": 4, "5+ Master": 10 }).map(([streak, count], idx) => (
-                      <motion.div
+                      <m.div
                         key={streak}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1195,7 +1196,7 @@ export function GamesAnalyticsDashboard() {
                           <span className="text-2xl font-black text-amber-700">{count}</span>
                         </div>
                         <span className="mt-1 block text-[10px] font-black text-amber-900 uppercase">{streak}</span>
-                      </motion.div>
+                      </m.div>
                     ))}
                   </div>
                 </div>
@@ -1205,11 +1206,11 @@ export function GamesAnalyticsDashboard() {
             <p className="text-[11px] font-semibold text-[#6682a5]">
               Combos grant celebratory audio fanfare and advance student explorers toward the victory podium.
             </p>
-          </motion.div>
+          </m.div>
         </div>
 
         {/* ─── SECTION 4: Explorer Hall of Fame (Student Leaderboard) ─── */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -1238,7 +1239,7 @@ export function GamesAnalyticsDashboard() {
           {data?.leaderboard && data.leaderboard.length > 0 && (
             <div className="my-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {/* 1st Place (Gold Champion Pedestal) */}
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, y: 25 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.1 }}
@@ -1266,11 +1267,11 @@ export function GamesAnalyticsDashboard() {
                 <span className="mt-1 text-xs font-bold text-amber-900">
                   {data.leaderboard[0].sessionsPlayed} matches · {data.leaderboard[0].winRate}% win rate
                 </span>
-              </motion.div>
+              </m.div>
 
               {/* 2nd Place (Silver Pedestal) */}
               {data.leaderboard.length >= 2 && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 25 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.15 }}
@@ -1294,12 +1295,12 @@ export function GamesAnalyticsDashboard() {
                   <span className="mt-1 text-xs font-bold text-slate-600">
                     {data.leaderboard[1].sessionsPlayed} matches · {data.leaderboard[1].winRate}% win rate
                   </span>
-                </motion.div>
+                </m.div>
               )}
 
               {/* 3rd Place (Bronze Pedestal) */}
               {data.leaderboard.length >= 3 && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 25 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.2 }}
@@ -1323,7 +1324,7 @@ export function GamesAnalyticsDashboard() {
                   <span className="mt-1 text-xs font-bold text-slate-600">
                     {data.leaderboard[2].sessionsPlayed} matches · {data.leaderboard[2].winRate}% win rate
                   </span>
-                </motion.div>
+                </m.div>
               )}
             </div>
           )}
@@ -1399,10 +1400,10 @@ export function GamesAnalyticsDashboard() {
               </tbody>
             </table>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* ─── SECTION 5: Recorded Game Sessions Table WITH PAGINATION ─── */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -1643,20 +1644,20 @@ export function GamesAnalyticsDashboard() {
               </div>
             </div>
           )}
-        </motion.div>
+        </m.div>
 
         {/* ─── MODAL: Session Details Inspector ─── */}
         <AnimatePresence>
           {selectedSession && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-[#002f76]/40 backdrop-blur-xs transition-opacity"
                 onClick={() => setSelectedSession(null)}
               />
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -1744,7 +1745,7 @@ export function GamesAnalyticsDashboard() {
                     Close Inspection
                   </button>
                 </div>
-              </motion.div>
+              </m.div>
             </div>
           )}
         </AnimatePresence>
@@ -1753,14 +1754,14 @@ export function GamesAnalyticsDashboard() {
         <AnimatePresence>
           {deleteConfirmId && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-[#002f76]/40 backdrop-blur-xs transition-opacity"
                 onClick={() => setDeleteConfirmId(null)}
               />
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -1789,11 +1790,12 @@ export function GamesAnalyticsDashboard() {
                     {isDeleting ? "Deleting…" : "Confirm Delete"}
                   </button>
                 </div>
-              </motion.div>
+              </m.div>
             </div>
           )}
         </AnimatePresence>
       </div>
-    </AppShell>
-  );
+    </LazyMotion>
+  </AppShell>
+);
 }
