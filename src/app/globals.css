@@ -211,6 +211,51 @@ html.menu-open {
   animation: pet-race-ready 720ms ease-in-out infinite;
 }
 
+@keyframes trail-animal-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -3px; }
+}
+
+@keyframes trail-animal-leg-front {
+  0%, 100% { transform: rotate(-20deg); }
+  50% { transform: rotate(20deg); }
+}
+
+@keyframes trail-animal-leg-back {
+  0%, 100% { transform: rotate(20deg); }
+  50% { transform: rotate(-20deg); }
+}
+
+@keyframes trail-animal-tail-wag {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(18deg); }
+}
+
+@keyframes trail-animal-ears-flop {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(2px) rotate(4deg); }
+}
+
+.trail-animal-walk {
+  overflow: visible;
+  animation: trail-animal-bob 320ms ease-in-out infinite;
+}
+
+.trail-animal-idle {
+  overflow: visible;
+  animation: trail-animal-bob 2.2s ease-in-out infinite;
+}
+
+.trail-animal-leg {
+  transform-box: fill-box;
+  transform-origin: 50% 5%;
+}
+
+.trail-animal-leg-front { animation: trail-animal-leg-front 320ms ease-in-out infinite alternate; }
+.trail-animal-leg-back { animation: trail-animal-leg-back 320ms ease-in-out infinite alternate; }
+.trail-animal-tail { transform-box: fill-box; transform-origin: 90% 50%; animation: trail-animal-tail-wag 520ms ease-in-out infinite; }
+.trail-animal-ears { transform-box: fill-box; transform-origin: 50% 100%; animation: trail-animal-ears-flop 360ms ease-in-out infinite; }
+
 .race-lane-runner {
   transition: left 2600ms cubic-bezier(.16, .72, .18, 1);
 }
@@ -227,8 +272,10 @@ html.menu-open {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pet-race-bounce, .pet-race-ready { animation: none; }
+  .pet-race-bounce, .pet-race-ready, .trail-animal-walk, .trail-animal-idle,
+  .trail-animal-leg-front, .trail-animal-leg-back, .trail-animal-tail, .trail-animal-ears { animation: none; }
   .race-lane-runner { transition: none; }
+  .trail-explorer-mover { transition: none; }
   .trail-progress-stroke { transition: none; }
   .body-part-answer-picture { animation: none; }
 }
@@ -307,6 +354,17 @@ body {
     repeating-linear-gradient(155deg, rgb(39 104 57 / 3%) 0 2px, transparent 2px 13px),
     linear-gradient(180deg, #dcefd2 0%, #c5e0ad 100%);
   box-shadow: inset 0 2px 12px rgb(33 83 43 / 12%), 0 12px 30px rgb(31 85 57 / 10%);
+}
+
+.number-trail-journey {
+  background:
+    radial-gradient(ellipse at 77% 8%, rgb(255 244 198 / 24%), transparent 22%),
+    linear-gradient(180deg, rgb(244 251 248 / 9%) 0%, rgb(54 109 61 / 12%) 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%), 0 24px 70px rgb(24 63 46 / 24%);
+}
+
+.trail-explorer-mover {
+  will-change: left, top;
 }
 
 .number-trail-challenge-card {

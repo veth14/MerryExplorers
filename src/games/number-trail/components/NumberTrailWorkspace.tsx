@@ -36,7 +36,6 @@ import {
   AnimalAvatarBadge,
   MaximizeIcon,
   MinimizeIcon,
-  SparklesIcon,
 } from "./GameIcons";
 
 type NumberTrailWorkspaceProps = {
@@ -574,7 +573,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
               <div className="forest-tree forest-tree-medium absolute bottom-[11%] right-[11%]" />
               <div className="forest-tree forest-tree-small absolute bottom-[15%] right-[2%]" />
               <div className="forest-ground absolute -bottom-14 -left-[8%] h-[27%] w-[116%] rounded-[50%_50%_0_0]" />
-              <svg aria-hidden="true" viewBox="0 0 1000 460" preserveAspectRatio="none" className="pointer-events-none absolute -bottom-[4%] left-0 z-[4] h-[38%] w-full overflow-hidden">
+              {phase !== "racing" && <svg aria-hidden="true" viewBox="0 0 1000 460" preserveAspectRatio="none" className="pointer-events-none absolute -bottom-[4%] left-0 z-[4] h-[38%] w-full overflow-hidden">
                 <defs>
                   <linearGradient id="forestTrailDirt" x1="0" x2="0.2" y1="0" y2="1">
                     <stop offset="0" stopColor="#d9b77f" />
@@ -584,7 +583,7 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
                 <path d="M 465 0 C 505 92 625 130 600 218 C 570 310 300 348 112 460 L 888 460 C 710 350 630 310 646 218 C 665 130 535 92 535 0 Z" fill="#825a3e" opacity=".82" />
                 <path d="M 477 0 C 520 92 630 132 608 218 C 580 305 326 350 145 460 L 855 460 C 690 350 620 305 638 218 C 658 132 527 92 523 0 Z" fill="url(#forestTrailDirt)" />
                 <path d="M 500 0 C 540 92 640 132 623 218 C 605 302 500 348 500 460" fill="none" stroke="#f4d9a6" strokeDasharray="4 22" strokeLinecap="round" strokeWidth="5" opacity=".56" />
-              </svg>
+              </svg>}
               <span className="forest-firefly absolute left-[31%] top-[58%]" />
               <span className="forest-firefly absolute right-[34%] top-[43%] [animation-delay:1.3s]" />
               <span className="forest-firefly absolute right-[12%] top-[64%] [animation-delay:2.1s]" />
@@ -771,75 +770,16 @@ export function NumberTrailWorkspace({ mode }: NumberTrailWorkspaceProps) {
 
               {/* Phase 2.5: Racing Stage (Appears only after answer!) */}
               {phase === "racing" && raceMotion && (
-                <div className="w-full max-w-7xl mx-auto space-y-3 sm:space-y-4 my-auto animate-fade-in">
-                  {/* Race Celebration Header */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-[28px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md p-4 sm:p-5 shadow-xl">
-                    <div className="flex items-center gap-3.5">
-                      <div className="animate-bounce">
-                        <AnimalAvatarBadge
-                          name={players[raceMotion.playerIndex]?.petName || players[raceMotion.playerIndex]?.name || "Explorer"}
-                          color={players[raceMotion.playerIndex]?.color || "#0284c7"}
-                          bgLight="#ffffff"
-                          borderColor={players[raceMotion.playerIndex]?.borderColor}
-                          className="h-14 w-14 sm:h-16 sm:w-16 shadow-lg ring-4 ring-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-black uppercase tracking-wider text-emerald-800">
-                          <SparklesIcon className="h-3.5 w-3.5 text-emerald-600" />
-                          Correct Answer!
-                        </span>
-                        <h2 className="font-[family-name:var(--font-fredoka)] text-2xl sm:text-3xl font-black text-[#002f76]">
-                          {raceAnimationStarted
-                            ? `${players[raceMotion.playerIndex]?.name}'s Mascot is Racing!`
-                            : "Ready… set… watch it go!"}
-                        </h2>
-                        <p className="text-xs sm:text-sm font-bold text-slate-600">
-                          {raceAnimationDone && raceMotion.willReachGoal
-                            ? "Crossed the finish line! Trail champion!"
-                            : raceAnimationStarted
-                              ? "Advancing closer to the victory trophy on the trail!"
-                              : "Get ready! Your mascot is about to race!"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-5 py-2.5 text-center shadow-xs">
-                      <span className="block text-xs font-black uppercase tracking-wide text-amber-800">Trail Progress</span>
-                      <span className="font-[family-name:var(--font-fredoka)] text-2xl font-black text-amber-950">
-                        Step {raceMotion.toCount} of {roundsPerPlayer}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Race Track */}
-                  <div className="rounded-[32px] border-[3.5px] border-white/90 bg-white/95 backdrop-blur-md shadow-2xl p-3 sm:p-5">
-                    <TrailRaceTrack
-                      players={players}
-                      totalSteps={roundsPerPlayer}
-                      activePlayerIndex={raceMotion.playerIndex}
-                      raceMotion={raceMotion}
-                      raceAnimationStarted={raceAnimationStarted}
-                    />
-                  </div>
-
-                  {/* Race Footer Action */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/95 backdrop-blur-md p-3.5 shadow-lg">
-                    <span className="text-xs sm:text-sm font-bold text-slate-600 text-center sm:text-left">
-                      Every explorer can win by reaching the trail goal. Turn advances automatically or tap next.
-                    </span>
-                    {raceAnimationDone ? (
-                      <button
-                        type="button"
-                        onClick={handleContinueAfterRace}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#002f76] px-6 py-3 text-sm font-black text-white shadow-md hover:bg-[#002358] active:scale-95 transition"
-                      >
-                        <span>{raceMotion.willReachGoal ? "Victory! View Results 🏆" : "Next Explorer's Turn ➜"}</span>
-                      </button>
-                    ) : (
-                      <span className="inline-flex min-h-11 items-center rounded-xl bg-sky-100 px-5 text-sm font-black text-sky-900">Watch the race…</span>
-                    )}
-                  </div>
+                <div className="my-auto flex min-h-0 w-full flex-1 animate-fade-in">
+                  <TrailRaceTrack
+                    players={players}
+                    totalSteps={roundsPerPlayer}
+                    activePlayerIndex={raceMotion.playerIndex}
+                    raceMotion={raceMotion}
+                    raceAnimationStarted={raceAnimationStarted}
+                    raceAnimationDone={raceAnimationDone}
+                    onContinue={handleContinueAfterRace}
+                  />
                 </div>
               )}
 
