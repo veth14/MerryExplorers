@@ -249,8 +249,10 @@ export default function ClockPage() {
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: targetFacing },
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
+          // A smaller input is more than enough for face verification and
+          // keeps the camera workload manageable on phones.
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
         },
         audio: false,
       });
@@ -478,8 +480,17 @@ export default function ClockPage() {
 
   useEffect(() => {
     setMounted(true);
-    const id = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(id);
+    const refreshTime = () => setNow(new Date());
+    const id = window.setInterval(refreshTime, 1000);
+    window.addEventListener("focus", refreshTime);
+    document.addEventListener("visibilitychange", refreshTime);
+    window.addEventListener("pageshow", refreshTime);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", refreshTime);
+      document.removeEventListener("visibilitychange", refreshTime);
+      window.removeEventListener("pageshow", refreshTime);
+    };
   }, []);
 
   // ── Elapsed timer (pauses during breaks) ─────────────────────────────────
@@ -487,13 +498,23 @@ export default function ClockPage() {
   useEffect(() => {
     if (state !== "clocked-in" || !clockInAt.current) return;
 
-    const id = window.setInterval(() => {
+    const refreshElapsed = () => {
       const workNow =
         Date.now() - clockInAt.current!.getTime() - totalBreakMs(breaks);
       setElapsed(Math.max(0, Math.floor(workNow / 1000)));
-    }, 1000);
+    };
+    refreshElapsed();
+    const id = window.setInterval(refreshElapsed, 1000);
+    window.addEventListener("focus", refreshElapsed);
+    document.addEventListener("visibilitychange", refreshElapsed);
+    window.addEventListener("pageshow", refreshElapsed);
 
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", refreshElapsed);
+      document.removeEventListener("visibilitychange", refreshElapsed);
+      window.removeEventListener("pageshow", refreshElapsed);
+    };
   }, [state, breaks]);
 
   // ── Undo timer ───────────────────────────────────────────────────────────

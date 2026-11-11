@@ -189,6 +189,8 @@ export function useFaceDetection(): FaceDetectionResult {
   const lastInferenceTimeRef = useRef(0);
   const smoothScoreRef = useRef(0);
   const lastScoreEmitRef = useRef(0);
+  const lastUiEmitRef = useRef(0);
+  const faceDetectedRef = useRef(false);
   const consecutiveErrorsRef = useRef(0);
 
   // The loop itself is stored in a ref, not a useCallback
@@ -231,12 +233,12 @@ export function useFaceDetection(): FaceDetectionResult {
       return;
     }
 
-    // Throttle inference: Mobile devices overheat and drop frames if inference runs at 60fps.
-    // Optimal inference is ~20 to 25 fps (every 45ms).
+    // Keep inference to 10 fps. Running a face model at 20+ fps can saturate
+    // mobile CPUs and make unrelated UI, including the shift timer, lag.
     // IMPORTANT: Never rely on `video.currentTime === lastTimeRef.current` because on iOS Safari
     // `video.currentTime` on a MediaStream frequently stays 0 indefinitely!
     const now = performance.now();
-    if (now - lastInferenceTimeRef.current < 45) {
+    if (now - lastInferenceTimeRef.current < 100) {
       scheduleNext();
       return;
     }
@@ -266,13 +268,20 @@ export function useFaceDetection(): FaceDetectionResult {
         currentScore = 0;
       }
 
-      setFaceDetected(detected);
-      setFaceLandmarks(detected ? landmarks : null);
-      setStatus(detected ? "detected" : "detecting");
-
-      // Throttle React state update to every 70ms (~14fps) for smooth UI
+      // Update the page only when detection changes, and cap landmark/score
+      // renders to about 6 fps. This keeps the overlay responsive without
+      // forcing the entire clock page to render on every camera frame.
+      if (detected !== faceDetectedRef.current) {
+        faceDetectedRef.current = detected;
+        setFaceDetected(detected);
+        setStatus(detected ? "detected" : "detecting");
+      }
       const nowMs = performance.now();
-      if (nowMs - lastScoreEmitRef.current > 70) {
+      if (nowMs - lastUiEmitRef.current > 150) {
+        lastUiEmitRef.current = nowMs;
+        setFaceLandmarks(detected ? landmarks : null);
+      }
+      if (nowMs - lastScoreEmitRef.current > 150) {
         lastScoreEmitRef.current = nowMs;
         setFaceScore(currentScore);
       }
@@ -315,6 +324,9 @@ export function useFaceDetection(): FaceDetectionResult {
 
     runningRef.current = true;
     lastInferenceTimeRef.current = 0;
+    lastUiEmitRef.current = 0;
+    lastScoreEmitRef.current = 0;
+    faceDetectedRef.current = false;
     smoothScoreRef.current = 0;
     consecutiveErrorsRef.current = 0;
 
@@ -351,6 +363,7 @@ export function useFaceDetection(): FaceDetectionResult {
   const stopDetection = useCallback(() => {
     sessionIdRef.current++;
     runningRef.current = false;
+    faceDetectedRef.current = false;
     smoothScoreRef.current = 0;
     consecutiveErrorsRef.current = 0;
     if (rafIdRef.current !== null) {
