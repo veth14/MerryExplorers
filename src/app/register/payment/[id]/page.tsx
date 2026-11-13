@@ -457,8 +457,8 @@ export default function PaymentPage() {
                 </h1>
                 <p className="vp-sub text-[15px] max-w-xl mx-auto text-balance">
                   {isBalanceMode
-                    ? <>Your balance payment receipt for <strong className="whitespace-nowrap">{prog?.name || "Adventure 2"}</strong> has been received.</>
-                    : <>Thank you! Your receipt has been received to confirm registration for <strong className="whitespace-nowrap">{prog?.name ? `${prog.name} (Adventure 2)` : "2026 Adventure 2"}</strong>.</>}
+                    ? <>Your balance payment receipt for <strong className="whitespace-nowrap">{prog?.name || (regData?.adventureNumber ? `Adventure ${regData.adventureNumber}` : "Adventure 3")}</strong> has been received.</>
+                    : <>Thank you! Your receipt has been received to confirm registration for <strong className="whitespace-nowrap">{prog?.name ? `${prog.name} (Adventure ${regData?.adventureNumber || 3})` : `2026 Adventure ${regData?.adventureNumber || 3}`}</strong>.</>}
                 </p>
               </>
             ) : regData?.isScholar || regData?.promoCode === "A1JesusLovesMe2026" || regData?.promoCode?.toUpperCase() === "A1JESUSLOVESME2026" || regData?.status === "scholar" ? (
@@ -507,8 +507,8 @@ export default function PaymentPage() {
                 </h1>
                 <p className="vp-sub text-[15px] max-w-md mx-auto text-balance">
                   {isBalanceMode
-                    ? <>Submit your receipt below for the remaining balance on <strong className="whitespace-nowrap">{prog?.name || "Adventure 2"}</strong>.</>
-                    : <>Submit your receipt below to confirm registration for <strong className="whitespace-nowrap">{prog?.name ? `${prog.name} (Adventure 2)` : "2026 Adventure 2"}</strong>.</>}
+                    ? <>Submit your receipt below for the remaining balance on <strong className="whitespace-nowrap">{prog?.name || (regData?.adventureNumber ? `Adventure ${regData.adventureNumber}` : "Adventure 3")}</strong>.</>
+                    : <>Submit your receipt below to confirm registration for <strong className="whitespace-nowrap">{prog?.name ? `${prog.name} (Adventure ${regData?.adventureNumber || 3})` : `2026 Adventure ${regData?.adventureNumber || 3}`}</strong>.</>}
                 </p>
               </>
             )}

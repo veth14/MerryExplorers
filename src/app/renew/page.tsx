@@ -663,10 +663,10 @@ export default function RenewPage() {
                     <span>NOTE &amp; DISCLAIMER</span>
                   </div>
                   <p className="font-bold text-[#0b2a82] leading-snug">
-                    Please ensure to settle your <strong>2026 Adventure 1 Balance</strong> before you can proceed to the registration.
+                    Please ensure to settle your <strong>2026 Adventure {displayCurrentAdventure} Balance</strong> before you can proceed to the registration.
                   </p>
                   <p className="mt-2 font-medium italic text-[#3d5a99] text-[12px] bg-white/80 p-3 rounded-xl border-2 border-[#b6dcf5]">
-                    &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                    &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure {displayTargetAdventure} will be credited as your balance payment for the 2026 Adventure {displayCurrentAdventure}.&quot;
                   </p>
                 </div>
 
