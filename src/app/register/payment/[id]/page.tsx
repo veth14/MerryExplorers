@@ -26,6 +26,10 @@ type RegData = {
   isNewFamily?: boolean;
   customRate?: number;
   amountDue?: number;
+  downpaymentDeferred?: boolean;
+  downpaymentStartDate?: string | null;
+  adventureNumber?: number | null;
+  childName?: string | null;
   balanceInfo?: {
     total: number | null;
     paid: number;
@@ -348,8 +352,12 @@ export default function PaymentPage() {
 
   if (!mounted) return null;
 
-  const isExpired = timeLeft === "0d 0h 0m 0s" || timeLeft === "00:00";
-  const reservationIsExpired = Boolean(regData && (
+  const isDeferred = Boolean(
+    regData?.downpaymentDeferred ||
+    (regData?.status === "reserved" && regData?.downpaymentStartDate && new Date(regData.downpaymentStartDate).getTime() > Date.now())
+  );
+  const isExpired = !isDeferred && (timeLeft === "0d 0h 0m 0s" || timeLeft === "00:00");
+  const reservationIsExpired = !isDeferred && Boolean(regData && (
     regData.status === "expired" ||
     (regData.status === "reserved" && regData.reservedUntil && new Date(regData.reservedUntil).getTime() <= Date.now())
   ));
@@ -360,7 +368,7 @@ export default function PaymentPage() {
       <PortalScene />
 
       {/* ── Disclaimer Modal ─────────────────────────────────────────────── */}
-      {showDisclaimerModal && (
+      {showDisclaimerModal && !isDeferred && (
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center p-4"
           style={{ background: "rgba(11,42,130,0.70)", backdropFilter: "blur(6px)" }}
@@ -465,6 +473,18 @@ export default function PaymentPage() {
                   Welcome to Merry Explorers! Your child&apos;s slot is 100% tuition sponsored.
                 </p>
               </>
+            ) : isDeferred ? (
+              <>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-100 border-2 border-violet-500 shadow-[0_4px_0_#7c3aed] text-[12px] font-black text-violet-950 mb-1">
+                  <span>🎉</span> SLOT RESERVED — NO PAYMENT TODAY
+                </div>
+                <h1 className="vp-title text-[32px] sm:text-[42px]">
+                  Priority Slot Reserved!
+                </h1>
+                <p className="vp-sub text-[15px] max-w-lg mx-auto text-balance">
+                  {regData?.childName ? `${regData.childName}'s` : "Your child's"} slot is secured for Adventure {regData?.adventureNumber ?? 3}.
+                </p>
+              </>
             ) : regData?.status === "early-bird" ? (
               <>
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border-2 border-amber-500 shadow-[0_4px_0_#d97706] text-[12px] font-black text-amber-950 mb-1">
@@ -544,6 +564,28 @@ export default function PaymentPage() {
               </Link>
               <Link href="/" className="vp-btn ghost small">
                 Back to Home
+              </Link>
+            </div>
+          </div>
+        ) : isDeferred ? (
+          <div className="vp-card text-center py-12 max-w-2xl mx-auto w-full">
+            <div className="vp-tape" />
+            <div className="w-20 h-20 rounded-full bg-violet-100 border-4 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] flex items-center justify-center text-4xl mx-auto mb-5">
+              🎉
+            </div>
+            <h2 className="vp-h2 text-[28px] mb-2">Slot Successfully Reserved!</h2>
+            <div className="vp-sub max-w-md mx-auto text-[15px] mb-8 space-y-3 leading-relaxed">
+              <p>Your child&apos;s slot for <strong>{prog?.name || "the upcoming Adventure"}</strong> ({regData?.classTime || "Selected Session"}) is locked in.</p>
+              <div className="rounded-2xl bg-violet-50 border-2 border-violet-200 p-4 text-[13px] font-bold text-violet-900 text-left space-y-1">
+                <p className="flex items-center gap-2"><span>💳</span> <strong>No Downpayment Due Right Now</strong></p>
+                <p className="text-violet-700 font-medium">
+                  Downpayment collection will begin on <strong>{regData?.downpaymentStartDate ? new Date(regData.downpaymentStartDate).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" }) : "the scheduled date"}</strong>. We will notify you via email when payment collection opens.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <Link href="/" className="vp-btn">
+                Return to Home
               </Link>
             </div>
           </div>

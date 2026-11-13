@@ -88,6 +88,7 @@ export type ProgramRenewalEntry = {
   virtualLink?: string;
   virtualLinkOpen?: boolean;
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
+  downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this, renewals are free slot reservations
 };
 
 export type RenewalSettingsData = {
@@ -1220,6 +1221,58 @@ export function RenewalSettingsManager() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Row 4: Downpayment Start Date (Adventure Programs only) */}
+                  {isAdventureProg && (
+                    <div className="rounded-2xl border-2 border-violet-100 bg-violet-50/40 p-4 space-y-2">
+                      <div>
+                        <p className="text-[12px] font-black uppercase tracking-wider text-violet-900 flex items-center gap-1.5">
+                          <span>💳</span> Downpayment Start Date
+                        </p>
+                        <p className="text-[11px] text-violet-700 font-medium mt-0.5">
+                          Before this date, renewals are accepted as a <strong>free slot reservation</strong> (no payment required yet).
+                          On and after this date, the standard downpayment is collected at sign-up.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={prog.downpaymentStartDate ? prog.downpaymentStartDate.slice(0, 10) : ""}
+                          onChange={(e) =>
+                            updateProgram(prog.programKey, {
+                              downpaymentStartDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : null,
+                            })
+                          }
+                          className="flex-1 h-8 rounded-lg border border-violet-200 bg-white px-2 text-[11.5px] font-bold text-[#002f76] focus:border-violet-400 focus:outline-none"
+                        />
+                        {prog.downpaymentStartDate && (
+                          <button
+                            type="button"
+                            onClick={() => updateProgram(prog.programKey, { downpaymentStartDate: null })}
+                            className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors px-2"
+                          >
+                            ✕ Clear
+                          </button>
+                        )}
+                      </div>
+                      {prog.downpaymentStartDate ? (() => {
+                        const dpDate = prog.downpaymentStartDate!.slice(0, 10);
+                        const todayStr = new Date().toISOString().slice(0, 10);
+                        const isActive = todayStr >= dpDate;
+                        return (
+                          <p className={`text-[10px] font-bold ${isActive ? "text-emerald-700" : "text-violet-600"}`}>
+                            {isActive
+                              ? `✅ Downpayment is now required (started ${fmtDate(prog.downpaymentStartDate)})`
+                              : `⏳ Renewals are FREE slot reservation until ${fmtDate(prog.downpaymentStartDate)} — no payment collected yet`}
+                          </p>
+                        );
+                      })() : (
+                        <p className="text-[10px] font-semibold text-slate-400">
+                          Leave blank to always require downpayment immediately upon renewal.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Brave Explorer Virtual Session Link */}
                   {prog.programKey === "Trailblazer: Brave Explorer" && (

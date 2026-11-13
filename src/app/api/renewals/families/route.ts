@@ -62,13 +62,44 @@ export async function GET(request: Request) {
       );
     });
 
-    // Load pioneer families to link isPioneer flag dynamically and link alternate emails
-    const [pioneerDocs, activeRegistrations] = await Promise.all([
+    // Resolve target adventure from requested period
+    const selectedPeriodDoc = period && period !== "all" && period !== "all-periods"
+      ? await db.collection("renewal_periods").findOne({ slug: period })
+      : await db.collection("renewal_periods").findOne({ isActive: true }) || await db.collection("renewal_periods").findOne({ isDefault: true });
+
+    const legacyAdventureMatch = period ? period.match(/^adventure-(\d+)-renewal$/i) : null;
+    const targetAdventure =
+      Number(selectedPeriodDoc?.targetAdventure) ||
+      Number((String(selectedPeriodDoc?.targetProgram || "").match(/adventure\s*(\d+)/i) || [])[1]) ||
+      (legacyAdventureMatch ? Number(legacyAdventureMatch[1]) + 1 : 2);
+    const prevAdventure = targetAdventure > 1 ? targetAdventure - 1 : 1;
+
+    const PROGRAM_DISPLAY_MAP: Record<string, string> = {
+      "curious-explorer": "Curious Explorer",
+      "creative-explorer": "Creative Explorer",
+      "everyday-curious": "Everyday Explorer",
+      "brave-explorer": "Brave Explorer",
+      "ballet": "Ballet",
+      "saturday-playdate": "Saturday Playdate",
+      "virtual-session": "Virtual Tutorial",
+    };
+
+    // Load pioneer families, registrations targeting current cycle, and all historical approved registrations
+    const targetAdvPattern = new RegExp(`^adventure[-_ ]?${targetAdventure}$`, "i");
+    const [pioneerDocs, targetRegistrations, allApprovedRegistrations] = await Promise.all([
       db.collection("pioneer_families").find({}).toArray(),
       db.collection("student_registrations").find({
         status: { $in: ["approved", "active", "reserved"] },
-        $or: [{ adventureNumber: 2 }, { period: /adventure-2/i }],
+        $or: [
+          { adventureNumber: targetAdventure },
+          { period: targetAdventure },
+          { period: targetAdvPattern },
+          ...(period && period !== "all" ? [{ renewalPeriod: period }] : []),
+        ],
       }).toArray(),
+      db.collection("student_registrations").find({
+        status: { $in: ["approved", "active"] },
+      }).sort({ submittedAt: 1 }).toArray(),
     ]);
 
     const pioneerEmails = new Set(pioneerDocs.flatMap((p) => [p.email, p.email2].map((email) => (email || "").toLowerCase().trim()).filter(Boolean)));
@@ -86,6 +117,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
+      targetAdventure,
+      prevAdventure,
       data: families.map((f) => {
         const emailLower = (f.parentEmail || "").toLowerCase().trim();
         const secondaryLower = (f.secondaryEmail || "").toLowerCase().trim();
@@ -99,36 +132,76 @@ export async function GET(request: Request) {
           (childFirst && pioneerChildFirsts.has(childFirst))
         );
 
-        // Check if an approved/paid registration exists for this family
-        let effectiveStatus = f.renewalStatus || "not_yet_submitted";
-        let linkedRegistrationId = f.registrationId || null;
+        // Helper to test if a registration matches this family
+        const isRegMatch = (r: any) => {
+          const regEmail = (r.parentInfo?.email || "").toLowerCase().trim();
+          const rFirst = (r.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
+          const rLast = (r.childInfo?.lastName || "").toLowerCase().trim();
 
-        if (effectiveStatus === "not_yet_submitted" || !linkedRegistrationId) {
-          const matchedReg = activeRegistrations.find((r: any) => {
-            if (linkedRegistrationId && r._id.toString() === linkedRegistrationId) return true;
-            const regEmail = (r.parentInfo?.email || "").toLowerCase().trim();
-            const rFirst = (r.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
-            const rLast = (r.childInfo?.lastName || "").toLowerCase().trim();
+          const emailMatches =
+            regEmail === emailLower ||
+            (secondaryLower && regEmail === secondaryLower) ||
+            (pioneer && (regEmail === pioneer.email?.toLowerCase().trim() || regEmail === pioneer.email2?.toLowerCase().trim()));
 
-            const emailMatches =
-              regEmail === emailLower ||
-              (secondaryLower && regEmail === secondaryLower) ||
-              (pioneer && (regEmail === pioneer.email?.toLowerCase().trim() || regEmail === pioneer.email2?.toLowerCase().trim()));
+          const nameMatches = Boolean(rFirst && childFirst && rFirst === childFirst && (!rLast || !childLast || rLast === childLast));
+          return emailMatches && nameMatches;
+        };
 
-            const nameMatches = Boolean(rFirst && childFirst && rFirst === childFirst && (!rLast || !childLast || rLast === childLast));
+        // 1. Build comprehensive past adventure history from confirmed registrations
+        const historyAdventures: Array<{ adventure: string; program: string; classTime?: string; status?: string }> = Array.isArray(f.adventures)
+          ? [...f.adventures]
+          : [];
 
-            return emailMatches && nameMatches;
-          });
+        for (const reg of allApprovedRegistrations) {
+          if (!isRegMatch(reg)) continue;
 
-          if (matchedReg) {
-            linkedRegistrationId = matchedReg._id.toString();
-            effectiveStatus = (matchedReg.status === "approved" || Number(matchedReg.amountPaid) > 0) ? "confirmed" : "reserved";
+          // Determine adventure number of this registration
+          const regPeriodStr = String(reg.period || "");
+          const periodMatch = regPeriodStr.match(/adventure\s*[-_]?\s*(\d+)/i);
+          const regAdvNum = Number(reg.adventureNumber) || (periodMatch ? Number(periodMatch[1]) : null);
+
+          if (regAdvNum && regAdvNum < targetAdventure) {
+            const advLabel = `Adventure ${regAdvNum}`;
+            const progDisplayName = PROGRAM_DISPLAY_MAP[reg.program] || reg.program || "Explorer";
+            const alreadyInHistory = historyAdventures.some((h) => h.adventure.toLowerCase() === advLabel.toLowerCase());
+            if (!alreadyInHistory) {
+              historyAdventures.push({
+                adventure: advLabel,
+                program: progDisplayName,
+                classTime: reg.classTime || "",
+                status: "approved",
+              });
+            }
           }
+        }
+
+        // Sort history by adventure number ascending
+        historyAdventures.sort((a, b) => {
+          const numA = Number((a.adventure.match(/\d+/) || [])[0]) || 0;
+          const numB = Number((b.adventure.match(/\d+/) || [])[0]) || 0;
+          return numA - numB;
+        });
+
+        // 2. Check if a submitted/confirmed registration exists for the TARGET adventure
+        const matchedTargetReg = targetRegistrations.find(isRegMatch);
+
+        let effectiveStatus: "not_yet_submitted" | "reserved" | "confirmed" | "released" = "not_yet_submitted";
+        let linkedRegistrationId: string | null = null;
+
+        if (matchedTargetReg) {
+          linkedRegistrationId = matchedTargetReg._id.toString();
+          effectiveStatus = (matchedTargetReg.status === "approved" || Number(matchedTargetReg.amountPaid) > 0)
+            ? "confirmed"
+            : "reserved";
+        } else if (f.renewalPeriod === period && f.renewalStatus) {
+          effectiveStatus = f.renewalStatus;
+          linkedRegistrationId = f.registrationId || null;
         }
 
         return {
           ...f,
           _id: f._id.toString(),
+          adventures: historyAdventures,
           registrationId: linkedRegistrationId,
           renewalStatus: effectiveStatus,
           isPioneer,

@@ -43,6 +43,7 @@ export type ProgramRenewalEntry = {
   virtualLinkOpen?: boolean;
   newFamilyRegistrationOpenDate?: string | null; // optional: date when /register opens for new families
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
+  downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this date, renewals are free slot reservations
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -183,6 +184,7 @@ export async function GET() {
             renewalOpen: existing.renewalOpen !== false,
             newFamilyRegistrationOpenDate: existing.newFamilyRegistrationOpenDate ?? null,
             closedClasses: Array.isArray(existing.closedClasses) ? existing.closedClasses : [],
+            downpaymentStartDate: existing.downpaymentStartDate ?? null,
           }
         : {
             programKey: key,
@@ -199,6 +201,7 @@ export async function GET() {
             virtualLinkOpen: false,
             newFamilyRegistrationOpenDate: null,
             closedClasses: [],
+            downpaymentStartDate: null,
           };
     });
 
@@ -286,6 +289,7 @@ export async function PUT(req: NextRequest) {
         virtualLinkOpen: p?.virtualLinkOpen ?? false,
         newFamilyRegistrationOpenDate: p?.newFamilyRegistrationOpenDate ?? null,
         closedClasses: Array.isArray(p?.closedClasses) ? p.closedClasses : [],
+        downpaymentStartDate: p?.downpaymentStartDate ?? null,
       };
     });
 

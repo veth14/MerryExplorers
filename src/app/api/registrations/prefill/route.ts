@@ -97,7 +97,16 @@ export async function GET(request: Request) {
     const settings = settingsDoc?.programs || [];
     const currentProgram = studentDoc?.program || prevReg?.program || "curious-explorer";
     const programSetting = getProgramAdventureSetting(currentProgram, settings);
-    const adventureNumber = programSetting ? getTargetRegistrationAdventureNumber(currentProgram, settings) : 2;
+
+    // Resolve target adventure: check the most recently active renewal_period first (most reliable),
+    // because nextAdventureStart may not be set yet in program settings.
+    const activePeriod = await db.collection("renewal_periods").findOne(
+      { isActive: true, targetAdventure: { $exists: true } },
+      { sort: { createdAt: -1 } }
+    );
+    const targetAdventureFromPeriod = activePeriod?.targetAdventure ? Number(activePeriod.targetAdventure) : null;
+    const adventureNumber = targetAdventureFromPeriod
+      || (programSetting ? getTargetRegistrationAdventureNumber(currentProgram, settings) : 2);
     const adventureStartDate = programSetting ? getRegistrationAdventureStartDate(currentProgram, settings) : null;
     const cycleQuery: Record<string, unknown>[] = getAdventureCycleRegistrationQuery(adventureNumber, adventureStartDate);
     const activeCurrentCycleReg = regOr.length > 0
@@ -108,16 +117,38 @@ export async function GET(request: Request) {
         }, { sort: { submittedAt: -1 } })
       : null;
 
-    // Also check if familyDoc has an existing registrationId
-    let existingRegistrationId = activeCurrentCycleReg?._id?.toString() || null;
-    if (!existingRegistrationId && familyDoc?.registrationId) {
-      existingRegistrationId = familyDoc.registrationId;
+    // Only treat as "already registered" if the registration actually belongs to the TARGET adventure.
+    // familyDoc.registrationId may point to a PREVIOUS cycle — do NOT use it to block a new renewal.
+    let existingRegistrationId: string | null = null;
+    let linkedRegistration: any = null;
+
+    if (activeCurrentCycleReg) {
+      const regPeriod: string = activeCurrentCycleReg.period || `adventure-${activeCurrentCycleReg.adventureNumber}`;
+      const targetPeriod = `adventure-${adventureNumber}`;
+      if (regPeriod === targetPeriod || activeCurrentCycleReg.adventureNumber === adventureNumber) {
+        existingRegistrationId = activeCurrentCycleReg._id?.toString() || null;
+        linkedRegistration = activeCurrentCycleReg;
+      }
     }
-    const linkedRegistration = activeCurrentCycleReg || (
-      existingRegistrationId && ObjectId.isValid(existingRegistrationId)
-        ? await db.collection("student_registrations").findOne({ _id: new ObjectId(existingRegistrationId) })
-        : null
-    );
+
+    // If no active target-cycle registration found, check familyDoc.registrationId.
+    // Only use it if it belongs to the TARGET adventure — otherwise it's historical data for prefill only.
+    if (!existingRegistrationId && familyDoc?.registrationId && ObjectId.isValid(familyDoc.registrationId)) {
+      const familyLinkedReg = await db.collection("student_registrations").findOne({ _id: new ObjectId(familyDoc.registrationId) });
+      if (familyLinkedReg) {
+        const regPeriod: string = familyLinkedReg.period || `adventure-${familyLinkedReg.adventureNumber}`;
+        const targetPeriod = `adventure-${adventureNumber}`;
+        if (regPeriod === targetPeriod || familyLinkedReg.adventureNumber === adventureNumber) {
+          // Same cycle — this IS the existing registration for the target adventure
+          existingRegistrationId = familyDoc.registrationId;
+          linkedRegistration = familyLinkedReg;
+        } else {
+          // Different cycle (e.g. Adventure 2 reg when targeting Adventure 3):
+          // use only for prefill data, not to block renewal
+          linkedRegistration = familyLinkedReg;
+        }
+      }
+    }
 
     // ── Nothing found ─────────────────────────────────────────────────────────
     if (!familyDoc && !studentDoc && !accountDoc && !prevReg) {
@@ -194,11 +225,11 @@ export async function GET(request: Request) {
       emergencyContact,
       alreadyRegistered: Boolean(existingRegistrationId),
       existingRegistrationId,
-      existingProgram: activeCurrentCycleReg?.program || null,
-      existingRegistrationSubmittedAt: linkedRegistration?.submittedAt || null,
-      existingRegistrationStatus: linkedRegistration?.status || null,
-      existingReservationExpiresAt: linkedRegistration?.reservedUntil || null,
-      existingPromoCode: linkedRegistration?.promoCode || null,
+      existingProgram: (existingRegistrationId && linkedRegistration?.program) || null,
+      existingRegistrationSubmittedAt: existingRegistrationId ? (linkedRegistration?.submittedAt || null) : null,
+      existingRegistrationStatus: existingRegistrationId ? (linkedRegistration?.status || null) : null,
+      existingReservationExpiresAt: existingRegistrationId ? (linkedRegistration?.reservedUntil || null) : null,
+      existingPromoCode: existingRegistrationId ? (linkedRegistration?.promoCode || null) : null,
     };
 
     return NextResponse.json({ success: true, data: prefillData });

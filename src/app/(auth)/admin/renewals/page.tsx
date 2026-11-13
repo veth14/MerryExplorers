@@ -103,6 +103,17 @@ export default function RenewalsPage() {
   const periodSelectionInitialized = useRef(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
+  const currentPeriodConfig = useMemo(() => {
+    const found = periods.find((p: any) => p.slug === selectedPeriod);
+    const legacyMatch = selectedPeriod.match(/^adventure-(\d+)-renewal$/i);
+    const targetAdv =
+      Number(found?.targetAdventure) ||
+      Number((String(found?.targetProgram || "").match(/adventure\s*(\d+)/i) || [])[1]) ||
+      (legacyMatch ? Number(legacyMatch[1]) + 1 : 2);
+    const prevAdv = targetAdv > 1 ? targetAdv - 1 : 1;
+    return { targetAdv, prevAdv, name: found?.name || `Adventure ${targetAdv} Renewal` };
+  }, [periods, selectedPeriod]);
+
   // Renewals tab state
   const [renewalRecords, setRenewalRecords] = useState<RenewalRecord[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -172,7 +183,7 @@ export default function RenewalsPage() {
       const [pRes, rRes, fRes] = await Promise.all([
         adminFetch("/api/renewals/periods"),
         adminFetch(`/api/renewals?period=${selectedPeriod}`),
-        adminFetch("/api/renewals/families"),
+        adminFetch(`/api/renewals/families?period=${selectedPeriod}`),
       ]);
       const [pData, rData, fData] = await Promise.all([pRes.json(), rRes.json(), fRes.json()]);
       return { pData, rData, fData };
@@ -1441,7 +1452,7 @@ export default function RenewalsPage() {
                     <th className="py-3.5 px-4">Contact Details</th>
                     <th className="py-3.5 px-4">Explorer (Child)</th>
                     <th className="py-3.5 px-4">Adventure History</th>
-                    <th className="py-3.5 px-4">Renewing To</th>
+                    <th className="py-3.5 px-4">Renewing To (Adv {currentPeriodConfig.targetAdv})</th>
                     <th className="py-3.5 px-4">Renewal Status</th>
                     <th className="py-3.5 px-4">Email Logs</th>
                     <th className="py-3.5 px-4">Notes</th>
@@ -1498,29 +1509,25 @@ export default function RenewalsPage() {
                               ))
                             ) : f.previousProgram ? (
                               <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-200/70 px-2.5 py-1 text-[11.5px] font-medium text-[#002f76] whitespace-nowrap shadow-xs">
-                                <strong className="font-extrabold text-[#0033a0]">Adventure 1:</strong> {f.previousProgram}
+                                <strong className="font-extrabold text-[#0033a0]">Adventure {currentPeriodConfig.prevAdv}:</strong> {f.previousProgram}
                               </span>
                             ) : (
                               <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500 font-medium whitespace-nowrap">
-                                Adventure 1
+                                Adventure {currentPeriodConfig.prevAdv}
                               </span>
                             )}
                           </div>
                         </td>
                         <td className="py-3.5 px-4 text-[12px]">
-                          {f.renewingTo && f.renewingTo.toLowerCase().includes("adventure") ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
-                              {f.renewingTo}
-                            </span>
-                          ) : f.renewingTo ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
-                              <strong className="font-extrabold text-amber-950">Adventure 2:</strong> {f.renewingTo}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
-                              Adventure 2
-                            </span>
-                          )}
+                          {(() => {
+                            const rawTarget = f.renewingTo || f.previousProgram || "Creative Explorer";
+                            const cleanTarget = rawTarget.replace(/^Adventure\s*\d+\s*:\s*/i, "").trim();
+                            return (
+                              <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 whitespace-nowrap shadow-xs">
+                                <strong className="font-extrabold text-amber-950">Adventure {currentPeriodConfig.targetAdv}:</strong> {cleanTarget}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="py-3.5 px-4">
                           {(() => {
@@ -1695,7 +1702,9 @@ export default function RenewalsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Previous Program *</label>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
+                    Previous Program (Adv {currentPeriodConfig.prevAdv}) *
+                  </label>
                   <select
                     value={formPreviousProgram}
                     onChange={(e) => setFormPreviousProgram(e.target.value)}
@@ -1712,7 +1721,9 @@ export default function RenewalsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[12px] font-bold text-slate-600 mb-1">Renewing To *</label>
+                  <label className="block text-[12px] font-bold text-slate-600 mb-1">
+                    Renewing To (Adv {currentPeriodConfig.targetAdv}) *
+                  </label>
                   <select
                     value={formRenewingTo}
                     onChange={(e) => setFormRenewingTo(e.target.value)}
@@ -1960,7 +1971,7 @@ export default function RenewalsPage() {
                           )}
                           <div className="flex justify-between border-b border-slate-100 pb-1">
                             <span className="text-slate-500 font-semibold">Adventure Cycle:</span>
-                            <span className="font-bold text-emerald-700">Adventure 2</span>
+                            <span className="font-bold text-emerald-700">Adventure {currentPeriodConfig.targetAdv}</span>
                           </div>
                           <div className="flex justify-between border-b border-slate-100 pb-1">
                             <span className="text-slate-500 font-semibold">Total Tuition:</span>
@@ -1982,9 +1993,9 @@ export default function RenewalsPage() {
                         </div>
                         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-amber-900 text-[11.5px]">
                           <p className="font-bold">⚠️ NOTE &amp; DISCLAIMER:</p>
-                          <p className="mt-0.5">Please ensure to settle your 2026 Adventure 1 Balance before you can proceed to the registration.</p>
+                          <p className="mt-0.5">Please ensure to settle your 2026 Adventure {currentPeriodConfig.prevAdv} Balance before you can proceed to the registration.</p>
                           <p className="italic mt-1">
-                            &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure 2 will be credited as your balance payment for the 2026 Adventure 1.&quot;
+                            &quot;In the event that a family has unsettled balance, your downpayment for the 2026 Adventure {currentPeriodConfig.targetAdv} will be credited as your balance payment for the 2026 Adventure {currentPeriodConfig.prevAdv}.&quot;
                           </p>
                         </div>
                       </div>

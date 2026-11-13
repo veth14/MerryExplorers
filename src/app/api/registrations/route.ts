@@ -243,10 +243,28 @@ export async function POST(request: Request) {
       registrationAutoCloseDays?: number | null;
     }>;
     const adventureSetting = getProgramAdventureSetting(program, adventureSettings);
-    const adventureNumber = adventureSetting ? getTargetRegistrationAdventureNumber(program, adventureSettings) : null;
-    const adventureStartDate = adventureSetting
-      ? getRegistrationAdventureStartDate(program, adventureSettings)
-      : null;
+    // Determine target adventure for registration (check isRenewal & active renewal period first)
+    let targetAdventureNumber: number | null = null;
+    if (isRenewal) {
+      if (typeof data.targetAdventure === "number") {
+        targetAdventureNumber = data.targetAdventure;
+      } else {
+        const activePeriod = await db.collection("renewal_periods").findOne(
+          { isActive: true, targetAdventure: { $exists: true } },
+          { sort: { createdAt: -1 } }
+        );
+        if (activePeriod?.targetAdventure) {
+          targetAdventureNumber = Number(activePeriod.targetAdventure);
+        } else if (adventureSetting) {
+          targetAdventureNumber = (adventureSetting.currentAdventure ?? 2) + 1;
+        }
+      }
+    }
+    const adventureNumber = targetAdventureNumber
+      || (adventureSetting ? getTargetRegistrationAdventureNumber(program, adventureSettings) : null);
+    const adventureStartDate = targetAdventureNumber && adventureSetting?.nextAdventureStart
+      ? adventureSetting.nextAdventureStart
+      : (adventureSetting ? getRegistrationAdventureStartDate(program, adventureSettings) : null);
     const autoCloseDays = Number(adventureSetting?.registrationAutoCloseDays ?? 7);
     if (!isRenewal && adventureSetting?.registrationOpen !== false && adventureStartDate && autoCloseDays > 0) {
       const closesAt = new Date(`${adventureStartDate.slice(0, 10)}T00:00:00+08:00`).getTime() + autoCloseDays * 86400000;
@@ -342,8 +360,14 @@ export async function POST(request: Request) {
     const isPriorityReservation = cleanPromoCode.toUpperCase() === "A1RENEWAL2026";
     // Trailblazer-at-Creative-Explorer-pioneer-price promo
     const isTrailblazerCreativePioneer = cleanPromoCode.toUpperCase() === "TRAILBLAZER2CREATIVE";
+    const downpaymentStartDate = data.downpaymentStartDate || (adventureSetting as any)?.downpaymentStartDate;
+    const isDownpaymentDeferred = isRenewal && Boolean(
+      downpaymentStartDate && new Date(downpaymentStartDate).getTime() > Date.now()
+    );
     const reservedUntil = isScholar
       ? new Date("2099-12-31T23:59:59+08:00")
+      : isDownpaymentDeferred && downpaymentStartDate
+      ? new Date(new Date(downpaymentStartDate).getTime() + 7 * 86400000)
       : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     // Auto-detect pioneer status if not explicitly passed
@@ -402,10 +426,14 @@ export async function POST(request: Request) {
       isNewFamily: !isReturningFamily,
       isPioneer,
       customRate: isScholar ? 0 : (customRate || null),
+      downpaymentDeferred: isDownpaymentDeferred,
+      downpaymentStartDate: downpaymentStartDate || null,
       notes: isScholar
         ? "Scholar Registration (Promo code: A1JesusLovesMe2026 — 100% tuition sponsored, no payment needed)"
         : isTrailblazerCreativePioneer
         ? "Special Rate (Promo code: TRAILBLAZER2CREATIVE — Trailblazer slot at Creative Explorer Pioneer Price ₱4,820)"
+        : isDownpaymentDeferred
+        ? `Priority Renewal for Adventure ${adventureNumber ?? 3} (Slot reserved — Downpayment collection starts ${new Date(downpaymentStartDate).toLocaleDateString("en-PH")})`
         : "",
       submittedAt: new Date(),
       ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}`, adventureStartDate } : {}),
@@ -460,6 +488,7 @@ export async function POST(request: Request) {
               $set: {
                 renewalStatus: amountPaid > 0 ? "confirmed" : "reserved",
                 registrationId: result.insertedId.toString(),
+                targetAdventure: adventureNumber,
                 updatedAt: new Date(),
               },
             }

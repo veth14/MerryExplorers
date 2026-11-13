@@ -250,20 +250,25 @@ export default function RenewPage() {
   }, [parentInfo?.email]);
 
   // Program renewal settings for dynamic Adventure cycle # & dates
-  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean; closedClasses?: string[] }>>({});
+  const [renewalSettings, setRenewalSettings] = useState<Record<string, { currentAdventure: number; targetAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean; closedClasses?: string[]; downpaymentStartDate?: string | null }>>({});
 
   useEffect(() => {
     fetch("/api/renewal-settings")
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.programs)) {
-          const map: Record<string, { currentAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean; closedClasses?: string[] }> = {};
+          const map: Record<string, { currentAdventure: number; targetAdventure: number; nextAdventureStart: string | null; renewalOpen?: boolean; closedClasses?: string[]; downpaymentStartDate?: string | null }> = {};
           d.programs.forEach((p: any) => {
+            const targetAdv = p.nextAdventureStart
+              ? (p.currentAdventure ?? 1) + 1
+              : (p.currentAdventure ?? 2) + 1;
             const settingItem = {
               currentAdventure: p.currentAdventure ?? 2,
+              targetAdventure: targetAdv,
               nextAdventureStart: p.nextAdventureStart ?? null,
               renewalOpen: p.renewalOpen !== false,
               closedClasses: Array.isArray(p.closedClasses) ? p.closedClasses : [],
+              downpaymentStartDate: p.downpaymentStartDate ?? null,
             };
             map[p.programKey] = settingItem;
             if (p.programKey === "Ballet") map["ballet"] = settingItem;
@@ -282,6 +287,24 @@ export default function RenewPage() {
       .catch(() => { });
   }, []);
 
+  // Derive dynamic adventure numbers for display from master program (Curious Explorer)
+  const masterProgramSettings = renewalSettings["Discovery Club: Curious Explorer"];
+  const displayTargetAdventure = masterProgramSettings?.targetAdventure ?? 3;
+  const displayCurrentAdventure = masterProgramSettings?.currentAdventure ?? 2;
+
+  // Determine if downpayment is required today based on the selected program's setting
+  const selectedProgramSettings = selectedProgram
+    ? (() => {
+        const slot = PROGRAM_SLOTS[selectedProgram];
+        return slot?.name ? renewalSettings[slot.name] : null;
+      })()
+    : null;
+  const downpaymentStartDate = selectedProgramSettings?.downpaymentStartDate
+    ?? masterProgramSettings?.downpaymentStartDate
+    ?? null;
+  const isDownpaymentRequired = !downpaymentStartDate
+    || new Date().toISOString().slice(0, 10) >= downpaymentStartDate.slice(0, 10);
+
   const prog = selectedProgram ? PROGRAM_SLOTS[selectedProgram] : null;
 
   // Effective pricing: Pioneer families receive their set pioneer prices
@@ -298,7 +321,10 @@ export default function RenewPage() {
   const effectiveBalance = effectiveRate - effectiveDownpayment;
 
   const addonCost = (uniformOrdered ? UNIFORM_KIT.price : 0) + (lanyardOrdered ? UNIFORM_KIT.lanyardPrice : 0);
-  const amountDue = prog ? effectiveDownpayment + addonCost : 0;
+  // If downpayment is not yet required, families reserve a slot for free (add-ons still apply)
+  const amountDue = prog
+    ? (isDownpaymentRequired ? effectiveDownpayment + addonCost : addonCost)
+    : 0;
 
   const requiresUniformDay = Boolean(
     selectedProgram && !["ballet", "saturday-playdate", "virtual-session"].includes(selectedProgram)
@@ -333,6 +359,9 @@ export default function RenewPage() {
           promoCode: promoAccepted ? promoCode.trim() : undefined,
           isPromoRegistration: promoAccepted,
           amountDue,
+          targetAdventure: displayTargetAdventure,
+          downpaymentDeferred: !isDownpaymentRequired,
+          downpaymentStartDate: downpaymentStartDate || null,
           uniformOrdered,
           lanyardOrdered,
           welcomeKitOrdered: false,
@@ -402,11 +431,11 @@ export default function RenewPage() {
             <div className="absolute -top-4 left-1/2 h-[26px] w-[92px] -translate-x-1/2 rotate-2 rounded border-2 border-[#0b2a82]/25 bg-[repeating-linear-gradient(45deg,#ffd23f_0_9px,#ffe066_9px_18px)]" />
             <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#0b2a82] bg-emerald-100 text-4xl shadow-[0_6px_0_#0b2a82]">🎉</div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-[#0b2a82] bg-[#fff6cf] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[#0b2a82]">
-              <span>🌟</span> 2026 Adventure 2
+              <span>🌟</span> 2026 Adventure {displayTargetAdventure}
             </div>
             <h1 className="mx-auto mb-3 max-w-xl text-[26px] font-black leading-tight text-[#0b2a82] sm:text-[32px]">Already Registered!</h1>
             <p className="mx-auto mb-4 max-w-lg text-[15px] font-medium leading-relaxed text-[#3d5a99]">
-              A registration for <strong className="text-[#0b2a82]">{childName}</strong> was found for <strong className="text-[#0b2a82]">Adventure 2</strong>.
+              A registration for <strong className="text-[#0b2a82]">{childName}</strong> was found for <strong className="text-[#0b2a82]">Adventure {displayTargetAdventure}</strong>.
             </p>
             {prefillData?.existingRegistrationSubmittedAt && (
               <p className="mx-auto mb-4 max-w-xl rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-[13px] font-semibold leading-relaxed text-amber-900">
@@ -530,10 +559,10 @@ export default function RenewPage() {
             )}
           </div>
           <h1 className="vp-title text-[32px] sm:text-[42px]">
-            Adventure 2 Renewal
+            Adventure {displayTargetAdventure} Renewal
           </h1>
           <p className="vp-sub text-[15px] max-w-md">
-            Welcome back! Secure <strong>{childNick}&apos;s</strong> slot for 2026 Adventure 2 in a few quick steps.
+            Welcome back! Secure <strong>{childNick}&apos;s</strong> slot for 2026 Adventure {displayTargetAdventure} in a few quick steps.
           </p>
         </div>
 
@@ -571,16 +600,16 @@ export default function RenewPage() {
                 <div className="mb-6 rounded-[22px] bg-gradient-to-r from-[#0b2a82] to-[#1f7ae0] p-6 text-white border-3 border-[#0b2a82] shadow-[0_6px_0_#0b2a82] relative overflow-hidden">
                   <div className="relative z-10">
                     <div className="inline-block px-3 py-1 rounded-full bg-[#ffd23f] text-[#0b2a82] text-[11px] font-black uppercase tracking-wider mb-2">
-                      🌟 2026 ADVENTURE 2
+                      🌟 2026 ADVENTURE {displayTargetAdventure}
                     </div>
                     <h2 className="text-[26px] sm:text-[30px] font-black leading-tight mb-2">
                       Hello, {childNick}!
                     </h2>
                     <p className="text-[14px] text-white/95 font-medium leading-relaxed">
-                      We are thrilled to welcome you to <strong>Adventure 2</strong>! Your details from <strong>Adventure 1</strong> are already verified below — simply review and choose your preferred schedule.
+                      We are thrilled to welcome you to <strong>Adventure {displayTargetAdventure}</strong>! Your details from <strong>Adventure {displayCurrentAdventure}</strong> are already verified below — simply review and choose your preferred schedule.
                     </p>
                     <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/20 px-3 py-1.5 text-[12px] font-extrabold">
-                      <span>✓</span> Adventure 2 Priority Reservation Active
+                      <span>✓</span> Adventure {displayTargetAdventure} Priority Reservation Active
                     </div>
                   </div>
                 </div>
@@ -661,10 +690,10 @@ export default function RenewPage() {
               <m.div key="step1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
                 <div className="mb-3">
                   <span className="vp-tag text-[12px] font-black uppercase">
-                    🌟 2026 Adventure 2
+                    🌟 2026 Adventure {displayTargetAdventure}
                   </span>
                 </div>
-                <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure 2 Program</h2>
+                <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure {displayTargetAdventure} Program</h2>
                 <p className="vp-sub mb-4">Follow both steps to choose {childNick ? `${childNick}'s` : "your child's"} class. You must choose a session time before continuing.</p>
                 <div className="mb-6 grid gap-2 sm:grid-cols-2" aria-label="Program selection steps">
                   <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${selectedProgram ? "border-emerald-400 bg-emerald-50" : "border-[#0b2a82] bg-[#fff6cf]"}`}>
@@ -728,7 +757,7 @@ export default function RenewPage() {
                       const isSelected = selectedProgram === p.id;
                       const programSlotData = slots[p.id] || {};
                       const progSettings = renewalSettings[p.name] || renewalSettings[p.id] || Object.values(renewalSettings)[0];
-                      const advNumber = progSettings?.currentAdventure ?? 2;
+                      const advNumber = progSettings?.targetAdventure ?? (progSettings?.currentAdventure ? progSettings.currentAdventure + 1 : 3);
                       const startDateStr = progSettings?.nextAdventureStart
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : null;
@@ -1168,7 +1197,7 @@ export default function RenewPage() {
                       <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
                     </div>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      A registration for <strong>{childName}</strong> was found for <strong>Adventure 2</strong>.
+                      A registration for <strong>{childName}</strong> was found for <strong>Adventure {displayTargetAdventure}</strong>.
                     </p>
                     {prefillData?.existingRegistrationSubmittedAt && (
                       <p className="text-[12px] font-semibold text-amber-900">
@@ -1193,6 +1222,20 @@ export default function RenewPage() {
                       <div className="vp-error mb-4">❌ {submitError}</div>
                     )}
 
+                    {/* Downpayment-not-yet-required notice */}
+                    {!isDownpaymentRequired && downpaymentStartDate && (
+                      <div className="rounded-[22px] border-2 border-violet-200 bg-violet-50 p-4 mb-4 space-y-1">
+                        <p className="font-black text-[13px] text-violet-900 flex items-center gap-2">
+                          <span>💳</span> Free Slot Reservation — No Downpayment Yet
+                        </p>
+                        <p className="text-[12px] text-violet-700 font-medium leading-relaxed">
+                          Your slot is being reserved now at no cost. The downpayment will only be collected starting{" "}
+                          <strong>{new Date(downpaymentStartDate).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</strong>.
+                          We will notify you when it&apos;s time to pay.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="mt-8 flex justify-between items-center">
                       <button onClick={() => setStep(1)} disabled={submitting} className="vp-btn ghost small disabled:opacity-50">← Back</button>
                       <button
@@ -1200,7 +1243,11 @@ export default function RenewPage() {
                         onClick={handleSubmit}
                         className="vp-btn"
                       >
-                        {submitting ? "Reserving Slot..." : "Complete Slot Reservation 🎉"}
+                        {submitting
+                          ? "Reserving Slot..."
+                          : isDownpaymentRequired
+                            ? "Complete Slot Reservation 🎉"
+                            : "Reserve My Slot (Free) 🎉"}
                       </button>
                     </div>
                   </>
