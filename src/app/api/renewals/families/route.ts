@@ -67,6 +67,12 @@ export async function GET(request: Request) {
       ? await db.collection("renewal_periods").findOne({ slug: period })
       : await db.collection("renewal_periods").findOne({ isActive: true }) || await db.collection("renewal_periods").findOne({ isDefault: true });
 
+    // Cutoff: only show email history entries sent after this period was created.
+    // Emails before this date are from a previous adventure cycle and should be hidden.
+    const periodStartCutoff: Date = selectedPeriodDoc?.createdAt
+      ? new Date(selectedPeriodDoc.createdAt)
+      : new Date(0);
+
     const legacyAdventureMatch = period ? period.match(/^adventure-(\d+)-renewal$/i) : null;
     const targetAdventure =
       Number(selectedPeriodDoc?.targetAdventure) ||
@@ -198,6 +204,33 @@ export async function GET(request: Request) {
           linkedRegistrationId = f.registrationId || null;
         }
 
+        // Filter email history to this renewal cycle only (entries sent after periodStartCutoff).
+        // This prevents Adventure 2 promo-code emails from leaking into Adventure 3's view.
+        const cycleEmailHistory = Array.isArray(f.emailHistory)
+          ? f.emailHistory.filter((e: any) => {
+              const sentAt = e.sentAt ? new Date(e.sentAt) : null;
+              return sentAt && sentAt >= periodStartCutoff;
+            })
+          : [];
+
+        // Derive last email fields from cycle-scoped history
+        const lastCycleEmail = cycleEmailHistory.length > 0
+          ? cycleEmailHistory[cycleEmailHistory.length - 1]
+          : null;
+
+        // Map internal email type to human-readable label
+        const EMAIL_TYPE_LABELS: Record<string, string> = {
+          payment_reminder: "Payment Reminder Sent",
+          release_notice: "Release Notice Sent",
+          renewal_invite: "Renewal Invite Sent",
+          confirmation: "Confirmation Sent",
+          custom: "Custom Email Sent",
+        };
+        const derivedLastEmailSent = lastCycleEmail
+          ? (EMAIL_TYPE_LABELS[lastCycleEmail.type] || lastCycleEmail.subject || "Email Sent")
+          : null;
+        const derivedLastEmailDate = lastCycleEmail?.sentAt || null;
+
         return {
           ...f,
           _id: f._id.toString(),
@@ -205,6 +238,10 @@ export async function GET(request: Request) {
           registrationId: linkedRegistrationId,
           renewalStatus: effectiveStatus,
           isPioneer,
+          // Override with cycle-scoped email data so old adventure emails don't bleed through
+          emailHistory: cycleEmailHistory,
+          lastEmailSent: derivedLastEmailSent,
+          lastEmailDate: derivedLastEmailDate,
         };
       }),
     });
