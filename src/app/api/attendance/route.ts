@@ -60,16 +60,44 @@ export async function GET(request: Request) {
         isSuspended = true;
         suspendReason = suspendDoc.reason || null;
         suspendType = suspendDoc.type === "holiday" ? "holiday" : "suspension";
+      } else {
+        // Auto-detect: if a PH holiday exists in calendar_events for this date, treat it as a holiday.
+        // Respects soft-delete (hidden: true means admin removed it, so do NOT auto-mark).
+        const calHoliday = await db.collection("calendar_events").findOne({
+          type: "holiday",
+          startDate: resolvedDateStr,
+          hidden: { $ne: true },
+        });
+        if (calHoliday) {
+          isSuspended = true;
+          suspendReason = calHoliday.title || "Philippine Public Holiday";
+          suspendType = "holiday";
+        }
       }
     }
 
     // Also fetch all suspended/holiday days for bulk queries (timekeeping etc.)
+    // Include auto-detected calendar holidays not yet in suspended_days
     const allSuspendedDocs = await db.collection("suspended_days").find({}).toArray();
+    const manualSuspDates = new Set(allSuspendedDocs.map((d) => d.dateStr as string));
+    const autoHolidayDocs = await db.collection("calendar_events").find({
+      type: "holiday",
+      hidden: { $ne: true },
+    }).toArray();
     // Return as typed objects so consumers can distinguish holiday vs suspension
-    const suspendedDays = allSuspendedDocs.map(d => ({
-      dateStr: d.dateStr as string,
-      type: (d.type === "holiday" ? "holiday" : "suspension") as "suspension" | "holiday",
-    }));
+    const suspendedDays = [
+      ...allSuspendedDocs.map(d => ({
+        dateStr: d.dateStr as string,
+        type: (d.type === "holiday" ? "holiday" : "suspension") as "suspension" | "holiday",
+      })),
+      // Add calendar holidays that are NOT already in suspended_days (avoid duplicates)
+      ...autoHolidayDocs
+        .filter(h => !manualSuspDates.has(h.startDate as string))
+        .map(h => ({
+          dateStr: h.startDate as string,
+          type: "holiday" as const,
+        })),
+    ];
 
     const attendanceRecords = await db.collection("attendance").find(query).toArray();
     
