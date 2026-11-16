@@ -1421,6 +1421,11 @@ export default function RegisterPage() {
                       const advNumber = isClosed ? currentAdv : registrationAdv;
                       const nextAdvNumber = isClosed ? registrationAdv : registrationAdv + 1;
 
+                      // Date-aware session status: check if currentAdv start date has already passed
+                      const todayManila = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+                      const currentAdvStartStr = progSettings?.adventureStartDate ? progSettings.adventureStartDate.slice(0, 10) : null;
+                      const currentAdvIsInSession = currentAdvStartStr ? todayManila >= currentAdvStartStr : false;
+
                       if (isClosed) {
                         return (
                           <div
@@ -1437,7 +1442,7 @@ export default function RegisterPage() {
                                   </span>
                                   {isAdvProgram ? (
                                     <span className="rounded-full bg-slate-200/80 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                                      Adventure {advNumber} in Session
+                                      Adventure {advNumber} {currentAdvIsInSession ? "in Session" : "Starting Soon"}
                                     </span>
                                   ) : (
                                     <span className="rounded-full bg-slate-200/80 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-700">
@@ -1460,7 +1465,7 @@ export default function RegisterPage() {
                               <div className="space-y-0.5 max-w-lg">
                                 <p className="text-[13px] font-extrabold text-amber-950">
                                   {isAdvProgram
-                                    ? `🎒 Current Adventure ${advNumber} is starting / in session!`
+                                    ? `🎒 Adventure ${advNumber} is ${currentAdvIsInSession ? "in session!" : "starting soon!"}`
                                     : `🎒 Registration for ${p.name} is currently closed.`}
                                 </p>
                                 <p className="text-[12px] font-medium text-slate-600 leading-snug">

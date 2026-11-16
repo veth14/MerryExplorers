@@ -635,6 +635,11 @@ export function RenewalSettingsManager() {
             // Use nextAdv in open-registration labels so the UI says "Adventure 3" not "Adventure 2".
             const registrationAdv = prog.nextAdventureStart ? nextAdv : currentAdv;
 
+            // Date-aware: has currentAdv's start date already passed?
+            const todayManilaStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+            const currentAdvStartStr = prog.adventureStartDate ? prog.adventureStartDate.slice(0, 10) : null;
+            const currentAdvIsInSession = currentAdvStartStr ? todayManilaStr >= currentAdvStartStr : false;
+
             return (
               <div
                 key={prog.programKey}
@@ -1167,7 +1172,7 @@ export function RenewalSettingsManager() {
                             <div className="text-[12px] font-medium text-amber-800 leading-snug">
                               🔒{" "}
                               {isAdventureProg ? (
-                                <><strong>Current Adventure {currentAdv} is starting!</strong> Online registration for Adventure {currentAdv} is now closed. Please wait for the next <strong>Adventure {nextAdv}</strong>{prog.nextAdventureStart ? ` (Starts ${nextStartDateDisplay})` : ""}!</>
+                                <><strong>Adventure {currentAdv} is {currentAdvIsInSession ? "in session!" : "starting soon!"}</strong> Online registration for Adventure {currentAdv} is now closed. Please wait for the next <strong>Adventure {nextAdv}</strong>{prog.nextAdventureStart ? ` (Starts ${nextStartDateDisplay})` : ""}!</>
                               ) : (
                                 <><strong>Registration for {meta.short} is currently closed.</strong>{prog.adventureStartDate ? ` Started ${currentStartDateDisplay}.` : ""} Please check back soon or inquire for the next batch!</>
                               )}
