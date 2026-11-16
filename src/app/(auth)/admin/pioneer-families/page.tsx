@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -346,7 +346,7 @@ export default function PioneerFamiliesPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-bold text-[14px] text-[#002f76]">{prog.label}</p>
-                      <p className="mt-0.5 text-[11px] text-slate-500">Regular tuition <span className="font-extrabold text-slate-700">₱{prog.regular.toLocaleString()}</span></p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">Regular rate <span className="font-extrabold text-slate-700">₱{prog.regular.toLocaleString()}</span></p>
                     </div>
                   </div>
                 </div>

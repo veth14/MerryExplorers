@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { getAdventureCycleRegistrationQuery, getTargetRegistrationAdventureNumber, getRegistrationAdventureStartDate, getProgramAdventureSetting } from "@/lib/adventure-cycle";
@@ -153,7 +153,7 @@ export async function GET(request: Request) {
       }
 
       // Financials (shared logic with PATCH)
-      const { totalTuition, expectedDownpayment, isPioneer: isPioneerRecord } = computeTuition(
+      const { totalRate, expectedDownpayment, isPioneer: isPioneerRecord } = computeTuition(
         r,
         pricingCtx,
         Boolean(matchedFamily?.isPioneer)
@@ -168,7 +168,7 @@ export async function GET(request: Request) {
       const paidToPrevious = Math.min(totalPaid, prevAdventureBal);
       const appliedToCurrentSession = Math.max(0, totalPaid - paidToPrevious);
       const remainingPrev = Math.max(0, prevAdventureBal - paidToPrevious);
-      const sessionRemaining = Math.max(0, totalTuition - appliedToCurrentSession);
+      const sessionRemaining = Math.max(0, totalRate - appliedToCurrentSession);
       const remainingBalance = sessionRemaining + remainingPrev;
       const amountPaid = appliedToCurrentSession;
 
@@ -186,7 +186,7 @@ export async function GET(request: Request) {
 
       // Guard: a record only counts as paid if tuition is known and money was actually paid
       const downpaymentMet =
-        totalTuition > 0 && amountPaid > 0 && amountPaid >= expectedDownpayment;
+        totalRate > 0 && amountPaid > 0 && amountPaid >= expectedDownpayment;
       const confirmable = REQUIRE_VERIFIED_FOR_CONFIRMED
         ? downpaymentMet && isVerified
         : downpaymentMet || r.status === "approved";
@@ -203,7 +203,7 @@ export async function GET(request: Request) {
       }
 
       let paymentStatus: "unpaid" | "downpayment_received" | "fully_paid" = "unpaid";
-      if (totalTuition > 0 && amountPaid >= totalTuition) {
+      if (totalRate > 0 && amountPaid >= totalRate) {
         paymentStatus = "fully_paid";
       } else if (downpaymentMet) {
         paymentStatus = "downpayment_received";
@@ -229,7 +229,7 @@ export async function GET(request: Request) {
         reservedUntil: reservedUntil?.toISOString() || null,
         renewalStatus,
         paymentStatus,
-        totalTuition,
+        totalRate,
         expectedDownpayment,
         amountPaid,
         remainingBalance,

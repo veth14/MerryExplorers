@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId, type Db } from "mongodb";
 import {
@@ -101,15 +101,15 @@ export async function PATCH(
       // Same pricing rules as GET (customRate / pioneer rate / amountDue / program rate)
       const ctx = await loadPricingContext(db);
       const families = await findFamilies(db, reg);
-      const { totalTuition, expectedDownpayment } = computeTuition(
+      const { totalRate, expectedDownpayment } = computeTuition(
         reg,
         ctx,
         families.some((f) => f.isPioneer)
       );
 
-      if (totalTuition <= 0) {
+      if (totalRate <= 0) {
         return NextResponse.json(
-          { error: "Tuition is not set for this registration. Set the rate before recording payment." },
+          { error: "Rate is not set for this registration. Set the rate before recording payment." },
           { status: 400 }
         );
       }
@@ -160,7 +160,7 @@ export async function PATCH(
         message: downpaymentMet
           ? "Payment recorded. Downpayment met, so the slot is now confirmed."
           : "Payment recorded. Downpayment not yet met.",
-        data: { newTotalPaid, expectedDownpayment, totalTuition, status: resultingStatus },
+        data: { newTotalPaid, expectedDownpayment, totalRate, status: resultingStatus },
       });
     }
 

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-guard";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -182,13 +182,13 @@ export async function POST(request: Request) {
     const specificPioneerPrice = Number(pioneerPrices[targetProgramSlug]) || FALLBACK_PIONEER_RATES[targetProgramSlug] || 0;
     const hasPioneerDiscount = isPioneer && (specificPioneerPrice > 0 || Number(studentReg?.customRate) > 0);
 
-    const totalTuition: number = hasPioneerDiscount
+    const totalRate: number = hasPioneerDiscount
       ? (specificPioneerPrice || Number(studentReg?.customRate) || programDefinition.rate)
       : (Number(studentReg?.customRate) || programDefinition.rate);
 
     const expectedDownpayment: number = hasPioneerDiscount
-      ? Math.round(totalTuition * 0.6)
-      : (Number(studentReg?.amountDue) || Math.round(totalTuition * 0.6) || programDefinition.downpayment);
+      ? Math.round(totalRate * 0.6)
+      : (Number(studentReg?.amountDue) || Math.round(totalRate * 0.6) || programDefinition.downpayment);
 
     const initialPaid = Number(studentReg?.amountPaid) || 0;
     const balancePaid = Array.isArray(studentReg?.balancePayments)
@@ -261,9 +261,9 @@ export async function POST(request: Request) {
                 </tr>
                 ` : ""}
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b;"><strong>Total Tuition:</strong></td>
+                  <td style="padding: 4px 0; color: #64748b;"><strong>Total Rate:</strong></td>
                   <td style="padding: 4px 0; font-weight: bold; color: #1e293b;">
-                    ₱${totalTuition.toLocaleString()}
+                    ₱${totalRate.toLocaleString()}
                     ${hasPioneerDiscount ? `<span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 20px; font-weight: 800; margin-left: 6px;">PIONEER FAMILY</span>` : ""}
                   </td>
                 </tr>

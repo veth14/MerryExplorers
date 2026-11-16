@@ -1,4 +1,4 @@
-import type { Db } from "mongodb";
+﻿import type { Db } from "mongodb";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { requireAdmin } from "@/lib/auth-guard";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
@@ -64,14 +64,14 @@ export function computeTuition(reg: any, ctx: PricingContext, familyIsPioneer = 
 
     const customRate = Number(reg.customRate) || 0;
     const standardRate = progDef ? progDef.rate : 0;
-    const totalTuition = isPioneer && pioneerRate
+    const totalRate = isPioneer && pioneerRate
         ? pioneerRate
         : customRate || Number(reg.amountDue) || standardRate || 0;
 
     const expectedDownpayment =
-        Math.round(totalTuition * DOWNPAYMENT_RATE) || (progDef ? progDef.downpayment : 0) || 0;
+        Math.round(totalRate * DOWNPAYMENT_RATE) || (progDef ? progDef.downpayment : 0) || 0;
 
-    return { totalTuition, expectedDownpayment, isPioneer };
+    return { totalRate, expectedDownpayment, isPioneer };
 }
 
 export function totalPaid(reg: any): number {

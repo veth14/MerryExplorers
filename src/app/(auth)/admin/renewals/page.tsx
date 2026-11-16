@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import useSWR from "swr";
@@ -56,7 +56,7 @@ type RenewalRecord = {
   reservedUntil: string | null;
   renewalStatus: "reserved" | "confirmed" | "for_release" | "released";
   paymentStatus: "unpaid" | "downpayment_received" | "fully_paid";
-  totalTuition: number;
+  totalRate: number;
   expectedDownpayment: number;
   amountPaid: number;
   remainingBalance: number;
@@ -708,7 +708,7 @@ export default function RenewalsPage() {
       "Promo Code": r.promoCode || "None",
       "Renewal Status": r.renewalStatus,
       "Payment Status": r.paymentStatus,
-      "Total Tuition": r.totalTuition,
+      "Total Rate": r.totalRate,
       "Expected 60% Downpayment": r.expectedDownpayment,
       "Amount Paid": r.amountPaid,
       "Remaining Balance": r.remainingBalance,
@@ -1004,7 +1004,7 @@ export default function RenewalsPage() {
                 <span className="text-sm">⚖️</span>
               </div>
               <p className="mt-1 text-2xl font-black text-amber-900">₱{kpi.totalOutstandingBalance.toLocaleString()}</p>
-              <p className="text-[11px] text-amber-700 mt-0.5">Remaining tuition</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">Remaining balance</p>
             </div>
           </div>
         )}
@@ -1160,7 +1160,7 @@ export default function RenewalsPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="space-y-0.5 text-[11.5px]">
-                            <p>Due: <strong>₱{r.totalTuition.toLocaleString()}</strong></p>
+                            <p>Due: <strong>₱{r.totalRate.toLocaleString()}</strong></p>
                             <p className="text-emerald-700 font-bold">Paid: ₱{r.amountPaid.toLocaleString()}</p>
                             <p className="text-amber-700">Bal: ₱{r.remainingBalance.toLocaleString()}</p>
                           </div>
@@ -1322,7 +1322,7 @@ export default function RenewalsPage() {
                               </td>
                               <td className="py-3 px-4">
                                 <div className="space-y-0.5 text-[11px]">
-                                  <p className="text-slate-500">Total Due: <span className="font-bold text-slate-700">₱{r.totalTuition.toLocaleString()}</span></p>
+                                  <p className="text-slate-500">Total Due: <span className="font-bold text-slate-700">₱{r.totalRate.toLocaleString()}</span></p>
                                   <p className={r.amountPaid > 0 ? "text-emerald-600 font-bold" : "text-slate-400"}>
                                     Paid: ₱{r.amountPaid.toLocaleString()}
                                   </p>
@@ -1944,7 +1944,7 @@ export default function RenewalsPage() {
                               : "curious-explorer";
                   const programDefinition = (PROGRAM_SLOTS as Record<string, any>)[displayProgramSlug];
                   const pioneerFallback = emailModalFamily.isPioneer ? FALLBACK_PIONEER_RATES[displayProgramSlug] : undefined;
-                  const displayTuition = modalMatchingRecord?.totalTuition || pioneerFallback || programDefinition?.rate || 0;
+                  const displayTuition = modalMatchingRecord?.totalRate || pioneerFallback || programDefinition?.rate || 0;
                   const displayDownpayment = modalMatchingRecord?.expectedDownpayment || Math.round(displayTuition * 0.6);
 
                   return (
@@ -1981,7 +1981,7 @@ export default function RenewalsPage() {
                             <span className="font-bold text-emerald-700">Adventure {currentPeriodConfig.targetAdv}</span>
                           </div>
                           <div className="flex justify-between border-b border-slate-100 pb-1">
-                            <span className="text-slate-500 font-semibold">Total Tuition:</span>
+                            <span className="text-slate-500 font-semibold">Total Rate:</span>
                             <span className="font-bold text-slate-800">₱{displayTuition.toLocaleString()}{emailModalFamily.isPioneer && pioneerFallback ? " · Pioneer Family Rate" : ""}</span>
                           </div>
                           <div className="flex justify-between border-b border-slate-100 pb-1">
