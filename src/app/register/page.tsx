@@ -870,17 +870,25 @@ export default function RegisterPage() {
       <main className="vp-main">
 
         {/* Hero Title */}
-        <div className="text-center flex flex-col items-center gap-2 -mb-2">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
-            <span>🎒</span> 2026 ADVENTURE 2 REGISTRATION
-          </div>
-          <h1 className="vp-title text-[32px] sm:text-[42px]">
-            Register Your Explorer
-          </h1>
-          <p className="vp-sub text-[15px] max-w-md">
-            Secure your child&apos;s slot for <strong>Adventure 2</strong> in just a few friendly steps!
-          </p>
-        </div>
+        {(() => {
+          // Use master program's registrationAdventure for the page-level header.
+          // Falls back to curious-explorer, then creative-explorer, then 2.
+          const masterSetting = renewalSettings["curious-explorer"] || renewalSettings["creative-explorer"];
+          const pageAdventureNum = masterSetting?.registrationAdventure ?? masterSetting?.currentAdventure ?? 2;
+          return (
+            <div className="text-center flex flex-col items-center gap-2 -mb-2">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+                <span>🎒</span> 2026 ADVENTURE {pageAdventureNum} REGISTRATION
+              </div>
+              <h1 className="vp-title text-[32px] sm:text-[42px]">
+                Register Your Explorer
+              </h1>
+              <p className="vp-sub text-[15px] max-w-md">
+                Secure your child&apos;s slot for <strong>Adventure {pageAdventureNum}</strong> in just a few friendly steps!
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Step Tabs Indicator */}
         <nav className="vp-tabs">
@@ -1307,8 +1315,8 @@ export default function RegisterPage() {
                       const isSelected = selectedProgram === p.id;
 
                       const isAdvProgram = !["ballet", "virtual-session", "saturday-playdate"].includes(p.id) && !["Ballet", "Virtual Tutorial", "Saturday Playdate"].includes(p.name);
-                      const advNumber = progSettings?.registrationAdventure ?? progSettings?.currentAdventure ?? 2;
-                      const nextAdvNumber = advNumber + 1;
+                      const currentAdv = progSettings?.currentAdventure ?? 2;
+                      const registrationAdv = progSettings?.registrationAdventure ?? currentAdv;
                       const startDateStr = progSettings?.nextAdventureStart
                         ? new Date(progSettings.nextAdventureStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : null;
@@ -1382,6 +1390,10 @@ export default function RegisterPage() {
 
                       // 2) Registration closed
                       const isClosed = checkIsRegistrationClosed(progSettings);
+                      // When closed: show currentAdv as "in session" and registrationAdv as the upcoming target.
+                      // When open: show registrationAdv as what families are registering for.
+                      const advNumber = isClosed ? currentAdv : registrationAdv;
+                      const nextAdvNumber = isClosed ? registrationAdv : registrationAdv + 1;
 
                       if (isClosed) {
                         return (
