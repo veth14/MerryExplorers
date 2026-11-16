@@ -352,7 +352,9 @@ export default function PaymentPage() {
 
   if (!mounted) return null;
 
-  const isDeferred = Boolean(
+  // Deferred downpayment only applies to renewals (returning families), never to new-family registrations.
+  const isRenewalRegistration = regData?.isNewFamily === false;
+  const isDeferred = isRenewalRegistration && Boolean(
     regData?.downpaymentDeferred ||
     (regData?.status === "reserved" && regData?.downpaymentStartDate && new Date(regData.downpaymentStartDate).getTime() > Date.now())
   );

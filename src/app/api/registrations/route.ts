@@ -360,7 +360,10 @@ export async function POST(request: Request) {
     const isPriorityReservation = cleanPromoCode.toUpperCase() === "A1RENEWAL2026";
     // Trailblazer-at-Creative-Explorer-pioneer-price promo
     const isTrailblazerCreativePioneer = cleanPromoCode.toUpperCase() === "TRAILBLAZER2CREATIVE";
-    const downpaymentStartDate = data.downpaymentStartDate || (adventureSetting as any)?.downpaymentStartDate;
+    // downpaymentStartDate applies ONLY to renewals — never carry it over to new-family registrations.
+    const downpaymentStartDate = isRenewal
+      ? (data.downpaymentStartDate || (adventureSetting as any)?.downpaymentStartDate)
+      : null;
     const isDownpaymentDeferred = isRenewal && Boolean(
       downpaymentStartDate && new Date(downpaymentStartDate).getTime() > Date.now()
     );
