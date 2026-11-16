@@ -225,11 +225,14 @@ export async function GET(request: Request) {
           renewal_invite: "Renewal Invite Sent",
           confirmation: "Confirmation Sent",
           custom: "Custom Email Sent",
+          self_renewed: "Self-submitted (Renewal Form)",
+          self_registered: "Self-registered (Public Form)",
         };
         const derivedLastEmailSent = lastCycleEmail
           ? (EMAIL_TYPE_LABELS[lastCycleEmail.type] || lastCycleEmail.subject || "Email Sent")
           : null;
         const derivedLastEmailDate = lastCycleEmail?.sentAt || null;
+        const derivedLastEmailType = lastCycleEmail?.type || null;
 
         return {
           ...f,
@@ -242,6 +245,7 @@ export async function GET(request: Request) {
           emailHistory: cycleEmailHistory,
           lastEmailSent: derivedLastEmailSent,
           lastEmailDate: derivedLastEmailDate,
+          lastEmailType: derivedLastEmailType,
         };
       }),
     });

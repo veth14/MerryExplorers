@@ -30,6 +30,7 @@ type Family = {
   lastEmailSent?: string | null;
   lastEmailDate?: string | null;
   emailHistory?: any[];
+  lastEmailType?: string | null;
   notes?: string;
   renewalPeriod?: string;
   registrationId?: string | null;
@@ -1565,9 +1566,15 @@ export default function RenewalsPage() {
                         <td className="py-3.5 px-4 text-[11px] text-slate-500">
                           {f.lastEmailSent ? (
                             <div>
-                              <p className="font-semibold text-emerald-700 flex items-center gap-1">
-                                <span>✓</span> {f.lastEmailSent}
-                              </p>
+                              {f.lastEmailType === "self_registered" || f.lastEmailType === "self_renewed" ? (
+                                <p className="font-semibold text-blue-600 flex items-center gap-1">
+                                  <span>📋</span> {f.lastEmailSent}
+                                </p>
+                              ) : (
+                                <p className="font-semibold text-emerald-700 flex items-center gap-1">
+                                  <span>✓</span> {f.lastEmailSent}
+                                </p>
+                              )}
                               <p className="text-slate-400">{f.lastEmailDate ? new Date(f.lastEmailDate).toLocaleDateString() : ""}</p>
                             </div>
                           ) : (

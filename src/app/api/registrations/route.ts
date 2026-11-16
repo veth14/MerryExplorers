@@ -485,6 +485,18 @@ export async function POST(request: Request) {
         });
 
         if (familyMatch) {
+          // Determine the registration source: renewal form (/renew) vs public register form (/register)
+          const registeredViaRenewalForm = Boolean(isRenewal);
+          const activityLog = {
+            type: registeredViaRenewalForm ? "self_renewed" : "self_registered",
+            subject: registeredViaRenewalForm
+              ? `Self-submitted via Renewal Form (Adventure ${adventureNumber ?? "?"})`
+              : `Self-registered via Public Form (Adventure ${adventureNumber ?? "?"})`,
+            sentAt: new Date(),
+            sentBy: "System",
+            recipient: (parentInfo?.email || "").toLowerCase().trim(),
+          };
+
           await db.collection("renewal_families").updateOne(
             { _id: familyMatch._id },
             {
@@ -493,6 +505,9 @@ export async function POST(request: Request) {
                 registrationId: result.insertedId.toString(),
                 targetAdventure: adventureNumber,
                 updatedAt: new Date(),
+              },
+              $push: {
+                emailHistory: activityLog as any,
               },
             }
           );
