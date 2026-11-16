@@ -400,6 +400,7 @@ export default function RegisterPage() {
   };
 
   const [renewalSettings, setRenewalSettings] = useState<Record<string, ProgramSetting>>({});
+  const [renewalSettingsLoaded, setRenewalSettingsLoaded] = useState(false);
 
   function registrationCloseAt(setting?: ProgramSetting) {
     if (!setting) return null;
@@ -412,7 +413,8 @@ export default function RegisterPage() {
   }
 
   function checkIsRegistrationClosed(setting?: ProgramSetting): boolean {
-    if (!setting) return false;
+    // If settings haven't loaded yet, treat as closed to avoid a flash of "open" state.
+    if (!setting) return !renewalSettingsLoaded ? true : false;
     if (setting.registrationOpen === false) return true;
 
     // If an open date is set for new families:
@@ -434,22 +436,41 @@ export default function RegisterPage() {
       .then((d) => {
         if (Array.isArray(d.programs)) {
           const map: Record<string, ProgramSetting> = {};
+
+          // Short-key → full-name aliases so both lookup styles work
+          const SHORT_KEY_MAP: Record<string, string> = {
+            "curious-explorer": "Discovery Club: Curious Explorer",
+            "creative-explorer": "Discovery Club: Creative Explorer",
+            "everyday-explorer": "Discovery Club: Everyday Explorer",
+            "everyday-curious": "Discovery Club: Everyday Explorer",
+            "brave-explorer": "Trailblazer: Brave Explorer",
+            "saturday-playdate": "Saturday Playdate",
+            "ballet": "Ballet",
+            "virtual-session": "Virtual Tutorial",
+          };
+
           d.programs.forEach((p: any) => {
             const entry: ProgramSetting = {
               currentAdventure: p.currentAdventure ?? 2,
               registrationAdventure: getTargetRegistrationAdventureNumber(p.programKey, d.programs),
               adventureStartDate: p.adventureStartDate ?? null,
               nextAdventureStart: p.nextAdventureStart ?? null,
-              registrationOpen: p.registrationOpen !== false,
+              // Explicit false = closed; anything else (true/null/undefined) = open
+              registrationOpen: p.registrationOpen === false ? false : Boolean(p.registrationOpen),
               registrationAutoCloseDays: p.registrationAutoCloseDays ?? 7,
               customClosedMessage: p.customClosedMessage || "",
               newFamilyRegistrationOpenDate: p.newFamilyRegistrationOpenDate ?? null,
               closedClasses: Array.isArray(p.closedClasses) ? p.closedClasses : [],
             };
+            // Store by full programKey name
             map[p.programKey] = entry;
-            if (p.programKey === "Ballet") map["ballet"] = entry;
+            // Also store by short key aliases so lookups by p.id work too
+            for (const [shortKey, fullName] of Object.entries(SHORT_KEY_MAP)) {
+              if (p.programKey === fullName) map[shortKey] = entry;
+            }
           });
           setRenewalSettings(map);
+          setRenewalSettingsLoaded(true);
         }
       })
       .catch(() => {});
@@ -872,9 +893,16 @@ export default function RegisterPage() {
         {/* Hero Title */}
         {(() => {
           // Use master program's registrationAdventure for the page-level header.
-          // Falls back to curious-explorer, then creative-explorer, then 2.
-          const masterSetting = renewalSettings["curious-explorer"] || renewalSettings["creative-explorer"];
-          const pageAdventureNum = masterSetting?.registrationAdventure ?? masterSetting?.currentAdventure ?? 2;
+          // The renewalSettings map is keyed by full programKey names (e.g. "Discovery Club: Curious Explorer").
+          const masterSetting =
+            renewalSettings["Discovery Club: Curious Explorer"] ||
+            renewalSettings["Discovery Club: Creative Explorer"] ||
+            renewalSettings["curious-explorer"] ||
+            renewalSettings["creative-explorer"];
+          // If masterSetting not loaded yet or registrationAdventure isn't ready, also check nextAdventureStart.
+          const pageAdventureNum =
+            masterSetting?.registrationAdventure ??
+            (masterSetting?.nextAdventureStart ? (masterSetting.currentAdventure ?? 2) + 1 : masterSetting?.currentAdventure ?? 2);
           return (
             <div className="text-center flex flex-col items-center gap-2 -mb-2">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
