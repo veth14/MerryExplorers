@@ -631,6 +631,9 @@ export function RenewalSettingsManager() {
 
             const currentAdv = prog.currentAdventure ?? 2;
             const nextAdv = currentAdv + 1;
+            // When nextAdventureStart is set, open registration is PRE-REGISTRATION for the NEXT adventure.
+            // Use nextAdv in open-registration labels so the UI says "Adventure 3" not "Adventure 2".
+            const registrationAdv = prog.nextAdventureStart ? nextAdv : currentAdv;
 
             return (
               <div
@@ -1073,7 +1076,7 @@ export function RenewalSettingsManager() {
                             : "bg-amber-500 text-white hover:bg-amber-600"
                             }`}
                         >
-                          {isClosed ? "Reopen Registration" : isAdventureProg ? `Close Adventure ${currentAdv}` : `Close Registration`}
+                          {isClosed ? "Reopen Registration" : isAdventureProg ? `Close Adventure ${registrationAdv}` : `Close Registration`}
                         </button>
                       </div>
                     </div>
@@ -1092,7 +1095,7 @@ export function RenewalSettingsManager() {
                             }
                             className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
                           />
-                          <span>Auto-close registration 1 week (7 days) after Adventure {currentAdv} starts</span>
+                          <span>Auto-close registration 1 week (7 days) after Adventure {registrationAdv} starts</span>
                         </label>
                         <span className="text-[10.5px] font-bold text-slate-400">
                           {prog.registrationAutoCloseDays ? "7 days" : "Manual only"}
@@ -1177,7 +1180,7 @@ export function RenewalSettingsManager() {
                             <div className="text-[12px] font-medium text-emerald-800 leading-snug">
                               ✓{" "}
                               {isAdventureProg ? (
-                                <><strong>Adventure {currentAdv} is Open for Registration!</strong> Families can select classes and reserve slots online.</>
+                                <><strong>Adventure {registrationAdv} is Open for Registration!</strong> Families can select classes and reserve slots online.</>
                               ) : (
                                 <><strong>{meta.short} is Open for Registration!</strong> Families can sign up online.</>
                               )}
