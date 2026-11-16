@@ -556,6 +556,8 @@ export default function AttendancePage() {
             timeIn = fmtTime(rec.clockInTime);
             timeOut = fmtTime(rec.clockOutTime);
             const isDayExempt = !!acc?.noTimeLog || dailyExemptSet.has(`${exportTeacherUid}_${dStr}`);
+            const isNoTimeLog = !!acc?.noTimeLog; // permanent flexible (Ian) → "Completed"
+            // daily override (Angel etc.) → "On Time" in DTR
             const m = workedMins(rec.clockInTime, rec.clockOutTime, name, scheduleConfigs);
             totalMins += m;
             hours = fmtHM(m);
@@ -565,19 +567,20 @@ export default function AttendancePage() {
             let statusLabel = "On Time";
 
             if (isDayExempt) {
-              statusLabel = "Exempt";
+              // noTimeLog (developer/permanent flexible) → "Completed"; daily override → "On Time"
+              statusLabel = isNoTimeLog ? "Completed" : "On Time";
             } else if (rec.clockInTime) {
               const comp = computeTimeInStatus(rec.clockInTime, isDayExempt, name, scheduleConfigs);
               if (comp === "Late") {
                 isLate = true;
                 statusLabel = "Late";
               } else if (comp === "Exempt") {
-                statusLabel = "Exempt";
+                statusLabel = "On Time";
               } else {
                 statusLabel = "On Time";
               }
             } else if (rec.timeInStatus === "Exempt") {
-              statusLabel = "Exempt";
+              statusLabel = "On Time";
             }
 
             if (isLate && rec.clockInTime) {
@@ -689,6 +692,7 @@ export default function AttendancePage() {
             const teacherAcc = accounts.find((a) => (a.id || a._id) === r.teacherUid) ||
               accounts.find((a) => (a.fullName || "").toLowerCase() === teacherName.toLowerCase());
             const isDayExempt = !!teacherAcc?.noTimeLog || dailyExemptSet.has(`${r.teacherUid}_${dStr}`);
+            const isNoTimeLogTeacher = !!teacherAcc?.noTimeLog;
 
             // Compute worked minutes with shift capping
             const m = workedMins(r.clockInTime, r.clockOutTime, teacherName, scheduleConfigs);
@@ -699,19 +703,20 @@ export default function AttendancePage() {
             let isLate = false;
 
             if (isDayExempt) {
-              teacherStatus = "Exempt (Flexible)";
+              // noTimeLog (permanent flexible e.g. developer) → "Completed"; daily override → "On Time"
+              teacherStatus = isNoTimeLogTeacher ? "Completed" : "On Time";
             } else if (r.clockInTime) {
               const comp = computeTimeInStatus(r.clockInTime, isDayExempt, teacherAcc?.fullName || teacherName, scheduleConfigs);
               if (comp === "Late") {
                 isLate = true;
                 teacherStatus = "Late";
               } else if (comp === "Exempt") {
-                teacherStatus = "Exempt (Flexible)";
+                teacherStatus = "On Time";
               } else {
                 teacherStatus = "On Time";
               }
             } else if (r.timeInStatus === "Exempt") {
-              teacherStatus = "Exempt (Flexible)";
+              teacherStatus = "On Time";
             } else {
               teacherStatus = "Absent";
             }
