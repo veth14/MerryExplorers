@@ -402,6 +402,19 @@ export default function RegisterPage() {
   const [renewalSettings, setRenewalSettings] = useState<Record<string, ProgramSetting>>({});
   const [renewalSettingsLoaded, setRenewalSettingsLoaded] = useState(false);
 
+  // Derive the page-level adventure number from the master program setting.
+  // Used in page header, step titles, and review badge — always dynamic, never hardcoded.
+  const masterProgramSetting =
+    renewalSettings["Discovery Club: Curious Explorer"] ||
+    renewalSettings["Discovery Club: Creative Explorer"] ||
+    renewalSettings["curious-explorer"] ||
+    renewalSettings["creative-explorer"];
+  const pageAdventureNum =
+    masterProgramSetting?.registrationAdventure ??
+    (masterProgramSetting?.nextAdventureStart
+      ? (masterProgramSetting.currentAdventure ?? 2) + 1
+      : masterProgramSetting?.currentAdventure ?? 2);
+
   function registrationCloseAt(setting?: ProgramSetting) {
     if (!setting) return null;
     const startDate = setting.registrationAdventure > setting.currentAdventure
@@ -891,32 +904,17 @@ export default function RegisterPage() {
       <main className="vp-main">
 
         {/* Hero Title */}
-        {(() => {
-          // Use master program's registrationAdventure for the page-level header.
-          // The renewalSettings map is keyed by full programKey names (e.g. "Discovery Club: Curious Explorer").
-          const masterSetting =
-            renewalSettings["Discovery Club: Curious Explorer"] ||
-            renewalSettings["Discovery Club: Creative Explorer"] ||
-            renewalSettings["curious-explorer"] ||
-            renewalSettings["creative-explorer"];
-          // If masterSetting not loaded yet or registrationAdventure isn't ready, also check nextAdventureStart.
-          const pageAdventureNum =
-            masterSetting?.registrationAdventure ??
-            (masterSetting?.nextAdventureStart ? (masterSetting.currentAdventure ?? 2) + 1 : masterSetting?.currentAdventure ?? 2);
-          return (
-            <div className="text-center flex flex-col items-center gap-2 -mb-2">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
-                <span>🎒</span> 2026 ADVENTURE {pageAdventureNum} REGISTRATION
-              </div>
-              <h1 className="vp-title text-[32px] sm:text-[42px]">
-                Register Your Explorer
-              </h1>
-              <p className="vp-sub text-[15px] max-w-md">
-                Secure your child&apos;s slot for <strong>Adventure {pageAdventureNum}</strong> in just a few friendly steps!
-              </p>
-            </div>
-          );
-        })()}
+        <div className="text-center flex flex-col items-center gap-2 -mb-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border-2 border-[#0b2a82] shadow-[0_4px_0_#0b2a82] text-[12px] font-extrabold text-[#0b2a82] mb-1">
+            <span>🎒</span> 2026 ADVENTURE {pageAdventureNum} REGISTRATION
+          </div>
+          <h1 className="vp-title text-[32px] sm:text-[42px]">
+            Register Your Explorer
+          </h1>
+          <p className="vp-sub text-[15px] max-w-md">
+            Secure your child&apos;s slot for <strong>Adventure {pageAdventureNum}</strong> in just a few friendly steps!
+          </p>
+        </div>
 
         {/* Step Tabs Indicator */}
         <nav className="vp-tabs">
@@ -1249,7 +1247,7 @@ export default function RegisterPage() {
                       <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
                     </div>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      A registration for <strong>{duplicateChildName || childInfo.firstName || "your child"}</strong> was found for <strong>Adventure 2</strong> (possibly submitted via the renewal form or general registration).
+                      A registration for <strong>{duplicateChildName || childInfo.firstName || "your child"}</strong> was found for <strong>Adventure {pageAdventureNum}</strong> (possibly submitted via the renewal form or general registration).
                     </p>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
                       You do not need to register again! You can proceed directly to your payment page to upload proof of payment and confirm your slot.
@@ -1287,10 +1285,10 @@ export default function RegisterPage() {
               <m.div key="step1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
                 <div className="mb-3">
                   <span className="vp-tag text-[12px] font-black uppercase">
-                    🌟 2026 Adventure 2
+                    🌟 2026 Adventure {pageAdventureNum}
                   </span>
                 </div>
-                <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure 2 Program</h2>
+                <h2 className="vp-h2 text-[24px] mb-1">Choose an Adventure {pageAdventureNum} Program</h2>
                 <p className="vp-sub mb-4">Follow both steps to choose your child&apos;s class. You must choose a session time before continuing.</p>
                 <div className="mb-6 grid gap-2 sm:grid-cols-2" aria-label="Program selection steps">
                   <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${selectedProgram ? "border-emerald-400 bg-emerald-50" : "border-[#0b2a82] bg-[#fff6cf]"}`}>
@@ -1883,7 +1881,7 @@ export default function RegisterPage() {
               <m.div key="step3" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.25 }}>
                 <div className="mb-3">
                   <span className="vp-tag text-[12px] font-black uppercase">
-                    🌟 2026 ADVENTURE 2
+                    🌟 2026 ADVENTURE {pageAdventureNum}
                   </span>
                 </div>
                 <h2 className="vp-h2 text-[24px] mb-1">Review & Confirm</h2>
@@ -1977,7 +1975,7 @@ export default function RegisterPage() {
                       <p className="font-black text-[15px] text-amber-900">Existing Registration Found!</p>
                     </div>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
-                      A registration for <strong>{duplicateChildName || "your child"}</strong> was found for <strong>Adventure 2</strong> — possibly submitted via the renewal form.
+                      A registration for <strong>{duplicateChildName || "your child"}</strong> was found for <strong>Adventure {pageAdventureNum}</strong> — possibly submitted via the renewal form.
                     </p>
                     <p className="text-[13px] font-medium text-amber-800 leading-relaxed">
                       You <strong>do not need to register again</strong>. Click below to go directly to your existing registration&apos;s payment page to upload your proof of payment and confirm your slot.
