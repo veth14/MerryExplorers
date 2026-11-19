@@ -716,18 +716,19 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                       >
                         {(programData?.classes || []).map((cls) => {
                           const slot = slots[selectedProgram]?.[cls.name];
-                          const avail = slot ? slot.available : null;
-                          const max = slot ? slot.maxSlots : cls.maxSlots;
+                          const max = slot?.maxSlots ?? cls.maxSlots ?? 10;
+                          const taken = slot?.taken ?? 0;
+                          const avail = slot ? slot.available : Math.max(0, max - taken);
                           const isClosed = slot?.closed;
-                          const isFull = avail !== null && avail <= 0;
+                          const isFull = avail <= 0;
 
                           let slotSuffix = "";
                           if (isClosed) {
-                            slotSuffix = " — 🔒 CLOSED";
+                            slotSuffix = ` — 🔒 CLOSED (Total: ${max} slots)`;
                           } else if (isFull) {
-                            slotSuffix = " — ⚠️ FULL (0 slots left)";
-                          } else if (avail !== null) {
-                            slotSuffix = ` — 🟢 ${avail} of ${max} slots left`;
+                            slotSuffix = ` — ⚠️ FULL (${taken}/${max} slots taken · 0 left · Total: ${max})`;
+                          } else {
+                            slotSuffix = ` — 🟢 ${avail} of ${max} slots left (${taken} taken · Total: ${max})`;
                           }
 
                           return (
@@ -740,11 +741,11 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                     </div>
                   </div>
 
-                  {/* Visual Session Availability Selector */}
+                  {/* Visual Session Availability Selector with Slot Numbers */}
                   <div className="space-y-1.5 pt-1">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-extrabold uppercase tracking-wide text-slate-500">
-                        Available Slots by Session
+                        Total &amp; Remaining Slots by Session
                       </span>
                       {loadingSlots && (
                         <span className="text-slate-400 font-medium">Checking live slots…</span>
@@ -755,13 +756,15 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                       {(programData?.classes || []).map((cls) => {
                         const isSelected = selectedClass === cls.name;
                         const slot = slots[selectedProgram]?.[cls.name];
-                        const avail = slot ? slot.available : null;
-                        const max = slot ? slot.maxSlots : cls.maxSlots;
+                        const max = slot?.maxSlots ?? cls.maxSlots ?? 10;
+                        const taken = slot?.taken ?? 0;
+                        const avail = slot ? slot.available : Math.max(0, max - taken);
                         const isClosed = slot?.closed;
-                        const isFull = avail !== null && avail <= 0;
+                        const isFull = avail <= 0;
+                        const pct = Math.min(100, Math.round((taken / max) * 100));
 
                         let badgeBg = "bg-emerald-50 text-emerald-800 border-emerald-300";
-                        let badgeLabel = avail !== null ? `${avail} left` : "Available";
+                        let badgeLabel = `${avail} left`;
 
                         if (isClosed) {
                           badgeBg = "bg-slate-100 text-slate-600 border-slate-300";
@@ -769,7 +772,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                         } else if (isFull) {
                           badgeBg = "bg-rose-100 text-rose-800 border-rose-300";
                           badgeLabel = "0 left (FULL)";
-                        } else if (avail !== null && avail <= 2) {
+                        } else if (avail <= 2) {
                           badgeBg = "bg-amber-100 text-amber-900 border-amber-300";
                           badgeLabel = `Only ${avail} left!`;
                         }
@@ -795,16 +798,26 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                                 </span>
                               )}
                             </div>
+
                             <p className="text-[10.5px] text-slate-500 font-semibold">{cls.time}</p>
-                            <div className="pt-1 flex items-center justify-between text-[10px]">
+
+                            {/* Mini Capacity Progress Bar */}
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden my-0.5">
+                              <div
+                                className={`h-full rounded-full ${
+                                  pct >= 100 ? "bg-rose-500" : pct >= 75 ? "bg-amber-500" : "bg-emerald-500"
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] gap-1">
                               <span className={`px-2 py-0.5 rounded-full font-black border ${badgeBg}`}>
                                 {badgeLabel}
                               </span>
-                              {slot && (
-                                <span className="text-slate-400 font-medium">
-                                  {slot.taken}/{max} occupied
-                                </span>
-                              )}
+                              <span className="text-slate-600 font-bold">
+                                {taken}/{max} total slots
+                              </span>
                             </div>
                           </button>
                         );
@@ -812,15 +825,70 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                     </div>
                   </div>
 
+                  {/* Selected Session Live Capacity Ribbon */}
+                  {(() => {
+                    const selectedSlot = slots[selectedProgram]?.[selectedClass];
+                    const clsData = (programData?.classes || []).find((c) => c.name === selectedClass);
+                    const max = selectedSlot?.maxSlots ?? clsData?.maxSlots ?? 10;
+                    const taken = selectedSlot?.taken ?? 0;
+                    const avail = selectedSlot ? selectedSlot.available : Math.max(0, max - taken);
+                    const pct = Math.min(100, Math.round((taken / max) * 100));
+
+                    return (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-1.5 text-[12px]">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-[#002f76]">
+                              📊 {selectedClass || "Session"} Capacity:
+                            </span>
+                            <span className="text-[11px] bg-white border border-blue-200 text-blue-900 font-black px-2 py-0.5 rounded-full">
+                              Total Slots: {max}
+                            </span>
+                            <span className="text-[11px] bg-white border border-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">
+                              Occupied / Taken: {taken}
+                            </span>
+                          </div>
+                          <div>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full font-black text-[11px] border ${
+                                avail <= 0
+                                  ? "bg-rose-100 text-rose-800 border-rose-300"
+                                  : avail <= 2
+                                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                                  : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                              }`}
+                            >
+                              {avail <= 0 ? "⚠️ 0 slots left (FULL)" : `🟢 ${avail} of ${max} slots remaining`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              pct >= 100 ? "bg-rose-500" : pct >= 75 ? "bg-amber-500" : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Overcapacity warning if selected class is full */}
                   {(() => {
                     const currentSlot = slots[selectedProgram]?.[selectedClass];
-                    if (currentSlot && currentSlot.available <= 0) {
+                    const clsData = (programData?.classes || []).find((c) => c.name === selectedClass);
+                    const max = currentSlot?.maxSlots ?? clsData?.maxSlots ?? 10;
+                    const taken = currentSlot?.taken ?? 0;
+                    const avail = currentSlot ? currentSlot.available : Math.max(0, max - taken);
+                    if (avail <= 0) {
                       return (
                         <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-[11.5px] font-semibold text-amber-900 flex items-start gap-2">
                           <span className="shrink-0 text-amber-600 font-bold">⚠️</span>
                           <span>
-                            <strong>{selectedClass}</strong> currently has <strong>0 slots left</strong> ({currentSlot.taken}/{currentSlot.maxSlots} occupied). As staff, you may still encode this reservation if authorized to overbook.
+                            <strong>{selectedClass}</strong> has <strong>0 slots remaining</strong> ({taken} of {max} slots occupied). As staff, you may still encode this reservation if authorized to overbook.
                           </span>
                         </div>
                       );
