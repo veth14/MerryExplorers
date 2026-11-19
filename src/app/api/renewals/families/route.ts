@@ -136,6 +136,9 @@ export async function GET(request: Request) {
 
         // Helper to test if a registration matches this family
         const isRegMatch = (r: any) => {
+          if (f.registrationId && (r._id?.toString() === f.registrationId || (r._id?.equals && r._id.equals(f.registrationId)))) {
+            return true;
+          }
           const regEmail = (r.parentInfo?.email || "").toLowerCase().trim();
           const rFirst = (r.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
           const rLast = (r.childInfo?.lastName || "").toLowerCase().trim();
@@ -231,13 +234,56 @@ export async function GET(request: Request) {
         const derivedLastEmailDate = lastCycleEmail?.sentAt || null;
         const derivedLastEmailType = lastCycleEmail?.type || null;
 
+        const matchingRegs = allApprovedRegistrations.filter((r) => isRegMatch(r) || (f.registrationId && r._id?.toString() === f.registrationId));
+        const latestReg = matchingRegs[matchingRegs.length - 1];
+
+        const cleanPhone = (val?: string) => {
+          if (!val) return "";
+          const t = String(val).trim();
+          if (/^(n\/?a|none|null|undefined|-)$/i.test(t)) return "";
+          return t;
+        };
+
+        const resolvedPhone =
+          cleanPhone(f.phone) ||
+          cleanPhone(latestReg?.parentInfo?.phone) ||
+          cleanPhone(latestReg?.emergencyContact?.phone) ||
+          cleanPhone(f.emergencyPhone) ||
+          f.phone ||
+          "";
+
+        const resolvedNickname =
+          latestReg?.childInfo?.nickname ||
+          f.childNickname ||
+          f.nickname ||
+          null;
+
+        const lastAdv = historyAdventures[historyAdventures.length - 1];
+        const derivedClassTime =
+          f.previousClassTime ||
+          f.classTime ||
+          f.targetSession ||
+          latestReg?.classTime ||
+          lastAdv?.classTime ||
+          null;
+        const derivedProgram =
+          f.renewingTo ||
+          f.previousProgram ||
+          latestReg?.program ||
+          lastAdv?.program ||
+          null;
+
         return {
           ...f,
           _id: f._id.toString(),
+          phone: resolvedPhone,
+          childNickname: resolvedNickname,
           adventures: historyAdventures,
           registrationId: linkedRegistrationId,
           renewalStatus: effectiveStatus,
           isPioneer,
+          previousClassTime: derivedClassTime,
+          previousProgram: derivedProgram,
           // Override with cycle-scoped email data so old adventure emails don't bleed through
           emailHistory: cycleEmailHistory,
           lastEmailSent: derivedLastEmailSent,

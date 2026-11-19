@@ -11,10 +11,14 @@ export interface RenewalFamilyOption {
   parentEmail: string;
   phone: string;
   childName: string;
+  childNickname?: string;
   previousProgram?: string;
+  previousClassTime?: string;
+  classTime?: string;
   renewingTo?: string;
   renewalStatus: "not_yet_submitted" | "reserved" | "confirmed" | "released";
   isPioneer?: boolean;
+  adventures?: Array<{ adventure: string; program: string; classTime?: string }>;
 }
 
 interface QuickEncodeModalProps {
@@ -39,6 +43,54 @@ function matchProgramId(val?: string): string {
   return "creative-explorer";
 }
 
+function matchClassTime(
+  preferred?: string,
+  availableClasses: readonly { name: string; time?: string }[] = []
+): string {
+  if (!availableClasses || availableClasses.length === 0) return "";
+  if (!preferred) return availableClasses[0].name;
+
+  const p = preferred.trim().toLowerCase();
+
+  // 1. Exact match on class name
+  const exact = availableClasses.find((c) => c.name.toLowerCase() === p);
+  if (exact) return exact.name;
+
+  // 2. Name alias match ("Morning Class" vs "Morning Session", "Mid-Day Class" vs "Mid-Day Session", "Afternoon Class" vs "Afternoon Session")
+  const pNorm = p.replace(/\bclass\b/g, "session");
+  const alias = availableClasses.find((c) => c.name.toLowerCase().replace(/\bclass\b/g, "session") === pNorm);
+  if (alias) return alias.name;
+
+  // 3. Keyword matching (morning, mid-day / midday / noon, afternoon, baby, basic)
+  if (p.includes("morning")) {
+    const m = availableClasses.find((c) => c.name.toLowerCase().includes("morning"));
+    if (m) return m.name;
+  }
+  if (p.includes("mid-day") || p.includes("midday") || p.includes("noon") || p.includes("11:15")) {
+    const md = availableClasses.find((c) => c.name.toLowerCase().includes("mid-day") || c.name.toLowerCase().includes("midday"));
+    if (md) return md.name;
+  }
+  if (p.includes("afternoon") || p.includes("1:30") || p.includes("3:00")) {
+    const a = availableClasses.find((c) => c.name.toLowerCase().includes("afternoon"));
+    if (a) return a.name;
+  }
+  if (p.includes("baby")) {
+    const b = availableClasses.find((c) => c.name.toLowerCase().includes("baby"));
+    if (b) return b.name;
+  }
+  if (p.includes("basic")) {
+    const b = availableClasses.find((c) => c.name.toLowerCase().includes("basic"));
+    if (b) return b.name;
+  }
+
+  // 4. Time string matching (e.g. "9:45", "11:15", "1:30", "3:00")
+  for (const c of availableClasses) {
+    if (c.time && p.includes(c.time.toLowerCase())) return c.name;
+  }
+
+  return availableClasses[0].name;
+}
+
 export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure }: QuickEncodeModalProps) {
   const [families, setFamilies] = useState<RenewalFamilyOption[]>([]);
   const [loadingFamilies, setLoadingFamilies] = useState(false);
@@ -61,6 +113,13 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   // Live Slots
   const [slots, setSlots] = useState<Record<string, Record<string, { maxSlots: number; taken: number; available: number; closed?: boolean; time?: string }>>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
+
+  // Previous enrollment detection
+  const [previousEnrollment, setPreviousEnrollment] = useState<{
+    programName: string;
+    classTime: string;
+  } | null>(null);
+  const [prefillLoading, setPrefillLoading] = useState(false);
 
   // Payment Fields
   const [recordPayment, setRecordPayment] = useState(false);
@@ -147,9 +206,12 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
     return families.find((f) => f._id === selectedFamilyId) || null;
   }, [families, selectedFamilyId]);
 
-  // Populate form when family is selected
+  // Populate form when family is selected with exact previous data
   useEffect(() => {
-    if (!selectedFamily) return;
+    if (!selectedFamily) {
+      setPreviousEnrollment(null);
+      return;
+    }
 
     // Split childName into first and last
     const rawChild = (selectedFamily.childName || "").trim();
@@ -162,21 +224,107 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       setChildLastName("");
     }
 
+    setChildNickname(selectedFamily.childNickname || "");
     setParentName(selectedFamily.parentName || "");
     setParentEmail(selectedFamily.parentEmail || "");
-    setParentPhone(selectedFamily.phone || "");
 
-    const progId = matchProgramId(selectedFamily.renewingTo || selectedFamily.previousProgram);
-    setSelectedProgram(progId);
+    const cleanPh = (val?: string) => {
+      if (!val) return "";
+      const t = String(val).trim();
+      return /^(n\/?a|none|null|undefined|-)$/i.test(t) ? "" : t;
+    };
+    setParentPhone(cleanPh(selectedFamily.phone));
 
-    const progData = PROGRAM_SLOTS[progId as keyof typeof PROGRAM_SLOTS];
-    if (progData && progData.classes && progData.classes.length > 0) {
-      setSelectedClass(progData.classes[0].name);
-    } else {
-      setSelectedClass("");
+    // Initial Program & Session selection derived from family record
+    const rawProgStr = selectedFamily.renewingTo || selectedFamily.previousProgram;
+    const initialProgId = matchProgramId(rawProgStr);
+    setSelectedProgram(initialProgId);
+
+    const progData = PROGRAM_SLOTS[initialProgId as keyof typeof PROGRAM_SLOTS];
+    const initialPreferredClass =
+      selectedFamily.previousClassTime ||
+      selectedFamily.classTime ||
+      (Array.isArray(selectedFamily.adventures) && selectedFamily.adventures.length > 0
+        ? selectedFamily.adventures[selectedFamily.adventures.length - 1]?.classTime
+        : "") ||
+      "";
+
+    const initialMatchedClass = matchClassTime(initialPreferredClass, progData?.classes || []);
+    if (initialMatchedClass) {
+      setSelectedClass(initialMatchedClass);
+    }
+
+    if (rawProgStr || initialPreferredClass) {
+      setPreviousEnrollment({
+        programName: rawProgStr || progData?.name || "Program",
+        classTime: initialPreferredClass || initialMatchedClass,
+      });
     }
 
     setNotes(`Enrolled via Facebook Messenger / Direct Chat by Admin.`);
+
+    // Fetch /api/registrations/prefill for complete verified history (nickname, phone, exact session)
+    let isCancelled = false;
+    setPrefillLoading(true);
+
+    const params = new URLSearchParams();
+    if (selectedFamily._id) params.set("ref", selectedFamily._id);
+    if (selectedFamily.parentEmail) params.set("email", selectedFamily.parentEmail);
+
+    fetch(`/api/registrations/prefill?${params.toString()}`)
+      .then((res) => res.json())
+      .then((resJson) => {
+        if (isCancelled || !resJson?.success || !resJson?.prefillData) return;
+        const d = resJson.prefillData;
+
+        // Auto-fill real nickname if found
+        if (d.childInfo?.nickname) {
+          setChildNickname(d.childInfo.nickname);
+        }
+        if (d.childInfo?.firstName) {
+          setChildFirstName(d.childInfo.firstName);
+        }
+        if (d.childInfo?.lastName) {
+          setChildLastName(d.childInfo.lastName);
+        }
+
+        // Auto-fill parent name & clean phone
+        if (d.parentInfo?.name) {
+          setParentName(d.parentInfo.name);
+        }
+        const resolvedPhone = cleanPh(d.parentInfo?.phone) || cleanPh(d.emergencyContact?.phone);
+        if (resolvedPhone) {
+          setParentPhone(resolvedPhone);
+        }
+
+        // Exact program matching
+        const resolvedProgStr = selectedFamily.renewingTo || d.previousProgram || rawProgStr;
+        const resolvedProgId = matchProgramId(resolvedProgStr);
+        setSelectedProgram(resolvedProgId);
+
+        const targetProgData = PROGRAM_SLOTS[resolvedProgId as keyof typeof PROGRAM_SLOTS];
+        const resolvedClassStr = d.previousClassTime || initialPreferredClass;
+        const matchedClassTime = matchClassTime(resolvedClassStr, targetProgData?.classes || []);
+
+        if (matchedClassTime) {
+          setSelectedClass(matchedClassTime);
+        }
+
+        setPreviousEnrollment({
+          programName: resolvedProgStr || targetProgData?.name || "Program",
+          classTime: resolvedClassStr || matchedClassTime,
+        });
+      })
+      .catch((err) => {
+        console.warn("[QuickEncodeModal] prefill lookup error:", err);
+      })
+      .finally(() => {
+        if (!isCancelled) setPrefillLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedFamily]);
 
   // Program and class handling
@@ -187,7 +335,8 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   useEffect(() => {
     if (programData && programData.classes && programData.classes.length > 0) {
       if (!programData.classes.some((c) => c.name === selectedClass)) {
-        setSelectedClass(programData.classes[0].name);
+        const matched = matchClassTime(selectedClass, programData.classes);
+        setSelectedClass(matched || programData.classes[0].name);
       }
     }
   }, [programData, selectedClass]);
@@ -689,6 +838,29 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                       </span>
                     )}
                   </div>
+
+                  {/* Previous enrollment notice if detected */}
+                  {previousEnrollment && (
+                    <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 p-2.5 flex items-center justify-between gap-2 text-[11.5px]">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-[#0033A0] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                          🎒
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-wider font-extrabold text-blue-900 flex items-center gap-1.5">
+                            <span>Previous Record Detected &amp; Auto-Matched</span>
+                            {prefillLoading && <span className="text-[9.5px] text-blue-500 font-normal">· Checking history…</span>}
+                          </p>
+                          <p className="font-extrabold text-slate-800 truncate">
+                            {previousEnrollment.programName} · <span className="text-[#0033A0]">{previousEnrollment.classTime}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                        ✓ Auto-matched
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>

@@ -83,13 +83,19 @@ export async function GET(request: Request) {
     // ── 4. student_registrations ──────────────────────────────────────────────
     const regOr: any[] = [];
     if (ref && ObjectId.isValid(ref)) regOr.push({ _id: new ObjectId(ref) });
+    if (familyDoc?.registrationId && ObjectId.isValid(familyDoc.registrationId)) {
+      regOr.push({ _id: new ObjectId(familyDoc.registrationId) });
+    }
     if (lookupEmail) regOr.push({ "parentInfo.email": { $regex: new RegExp(`^${lookupEmail}$`, "i") } });
     if (familyChildFirst) regOr.push({ "childInfo.firstName": { $regex: new RegExp(`^${familyChildFirst}$`, "i") } });
     if (studentDoc?.childInfo?.firstName && studentDoc.childInfo.firstName !== familyChildFirst) {
       regOr.push({ "childInfo.firstName": { $regex: new RegExp(`^${studentDoc.childInfo.firstName}$`, "i") } });
     }
     const prevReg: any = regOr.length > 0
-      ? await db.collection("student_registrations").findOne({ $or: regOr })
+      ? await db.collection("student_registrations").findOne(
+          { $or: regOr },
+          { sort: { submittedAt: -1, createdAt: -1 } }
+        )
       : null;
 
     // Check if an active registration already exists for the current adventure cycle.
@@ -156,10 +162,24 @@ export async function GET(request: Request) {
     }
 
     // ── Merge — students > student_registrations > renewal_families > accounts ─
+    const cleanPhone = (val?: string) => {
+      if (!val) return "";
+      const t = String(val).trim();
+      if (/^(n\/?a|none|null|undefined|-)$/i.test(t)) return "";
+      return t;
+    };
+
+    const resolvedNickname =
+      studentDoc?.childInfo?.nickname ||
+      prevReg?.childInfo?.nickname ||
+      familyDoc?.childNickname ||
+      familyDoc?.nickname ||
+      "";
+
     const childInfo = {
       firstName: studentDoc?.childInfo?.firstName || prevReg?.childInfo?.firstName || familyChildFirst,
       lastName: studentDoc?.childInfo?.lastName || prevReg?.childInfo?.lastName || familyChildLast,
-      nickname: studentDoc?.childInfo?.nickname || prevReg?.childInfo?.nickname || studentDoc?.childInfo?.firstName || familyChildFirst,
+      nickname: resolvedNickname,
       dateOfBirth: studentDoc?.childInfo?.dateOfBirth || prevReg?.childInfo?.dateOfBirth || "",
       gender: studentDoc?.childInfo?.gender || prevReg?.childInfo?.gender || "",
       favoriteSong: studentDoc?.childInfo?.favoriteSong || prevReg?.childInfo?.favoriteSong || "",
@@ -168,27 +188,50 @@ export async function GET(request: Request) {
       healthProfile: studentDoc?.childInfo?.healthProfile || prevReg?.childInfo?.healthProfile || "",
     };
 
+    const resolvedPhone =
+      cleanPhone(familyDoc?.phone) ||
+      cleanPhone(studentDoc?.parentInfo?.phone) ||
+      cleanPhone(prevReg?.parentInfo?.phone) ||
+      cleanPhone(studentDoc?.emergencyContact?.phone) ||
+      cleanPhone(prevReg?.emergencyContact?.phone) ||
+      cleanPhone(familyDoc?.emergencyPhone) ||
+      cleanPhone(familyDoc?.contactNumber) ||
+      "";
+
     const parentInfo = {
       name: familyDoc?.parentName || studentDoc?.parentInfo?.name || prevReg?.parentInfo?.name || accountDoc?.name || "",
       email: lookupEmail || studentDoc?.parentInfo?.email || prevReg?.parentInfo?.email || "",
-      phone: familyDoc?.phone || studentDoc?.parentInfo?.phone || prevReg?.parentInfo?.phone || "",
+      phone: resolvedPhone || familyDoc?.phone || "",
       relationship: studentDoc?.parentInfo?.relationship || prevReg?.parentInfo?.relationship || "Mother",
     };
 
-    const emergencyContact =
-      studentDoc?.emergencyContact ||
-      prevReg?.emergencyContact || {
-        name: parentInfo.name,
-        phone: parentInfo.phone,
-        relationship: parentInfo.relationship,
-      };
+    const emergencyContact = {
+      name: studentDoc?.emergencyContact?.name || prevReg?.emergencyContact?.name || parentInfo.name,
+      phone: cleanPhone(studentDoc?.emergencyContact?.phone) || cleanPhone(prevReg?.emergencyContact?.phone) || resolvedPhone || "",
+      relationship: studentDoc?.emergencyContact?.relationship || prevReg?.emergencyContact?.relationship || parentInfo.relationship,
+    };
 
     const previousProgram =
+      familyDoc?.renewingTo ||
       studentDoc?.programName ||
       studentDoc?.program ||
       prevReg?.program ||
+      linkedRegistration?.program ||
       familyDoc?.previousProgram ||
-      "Trailblazer: Brave Explorer";
+      "Creative Explorer";
+
+    const previousClassTime =
+      studentDoc?.classTime ||
+      prevReg?.classTime ||
+      linkedRegistration?.classTime ||
+      familyDoc?.previousClassTime ||
+      familyDoc?.classTime ||
+      familyDoc?.renewingClass ||
+      familyDoc?.targetSession ||
+      (Array.isArray(familyDoc?.adventures) && familyDoc.adventures.length > 0
+        ? familyDoc.adventures[familyDoc.adventures.length - 1]?.classTime
+        : "") ||
+      "";
 
     // ── 5. Pioneer status & prices ──────────────────────────────────────────
     let isPioneer = false;
@@ -220,6 +263,7 @@ export async function GET(request: Request) {
       pioneerPrices,
       pioneerPrice,
       previousProgram,
+      previousClassTime,
       parentInfo,
       childInfo,
       emergencyContact,
