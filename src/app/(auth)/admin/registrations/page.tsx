@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
+import { QuickEncodeModal } from "@/components/admin/QuickEncodeModal";
 
 type Status = "pending" | "approved" | "active" | "rejected" | "early-bird" | "expired" | "reserved";
 
@@ -50,6 +51,7 @@ interface Registration {
   paymentPortalOpenedAt?: string;
   selfDeclaredPreviousAdventure?: boolean;
   detectedPreviousAdventure?: number;
+  encodedBy?: string;
 }
 
 const PROGRAM_NAMES: Record<string, string> = {
@@ -533,6 +535,11 @@ function DetailModal({
                 {isTestRegistration(reg) && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2.5 py-0.5 text-[11px] font-extrabold text-slate-700 shadow-sm">
                     🧪 Test Account
+                  </span>
+                )}
+                {reg.encodedBy && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-800 shadow-sm">
+                    📝 Encoded by {reg.encodedBy}
                   </span>
                 )}
                 <span className="text-[11px] text-[#94a3b8] font-medium">
@@ -1505,6 +1512,7 @@ export default function AdminRegistrationsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState("");
   const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(null);
+  const [showQuickEncodeModal, setShowQuickEncodeModal] = useState(false);
 
   // ── SWR data fetching ───────────────────────────────────────────────────────
   // auth-context.tsx patches window.fetch to inject the Bearer token, so SWR
@@ -2243,21 +2251,31 @@ export default function AdminRegistrationsPage() {
                   <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#64748b]">Choose an Adventure</p>
                   <p className="mt-1 text-[11px] text-slate-500">Choose a cycle below. The report shows students, class times, spaces left, and unpaid reservations.</p>
                 </div>
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={handleGenerateAdventureSummary}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#0033A0] px-4 py-2.5 text-[12px] font-extrabold text-white shadow-sm transition-colors hover:bg-[#002776] disabled:cursor-wait disabled:opacity-60"
-                >
-                  <span aria-hidden="true">🧾</span>
-                  {isProcessing
-                    ? "Preparing summary…"
-                    : adventureFilter === "all"
-                      ? "Generate All Adventures Summary"
-                      : adventureFilter === "unassigned"
-                        ? "Generate Untagged Cycle Summary"
-                        : `Generate Adventure ${adventureFilter} Summary`}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={handleGenerateAdventureSummary}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#0033A0] px-4 py-2.5 text-[12px] font-extrabold text-white shadow-sm transition-colors hover:bg-[#002776] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <span aria-hidden="true">🧾</span>
+                    {isProcessing
+                      ? "Preparing summary…"
+                      : adventureFilter === "all"
+                        ? "Generate All Adventures Summary"
+                        : adventureFilter === "unassigned"
+                          ? "Generate Untagged Cycle Summary"
+                          : `Generate Adventure ${adventureFilter} Summary`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickEncodeModal(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 px-4 py-2.5 text-[12px] font-extrabold text-white shadow-sm transition-colors"
+                  >
+                    <span aria-hidden="true">⚡</span>
+                    Quick Encode Renewal
+                  </button>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 {[
@@ -2614,6 +2632,14 @@ export default function AdminRegistrationsPage() {
                                 🎒 Continuing {reg.detectedPreviousAdventure ? `(Adv ${reg.detectedPreviousAdventure})` : ""}
                               </span>
                             )}
+                            {reg.encodedBy && (
+                              <span
+                                className="mt-1 ml-1.5 inline-flex items-center gap-0.5 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-800"
+                                title={`Encoded manually by ${reg.encodedBy}`}
+                              >
+                                📝 Admin Encoded
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -2668,6 +2694,19 @@ export default function AdminRegistrationsPage() {
           )
         )}
       </AppShell>
+
+      {/* Quick Encode Renewal Modal */}
+      {showQuickEncodeModal && (
+        <QuickEncodeModal
+          isOpen={showQuickEncodeModal}
+          onClose={() => setShowQuickEncodeModal(false)}
+          onSuccess={(msg) => {
+            setToast(msg);
+            fetchRegistrations();
+          }}
+          currentAdventure={adventureFilter !== "all" && adventureFilter !== "unassigned" ? Number(adventureFilter) : null}
+        />
+      )}
 
       {/* Detail modal */}
       {selected && (

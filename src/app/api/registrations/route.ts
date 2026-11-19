@@ -53,7 +53,7 @@ export async function GET(request: Request) {
             rejectionReason: 1, confirmationEmailSent: 1, earlyBirdAt: 1, earlyBirdBy: 1,
             paymentPortalOpen: 1, paymentPortalOpenedAt: 1,
             selfDeclaredPreviousAdventure: 1, detectedPreviousAdventure: 1,
-            unmatchedFamily: 1, familyId: 1,
+            unmatchedFamily: 1, familyId: 1, encodedBy: 1,
           },
         })
         .sort({ submittedAt: -1 })
@@ -178,10 +178,14 @@ export async function POST(request: Request) {
       isRenewal,
       promoCode,
       selfDeclaredPreviousAdventure,
+      encodedBy,       // "admin" when staff encodes via Quick Encode modal
+      encodedFamilyId, // renewal_families._id to directly link (skips email-match lookup)
     } = data;
 
     // Validate required fields
-    if (!program || !classTime || !parentInfo?.email || !parentInfo?.name || !childInfo?.firstName || (program !== "brave-explorer" && !signatureBase64)) {
+    // Admin-encoded registrations (encodedBy === "admin") skip the signature requirement
+    const isAdminEncoded = encodedBy === "admin";
+    if (!program || !classTime || !parentInfo?.email || !parentInfo?.name || !childInfo?.firstName || (!isAdminEncoded && program !== "brave-explorer" && !signatureBase64)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -450,6 +454,8 @@ export async function POST(request: Request) {
       selfDeclaredPreviousAdventure: Boolean(selfDeclaredPreviousAdventure || returningMatch.isReturning),
       detectedPreviousAdventure: returningMatch.previousAdventureNumber || null,
       previousProgram: returningMatch.previousProgram || null,
+      encodedBy: encodedBy || null,
+      familyId: encodedFamilyId || null,
     };
 
     const result = await db.collection("student_registrations").insertOne(newRegistration);
@@ -474,50 +480,56 @@ export async function POST(request: Request) {
       }
     }
 
-    // Match against renewal_families list (Task 5: Auto-match email + child's name)
+    // Match against renewal_families list (Task 5: Auto-match email + child's name, or direct encodedFamilyId)
     try {
       const parentEmailClean = (parentInfo?.email || "").toLowerCase().trim();
       const childNameClean = `${childInfo?.firstName || ""} ${childInfo?.lastName || ""}`.trim();
-      if (parentEmailClean && childNameClean) {
-        const familyMatch = await db.collection("renewal_families").findOne({
+      let familyMatch = null;
+      if (encodedFamilyId && ObjectId.isValid(encodedFamilyId)) {
+        familyMatch = await db.collection("renewal_families").findOne({ _id: new ObjectId(encodedFamilyId) });
+      }
+      if (!familyMatch && parentEmailClean && childNameClean) {
+        familyMatch = await db.collection("renewal_families").findOne({
           parentEmail: parentEmailClean,
           childName: { $regex: new RegExp(`^${childNameClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
         });
+      }
 
-        if (familyMatch) {
-          // Determine the registration source: renewal form (/renew) vs public register form (/register)
-          const registeredViaRenewalForm = Boolean(isRenewal);
-          const activityLog = {
-            type: registeredViaRenewalForm ? "self_renewed" : "self_registered",
-            subject: registeredViaRenewalForm
-              ? `Self-submitted via Renewal Form (Adventure ${adventureNumber ?? "?"})`
-              : `Self-registered via Public Form (Adventure ${adventureNumber ?? "?"})`,
-            sentAt: new Date(),
-            sentBy: "System",
-            recipient: (parentInfo?.email || "").toLowerCase().trim(),
-          };
+      if (familyMatch) {
+        // Determine the registration source: admin quick encode vs renewal form (/renew) vs public register form (/register)
+        const registeredViaRenewalForm = Boolean(isRenewal);
+        const activityLog = {
+          type: isAdminEncoded ? "admin_encoded" : registeredViaRenewalForm ? "self_renewed" : "self_registered",
+          subject: isAdminEncoded
+            ? `Admin Quick Encoded (Adventure ${adventureNumber ?? "?"})`
+            : registeredViaRenewalForm
+            ? `Self-submitted via Renewal Form (Adventure ${adventureNumber ?? "?"})`
+            : `Self-registered via Public Form (Adventure ${adventureNumber ?? "?"})`,
+          sentAt: new Date(),
+          sentBy: isAdminEncoded ? "Admin" : "System",
+          recipient: (parentInfo?.email || "").toLowerCase().trim(),
+        };
 
-          await db.collection("renewal_families").updateOne(
-            { _id: familyMatch._id },
-            {
-              $set: {
-                renewalStatus: amountPaid > 0 ? "confirmed" : "reserved",
-                registrationId: result.insertedId.toString(),
-                targetAdventure: adventureNumber,
-                updatedAt: new Date(),
-              },
-              $push: {
-                emailHistory: activityLog as any,
-              },
-            }
-          );
-        } else {
-          // Flag registration as unmatched so admin can review and link
-          await db.collection("student_registrations").updateOne(
-            { _id: result.insertedId },
-            { $set: { unmatchedFamily: true } }
-          );
-        }
+        await db.collection("renewal_families").updateOne(
+          { _id: familyMatch._id },
+          {
+            $set: {
+              renewalStatus: amountPaid > 0 ? "confirmed" : "reserved",
+              registrationId: result.insertedId.toString(),
+              targetAdventure: adventureNumber,
+              updatedAt: new Date(),
+            },
+            $push: {
+              emailHistory: activityLog as any,
+            },
+          }
+        );
+      } else if (!isAdminEncoded && parentEmailClean && childNameClean) {
+        // Flag registration as unmatched so admin can review and link
+        await db.collection("student_registrations").updateOne(
+          { _id: result.insertedId },
+          { $set: { unmatchedFamily: true } }
+        );
       }
     } catch (familyMatchErr) {
       console.error("[registrations POST] Failed to match renewal family:", familyMatchErr);

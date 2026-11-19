@@ -1566,7 +1566,11 @@ export default function RenewalsPage() {
                         <td className="py-3.5 px-4 text-[11px] text-slate-500">
                           {f.lastEmailSent ? (
                             <div>
-                              {f.lastEmailType === "self_registered" || f.lastEmailType === "self_renewed" ? (
+                              {f.lastEmailType === "admin_encoded" ? (
+                                <p className="font-semibold text-amber-600 flex items-center gap-1">
+                                  <span>📝</span> {f.lastEmailSent}
+                                </p>
+                              ) : f.lastEmailType === "self_registered" || f.lastEmailType === "self_renewed" ? (
                                 <p className="font-semibold text-blue-600 flex items-center gap-1">
                                   <span>📋</span> {f.lastEmailSent}
                                 </p>

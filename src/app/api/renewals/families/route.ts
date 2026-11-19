@@ -227,6 +227,7 @@ export async function GET(request: Request) {
           custom: "Custom Email Sent",
           self_renewed: "Self-submitted (Renewal Form)",
           self_registered: "Self-registered (Public Form)",
+          admin_encoded: "Admin Encoded (Renewal)",
         };
         const derivedLastEmailSent = lastCycleEmail
           ? (EMAIL_TYPE_LABELS[lastCycleEmail.type] || lastCycleEmail.subject || "Email Sent")
