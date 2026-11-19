@@ -46,6 +46,7 @@ export type ProgramRenewalEntry = {
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this date, renewals are free slot reservations
   totalSessions?: number | null; // optional: custom session count per adventure/batch (defaults to PROGRAM_SCHEDULE_CONFIGS)
   customSessions?: any[] | null; // calendar rescheduled sessions
+  nextCustomSessions?: any[] | null; // calendar rescheduled sessions for upcoming adventure
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -119,6 +120,8 @@ function applyAutoRollover(programs: ProgramRenewalEntry[]): {
         registrationOpen: true,            // new adventure starts open for registration
         renewalOpenDate: null,
         newFamilyRegistrationOpenDate: null,
+        customSessions: p.nextCustomSessions || null,
+        nextCustomSessions: null,
       };
     }
 
@@ -298,6 +301,7 @@ export async function PUT(req: NextRequest) {
         downpaymentStartDate: p?.downpaymentStartDate ?? null,
         totalSessions: typeof p?.totalSessions === "number" && p.totalSessions > 0 ? p.totalSessions : null,
         customSessions: Array.isArray(p?.customSessions) ? p.customSessions : (Array.isArray(old?.customSessions) ? old.customSessions : null),
+        nextCustomSessions: Array.isArray(p?.nextCustomSessions) ? p.nextCustomSessions : (Array.isArray(old?.nextCustomSessions) ? old.nextCustomSessions : null),
       };
     });
 

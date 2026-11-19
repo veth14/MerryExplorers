@@ -644,7 +644,10 @@ export type ProgramRenewalEntryLike = {
   programKey: string;
   currentAdventure?: number | null;
   adventureStartDate?: string | null;
+  nextAdventureStart?: string | null;
   totalSessions?: number | null;
+  customSessions?: CustomSessionOverride[] | null;
+  nextCustomSessions?: CustomSessionOverride[] | null;
   [key: string]: unknown;
 };
 
@@ -667,24 +670,48 @@ export function getAllProgramsSchedules({
       ? programs
       : PROGRAM_KEYS_LIST.map((key) => ({ programKey: key }));
 
-  return list.map((p) => {
+  const results: ProgramScheduleResult[] = [];
+
+  for (const p of list) {
     const config = PROGRAM_SCHEDULE_CONFIGS[p.programKey];
     const currentAdv = Number(p.currentAdventure) || 2;
     const totalSessions =
       typeof p.totalSessions === "number" && p.totalSessions > 0
         ? p.totalSessions
         : config?.defaultSessions ?? 8;
-    return generateProgramSchedule({
-      programKey: p.programKey,
-      adventureNumber: currentAdv,
-      startDateStr: p.adventureStartDate,
-      totalSessions,
-      holidaysMap,
-      suspensionsMap,
-      todayStr,
-      customSessions: (p as any).customSessions,
-    });
-  });
+
+    results.push(
+      generateProgramSchedule({
+        programKey: p.programKey,
+        adventureNumber: currentAdv,
+        startDateStr: p.adventureStartDate,
+        totalSessions,
+        holidaysMap,
+        suspensionsMap,
+        todayStr,
+        customSessions: (p as any).customSessions,
+      })
+    );
+
+    if (p.nextAdventureStart) {
+      const nextAdv = currentAdv + 1;
+      const nextSessions = config?.defaultSessions ?? totalSessions;
+      results.push(
+        generateProgramSchedule({
+          programKey: p.programKey,
+          adventureNumber: nextAdv,
+          startDateStr: p.nextAdventureStart,
+          totalSessions: nextSessions,
+          holidaysMap,
+          suspensionsMap,
+          todayStr,
+          customSessions: (p as any).nextCustomSessions || null,
+        })
+      );
+    }
+  }
+
+  return results;
 }
 
 /**

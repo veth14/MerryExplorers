@@ -103,24 +103,47 @@ export async function GET(req: NextRequest) {
       ? rawPrograms
       : PROGRAM_KEYS_LIST.map((key) => ({ programKey: key }));
 
-    const allSchedules: ProgramScheduleResult[] = programList.map((p: any) => {
+    const allSchedules: ProgramScheduleResult[] = [];
+
+    for (const p of programList) {
       const config = PROGRAM_SCHEDULE_CONFIGS[p.programKey];
       const currentAdv = Number(p.currentAdventure) || 2;
       const totalSessions =
         typeof p.totalSessions === "number" && p.totalSessions > 0
           ? p.totalSessions
           : config?.defaultSessions ?? 8;
-      return generateProgramSchedule({
-        programKey: p.programKey,
-        adventureNumber: currentAdv,
-        startDateStr: p.adventureStartDate,
-        totalSessions,
-        holidaysMap,
-        suspensionsMap: getProgramSuspensions(p.programKey),
-        todayStr,
-        customSessions: p.customSessions,
-      });
-    });
+
+      allSchedules.push(
+        generateProgramSchedule({
+          programKey: p.programKey,
+          adventureNumber: currentAdv,
+          startDateStr: p.adventureStartDate,
+          totalSessions,
+          holidaysMap,
+          suspensionsMap: getProgramSuspensions(p.programKey),
+          todayStr,
+          customSessions: p.customSessions,
+        })
+      );
+
+      // If nextAdventureStart is defined, also generate next adventure schedule
+      if (p.nextAdventureStart) {
+        const nextAdv = currentAdv + 1;
+        const nextSessions = config?.defaultSessions ?? totalSessions;
+        allSchedules.push(
+          generateProgramSchedule({
+            programKey: p.programKey,
+            adventureNumber: nextAdv,
+            startDateStr: p.nextAdventureStart,
+            totalSessions: nextSessions,
+            holidaysMap,
+            suspensionsMap: getProgramSuspensions(p.programKey),
+            todayStr,
+            customSessions: p.nextCustomSessions || null,
+          })
+        );
+      }
+    }
 
     const schedules = filterProgramKey
       ? allSchedules.filter((s) => s.programKey === filterProgramKey || s.slug === filterProgramKey)

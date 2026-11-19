@@ -79,6 +79,7 @@ export function ProgramSessionsCalendar({
   const isCalendarLoading = loading || (schedules.length === 0 && internalLoading);
 
   const [selectedProgramKey, setSelectedProgramKey] = useState<string>(initialProgramKey);
+  const [selectedAdvNum, setSelectedAdvNum] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "roadmap">("grid");
 
   // Manila current date / month
@@ -243,17 +244,26 @@ export function ProgramSessionsCalendar({
   const activeSchedules = useMemo(() => {
     if (selectedProgramKey === "all") return schedules;
     return schedules.filter(
-      (s) => s.programKey === selectedProgramKey || s.slug === selectedProgramKey
+      (s) =>
+        (s.programKey === selectedProgramKey || s.slug === selectedProgramKey) &&
+        (selectedAdvNum ? s.adventureNumber === selectedAdvNum : true)
     );
-  }, [schedules, selectedProgramKey]);
+  }, [schedules, selectedProgramKey, selectedAdvNum]);
 
   // Selected single program (if not "all")
   const singleSelectedProgram = useMemo(() => {
     if (selectedProgramKey === "all") return null;
-    return schedules.find(
-      (s) => s.programKey === selectedProgramKey || s.slug === selectedProgramKey
+    return (
+      schedules.find(
+        (s) =>
+          (s.programKey === selectedProgramKey || s.slug === selectedProgramKey) &&
+          (selectedAdvNum ? s.adventureNumber === selectedAdvNum : true)
+      ) ||
+      schedules.find(
+        (s) => s.programKey === selectedProgramKey || s.slug === selectedProgramKey
+      )
     );
-  }, [schedules, selectedProgramKey]);
+  }, [schedules, selectedProgramKey, selectedAdvNum]);
 
   // Fast lookups by date
   const sessionsByDate = useMemo(() => {
@@ -319,10 +329,16 @@ export function ProgramSessionsCalendar({
   while (cells.length % 7 !== 0) cells.push(null);
 
   // Jump current month to program start date if clicked
-  const handleSelectProgram = (key: string) => {
+  const handleSelectProgram = (key: string, advNum?: number) => {
     setSelectedProgramKey(key);
+    setSelectedAdvNum(advNum ?? null);
     if (key !== "all") {
-      const p = schedules.find((s) => s.programKey === key || s.slug === key);
+      const p =
+        schedules.find(
+          (s) =>
+            (s.programKey === key || s.slug === key) &&
+            (advNum ? s.adventureNumber === advNum : true)
+        ) || schedules.find((s) => s.programKey === key || s.slug === key);
       if (p?.startDate) {
         setCurrentMonth(p.startDate.slice(0, 7));
       }
@@ -403,12 +419,13 @@ export function ProgramSessionsCalendar({
 
           {schedules.map((sched) => {
             const isSelected =
-              selectedProgramKey === sched.programKey || selectedProgramKey === sched.slug;
+              (selectedProgramKey === sched.programKey || selectedProgramKey === sched.slug) &&
+              (selectedAdvNum === null || selectedAdvNum === sched.adventureNumber);
             return (
               <button
-                key={sched.programKey}
+                key={`${sched.programKey}-adv${sched.adventureNumber}`}
                 type="button"
-                onClick={() => handleSelectProgram(sched.programKey)}
+                onClick={() => handleSelectProgram(sched.programKey, sched.adventureNumber)}
                 className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-[12px] font-black transition-all border ${
                   isSelected
                     ? "text-white shadow-sm"
@@ -584,8 +601,8 @@ export function ProgramSessionsCalendar({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {schedules.map((sched) => (
             <div
-              key={sched.programKey}
-              onClick={() => handleSelectProgram(sched.programKey)}
+              key={`${sched.programKey}-adv${sched.adventureNumber}`}
+              onClick={() => handleSelectProgram(sched.programKey, sched.adventureNumber)}
               className="rounded-3xl border-2 p-4 transition-all hover:shadow-md cursor-pointer flex flex-col justify-between"
               style={{
                 backgroundColor: sched.config.bg,
@@ -853,7 +870,7 @@ export function ProgramSessionsCalendar({
         <div className="space-y-6">
           {activeSchedules.map((sched) => (
             <div
-              key={sched.programKey}
+              key={`${sched.programKey}-adv${sched.adventureNumber}`}
               className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">

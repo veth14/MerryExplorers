@@ -91,6 +91,7 @@ export type ProgramRenewalEntry = {
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this, renewals are free slot reservations
   totalSessions?: number | null; // optional override; null/undefined = use program default from PROGRAM_SCHEDULE_CONFIGS
   customSessions?: any[] | null; // calendar rescheduled sessions
+  nextCustomSessions?: any[] | null; // calendar rescheduled sessions for upcoming adventure
 };
 
 export type RenewalSettingsData = {
@@ -235,10 +236,14 @@ export function RenewalSettingsManager() {
               p.adventureStartDate = p.nextAdventureStart || masterNextDate;
               p.nextAdventureStart = null;
               p.registrationOpen = true;
+              p.customSessions = p.nextCustomSessions || null;
+              p.nextCustomSessions = null;
             } else if (p.nextAdventureStart && todayStr >= p.nextAdventureStart.slice(0, 10)) {
               p.adventureStartDate = p.nextAdventureStart;
               p.nextAdventureStart = null;
               p.registrationOpen = true;
+              p.customSessions = p.nextCustomSessions || null;
+              p.nextCustomSessions = null;
             }
           });
         }

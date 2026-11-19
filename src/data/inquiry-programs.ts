@@ -42,13 +42,6 @@ export const INQUIRY_PROGRAM_OPTIONS = [
     label: "Ballet (Ages 3 – 12)",
   },
   {
-    name: "Virtual Tutorial",
-    club: "Online Learning",
-    ageRange: "All Ages",
-    emoji: "💻",
-    label: "Virtual Tutorial (All Ages)",
-  },
-  {
     name: "General Inquiry",
     club: "Merry Explorers",
     ageRange: "Any age / Not sure yet",

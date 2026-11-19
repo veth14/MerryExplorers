@@ -51,8 +51,10 @@ export async function POST(req: NextRequest) {
 
     // ── ACTION: RESET SCHEDULE BACK TO AUTOMATIC DEFAULT ──
     if (action === "reset") {
+      const isNextAdv = Number(adventureNumber) > (Number(progEntry.currentAdventure) || 2);
+      const customSessionsField = isNextAdv ? "nextCustomSessions" : "customSessions";
       const updatedPrograms = rawPrograms.map((p: any) =>
-        p.programKey === programKey ? { ...p, customSessions: null } : p
+        p.programKey === programKey ? { ...p, [customSessionsField]: null } : p
       );
 
       await db.collection("settings").updateOne(
@@ -130,6 +132,11 @@ export async function POST(req: NextRequest) {
 
     const todayStr = getManilaTodayStr();
     const currentAdv = Number(adventureNumber) || Number(progEntry.currentAdventure) || 2;
+    const isNextAdv = currentAdv > (Number(progEntry.currentAdventure) || 2);
+    const startDateStr = isNextAdv ? progEntry.nextAdventureStart : progEntry.adventureStartDate;
+    const customSessionsField = isNextAdv ? "nextCustomSessions" : "customSessions";
+    const existingCustomSessions = progEntry[customSessionsField] || null;
+
     const totalSessions =
       typeof progEntry.totalSessions === "number" && progEntry.totalSessions > 0
         ? progEntry.totalSessions
@@ -139,12 +146,12 @@ export async function POST(req: NextRequest) {
     const currentSchedule = generateProgramSchedule({
       programKey,
       adventureNumber: currentAdv,
-      startDateStr: progEntry.adventureStartDate,
+      startDateStr,
       totalSessions,
       holidaysMap,
       suspensionsMap,
       todayStr,
-      customSessions: progEntry.customSessions,
+      customSessions: existingCustomSessions,
     });
 
     // Validation: cannot move before session K-1
@@ -176,10 +183,10 @@ export async function POST(req: NextRequest) {
     let updatedPrograms: any[];
     if (progIndex >= 0) {
       updatedPrograms = rawPrograms.map((p: any) =>
-        p.programKey === programKey ? { ...p, customSessions: updatedCustomSessions } : p
+        p.programKey === programKey ? { ...p, [customSessionsField]: updatedCustomSessions } : p
       );
     } else {
-      updatedPrograms = [...rawPrograms, { programKey, customSessions: updatedCustomSessions }];
+      updatedPrograms = [...rawPrograms, { ...progEntry, [customSessionsField]: updatedCustomSessions }];
     }
 
     await db.collection("settings").updateOne(

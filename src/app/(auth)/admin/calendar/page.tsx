@@ -242,7 +242,7 @@ function MonthGrid({
                   const chipName = getProgramChipName(s.programKey);
                   return (
                     <div
-                      key={`sess-${s.programKey}-${i}`}
+                      key={`sess-${s.programKey}-adv${s.adventureNumber}-${s.sessionNumber}-${i}`}
                       className="flex items-center justify-between gap-1 px-1.5 py-0.5 rounded-md border shadow-2xs transition-all hover:scale-[1.01]"
                       style={{
                         backgroundColor: cfg?.bg ?? "#f0f5ff",
@@ -1157,7 +1157,7 @@ function DayDrawer({
     if (!sessionsByDate || s.sessionNumber <= 1) return "";
     for (const [dStr, list] of Object.entries(sessionsByDate)) {
       const found = list.find(
-        (item) => item.programKey === s.programKey && item.sessionNumber === s.sessionNumber - 1
+        (item) => item.programKey === s.programKey && item.adventureNumber === s.adventureNumber && item.sessionNumber === s.sessionNumber - 1
       );
       if (found) {
         const [y, m, d] = dStr.split("-").map(Number);
