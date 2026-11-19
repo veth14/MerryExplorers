@@ -466,9 +466,21 @@ export default function TrailblazerDashboard(p: Props) {
     const childFavs = profile.studentInfo?.childInfo || profile.childInfo;
     const firstName = (profile.fullName || "").split(" ")[0] || "there";
 
+    // Find this child's registration to accurately identify their adventure cycle
+    const email = (profile.email || "").toLowerCase();
+    const childName = (childFavs?.firstName || profile.childName || "").trim().toLowerCase();
+    const mine = registrations.filter((r: any) => (r.parentInfo?.email || "").toLowerCase() === email);
+    const childRegistration: any =
+        mine.find((r: any) => {
+            const rn = (r.childInfo?.firstName || "").trim().toLowerCase();
+            return !!rn && !!childName && (rn === childName || childName.startsWith(rn) || rn.startsWith(childName));
+        }) ?? mine[0] ?? null;
+
+    const studentAdvNum = profile.adventureNumber || profile.studentInfo?.adventureNumber || childRegistration?.adventureNumber;
+
     // ── CALENDAR CONNECTED SESSION COUNTER ──
     // Synchronized with official School & Program Calendar (skips holidays & suspensions)
-    const matchedProg = matchProgramSchedule(allSchedules, profile.program || "Trailblazer: Brave Explorer");
+    const matchedProg = matchProgramSchedule(allSchedules, profile.program || "Trailblazer: Brave Explorer", studentAdvNum);
     const sessionProgress = calculateCalendarSessionProgress({
         programSchedule: matchedProg,
         schedule: profile.schedule || profile.studentInfo?.schedule || "",

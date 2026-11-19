@@ -88,11 +88,14 @@ export function getCompletedSessionsCount(
  */
 export function matchProgramSchedule(
     schedules: any[] | undefined | null,
-    programNameOrSlug: string | undefined | null
+    programNameOrSlug: string | undefined | null,
+    adventureNumber?: number | string | null
 ): any | undefined {
     if (!programNameOrSlug || !Array.isArray(schedules) || schedules.length === 0) return undefined;
     const p = programNameOrSlug.toLowerCase().trim();
-    return schedules.find((s) => {
+    const targetAdv = adventureNumber ? Number(String(adventureNumber).replace(/[^0-9]/g, "")) : null;
+
+    const matchesProgram = (s: any) => {
         const key = (s.programKey || "").toLowerCase();
         const slug = (s.slug || "").toLowerCase();
         const short = (s.shortName || "").toLowerCase();
@@ -108,7 +111,14 @@ export function matchProgramSchedule(
         if (p.includes("ballet") && key.includes("ballet")) return true;
         if (p.includes("playdate") && key.includes("playdate")) return true;
         return false;
-    });
+    };
+
+    if (targetAdv) {
+        const advMatch = schedules.find((s) => matchesProgram(s) && Number(s.adventureNumber) === targetAdv);
+        if (advMatch) return advMatch;
+    }
+
+    return schedules.find(matchesProgram);
 }
 
 export interface CalendarSessionProgress {

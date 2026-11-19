@@ -129,7 +129,10 @@ export async function GET(req: NextRequest) {
       // If nextAdventureStart is defined, also generate next adventure schedule
       if (p.nextAdventureStart) {
         const nextAdv = currentAdv + 1;
-        const nextSessions = config?.defaultSessions ?? totalSessions;
+        const nextSessions =
+          typeof p.nextTotalSessions === "number" && p.nextTotalSessions > 0
+            ? p.nextTotalSessions
+            : config?.defaultSessions ?? totalSessions;
         allSchedules.push(
           generateProgramSchedule({
             programKey: p.programKey,

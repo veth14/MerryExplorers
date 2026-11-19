@@ -45,6 +45,7 @@ export type ProgramRenewalEntry = {
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this date, renewals are free slot reservations
   totalSessions?: number | null; // optional: custom session count per adventure/batch (defaults to PROGRAM_SCHEDULE_CONFIGS)
+  nextTotalSessions?: number | null; // optional: custom session count for next adventure/batch
   customSessions?: any[] | null; // calendar rescheduled sessions
   nextCustomSessions?: any[] | null; // calendar rescheduled sessions for upcoming adventure
 };
@@ -120,6 +121,8 @@ function applyAutoRollover(programs: ProgramRenewalEntry[]): {
         registrationOpen: true,            // new adventure starts open for registration
         renewalOpenDate: null,
         newFamilyRegistrationOpenDate: null,
+        totalSessions: p.nextTotalSessions ?? p.totalSessions,
+        nextTotalSessions: null,
         customSessions: p.nextCustomSessions || null,
         nextCustomSessions: null,
       };
@@ -191,7 +194,9 @@ export async function GET() {
             closedClasses: Array.isArray(existing.closedClasses) ? existing.closedClasses : [],
             downpaymentStartDate: existing.downpaymentStartDate ?? null,
             totalSessions: typeof existing.totalSessions === "number" ? existing.totalSessions : null,
+            nextTotalSessions: typeof existing.nextTotalSessions === "number" ? existing.nextTotalSessions : null,
             customSessions: Array.isArray(existing.customSessions) ? existing.customSessions : null,
+            nextCustomSessions: Array.isArray(existing.nextCustomSessions) ? existing.nextCustomSessions : null,
           }
         : {
             programKey: key,
@@ -210,7 +215,9 @@ export async function GET() {
             closedClasses: [],
             downpaymentStartDate: null,
             totalSessions: null,
+            nextTotalSessions: null,
             customSessions: null,
+            nextCustomSessions: null,
           };
     });
 
@@ -300,6 +307,7 @@ export async function PUT(req: NextRequest) {
         closedClasses: Array.isArray(p?.closedClasses) ? p.closedClasses : [],
         downpaymentStartDate: p?.downpaymentStartDate ?? null,
         totalSessions: typeof p?.totalSessions === "number" && p.totalSessions > 0 ? p.totalSessions : null,
+        nextTotalSessions: typeof p?.nextTotalSessions === "number" && p.nextTotalSessions > 0 ? p.nextTotalSessions : null,
         customSessions: Array.isArray(p?.customSessions) ? p.customSessions : (Array.isArray(old?.customSessions) ? old.customSessions : null),
         nextCustomSessions: Array.isArray(p?.nextCustomSessions) ? p.nextCustomSessions : (Array.isArray(old?.nextCustomSessions) ? old.nextCustomSessions : null),
       };

@@ -646,6 +646,7 @@ export type ProgramRenewalEntryLike = {
   adventureStartDate?: string | null;
   nextAdventureStart?: string | null;
   totalSessions?: number | null;
+  nextTotalSessions?: number | null;
   customSessions?: CustomSessionOverride[] | null;
   nextCustomSessions?: CustomSessionOverride[] | null;
   [key: string]: unknown;
@@ -695,7 +696,10 @@ export function getAllProgramsSchedules({
 
     if (p.nextAdventureStart) {
       const nextAdv = currentAdv + 1;
-      const nextSessions = config?.defaultSessions ?? totalSessions;
+      const nextSessions =
+        typeof (p as any).nextTotalSessions === "number" && (p as any).nextTotalSessions > 0
+          ? (p as any).nextTotalSessions
+          : config?.defaultSessions ?? totalSessions;
       results.push(
         generateProgramSchedule({
           programKey: p.programKey,

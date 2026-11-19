@@ -238,6 +238,10 @@ export async function POST(
       const schedule = PROGRAM_SCHEDULES[program] || "";
       const classTimeDisplay = formatClassTime(program, classTime);
       const startDateDisplay = formatStartDate(adventureStartDate);
+      const isNextAdvApproval = Boolean(adventureNumber !== null && adventureSetting && adventureNumber > (adventureSetting.currentAdventure ?? 2));
+      const sessionsDisplay = isNextAdvApproval
+        ? (adventureSetting?.nextTotalSessions || adventureSetting?.totalSessions || prog?.sessions || "—")
+        : (adventureSetting?.totalSessions || prog?.sessions || "—");
       const pricingRegistration = {
         ...registration,
         isPioneer: isPioneerRegistration,
@@ -330,7 +334,7 @@ export async function POST(
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Class</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${classTimeDisplay}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Schedule</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${schedule}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Session Start Date</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${startDateDisplay}</td></tr>
-                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Sessions</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${adventureSetting?.totalSessions || prog?.sessions || "—"} Sessions</td></tr>
+                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Sessions</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${sessionsDisplay} Sessions</td></tr>
                           </table>
                         </div>
 

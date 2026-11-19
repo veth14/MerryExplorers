@@ -313,6 +313,12 @@ export async function GET(request: Request) {
       .collection("students")
       .findOne({ "parentInfo.email": account.email });
 
+    const latestReg = await db
+      .collection("student_registrations")
+      .findOne({ "parentInfo.email": account.email }, { sort: { submittedAt: -1 } });
+
+    const resolvedAdvNum = studentRecord?.adventureNumber ?? latestReg?.adventureNumber ?? account.adventureNumber ?? null;
+
     const mergedChildInfo = {
       ...(account.childInfo || {}),
       ...(studentRecord?.childInfo || {}),
@@ -328,12 +334,14 @@ export async function GET(request: Request) {
           schedule: studentRecord.schedule,
           enrolledAt: studentRecord.enrolledAt,
           status: studentRecord.status,
+          adventureNumber: resolvedAdvNum,
           childInfo: mergedChildInfo,
           emergencyContact: studentRecord.emergencyContact || account.emergencyContact || { name: "", relationship: "", phone: "" },
         }
       : account.childInfo || account.emergencyContact ? {
           id: account._id.toString(),
           program: account.program,
+          adventureNumber: resolvedAdvNum,
           childInfo: mergedChildInfo,
           emergencyContact: account.emergencyContact || { name: "", relationship: "", phone: "" },
         } 
@@ -343,6 +351,7 @@ export async function GET(request: Request) {
       ...account,
       id: uid,
       _id: undefined,
+      adventureNumber: resolvedAdvNum,
       waiverSignature: account.waiverSignature || null,
       waiverSignedAt: account.waiverSignedAt ? new Date(account.waiverSignedAt).toISOString() : null,
       virtualSessionLink: account.virtualSessionLink || null,

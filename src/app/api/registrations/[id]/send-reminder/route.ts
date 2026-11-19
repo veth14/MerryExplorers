@@ -105,7 +105,11 @@ export async function POST(
         p.programKey === registration.program ||
         (registration.program && p.programKey.toLowerCase().includes(registration.program.toLowerCase()))
     );
-    const totalSessionsDisplay = programSetting?.totalSessions || program?.sessions;
+    const regAdvNum = Number(registration.adventureNumber) || 2;
+    const isNextAdvReminder = Boolean(programSetting && regAdvNum > (programSetting.currentAdventure ?? 2));
+    const totalSessionsDisplay = isNextAdvReminder
+      ? (programSetting?.nextTotalSessions || programSetting?.totalSessions || program?.sessions)
+      : (programSetting?.totalSessions || program?.sessions);
 
     const subject = `Payment Reminder — ${registration.childInfo?.firstName || "Your Explorer"} at Merry Explorers`;
     const html = `

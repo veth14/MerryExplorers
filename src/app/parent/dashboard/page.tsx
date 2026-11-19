@@ -52,6 +52,7 @@ type ParentProfile = {
   schedule: string;
   classTime: string;
   status: string;
+  adventureNumber?: number | null;
   avatarUrl: string;
   avatarColor: string;
   initials: string;
@@ -97,6 +98,7 @@ type ParentProfile = {
     schedule: string;
     enrolledAt: string;
     status: string;
+    adventureNumber?: number | null;
     childInfo: {
       firstName: string;
       lastName: string;
@@ -1066,7 +1068,8 @@ export default function ParentDashboardPage() {
     profile.studentInfo?.program === "Virtual Tutorial";
 
   // ── Official Calendar Session Progress ──
-  const matchedSchedule = matchProgramSchedule(programSchedules, profile.program);
+  const userAdvNum = profile.adventureNumber ?? profile.studentInfo?.adventureNumber ?? null;
+  const matchedSchedule = matchProgramSchedule(programSchedules, profile.program, userAdvNum);
   const sessionProgress = calculateCalendarSessionProgress({
     programSchedule: matchedSchedule,
     schedule: profile.schedule,

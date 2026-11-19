@@ -555,7 +555,14 @@ export async function POST(request: Request) {
     if (parentInfo?.email) {
       try {
         // Fetch program configuration & adventure start date
-        const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null; totalSessions?: number | null }> = renewalSettingsDoc?.programs || [];
+        const storedPrograms: Array<{
+          programKey: string;
+          currentAdventure: number;
+          adventureStartDate?: string | null;
+          nextAdventureStart: string | null;
+          totalSessions?: number | null;
+          nextTotalSessions?: number | null;
+        }> = renewalSettingsDoc?.programs || [];
 
         const programKeyMap: Record<string, string> = {
           "curious-explorer": "Discovery Club: Curious Explorer",
@@ -576,9 +583,15 @@ export async function POST(request: Request) {
         const isAdvProg = !["ballet", "virtual-session"].includes(program);
         const advNum = adventureNumber ?? 2;
         const advLabel = isAdvProg ? `Adventure ${advNum}` : readableProgramName;
-        const totalSessionsDisplay = matchedProg?.totalSessions || (PROGRAM_SLOTS as any)?.[program]?.sessions || null;
-        const advStartDateStr = (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
-          ? new Date(matchedProg.nextAdventureStart || matchedProg.adventureStartDate!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+        const isNextAdventure = Boolean(matchedProg && advNum > (matchedProg.currentAdventure ?? 2));
+        const totalSessionsDisplay = isNextAdventure
+          ? (matchedProg?.nextTotalSessions || matchedProg?.totalSessions || (PROGRAM_SLOTS as any)?.[program]?.sessions || null)
+          : (matchedProg?.totalSessions || (PROGRAM_SLOTS as any)?.[program]?.sessions || null);
+        const targetDate = isNextAdventure
+          ? (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
+          : (matchedProg?.adventureStartDate || matchedProg?.nextAdventureStart);
+        const advStartDateStr = targetDate
+          ? new Date(targetDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
           : null;
 
         const auth = process.env.GMAIL_CLIENT_ID
