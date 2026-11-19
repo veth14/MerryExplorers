@@ -37,7 +37,9 @@ export const LEGACY_ADVENTURE_2_REGISTRATION_OPEN = "2026-10-12";
 export const LEGACY_ADVENTURE_1_START = "2026-09-28";
 
 function dateBefore(iso: string, days: number) {
-  const date = new Date(`${iso}T00:00:00Z`);
+  const clean = String(iso).slice(0, 10);
+  const date = new Date(`${clean}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return clean;
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10);
 }
@@ -108,8 +110,9 @@ export function getAdventureCycleRegistrationQuery(
   const minimumRegistrationDate = adventureNumber > 1
     ? registrationOpenDate || adventureStartDate
     : adventureStartDate;
-  const submittedAtFilter = minimumRegistrationDate
-    ? { submittedAt: { $gte: new Date(`${minimumRegistrationDate}T00:00:00+08:00`) } }
+  const cleanMinDate = minimumRegistrationDate ? String(minimumRegistrationDate).slice(0, 10) : null;
+  const submittedAtFilter = cleanMinDate
+    ? { submittedAt: { $gte: new Date(`${cleanMinDate}T00:00:00+08:00`) } }
     : {};
 
   return [

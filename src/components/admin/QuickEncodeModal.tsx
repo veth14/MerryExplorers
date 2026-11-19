@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { FALLBACK_PIONEER_RATES } from "@/lib/payment-terms";
+import { readReceipt, type ReceiptData } from "@/lib/receipt-ocr";
 
 export interface RenewalFamilyOption {
   _id: string;
@@ -91,6 +92,37 @@ function matchClassTime(
   return availableClasses[0].name;
 }
 
+function fileToReceipt(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("That file couldn't be read."));
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      if (file.type === "application/pdf") {
+        return resolve(dataUrl);
+      }
+      if (!file.type.startsWith("image/")) {
+        return reject(new Error("Please upload an image or PDF."));
+      }
+      const img = new Image();
+      img.onerror = () => reject(new Error("That image could not be opened."));
+      img.onload = () => {
+        const MAX = 1400;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(dataUrl);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure }: QuickEncodeModalProps) {
   const [families, setFamilies] = useState<RenewalFamilyOption[]>([]);
   const [loadingFamilies, setLoadingFamilies] = useState(false);
@@ -128,26 +160,67 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [referenceNumber, setReferenceNumber] = useState("");
   const [receiptBase64, setReceiptBase64] = useState<string>("");
   const [receiptFileName, setReceiptFileName] = useState<string>("");
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrInfo, setOcrInfo] = useState<ReceiptData | null>(null);
+  const ocrRunRef = useRef(0);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitStep, setSubmitStep] = useState<"" | "creating" | "uploading-receipt" | "done">("");
   const [error, setError] = useState<string | null>(null);
 
-  // Convert receipt image file → base64
-  const handleReceiptFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Convert receipt image file → base64 & run OCR extraction
+  const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 4_000_000) {
-      setError("Receipt image is too large (max 4 MB). Please compress or crop it first.");
-      e.target.value = "";
-      return;
+    setError(null);
+
+    try {
+      const dataUrl = await fileToReceipt(file);
+      setReceiptBase64(dataUrl);
+      setReceiptFileName(file.name);
+
+      if (dataUrl.startsWith("data:image")) {
+        const runId = ++ocrRunRef.current;
+        setOcrLoading(true);
+        setOcrInfo(null);
+
+        readReceipt(file, dataUrl)
+          .then((res) => {
+            if (runId !== ocrRunRef.current) return;
+            setOcrInfo(res);
+            if (res.reference) {
+              setReferenceNumber(res.reference);
+            }
+            if (res.amount != null && res.amount > 0) {
+              setAmountPaid(res.amount);
+            }
+            if (res.method) {
+              if (res.method === "gcash") setPaymentMethod("GCash");
+              else if (res.method === "bpi") setPaymentMethod("BPI Transfer");
+              else if (res.method === "mari-bank") setPaymentMethod("Other");
+            }
+          })
+          .catch((err) => {
+            console.warn("[QuickEncodeModal] OCR scan warning:", err);
+            if (runId === ocrRunRef.current) {
+              setOcrInfo({ reference: "", amount: null, date: null, method: null });
+            }
+          })
+          .finally(() => {
+            if (runId === ocrRunRef.current) setOcrLoading(false);
+          });
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to process receipt image.");
     }
-    setReceiptFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setReceiptBase64((ev.target?.result as string) || "");
-    };
-    reader.readAsDataURL(file);
+  };
+
+  const removeReceipt = () => {
+    ocrRunRef.current++;
+    setOcrLoading(false);
+    setOcrInfo(null);
+    setReceiptBase64("");
+    setReceiptFileName("");
   };
 
   // Fetch families when opened
@@ -159,6 +232,8 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
     // Reset receipt state each time the modal opens
     setReceiptBase64("");
     setReceiptFileName("");
+    setOcrInfo(null);
+    setOcrLoading(false);
 
     fetch("/api/renewals/families")
       .then((res) => res.json())
@@ -814,12 +889,12 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Parent Phone *</label>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Parent Phone (Optional)</label>
                       <input
                         type="tel"
-                        required
                         value={parentPhone}
                         onChange={(e) => setParentPhone(e.target.value)}
+                        placeholder="e.g. 09171234567"
                         className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] text-slate-800"
                       />
                     </div>
@@ -1136,37 +1211,83 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                         />
                       </div>
 
-                      {/* Receipt Image Upload */}
+                      {/* Receipt Image Upload & Auto-Extraction */}
                       <div className="sm:col-span-3">
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">
                           Receipt Screenshot / Photo
-                          <span className="ml-1 text-slate-400 font-normal">(optional — attaching it moves status to Pending immediately)</span>
+                          <span className="ml-1 text-slate-400 font-normal">(optional — auto-extracts amount, ref no. &amp; method; moves status to Pending)</span>
                         </label>
                         {receiptBase64 ? (
-                          <div className="flex items-center gap-3 p-2.5 rounded-xl border border-emerald-300 bg-emerald-50">
-                            <img
-                              src={receiptBase64}
-                              alt="receipt preview"
-                              className="w-14 h-14 rounded-lg object-cover border border-emerald-200 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <p className="text-[12px] font-bold text-emerald-900 truncate">{receiptFileName}</p>
-                              <p className="text-[11px] text-emerald-700 mt-0.5">Receipt ready — will be uploaded on submit</p>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-3 p-2.5 rounded-xl border border-emerald-300 bg-emerald-50">
+                              <img
+                                src={receiptBase64}
+                                alt="receipt preview"
+                                className="w-14 h-14 rounded-lg object-cover border border-emerald-200 shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-bold text-emerald-900 truncate">{receiptFileName}</p>
+                                <p className="text-[11px] text-emerald-700 mt-0.5">
+                                  {ocrLoading ? "Scanning receipt image…" : "Receipt ready — will be uploaded on submit"}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={removeReceipt}
+                                className="shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                              >
+                                ✕ Remove
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => { setReceiptBase64(""); setReceiptFileName(""); }}
-                              className="shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
-                            >
-                              ✕ Remove
-                            </button>
+
+                            {/* OCR Loading Banner */}
+                            {ocrLoading && (
+                              <div className="flex items-center gap-2 p-2.5 rounded-xl border border-blue-200 bg-blue-50/80 text-[11.5px] font-semibold text-blue-800 animate-pulse">
+                                <span className="animate-spin text-sm">🔎</span>
+                                <span>Reading receipt… auto-extracting reference no., amount &amp; payment method…</span>
+                              </div>
+                            )}
+
+                            {/* OCR Extraction Result Banner */}
+                            {!ocrLoading && ocrInfo && (() => {
+                              const found = Boolean(ocrInfo.reference || ocrInfo.amount != null || ocrInfo.method);
+                              return (
+                                <div className={`p-2.5 rounded-xl border text-[11.5px] ${
+                                  found ? "border-emerald-300 bg-emerald-50/90 text-emerald-950" : "border-amber-300 bg-amber-50/90 text-amber-950"
+                                }`}>
+                                  <p className="font-extrabold flex items-center gap-1.5 text-[11.5px]">
+                                    {found ? "✓ Auto-extracted from receipt (please verify fields above):" : "⚠️ Couldn't read all details automatically:"}
+                                  </p>
+                                  {found ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5 text-[11px]">
+                                      <div>
+                                        <span className="text-slate-500 font-semibold">Ref No: </span>
+                                        <strong className="font-mono text-emerald-900 font-bold">{ocrInfo.reference || "Not found"}</strong>
+                                      </div>
+                                      <div>
+                                        <span className="text-slate-500 font-semibold">Amount: </span>
+                                        <strong className="text-emerald-900 font-bold">{ocrInfo.amount != null ? `₱${ocrInfo.amount.toLocaleString()}` : "Not found"}</strong>
+                                      </div>
+                                      <div>
+                                        <span className="text-slate-500 font-semibold">Method: </span>
+                                        <strong className="capitalize text-emerald-900 font-bold">{ocrInfo.method || "Not found"}</strong>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-[11px] text-amber-800 mt-1">
+                                      Please manually type the reference number and amount paid above.
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <label className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer transition-all group">
                             <span className="text-2xl">📸</span>
                             <div>
                               <p className="text-[12px] font-bold text-slate-700 group-hover:text-blue-800">Click to attach receipt image</p>
-                              <p className="text-[10.5px] text-slate-400 mt-0.5">PNG, JPG, GIF · max 4 MB</p>
+                              <p className="text-[10.5px] text-slate-400 mt-0.5">PNG, JPG, GIF · auto-scans reference no., amount &amp; method</p>
                             </div>
                             <input
                               type="file"
