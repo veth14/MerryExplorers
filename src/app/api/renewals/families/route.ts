@@ -121,22 +121,18 @@ export async function GET(request: Request) {
       if (p.email2) emailToPioneerMap.set(p.email2.toLowerCase().trim(), p);
     }
 
-    return NextResponse.json({
-      success: true,
-      targetAdventure,
-      prevAdventure,
-      data: families.map((f) => {
-        const emailLower = (f.parentEmail || "").toLowerCase().trim();
-        const secondaryLower = (f.secondaryEmail || "").toLowerCase().trim();
-        const childFirst = (f.childName || "").toLowerCase().trim().split(/\s+/)[0];
-        const childLast = (f.childName || "").toLowerCase().trim().split(/\s+/).slice(-1)[0];
-        const pioneer = emailToPioneerMap.get(emailLower) || (secondaryLower ? emailToPioneerMap.get(secondaryLower) : null);
-        const isPioneer = Boolean(
-          f.isPioneer ||
-          pioneerEmails.has(emailLower) ||
-          (secondaryLower && pioneerEmails.has(secondaryLower)) ||
-          (childFirst && pioneerChildFirsts.has(childFirst))
-        );
+    const mappedFamilies = families.map((f) => {
+      const emailLower = (f.parentEmail || "").toLowerCase().trim();
+      const secondaryLower = (f.secondaryEmail || "").toLowerCase().trim();
+      const childFirst = (f.childName || "").toLowerCase().trim().split(/\s+/)[0];
+      const childLast = (f.childName || "").toLowerCase().trim().split(/\s+/).slice(-1)[0];
+      const pioneer = emailToPioneerMap.get(emailLower) || (secondaryLower ? emailToPioneerMap.get(secondaryLower) : null);
+      const isPioneer = Boolean(
+        f.isPioneer ||
+        pioneerEmails.has(emailLower) ||
+        (secondaryLower && pioneerEmails.has(secondaryLower)) ||
+        (childFirst && pioneerChildFirsts.has(childFirst))
+      );
 
         // Helper to test if a registration matches this family
         const isRegMatch = (r: any) => {
@@ -248,7 +244,14 @@ export async function GET(request: Request) {
           lastEmailDate: derivedLastEmailDate,
           lastEmailType: derivedLastEmailType,
         };
-      }),
+      });
+
+    return NextResponse.json({
+      success: true,
+      targetAdventure,
+      prevAdventure,
+      data: mappedFamilies,
+      families: mappedFamilies,
     });
   } catch (error: any) {
     console.error("[renewal_families GET]", error);

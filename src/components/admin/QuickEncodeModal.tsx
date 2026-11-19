@@ -44,7 +44,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [loadingFamilies, setLoadingFamilies] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>("");
-  const [filterPendingOnly, setFilterPendingOnly] = useState(true);
+  const [filterPendingOnly, setFilterPendingOnly] = useState(false);
 
   // Form Fields
   const [childFirstName, setChildFirstName] = useState("");
@@ -77,9 +77,12 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
-        if (data.families && Array.isArray(data.families)) {
-          setFamilies(data.families);
-        }
+        const list = Array.isArray(data.data)
+          ? data.data
+          : Array.isArray(data.families)
+          ? data.families
+          : [];
+        setFamilies(list);
       })
       .catch((err) => {
         if (isMounted) setError("Failed to load renewal families. Please refresh.");
@@ -167,8 +170,8 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   // Filtered families list for search/select
   const filteredFamilies = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return families.filter((f) => {
-      if (filterPendingOnly && f.renewalStatus !== "not_yet_submitted") {
+    const result = families.filter((f) => {
+      if (filterPendingOnly && f.renewalStatus && f.renewalStatus !== "not_yet_submitted") {
         return false;
       }
       if (!q) return true;
@@ -177,6 +180,15 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       const emailMatch = (f.parentEmail || "").toLowerCase().includes(q);
       const phoneMatch = (f.phone || "").toLowerCase().includes(q);
       return childMatch || parentMatch || emailMatch || phoneMatch;
+    });
+
+    // Sort: not yet registered first, then alphabetical by child name
+    return [...result].sort((a, b) => {
+      const aUnsub = !a.renewalStatus || a.renewalStatus === "not_yet_submitted";
+      const bUnsub = !b.renewalStatus || b.renewalStatus === "not_yet_submitted";
+      if (aUnsub && !bUnsub) return -1;
+      if (!aUnsub && bUnsub) return 1;
+      return (a.childName || "").localeCompare(b.childName || "");
     });
   }, [families, search, filterPendingOnly]);
 
