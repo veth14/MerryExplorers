@@ -58,17 +58,15 @@ export function fmtIsoDate(iso: string) {
 // How many Mondays have passed from the due date onward.
 // A due date that falls on a Monday counts as the first interest Monday.
 // `now` is the "as of" moment: today by default, or the date the parent actually paid.
-// `skipDates` — set of "YYYY-MM-DD" strings for holidays / suspensions.  A Monday that
-// falls on a holiday is NOT counted: no session that day means no interest charge.
-export function countMondaysAfter(dueIso: string, now = new Date(), skipDates?: Set<string>) {
+// NOTE: holidays / suspensions are intentionally NOT skipped here. Once a student's
+// 6th session has occurred, interest accrues every Monday regardless of whether that
+// Monday is a holiday. The skipDates set is only used for session-counting (finding the
+// 6th-session due date), never for interest-week counting.
+export function countMondaysAfter(dueIso: string, now = new Date()) {
     const d = new Date(dueIso + "T00:00:00");
     let count = 0;
-    const pad = (x: number) => String(x).padStart(2, "0");
     while (d <= now) {
-        if (d.getDay() === 1) {
-            const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-            if (!skipDates?.has(dateStr)) count++;
-        }
+        if (d.getDay() === 1) count++;
         d.setDate(d.getDate() + 1);
     }
     return count;
@@ -107,13 +105,15 @@ export function getRegistrationItems(reg: any): FeeItem[] {
     return items;
 }
 
-// First non-holiday Monday on or after the due date: the first day 4% is charged.
-export function firstInterestDate(dueIso: string, skipDates?: Set<string>): string {
+// First Monday on or after the due date: the first day 4% is charged.
+// NOTE: holidays are NOT skipped here — interest accrues on all Mondays once session 6 passes.
+export function firstInterestDate(dueIso: string): string {
     const d = new Date(dueIso + "T00:00:00");
     const pad = (n: number) => String(n).padStart(2, "0");
     while (true) {
-        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        if (d.getDay() === 1 && !skipDates?.has(dateStr)) return dateStr;
+        if (d.getDay() === 1) {
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
         d.setDate(d.getDate() + 1);
     }
 }
@@ -292,11 +292,13 @@ export function calcRegistrationTerms(
         balanceShare = due - reservation;
         dueDate = reg?.customDueDate ? String(reg.customDueDate).slice(0, 10) : getBalanceDueDate(student, skipDates);
         if (dueDate && balance && balance > 0) {
-            mondays = countMondaysAfter(dueDate, asOf, skipDates);
+            // Interest weeks use NO skipDates — once past session 6, every Monday accrues interest
+            // regardless of holidays (holidays only affect session counting, not interest counting).
+            mondays = countMondaysAfter(dueDate, asOf);
             interest = Math.round(balance * WEEKLY_INTEREST_RATE * mondays);
         }
     }
     const totalPayable = balance != null ? balance + interest : null;
-    const interestStart = dueDate && balance && balance > 0 ? firstInterestDate(dueDate, skipDates) : null;
+    const interestStart = dueDate && balance && balance > 0 ? firstInterestDate(dueDate) : null;
     return { interestStart, due, items: getRegistrationItems(reg), paidVerified, balance, reservation, balanceShare, dueDate, mondays, interest, totalPayable };
 }
