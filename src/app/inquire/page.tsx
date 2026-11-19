@@ -7,11 +7,7 @@ import { m, AnimatePresence  } from "framer-motion";
 import { SiteHeader } from "@/components/landing/site-header";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { WashiTape, PlayfulSun, PlayfulStar } from "@/components/landing/playful-decorations";
-
-const CHILD_AGE_OPTIONS = [
-  "1.6 – 2.5 years (Tiny Explorers)",
-  "2.6 – 4.11 years (Little Explorers)",
-];
+import { INQUIRY_PROGRAM_OPTIONS } from "@/data/inquiry-programs";
 
 function CheckIcon() {
   return (
@@ -52,7 +48,7 @@ function AgeDropdown({ value, onChange }: { value: string; onChange: (v: string)
           ${open ? "bg-white border-[#0033A0]/30" : "bg-[#f8fafc] border-transparent hover:bg-[#f1f5f9]"}
           ${value ? "text-[#002f76]" : "text-[#94a3b8] font-semibold"}`}
       >
-        <span>{value || "Select age range"}</span>
+        <span>{value || "Select program / age range"}</span>
         <span className="text-[#64748b] shrink-0"><ChevronDownIcon open={open} /></span>
       </button>
       <AnimatePresence>
@@ -64,16 +60,16 @@ function AgeDropdown({ value, onChange }: { value: string; onChange: (v: string)
             transition={{ duration: 0.2 }}
             className="absolute top-full left-0 right-0 mt-2 z-30 bg-white border border-[#e2e8f0] rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden p-2"
           >
-            {CHILD_AGE_OPTIONS.map((opt) => (
+            {INQUIRY_PROGRAM_OPTIONS.map((opt) => (
               <button
-                key={opt}
+                key={opt.label}
                 type="button"
-                onClick={() => { onChange(opt); setOpen(false); }}
+                onClick={() => { onChange(opt.label); setOpen(false); }}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[14px] font-bold text-left transition-colors
-                  ${value === opt ? "bg-[#0033A0] text-white" : "text-[#334155] hover:bg-[#f1f5f9]"}`}
+                  ${value === opt.label ? "bg-[#0033A0] text-white" : "text-[#334155] hover:bg-[#f1f5f9]"}`}
               >
-                <span>{opt}</span>
-                {value === opt && (
+                <span>{opt.emoji} {opt.label}</span>
+                {value === opt.label && (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4 shrink-0"><path d="M20 6 9 17l-5-5" /></svg>
                 )}
               </button>

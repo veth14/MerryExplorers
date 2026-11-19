@@ -1,0 +1,58 @@
+export const INQUIRY_PROGRAM_OPTIONS = [
+  {
+    name: "Curious Explorer",
+    club: "Discovery Club",
+    ageRange: "Ages 1.5 – 4.11",
+    emoji: "🔎",
+    label: "Curious Explorer (Ages 1.5 – 4.11)",
+  },
+  {
+    name: "Creative Explorer",
+    club: "Discovery Club",
+    ageRange: "Ages 2.6 – 4.11",
+    emoji: "🎨",
+    label: "Creative Explorer (Ages 2.6 – 4.11)",
+  },
+  {
+    name: "Everyday Explorer",
+    club: "Discovery Club",
+    ageRange: "Ages 1.5 – 4.11",
+    emoji: "🌈",
+    label: "Everyday Explorer (Ages 1.5 – 4.11)",
+  },
+  {
+    name: "Brave Explorer",
+    club: "Trailblazer",
+    ageRange: "Ages 3 – 4.11",
+    emoji: "🏕️",
+    label: "Brave Explorer (Ages 3 – 4.11)",
+  },
+  {
+    name: "Saturday Playdate",
+    club: "Weekend Adventures",
+    ageRange: "Little Explorers",
+    emoji: "🛝",
+    label: "Saturday Playdate (Little Explorers)",
+  },
+  {
+    name: "Ballet",
+    club: "Weekend Adventures",
+    ageRange: "Ages 3 – 12",
+    emoji: "🩰",
+    label: "Ballet (Ages 3 – 12)",
+  },
+  {
+    name: "Virtual Tutorial",
+    club: "Online Learning",
+    ageRange: "All Ages",
+    emoji: "💻",
+    label: "Virtual Tutorial (All Ages)",
+  },
+  {
+    name: "General Inquiry",
+    club: "Merry Explorers",
+    ageRange: "Any age / Not sure yet",
+    emoji: "✨",
+    label: "Not sure yet / General Inquiry",
+  },
+];
