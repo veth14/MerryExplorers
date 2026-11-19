@@ -90,6 +90,7 @@ export type ProgramRenewalEntry = {
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this, renewals are free slot reservations
   totalSessions?: number | null; // optional override; null/undefined = use program default from PROGRAM_SCHEDULE_CONFIGS
+  customSessions?: any[] | null; // calendar rescheduled sessions
 };
 
 export type RenewalSettingsData = {

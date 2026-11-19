@@ -45,6 +45,7 @@ export type ProgramRenewalEntry = {
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this date, renewals are free slot reservations
   totalSessions?: number | null; // optional: custom session count per adventure/batch (defaults to PROGRAM_SCHEDULE_CONFIGS)
+  customSessions?: any[] | null; // calendar rescheduled sessions
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -187,6 +188,7 @@ export async function GET() {
             closedClasses: Array.isArray(existing.closedClasses) ? existing.closedClasses : [],
             downpaymentStartDate: existing.downpaymentStartDate ?? null,
             totalSessions: typeof existing.totalSessions === "number" ? existing.totalSessions : null,
+            customSessions: Array.isArray(existing.customSessions) ? existing.customSessions : null,
           }
         : {
             programKey: key,
@@ -205,6 +207,7 @@ export async function GET() {
             closedClasses: [],
             downpaymentStartDate: null,
             totalSessions: null,
+            customSessions: null,
           };
     });
 
@@ -294,6 +297,7 @@ export async function PUT(req: NextRequest) {
         closedClasses: Array.isArray(p?.closedClasses) ? p.closedClasses : [],
         downpaymentStartDate: p?.downpaymentStartDate ?? null,
         totalSessions: typeof p?.totalSessions === "number" && p.totalSessions > 0 ? p.totalSessions : null,
+        customSessions: Array.isArray(p?.customSessions) ? p.customSessions : (Array.isArray(old?.customSessions) ? old.customSessions : null),
       };
     });
 
