@@ -63,9 +63,29 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("GCash");
   const [referenceNumber, setReferenceNumber] = useState("");
+  const [receiptBase64, setReceiptBase64] = useState<string>("");
+  const [receiptFileName, setReceiptFileName] = useState<string>("");
 
   const [submitting, setSubmitting] = useState(false);
+  const [submitStep, setSubmitStep] = useState<"" | "creating" | "uploading-receipt" | "done">("");
   const [error, setError] = useState<string | null>(null);
+
+  // Convert receipt image file → base64
+  const handleReceiptFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 4_000_000) {
+      setError("Receipt image is too large (max 4 MB). Please compress or crop it first.");
+      e.target.value = "";
+      return;
+    }
+    setReceiptFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setReceiptBase64((ev.target?.result as string) || "");
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Fetch families when opened
   useEffect(() => {
@@ -73,6 +93,9 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
     let isMounted = true;
     setLoadingFamilies(true);
     setError(null);
+    // Reset receipt state each time the modal opens
+    setReceiptBase64("");
+    setReceiptFileName("");
 
     fetch("/api/renewals/families")
       .then((res) => res.json())
@@ -211,11 +234,17 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       setError("Please choose a program and a session time.");
       return;
     }
+    if (recordPayment && !referenceNumber.trim()) {
+      setError("Please enter a reference/receipt number for the payment.");
+      return;
+    }
 
     setSubmitting(true);
+    setSubmitStep("creating");
     setError(null);
 
     try {
+      // ── STEP 1: Create the registration ──────────────────────────────────
       const payload = {
         encodedBy: "admin",
         encodedFamilyId: selectedFamily._id,
@@ -265,13 +294,62 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
         throw new Error(json.error || "Failed to encode registration.");
       }
 
-      onSuccess(`Successfully encoded renewal for ${childFirstName} ${childLastName}!`);
+      const registrationId: string = json.data?.id;
+
+      // ── STEP 2: Upload receipt image (optional) ───────────────────────────
+      // If admin provided payment details + a receipt image, call the payment
+      // endpoint immediately so the registration moves to "pending" status
+      // and doesn't need a separate trip to /admin/payments.
+      if (recordPayment && receiptBase64 && registrationId) {
+        setSubmitStep("uploading-receipt");
+        try {
+          const payRes = await fetch(`/api/registrations/${registrationId}/payment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              paymentMethod,
+              receiptBase64,
+              paymentType: Number(amountPaid) >= effectiveRate ? "full" : "downpayment",
+              amountDue: effectiveRate,
+              amountPaid: Number(amountPaid),
+              referenceNumber: referenceNumber.trim(),
+              isNewFamily: false,
+            }),
+          });
+          if (!payRes.ok) {
+            const payJson = await payRes.json().catch(() => ({}));
+            // Non-fatal: registration was created; just warn about receipt
+            console.warn("[QuickEncodeModal] receipt upload warning:", payJson.error);
+            onSuccess(
+              `Encoded renewal for ${childFirstName} ${childLastName}. ⚠️ Receipt upload failed (${payJson.error || "unknown error"}) — please add it manually in Payments.`
+            );
+          } else {
+            onSuccess(
+              `Encoded renewal for ${childFirstName} ${childLastName} with receipt. Status set to Pending. ✓`
+            );
+          }
+        } catch (payErr: any) {
+          console.warn("[QuickEncodeModal] receipt upload error:", payErr);
+          onSuccess(
+            `Encoded renewal for ${childFirstName} ${childLastName}. ⚠️ Receipt upload failed — please add it manually in Payments.`
+          );
+        }
+      } else {
+        onSuccess(
+          recordPayment
+            ? `Encoded renewal for ${childFirstName} ${childLastName} (no receipt image — slot Reserved).`
+            : `Successfully encoded renewal for ${childFirstName} ${childLastName}!`
+        );
+      }
+
+      setSubmitStep("done");
       onClose();
     } catch (err: any) {
       console.error("[QuickEncodeModal] error submitting:", err);
       setError(err.message || "An unexpected error occurred.");
     } finally {
       setSubmitting(false);
+      setSubmitStep("");
     }
   };
 
@@ -683,14 +761,57 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Reference Number</label>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Reference Number *</label>
                         <input
                           type="text"
+                          required
                           placeholder="e.g. 1002345678"
                           value={referenceNumber}
                           onChange={(e) => setReferenceNumber(e.target.value)}
                           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] text-slate-800"
                         />
+                      </div>
+
+                      {/* Receipt Image Upload */}
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                          Receipt Screenshot / Photo
+                          <span className="ml-1 text-slate-400 font-normal">(optional — attaching it moves status to Pending immediately)</span>
+                        </label>
+                        {receiptBase64 ? (
+                          <div className="flex items-center gap-3 p-2.5 rounded-xl border border-emerald-300 bg-emerald-50">
+                            <img
+                              src={receiptBase64}
+                              alt="receipt preview"
+                              className="w-14 h-14 rounded-lg object-cover border border-emerald-200 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-bold text-emerald-900 truncate">{receiptFileName}</p>
+                              <p className="text-[11px] text-emerald-700 mt-0.5">Receipt ready — will be uploaded on submit</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { setReceiptBase64(""); setReceiptFileName(""); }}
+                              className="shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                              ✕ Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer transition-all group">
+                            <span className="text-2xl">📸</span>
+                            <div>
+                              <p className="text-[12px] font-bold text-slate-700 group-hover:text-blue-800">Click to attach receipt image</p>
+                              <p className="text-[10.5px] text-slate-400 mt-0.5">PNG, JPG, GIF · max 4 MB</p>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleReceiptFile}
+                            />
+                          </label>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -732,7 +853,13 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0033A0] hover:bg-[#002776] text-white text-[12.5px] font-extrabold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>⚡</span>
-                <span>{submitting ? "Encoding Registration..." : "Confirm & Encode Registration"}</span>
+                <span>
+                  {submitting
+                    ? submitStep === "uploading-receipt"
+                      ? "Uploading Receipt..."
+                      : "Creating Registration..."
+                    : "Confirm & Encode Registration"}
+                </span>
               </button>
             </div>
           </form>
