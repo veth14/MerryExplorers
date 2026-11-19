@@ -81,7 +81,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       + (registration.uniformOrdered ? 650 : 0);
     const paidOn = payment.paidOn ? new Date(payment.paidOn) : payment.submittedAt ? new Date(payment.submittedAt) : now;
     const skipDates = await getHolidaySkipSet(db);
-    const terms = calcRegistrationTerms(pricedRegistration, student, paidVerified, fallbackTotal, paidOn, skipDates);
+    const terms = calcRegistrationTerms(pricedRegistration, student, paidVerified, fallbackTotal, paidOn, skipDates, renewalSettings?.programs || []);
     const allocation = allocateBalancePayment(terms, Number(payment.amountPaid), false);
     if (!allocation.ok) return NextResponse.json({ error: allocation.error || "This payment cannot be applied to the current balance." }, { status: 409 });
 

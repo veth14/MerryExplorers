@@ -40,6 +40,7 @@ export const PROGRAM_KEY_BY_SLUG: Record<string, string> = {
     "curious-explorer": "Discovery Club: Curious Explorer",
     "creative-explorer": "Discovery Club: Creative Explorer",
     "everyday-explorer": "Discovery Club: Everyday Explorer",
+    "everyday-curious": "Discovery Club: Everyday Explorer",
     "brave-explorer": "Trailblazer: Brave Explorer",
 };
 
@@ -259,8 +260,31 @@ export function getStudentSessionInfo(reg: any, account?: any, adventureStart?: 
 
 export function getBalanceDueDate(
     student: { enrolledAt?: string; schedule: string },
-    skipDates?: Set<string>
+    skipDates?: Set<string>,
+    settings?: any[],
+    programSlug?: string
 ): string | null {
+    // Check if the program has custom session dates configured (e.g. rescheduled from the calendar)
+    if (settings && programSlug) {
+        const key = PROGRAM_KEY_BY_SLUG[programSlug];
+        const entry = settings.find((p) => {
+            if (!p?.programKey) return false;
+            if (key && p.programKey === key) return true;
+            const pLower = p.programKey.toLowerCase();
+            const slugLower = programSlug.toLowerCase();
+            if (slugLower.includes("curious") && pLower.includes("curious")) return true;
+            if (slugLower.includes("creative") && pLower.includes("creative")) return true;
+            if ((slugLower.includes("everyday") || slugLower.includes("curious")) && pLower.includes("everyday")) return true;
+            if ((slugLower.includes("brave") || slugLower.includes("trailblazer")) && (pLower.includes("brave") || pLower.includes("trailblazer"))) return true;
+            return false;
+        });
+        if (entry && Array.isArray(entry.customSessions) && entry.customSessions.length > 0) {
+            const s6 = entry.customSessions.find((s: any) => s.sessionNumber === BALANCE_DUE_SESSION);
+            if (s6 && s6.dateStr) {
+                return s6.dateStr;
+            }
+        }
+    }
     return getNthSessionDate(student.enrolledAt, student.schedule, BALANCE_DUE_SESSION, skipDates);
 }
 
@@ -268,15 +292,16 @@ export function getBalanceDueDate(
 // `asOf`       = the moment interest is calculated up to (today by default, or the payment date).
 // `skipDates`  = Set of "YYYY-MM-DD" holiday / suspension strings fetched from the DB.
 //                  • Skips those dates when finding the Nth session (due-date calculation).
-//                  • Skips holiday Mondays when counting interest weeks.
 //                Pass an empty Set or omit it to keep the old (no-skip) behaviour.
+// `settings`   = Array of program renewal settings from DB (respects calendar-rescheduled sessions).
 export function calcRegistrationTerms(
     reg: any,
     student: { enrolledAt?: string; schedule: string },
     paidVerified: number,
     fallbackDue?: number,
     asOf: Date = new Date(),
-    skipDates?: Set<string>
+    skipDates?: Set<string>,
+    settings?: any[]
 ) {
     const rawDue = getRegistrationTotal(reg, fallbackDue);
     const due = rawDue && rawDue > 0 ? rawDue : null;
@@ -290,7 +315,9 @@ export function calcRegistrationTerms(
     if (due != null) {
         reservation = Math.round(due * RESERVATION_RATE);
         balanceShare = due - reservation;
-        dueDate = reg?.customDueDate ? String(reg.customDueDate).slice(0, 10) : getBalanceDueDate(student, skipDates);
+        dueDate = reg?.customDueDate
+            ? String(reg.customDueDate).slice(0, 10)
+            : getBalanceDueDate(student, skipDates, settings, reg?.program);
         if (dueDate && balance && balance > 0) {
             // Interest weeks use NO skipDates — once past session 6, every Monday accrues interest
             // regardless of holidays (holidays only affect session counting, not interest counting).

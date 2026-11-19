@@ -63,7 +63,7 @@ export async function GET(request: Request) {
       const appliedToCurrentSession = Math.max(0, paidVerified - paidToPrevious);
       const fallbackTotal = (getRegistrationTotal({ ...pricedRecord, uniformOrdered: false }, Number(record.amountDue) || 0) || 0)
         + (record.uniformOrdered ? 650 : 0);
-      const baseTerms = calcRegistrationTerms(pricedRecord, student, appliedToCurrentSession, fallbackTotal, new Date(), skipDates);
+      const baseTerms = calcRegistrationTerms(pricedRecord, student, appliedToCurrentSession, fallbackTotal, new Date(), skipDates, renewalSettings?.programs || []);
       const remainingPreviousBalance = Math.max(0, previousAdventureBalance - paidToPrevious);
       const sessionBalance = baseTerms.balance;
       const totalBalance = sessionBalance != null

@@ -80,7 +80,7 @@ export async function POST(
     const adventureStart = getRegistrationAdventureStart(renewalSettings?.programs || [], registration, getManilaTodayIso());
     const student = getStudentSessionInfo(registration, parentAccount, adventureStart);
     const skipDates = await getHolidaySkipSet(db);
-    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToSession, fallbackTotal, new Date(), skipDates);
+    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToSession, fallbackTotal, new Date(), skipDates, renewalSettings?.programs || []);
     const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
     const sessionBalance = terms.balance ?? Math.max(0, (terms.due ?? fallbackTotal) - appliedToSession);
     const total = terms.due ?? fallbackTotal;

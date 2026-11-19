@@ -67,7 +67,7 @@ export async function GET(
     const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
       + (registration.uniformOrdered ? 650 : 0);
     const skipDates = await getHolidaySkipSet(db);
-    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToCurrentSession, fallbackTotal, new Date(), skipDates);
+    const terms = calcRegistrationTerms(pricingRegistration, student, appliedToCurrentSession, fallbackTotal, new Date(), skipDates, renewalSettings?.programs || []);
     const remainingPrevious = Math.max(0, prevAdventureBal - paidToPrevious);
     const sessionBalance = terms.balance;
     const totalBalance = sessionBalance != null ? sessionBalance + remainingPrevious : (remainingPrevious > 0 ? remainingPrevious : null);

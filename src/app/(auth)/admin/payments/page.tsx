@@ -1720,7 +1720,7 @@ function AdminPaymentsPageInner() {
     const prevBal = typeof reg?.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
     const paidToPrev = Math.min(paidVerified, prevBal);
     const appliedToSession = Math.max(0, paidVerified - paidToPrev);
-    const terms = calcRegistrationTerms(reg, student, appliedToSession, reg?.amountDue, asOf, holidaySkipDates);
+    const terms = calcRegistrationTerms(reg, student, appliedToSession, reg?.amountDue, asOf, holidaySkipDates, renewalSettings);
     // first payment = the one parents make on the "Secure Your Slot" page
     const isInitial = reg?.status === "reserved" || reg?.status === "early-bird";
     const prog = (PROGRAM_SLOTS as any)[reg?.program] ?? null;
@@ -2253,7 +2253,7 @@ function AdminPaymentsPageInner() {
       const prevBal = typeof reg?.previousAdventureBalance === "number" ? reg.previousAdventureBalance : 0;
       const paidToPrev = Math.min(paidVerified, prevBal);
       const appliedToSession = Math.max(0, paidVerified - paidToPrev);
-      const baseTerms = calcRegistrationTerms(reg, student, appliedToSession, payment.amountDue ?? reg?.amountDue, new Date(), holidaySkipDates);
+      const baseTerms = calcRegistrationTerms(reg, student, appliedToSession, payment.amountDue ?? reg?.amountDue, new Date(), holidaySkipDates, renewalSettings);
       if (!baseTerms) return null;
       const sessionBal = baseTerms.balance;
       const remainingPrev = Math.max(0, prevBal - paidToPrev);

@@ -148,7 +148,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const student = getStudentSessionInfo(pricedReg, parentAcc, adventureStart);
         const paidVerified = isRegistrationVerified(reg.status) ? reg.amountPaid || reg.amountDue || 0 : 0;
         const skipDates = await getHolidaySkipSet(db);
-        const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue, new Date(), skipDates);
+        const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue, new Date(), skipDates, renewalSettings?.programs || []);
 
         // The admin's screen showed a "total payable". If it no longer matches (interest ticked over, or
         // another payment was just saved) refuse instead of applying money against numbers they never saw.

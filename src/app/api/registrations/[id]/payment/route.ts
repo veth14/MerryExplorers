@@ -110,7 +110,7 @@ export async function POST(
       const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
         + (registration.uniformOrdered ? 650 : 0);
       const skipDates = await getHolidaySkipSet(db);
-      const terms = calcRegistrationTerms(pricingRegistration, student, paidVerified, fallbackTotal, new Date(), skipDates);
+      const terms = calcRegistrationTerms(pricingRegistration, student, paidVerified, fallbackTotal, new Date(), skipDates, renewalSettings?.programs || []);
       if (data.expectedTotalPayable != null && terms.totalPayable != null && Math.abs(Number(data.expectedTotalPayable) - terms.totalPayable) > 0.01) {
         return NextResponse.json({ error: "The balance changed while you were preparing this payment. Refresh this page to see the latest amount." }, { status: 409 });
       }
