@@ -825,7 +825,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                     </div>
                   </div>
 
-                  {/* Selected Session Live Capacity Ribbon */}
+                  {/* Selected Session Live Capacity Ribbon (1-Liner) */}
                   {(() => {
                     const selectedSlot = slots[selectedProgram]?.[selectedClass];
                     const clsData = (programData?.classes || []).find((c) => c.name === selectedClass);
@@ -835,36 +835,34 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                     const pct = Math.min(100, Math.round((taken / max) * 100));
 
                     return (
-                      <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-1.5 text-[12px]">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-extrabold text-[#002f76]">
-                              📊 {selectedClass || "Session"} Capacity:
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2.5 space-y-1.5 text-[11.5px]">
+                        <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-extrabold text-[#002f76] truncate">
+                              📊 {selectedClass || "Session"}
                             </span>
-                            <span className="text-[11px] bg-white border border-blue-200 text-blue-900 font-black px-2 py-0.5 rounded-full">
-                              Total Slots: {max}
+                            <span className="text-[11px] bg-white border border-blue-200 text-blue-900 font-bold px-2 py-0.5 rounded-full shrink-0">
+                              Total: {max}
                             </span>
-                            <span className="text-[11px] bg-white border border-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">
-                              Occupied / Taken: {taken}
-                            </span>
-                          </div>
-                          <div>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full font-black text-[11px] border ${
-                                avail <= 0
-                                  ? "bg-rose-100 text-rose-800 border-rose-300"
-                                  : avail <= 2
-                                  ? "bg-amber-100 text-amber-900 border-amber-300"
-                                  : "bg-emerald-100 text-emerald-900 border-emerald-300"
-                              }`}
-                            >
-                              {avail <= 0 ? "⚠️ 0 slots left (FULL)" : `🟢 ${avail} of ${max} slots remaining`}
+                            <span className="text-[11px] bg-white border border-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full shrink-0">
+                              Taken: {taken}
                             </span>
                           </div>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full font-black text-[10.5px] border shrink-0 ${
+                              avail <= 0
+                                ? "bg-rose-100 text-rose-800 border-rose-300"
+                                : avail <= 2
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                            }`}
+                          >
+                            {avail <= 0 ? "⚠️ 0 left (FULL)" : `🟢 ${avail} of ${max} slots remaining`}
+                          </span>
                         </div>
 
                         {/* Progress Bar */}
-                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-300 ${
                               pct >= 100 ? "bg-rose-500" : pct >= 75 ? "bg-amber-500" : "bg-emerald-500"
