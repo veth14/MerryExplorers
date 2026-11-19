@@ -267,6 +267,11 @@ function MonthGrid({
                         className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-black bg-white/95 border shadow-2xs"
                         style={{ borderColor: cfg?.border ?? "#cbd5e1" }}
                       >
+                        {s.adventureNumber ? (
+                          <span className="text-[7.5px] font-black text-indigo-700 tracking-tight mr-0.5">
+                            Adv {s.adventureNumber} ·
+                          </span>
+                        ) : null}
                         <span className="text-[7.5px] font-extrabold uppercase opacity-60">S</span>
                         <span
                           className="text-[11px] sm:text-[12px] font-black leading-none"
@@ -1359,8 +1364,8 @@ function DayDrawer({
                           borderColor: cfg?.border ?? "#cbd5e1",
                         }}
                       >
-                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">
-                          SESSION
+                        <span className="text-[9px] font-black uppercase tracking-wider text-indigo-700">
+                          {s.adventureNumber ? `ADV ${s.adventureNumber} · SESSION` : "SESSION"}
                         </span>
                         <div className="flex items-baseline gap-0.5">
                           <span
