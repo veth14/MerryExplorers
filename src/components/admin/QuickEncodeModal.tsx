@@ -45,6 +45,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [search, setSearch] = useState("");
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>("");
   const [filterPendingOnly, setFilterPendingOnly] = useState(false);
+  const [isListExpanded, setIsListExpanded] = useState(true);
 
   // Form Fields
   const [childFirstName, setChildFirstName] = useState("");
@@ -342,36 +343,155 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                 </div>
               </div>
 
-              {/* Search & Select dropdown */}
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="🔍 Search by child name or parent name / email..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-[12.5px] font-medium text-slate-800 placeholder-slate-400 focus:border-[#0033A0] focus:ring-1 focus:ring-[#0033A0] outline-hidden"
-                />
+              {/* Selected Family Card (Collapsed State) */}
+              {selectedFamily && !isListExpanded ? (
+                <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center font-black text-lg shrink-0">
+                      ✓
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-extrabold text-[14px] text-emerald-950 truncate">{selectedFamily.childName}</p>
+                        {isPioneer && (
+                          <span className="rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-black px-2 py-0.5">
+                            ⭐ Pioneer
+                          </span>
+                        )}
+                        <span className="rounded-full bg-blue-100 border border-blue-200 text-blue-800 text-[10px] font-bold px-2 py-0.5">
+                          {selectedFamily.renewingTo || selectedFamily.previousProgram || "Creative Explorer"}
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-emerald-800/80 font-medium truncate mt-0.5">
+                        Parent: <strong>{selectedFamily.parentName}</strong> · {selectedFamily.parentEmail} {selectedFamily.phone ? `· ${selectedFamily.phone}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsListExpanded(true)}
+                    className="shrink-0 px-3 py-1.5 rounded-xl border border-emerald-400 bg-white hover:bg-emerald-100/50 text-[11.5px] font-bold text-emerald-900 transition-colors shadow-2xs"
+                  >
+                    Change Family ↩
+                  </button>
+                </div>
+              ) : (
+                /* Search and Card-Based Selection List */
+                <div className="space-y-2">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Type child or parent name, email, or phone to search..."
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setIsListExpanded(true);
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-9 py-2.5 text-[12.5px] font-medium text-slate-800 placeholder-slate-400 focus:border-[#0033A0] focus:ring-2 focus:ring-blue-100 outline-hidden transition-all shadow-2xs"
+                    />
+                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
+                    {search && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
 
-                <select
-                  value={selectedFamilyId}
-                  onChange={(e) => setSelectedFamilyId(e.target.value)}
-                  disabled={loadingFamilies}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-[13px] font-bold text-slate-800 focus:border-[#0033A0] focus:ring-1 focus:ring-[#0033A0] outline-hidden"
-                >
-                  <option value="">
-                    {loadingFamilies
-                      ? "Loading families list..."
-                      : `-- Choose a Family (${filteredFamilies.length} available) --`}
-                  </option>
-                  {filteredFamilies.map((f) => (
-                    <option key={f._id} value={f._id}>
-                      {f.childName} · Parent: {f.parentName} ({f.renewingTo || f.previousProgram || "Explorer"}
-                      {f.isPioneer ? " · ⭐ Pioneer" : ""})
-                      {f.renewalStatus !== "not_yet_submitted" ? ` [${f.renewalStatus}]` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-1">
+                    <span>
+                      {loadingFamilies
+                        ? "Loading families..."
+                        : `Showing ${filteredFamilies.length} ${filteredFamilies.length === 1 ? "family" : "families"}`}
+                    </span>
+                    {selectedFamily && (
+                      <button
+                        type="button"
+                        onClick={() => setIsListExpanded(false)}
+                        className="text-[#0033A0] font-bold hover:underline"
+                      >
+                        Keep current selection ({selectedFamily.childName})
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                    {loadingFamilies ? (
+                      <div className="p-6 text-center text-slate-400 text-[12px]">
+                        Loading families from renewal roster...
+                      </div>
+                    ) : filteredFamilies.length === 0 ? (
+                      <div className="p-6 text-center rounded-xl border border-dashed border-slate-200 bg-white">
+                        <p className="text-[13px] font-bold text-slate-600">No families found</p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          {search ? `No matches for "${search}". Try clearing search or unchecking "Not yet registered only".` : "No families available in this renewal roster."}
+                        </p>
+                      </div>
+                    ) : (
+                      filteredFamilies.map((f) => {
+                        const isSelected = f._id === selectedFamilyId;
+                        const statusConfig = {
+                          not_yet_submitted: { label: "Not Yet Registered", bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
+                          reserved: { label: "Reserved", bg: "bg-blue-100", text: "text-blue-800", border: "border-blue-300" },
+                          confirmed: { label: "Confirmed", bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-300" },
+                          released: { label: "Released", bg: "bg-red-100", text: "text-red-800", border: "border-red-200" },
+                        }[f.renewalStatus] || { label: f.renewalStatus, bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" };
+
+                        return (
+                          <button
+                            key={f._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedFamilyId(f._id);
+                              setIsListExpanded(false);
+                            }}
+                            className={`w-full text-left p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? "border-[#0033A0] bg-blue-50/70 shadow-xs ring-2 ring-blue-100"
+                                : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-2xs"
+                            }`}
+                          >
+                            <div className="min-w-0 flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                                isSelected ? "bg-[#0033A0] text-white" : "bg-slate-100 text-slate-600"
+                              }`}>
+                                {isSelected ? "✓" : "🎒"}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-extrabold text-[13px] text-[#002f76] truncate">{f.childName}</p>
+                                  {f.isPioneer && (
+                                    <span className="rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-[9.5px] font-black px-1.5 py-0.2">
+                                      ⭐ Pioneer
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                                  <span className="text-slate-400 font-medium">Parent:</span> <strong className="text-slate-700">{f.parentName}</strong>
+                                  {f.phone && <span className="text-slate-400"> · {f.phone}</span>}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 flex flex-col items-end gap-1">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 border border-blue-200 text-[#0033A0]">
+                                {f.renewingTo || f.previousProgram || "Creative Explorer"}
+                              </span>
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}>
+                                {statusConfig.label}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Warning if already submitted */}
               {selectedFamily && selectedFamily.renewalStatus !== "not_yet_submitted" && (
