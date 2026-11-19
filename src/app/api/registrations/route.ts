@@ -180,6 +180,9 @@ export async function POST(request: Request) {
       selfDeclaredPreviousAdventure,
       encodedBy,       // "admin" when staff encodes via Quick Encode modal
       encodedFamilyId, // renewal_families._id to directly link (skips email-match lookup)
+      paidOn,
+      paymentDate,
+      submittedAt: clientSubmittedAt,
     } = data;
 
     // Validate required fields
@@ -442,7 +445,20 @@ export async function POST(request: Request) {
         : isDownpaymentDeferred
         ? `Priority Renewal for Adventure ${adventureNumber ?? 3} (Slot reserved — Downpayment collection starts ${new Date(downpaymentStartDate).toLocaleDateString("en-PH")})`
         : "",
-      submittedAt: new Date(),
+      submittedAt: (() => {
+        const raw = paidOn || paymentDate || clientSubmittedAt;
+        if (!raw) return new Date();
+        const d = new Date(typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T12:00:00+08:00` : raw);
+        return Number.isNaN(d.getTime()) ? new Date() : d;
+      })(),
+      paidOn: (amountPaid > 0)
+        ? (() => {
+            const raw = paidOn || paymentDate || clientSubmittedAt;
+            if (!raw) return new Date();
+            const d = new Date(typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T12:00:00+08:00` : raw);
+            return Number.isNaN(d.getTime()) ? new Date() : d;
+          })()
+        : null,
       ...(adventureNumber !== null ? { adventureNumber, period: `adventure-${adventureNumber}`, adventureStartDate } : {}),
       approvedAt: isScholar ? new Date() : null,
       approvedBy: isScholar ? "system (scholar code: A1JesusLovesMe2026)" : null,

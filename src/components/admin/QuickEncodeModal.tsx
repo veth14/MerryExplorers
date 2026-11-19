@@ -158,6 +158,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("GCash");
   const [referenceNumber, setReferenceNumber] = useState("");
+  const [paymentDate, setPaymentDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [receiptBase64, setReceiptBase64] = useState<string>("");
   const [receiptFileName, setReceiptFileName] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -193,6 +194,9 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
             }
             if (res.amount != null && res.amount > 0) {
               setAmountPaid(res.amount);
+            }
+            if (res.date) {
+              setPaymentDate(res.date);
             }
             if (res.method) {
               if (res.method === "gcash") setPaymentMethod("GCash");
@@ -234,6 +238,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
     setReceiptFileName("");
     setOcrInfo(null);
     setOcrLoading(false);
+    setPaymentDate(new Date().toISOString().slice(0, 10));
 
     fetch("/api/renewals/families")
       .then((res) => res.json())
@@ -521,6 +526,9 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
         amountDue: effectiveRate,
         amountPaid: recordPayment ? Number(amountPaid) : 0,
         referenceNumber: recordPayment ? referenceNumber.trim() : "",
+        paymentDate: recordPayment && paymentDate ? paymentDate : undefined,
+        paidOn: recordPayment && paymentDate ? `${paymentDate}T12:00:00+08:00` : undefined,
+        submittedAt: recordPayment && paymentDate ? `${paymentDate}T12:00:00+08:00` : undefined,
         photoConsent: "yes",
         dataPrivacyConsent: true,
         notes: notes.trim()
@@ -558,6 +566,9 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
               amountDue: effectiveRate,
               amountPaid: Number(amountPaid),
               referenceNumber: referenceNumber.trim(),
+              paidOn: paymentDate ? `${paymentDate}T12:00:00+08:00` : undefined,
+              paymentDate: paymentDate || undefined,
+              submittedAt: paymentDate ? `${paymentDate}T12:00:00+08:00` : undefined,
               isNewFamily: false,
             }),
           });
@@ -1172,7 +1183,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                   </div>
 
                   {recordPayment ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Amount Paid (₱) *</label>
                         <input
@@ -1210,9 +1221,19 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] text-slate-800"
                         />
                       </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Date Paid (on Receipt) *</label>
+                        <input
+                          type="date"
+                          required={recordPayment}
+                          value={paymentDate}
+                          onChange={(e) => setPaymentDate(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] font-bold text-slate-800"
+                        />
+                      </div>
 
                       {/* Receipt Image Upload & Auto-Extraction */}
-                      <div className="sm:col-span-3">
+                      <div className="sm:col-span-2 lg:col-span-4">
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">
                           Receipt Screenshot / Photo
                           <span className="ml-1 text-slate-400 font-normal">(optional — auto-extracts amount, ref no. &amp; method; moves status to Pending)</span>
@@ -1259,7 +1280,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                                     {found ? "✓ Auto-extracted from receipt (please verify fields above):" : "⚠️ Couldn't read all details automatically:"}
                                   </p>
                                   {found ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5 text-[11px]">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1.5 text-[11px]">
                                       <div>
                                         <span className="text-slate-500 font-semibold">Ref No: </span>
                                         <strong className="font-mono text-emerald-900 font-bold">{ocrInfo.reference || "Not found"}</strong>
@@ -1267,6 +1288,10 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                                       <div>
                                         <span className="text-slate-500 font-semibold">Amount: </span>
                                         <strong className="text-emerald-900 font-bold">{ocrInfo.amount != null ? `₱${ocrInfo.amount.toLocaleString()}` : "Not found"}</strong>
+                                      </div>
+                                      <div>
+                                        <span className="text-slate-500 font-semibold">Date Paid: </span>
+                                        <strong className="text-emerald-900 font-bold">{ocrInfo.date || "Not found"}</strong>
                                       </div>
                                       <div>
                                         <span className="text-slate-500 font-semibold">Method: </span>

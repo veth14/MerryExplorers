@@ -101,6 +101,7 @@ export function UploadReceiptModal({
   const [paymentMethod, setPaymentMethod] = useState("GCash");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [paymentDate, setPaymentDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [verifyNow, setVerifyNow] = useState(true);
   const [sendEmail, setSendEmail] = useState(true);
 
@@ -143,6 +144,7 @@ export function UploadReceiptModal({
       ? registration.amountPaid
       : defaultDownpayment;
     setAmountPaid(initialPaid);
+    setPaymentDate(new Date().toISOString().slice(0, 10));
     setVerifyNow(true);
     setSendEmail(true);
   }, [isOpen, registration, defaultDownpayment]);
@@ -171,6 +173,9 @@ export function UploadReceiptModal({
             }
             if (res.amount != null && res.amount > 0) {
               setAmountPaid(res.amount);
+            }
+            if (res.date) {
+              setPaymentDate(res.date);
             }
             if (res.method) {
               const matchedMethod = PAYMENT_METHODS.find(
@@ -224,6 +229,9 @@ export function UploadReceiptModal({
         amountDue: effectiveRate,
         amountPaid: Number(amountPaid),
         referenceNumber: referenceNumber.trim(),
+        paidOn: paymentDate ? `${paymentDate}T12:00:00+08:00` : undefined,
+        paymentDate: paymentDate || undefined,
+        submittedAt: paymentDate ? `${paymentDate}T12:00:00+08:00` : undefined,
         isNewFamily: Boolean(registration.isNewFamily),
         uniformOrdered: Boolean(registration.uniformOrdered),
       };
@@ -418,6 +426,11 @@ export function UploadReceiptModal({
                           Amount: <strong>₱{ocrInfo.amount.toLocaleString()}</strong>
                         </span>
                       )}
+                      {ocrInfo.date && (
+                        <span>
+                          Date: <strong>{ocrInfo.date}</strong>
+                        </span>
+                      )}
                       {ocrInfo.method && (
                         <span>
                           Sent to: <strong className="capitalize">{ocrInfo.method}</strong>
@@ -434,7 +447,7 @@ export function UploadReceiptModal({
             )}
 
             {/* Form Fields Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
                   Payment Method *
@@ -478,6 +491,19 @@ export function UploadReceiptModal({
                   value={referenceNumber}
                   onChange={(e) => setReferenceNumber(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] font-mono font-semibold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  Date Paid (on Receipt) *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] font-bold text-slate-800"
                 />
               </div>
             </div>

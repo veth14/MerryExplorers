@@ -42,6 +42,9 @@ export async function POST(
       amountPaid,
       creditBalance,
       referenceNumber,
+      paidOn,
+      paymentDate,
+      submittedAt: clientSubmittedAt,
     } = data;
 
     if (!paymentMethod || !receiptBase64) {
@@ -128,6 +131,13 @@ export async function POST(
         return NextResponse.json({ error: "Failed to upload your receipt. Please try again." }, { status: 502 });
       }
 
+      const rawPaidOn = paidOn || paymentDate || clientSubmittedAt;
+      const effectivePaidOn = rawPaidOn
+        ? (() => {
+            const d = new Date(typeof rawPaidOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawPaidOn) ? `${rawPaidOn}T12:00:00+08:00` : rawPaidOn);
+            return Number.isNaN(d.getTime()) ? new Date() : d;
+          })()
+        : new Date();
       const now = new Date();
       const entry = {
         id: new ObjectId().toString(),
@@ -136,8 +146,8 @@ export async function POST(
         referenceNumber: reference,
         receiptUrl,
         receiptPublicId,
-        paidOn: now,
-        submittedAt: now,
+        paidOn: effectivePaidOn,
+        submittedAt: effectivePaidOn,
         verified: false,
         rejected: false,
         balanceBefore: allocation.balanceBefore,
@@ -232,7 +242,18 @@ export async function POST(
           welcomeKitOrdered: welcomeKitOrdered || false,
           recitalKitOrdered: recitalKitOrdered || false,
           isNewFamily: isNewFamily || false,
-          submittedAt: new Date(), // Reset submitted time to now
+          submittedAt: (() => {
+            const raw = paidOn || paymentDate || clientSubmittedAt;
+            if (!raw) return new Date();
+            const d = new Date(typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T12:00:00+08:00` : raw);
+            return Number.isNaN(d.getTime()) ? new Date() : d;
+          })(),
+          paidOn: (() => {
+            const raw = paidOn || paymentDate || clientSubmittedAt;
+            if (!raw) return new Date();
+            const d = new Date(typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T12:00:00+08:00` : raw);
+            return Number.isNaN(d.getTime()) ? new Date() : d;
+          })(),
         }
       }
     );
@@ -246,6 +267,10 @@ export async function POST(
       const childFull = `${registration.childInfo?.firstName || ""} ${registration.childInfo?.lastName || ""}`.trim();
       const parentEmailClean = (registration.parentInfo?.email || "").toLowerCase().trim();
       if (parentEmailClean && childFull) {
+        const rawDate = paidOn || paymentDate || clientSubmittedAt;
+        const paidOnDate = rawDate
+          ? new Date(typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? `${rawDate}T12:00:00+08:00` : rawDate)
+          : new Date();
         await db.collection("renewal_families").updateOne(
           {
             parentEmail: parentEmailClean,
@@ -256,6 +281,7 @@ export async function POST(
               renewalStatus: "confirmed",
               registrationId: id,
               updatedAt: new Date(),
+              paidOn: Number.isNaN(paidOnDate.getTime()) ? new Date() : paidOnDate,
             },
           }
         );
