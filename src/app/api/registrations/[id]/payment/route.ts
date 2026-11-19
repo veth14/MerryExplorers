@@ -7,6 +7,7 @@ import { allocateBalancePayment } from "@/lib/balance-payment";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
 import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
+import { requireAdmin } from "@/lib/auth-guard";
 import { hasDuplicatePaymentReference } from "@/lib/payment-reference";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +59,10 @@ export async function POST(
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
     }
 
-    if (await hasDuplicatePaymentReference(db, referenceNumber)) {
+    const adminAuth = await requireAdmin(request);
+    const isAdmin = !("response" in adminAuth);
+
+    if (await hasDuplicatePaymentReference(db, referenceNumber, id)) {
       return NextResponse.json({ error: "This reference number has already been used for another payment. Please check your receipt and submit the correct one." }, { status: 409 });
     }
 
@@ -165,14 +169,16 @@ export async function POST(
       return NextResponse.json({ success: true, balancePaymentSubmitted: true });
     }
 
-    if (registration.status !== "reserved") {
-      if (registration.status === "expired") {
-        return NextResponse.json({ error: "Your slot reservation has expired." }, { status: 410 });
+    if (!isAdmin) {
+      if (registration.status !== "reserved") {
+        if (registration.status === "expired") {
+          return NextResponse.json({ error: "Your slot reservation has expired." }, { status: 410 });
+        }
+        return NextResponse.json({ error: "Payment already submitted for this registration." }, { status: 400 });
       }
-      return NextResponse.json({ error: "Payment already submitted for this registration." }, { status: 400 });
-    }
-    if (registration.reservedUntil && new Date(registration.reservedUntil).getTime() <= Date.now()) {
-      return NextResponse.json({ error: "Your slot reservation has expired. Renew it to continue." }, { status: 410 });
+      if (registration.reservedUntil && new Date(registration.reservedUntil).getTime() <= Date.now()) {
+        return NextResponse.json({ error: "Your slot reservation has expired. Renew it to continue." }, { status: 410 });
+      }
     }
 
     // Upload receipt to Cloudinary
@@ -190,20 +196,29 @@ export async function POST(
       return NextResponse.json({ error: "Failed to upload receipt. Please try again." }, { status: 500 });
     }
 
+    // Determine target status: preserve approved/active if already verified, otherwise pending verification
+    const targetStatus = registration.status === "approved" || registration.status === "active"
+      ? registration.status
+      : "pending";
+
+    const updateFilter = isAdmin
+      ? { _id: new ObjectId(id) }
+      : {
+          _id: new ObjectId(id),
+          status: "reserved",
+          $or: [
+            { reservedUntil: { $exists: false } },
+            { reservedUntil: null },
+            { reservedUntil: { $gt: new Date() } },
+          ],
+        };
+
     // Update the registration document
     const saved = await db.collection("student_registrations").updateOne(
-      {
-        _id: new ObjectId(id),
-        status: "reserved",
-        $or: [
-          { reservedUntil: { $exists: false } },
-          { reservedUntil: null },
-          { reservedUntil: { $gt: new Date() } },
-        ],
-      },
+      updateFilter,
       {
         $set: {
-          status: "pending", // Change to pending verification
+          status: targetStatus,
           paymentMethod,
           paymentType,
           amountDue,

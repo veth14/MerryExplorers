@@ -9,6 +9,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { useAuth } from "@/lib/auth-context";
 import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { QuickEncodeModal } from "@/components/admin/QuickEncodeModal";
+import { UploadReceiptModal } from "@/components/admin/UploadReceiptModal";
 
 type Status = "pending" | "approved" | "active" | "rejected" | "early-bird" | "expired" | "reserved";
 
@@ -323,7 +324,7 @@ function SectionCard({ emoji, title, children }: { emoji: string; title: string;
 }
 
 function DetailModal({
-  reg, allRegistrations, onRefreshRegistrations, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, isProcessing,
+  reg, allRegistrations, onRefreshRegistrations, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, isProcessing, onToast,
 }: {
   reg: Registration;
   allRegistrations: Registration[];
@@ -335,7 +336,10 @@ function DetailModal({
   onOpenPayment: (id: string) => void;
   onSavePreviousAdventureBalance: (id: string, amount: number) => Promise<boolean>;
   isProcessing: boolean;
+  onToast?: (msg: string) => void;
 }) {
+  const { user, userProfile } = useAuth();
+  const [showUploadReceipt, setShowUploadReceipt] = useState(false);
   const [rejectMode, setRejectMode] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState(false);
   const [reason, setReason] = useState("");
@@ -615,21 +619,54 @@ function DetailModal({
             </SectionCard>
 
             {/* Receipt */}
-            {reg.receiptUrl && (
-              <SectionCard emoji="🧾" title="Payment Receipt">
-                <a href={reg.receiptUrl} target="_blank" rel="noreferrer" className="group relative my-3 block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                  <div className="relative aspect-[4/3] w-full">
-                    <Image src={reg.receiptUrl} alt="Receipt" fill className="object-contain" sizes="500px" />
+            <SectionCard emoji="🧾" title="Payment Receipt">
+              {reg.receiptUrl ? (
+                <>
+                  <a href={reg.receiptUrl} target="_blank" rel="noreferrer" className="group relative my-3 block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    <div className="relative aspect-[4/3] w-full">
+                      <Image src={reg.receiptUrl} alt="Receipt" fill className="object-contain" sizes="500px" />
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/20 transition-opacity rounded-xl">
+                      <span className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12px] font-bold text-[#002f76] shadow-lg">
+                        🔍 View Full Size
+                      </span>
+                    </div>
+                  </a>
+                  <InfoRow label="Payment Method" value={reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || "—"} />
+                  {reg.referenceNumber && (
+                    <InfoRow label="Reference No." value={reg.referenceNumber} highlight="blue" />
+                  )}
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowUploadReceipt(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-bold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <span>🔄</span>
+                      <span>Change / Re-upload Receipt</span>
+                    </button>
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/20 transition-opacity rounded-xl">
-                    <span className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12px] font-bold text-[#002f76] shadow-lg">
-                      🔍 View Full Size
-                    </span>
+                </>
+              ) : (
+                <div className="my-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/70 p-4 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 font-bold text-lg flex items-center justify-center mx-auto">
+                    🧾
                   </div>
-                </a>
-                <InfoRow label="Payment Method" value={reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || "—"} />
-              </SectionCard>
-            )}
+                  <p className="text-[12.5px] font-bold text-slate-700">No payment receipt attached yet</p>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Slot is held on reservation. You can attach a payment receipt photo received via Messenger or Viber.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadReceipt(true)}
+                    className="mt-1 inline-flex items-center gap-1.5 rounded-xl bg-[#0033A0] hover:bg-[#002776] px-4 py-2 text-[12px] font-extrabold text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    <span>📎</span>
+                    <span>Upload &amp; Record Receipt</span>
+                  </button>
+                </div>
+              )}
+            </SectionCard>
 
             {/* Payment details */}
             <SectionCard emoji="💳" title="Payment Details">
@@ -924,6 +961,17 @@ function DetailModal({
                       </button>
                     </div>
                   )}
+                  {(isReserved || !reg.receiptUrl) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowUploadReceipt(true)}
+                      disabled={isProcessing}
+                      className="w-full rounded-2xl border-2 border-emerald-300 bg-emerald-50 py-3.5 text-[13px] font-extrabold text-emerald-800 hover:bg-emerald-100 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                    >
+                      <span>📎</span>
+                      <span>Upload Payment Receipt</span>
+                    </button>
+                  )}
                   {(isPending || isReserved) && !isEarlyBird && (
                     <button
                       onClick={() => setEarlyBirdMode(true)}
@@ -993,6 +1041,26 @@ function DetailModal({
           )}
         </div>
       </m.div>
+
+      {showUploadReceipt && (
+        <UploadReceiptModal
+          isOpen={showUploadReceipt}
+          onClose={() => setShowUploadReceipt(false)}
+          onSuccess={async (msg) => {
+            setShowUploadReceipt(false);
+            if (onToast) onToast(msg);
+            await onRefreshRegistrations();
+            onClose();
+          }}
+          registration={reg}
+          currentUser={{
+            uid: user?.uid,
+            email: user?.email || undefined,
+            fullName: userProfile?.fullName || undefined,
+            role: userProfile?.role || undefined,
+          }}
+        />
+      )}
     </AnimatePresence>
   );
 }
@@ -2721,6 +2789,7 @@ export default function AdminRegistrationsPage() {
           onOpenPayment={handleOpenPayment}
           onSavePreviousAdventureBalance={handleSavePreviousAdventureBalance}
           isProcessing={isProcessing}
+          onToast={setToast}
         />
       )}
 
