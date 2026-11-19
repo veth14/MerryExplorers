@@ -58,6 +58,10 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [notes, setNotes] = useState("");
 
+  // Live Slots
+  const [slots, setSlots] = useState<Record<string, Record<string, { maxSlots: number; taken: number; available: number; closed?: boolean; time?: string }>>>({});
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
   // Payment Fields
   const [recordPayment, setRecordPayment] = useState(false);
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -114,6 +118,23 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       })
       .finally(() => {
         if (isMounted) setLoadingFamilies(false);
+      });
+
+    // Fetch live slot counts
+    setLoadingSlots(true);
+    fetch("/api/registrations/slots", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.success && data.data) {
+          setSlots(data.data);
+        }
+      })
+      .catch((err) => {
+        console.error("[QuickEncodeModal] fetch slots error:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingSlots(false);
       });
 
     return () => {
@@ -693,14 +714,119 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                         required
                         className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[12.5px] font-bold text-slate-800"
                       >
-                        {(programData?.classes || []).map((cls) => (
-                          <option key={cls.name} value={cls.name}>
-                            {cls.name} ({cls.time})
-                          </option>
-                        ))}
+                        {(programData?.classes || []).map((cls) => {
+                          const slot = slots[selectedProgram]?.[cls.name];
+                          const avail = slot ? slot.available : null;
+                          const max = slot ? slot.maxSlots : cls.maxSlots;
+                          const isClosed = slot?.closed;
+                          const isFull = avail !== null && avail <= 0;
+
+                          let slotSuffix = "";
+                          if (isClosed) {
+                            slotSuffix = " — 🔒 CLOSED";
+                          } else if (isFull) {
+                            slotSuffix = " — ⚠️ FULL (0 slots left)";
+                          } else if (avail !== null) {
+                            slotSuffix = ` — 🟢 ${avail} of ${max} slots left`;
+                          }
+
+                          return (
+                            <option key={cls.name} value={cls.name}>
+                              {cls.name} ({cls.time}){slotSuffix}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
+
+                  {/* Visual Session Availability Selector */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-extrabold uppercase tracking-wide text-slate-500">
+                        Available Slots by Session
+                      </span>
+                      {loadingSlots && (
+                        <span className="text-slate-400 font-medium">Checking live slots…</span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {(programData?.classes || []).map((cls) => {
+                        const isSelected = selectedClass === cls.name;
+                        const slot = slots[selectedProgram]?.[cls.name];
+                        const avail = slot ? slot.available : null;
+                        const max = slot ? slot.maxSlots : cls.maxSlots;
+                        const isClosed = slot?.closed;
+                        const isFull = avail !== null && avail <= 0;
+
+                        let badgeBg = "bg-emerald-50 text-emerald-800 border-emerald-300";
+                        let badgeLabel = avail !== null ? `${avail} left` : "Available";
+
+                        if (isClosed) {
+                          badgeBg = "bg-slate-100 text-slate-600 border-slate-300";
+                          badgeLabel = "Closed";
+                        } else if (isFull) {
+                          badgeBg = "bg-rose-100 text-rose-800 border-rose-300";
+                          badgeLabel = "0 left (FULL)";
+                        } else if (avail !== null && avail <= 2) {
+                          badgeBg = "bg-amber-100 text-amber-900 border-amber-300";
+                          badgeLabel = `Only ${avail} left!`;
+                        }
+
+                        return (
+                          <button
+                            key={cls.name}
+                            type="button"
+                            onClick={() => setSelectedClass(cls.name)}
+                            className={`p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? "border-[#0033A0] bg-blue-50/70 ring-2 ring-blue-200 shadow-2xs"
+                                : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/70"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[12px] font-extrabold text-[#002f76] truncate">
+                                {cls.name}
+                              </span>
+                              {isSelected && (
+                                <span className="w-4 h-4 rounded-full bg-[#0033A0] text-white flex items-center justify-center text-[9px] font-black shrink-0">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10.5px] text-slate-500 font-semibold">{cls.time}</p>
+                            <div className="pt-1 flex items-center justify-between text-[10px]">
+                              <span className={`px-2 py-0.5 rounded-full font-black border ${badgeBg}`}>
+                                {badgeLabel}
+                              </span>
+                              {slot && (
+                                <span className="text-slate-400 font-medium">
+                                  {slot.taken}/{max} occupied
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Overcapacity warning if selected class is full */}
+                  {(() => {
+                    const currentSlot = slots[selectedProgram]?.[selectedClass];
+                    if (currentSlot && currentSlot.available <= 0) {
+                      return (
+                        <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-[11.5px] font-semibold text-amber-900 flex items-start gap-2">
+                          <span className="shrink-0 text-amber-600 font-bold">⚠️</span>
+                          <span>
+                            <strong>{selectedClass}</strong> currently has <strong>0 slots left</strong> ({currentSlot.taken}/{currentSlot.maxSlots} occupied). As staff, you may still encode this reservation if authorized to overbook.
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Pricing Summary Ribbon */}
                   <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 flex items-center justify-between text-[12px]">
