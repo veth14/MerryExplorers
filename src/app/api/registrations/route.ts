@@ -555,7 +555,7 @@ export async function POST(request: Request) {
     if (parentInfo?.email) {
       try {
         // Fetch program configuration & adventure start date
-        const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null }> = renewalSettingsDoc?.programs || [];
+        const storedPrograms: Array<{ programKey: string; currentAdventure: number; adventureStartDate?: string | null; nextAdventureStart: string | null; totalSessions?: number | null }> = renewalSettingsDoc?.programs || [];
 
         const programKeyMap: Record<string, string> = {
           "curious-explorer": "Discovery Club: Curious Explorer",
@@ -576,6 +576,7 @@ export async function POST(request: Request) {
         const isAdvProg = !["ballet", "virtual-session"].includes(program);
         const advNum = adventureNumber ?? 2;
         const advLabel = isAdvProg ? `Adventure ${advNum}` : readableProgramName;
+        const totalSessionsDisplay = matchedProg?.totalSessions || (PROGRAM_SLOTS as any)?.[program]?.sessions || null;
         const advStartDateStr = (matchedProg?.nextAdventureStart || matchedProg?.adventureStartDate)
           ? new Date(matchedProg.nextAdventureStart || matchedProg.adventureStartDate!).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
           : null;
@@ -649,6 +650,12 @@ export async function POST(request: Request) {
                     <tr>
                       <td style="padding: 4px 0; color: #64748b;"><strong>Class / Session:</strong></td>
                       <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${classTime}</td>
+                    </tr>
+                    ` : ""}
+                    ${totalSessionsDisplay ? `
+                    <tr>
+                      <td style="padding: 4px 0; color: #64748b;"><strong>Sessions:</strong></td>
+                      <td style="padding: 4px 0; font-weight: bold; color: #002f76;">${totalSessionsDisplay} Sessions</td>
                     </tr>
                     ` : ""}
                     ${isAdvProg ? `

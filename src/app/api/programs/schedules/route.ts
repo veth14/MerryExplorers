@@ -106,11 +106,15 @@ export async function GET(req: NextRequest) {
     const allSchedules: ProgramScheduleResult[] = programList.map((p: any) => {
       const config = PROGRAM_SCHEDULE_CONFIGS[p.programKey];
       const currentAdv = Number(p.currentAdventure) || 2;
+      const totalSessions =
+        typeof p.totalSessions === "number" && p.totalSessions > 0
+          ? p.totalSessions
+          : config?.defaultSessions ?? 8;
       return generateProgramSchedule({
         programKey: p.programKey,
         adventureNumber: currentAdv,
         startDateStr: p.adventureStartDate,
-        totalSessions: config?.defaultSessions ?? 8,
+        totalSessions,
         holidaysMap,
         suspensionsMap: getProgramSuspensions(p.programKey),
         todayStr,

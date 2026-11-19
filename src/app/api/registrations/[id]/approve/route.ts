@@ -3,7 +3,8 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { requireInternalAuth } from "@/lib/auth-guard";
 import { ObjectId } from "mongodb";
 import { getProgramAdventureSetting, getRegistrationAdventureNumber, getAdventureStartDateForNumber } from "@/lib/adventure-cycle";
-import { FALLBACK_PIONEER_RATES, getRegistrationTotal, isRegistrationVerified } from "@/lib/payment-terms";
+import { FALLBACK_PIONEER_RATES, getRegistrationTotal, isRegistrationVerified, getBalanceDueDate, getStudentSessionInfo, fmtIsoDate } from "@/lib/payment-terms";
+import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
@@ -262,6 +263,20 @@ export async function POST(
       const totalRemaining = sessionBalance + remainingPrevious;
       const isFullyPaid = totalRemaining <= 0;
 
+      let dueDateText: string | null = null;
+      if (!isFullyPaid) {
+        try {
+          const skipDates = await getHolidaySkipSet(db);
+          const student = getStudentSessionInfo(registration, null, adventureStartDate);
+          const rawDueDate = registration.customDueDate
+            ? String(registration.customDueDate).slice(0, 10)
+            : getBalanceDueDate(student, skipDates, adventureSettings, registration.program);
+          if (rawDueDate) dueDateText = fmtIsoDate(rawDueDate);
+        } catch {
+          // ignore error
+        }
+      }
+
       const emailSubject = `🎉 ${childFirstName} is Officially Registered at Merry Explorers!${adventureNumber !== null ? ` (Adventure ${adventureNumber})` : ""}`;
       const emailHtml = `
           <!DOCTYPE html>
@@ -315,7 +330,7 @@ export async function POST(
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Class</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${classTimeDisplay}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Schedule</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${schedule}</td></tr>
                             <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Session Start Date</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${startDateDisplay}</td></tr>
-                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Sessions</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${prog?.sessions || "—"} Sessions</td></tr>
+                            <tr><td style="padding: 6px 0; color: #94a3b8; font-size: 13px; font-weight: 600;">Sessions</td><td style="padding: 6px 0; color: #0033A0; font-size: 14px; font-weight: 700;">${adventureSetting?.totalSessions || prog?.sessions || "—"} Sessions</td></tr>
                           </table>
                         </div>
 
@@ -337,7 +352,7 @@ export async function POST(
                               </td>
                             </tr>
                           </table>
-                          ${!isFullyPaid ? `<p style="margin: 12px 0 0 0; color: #b45309; font-size: 12px; line-height: 1.5;">⚠️ The remaining balance is due on the 6th session. A 4% weekly interest applies to overdue balances.</p>` : ""}
+                          ${!isFullyPaid ? `<p style="margin: 12px 0 0 0; color: #b45309; font-size: 12px; line-height: 1.5;">⚠️ The remaining balance is due on the 6th session${dueDateText ? ` (<strong>${dueDateText}</strong>)` : ""}. A 4% weekly interest applies to overdue balances.</p>` : ""}
                         </div>
 
                         <!-- Uniform reminder -->

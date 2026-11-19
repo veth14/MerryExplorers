@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import nodemailer from "nodemailer";
 import { connectToDatabase } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/auth-guard";
-import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, fmtIsoDate, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified, WEEKLY_INTEREST_RATE } from "@/lib/payment-terms";
+import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, fmtIsoDate, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified, WEEKLY_INTEREST_RATE, PROGRAM_KEY_BY_SLUG } from "@/lib/payment-terms";
 import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { PROGRAM_SLOTS } from "@/data/landing";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
@@ -97,6 +97,15 @@ export async function POST(
     const parentName = escapeHtml(registration.parentInfo?.name || "Parent / Guardian");
     const childName = escapeHtml(registration.childInfo?.firstName || "your child");
     const programName = escapeHtml(program?.name || registration.program || "your program");
+    const mappedKey = PROGRAM_KEY_BY_SLUG[registration.program];
+    const programSetting = (renewalSettings?.programs || []).find(
+      (p: any) =>
+        (mappedKey && p.programKey === mappedKey) ||
+        p.programKey === program?.name ||
+        p.programKey === registration.program ||
+        (registration.program && p.programKey.toLowerCase().includes(registration.program.toLowerCase()))
+    );
+    const totalSessionsDisplay = programSetting?.totalSessions || program?.sessions;
 
     const subject = `Payment Reminder — ${registration.childInfo?.firstName || "Your Explorer"} at Merry Explorers`;
     const html = `
@@ -127,7 +136,7 @@ export async function POST(
                     <tr><td style="padding:5px 0;color:#94a3b8;font-size:13px;font-weight:600;width:38%">Explorer</td><td style="padding:5px 0;color:#0033A0;font-size:13px;font-weight:700">${escapeHtml(`${registration.childInfo?.firstName || ""} ${registration.childInfo?.lastName || ""}`.trim() || "Explorer")}</td></tr>
                     <tr><td style="padding:5px 0;color:#94a3b8;font-size:13px;font-weight:600">Program</td><td style="padding:5px 0;color:#0033A0;font-size:13px;font-weight:700">${programName}</td></tr>
                     ${registration.classTime ? `<tr><td style="padding:5px 0;color:#94a3b8;font-size:13px;font-weight:600">Class</td><td style="padding:5px 0;color:#0033A0;font-size:13px;font-weight:700">${escapeHtml(registration.classTime)}</td></tr>` : ""}
-                    ${program?.sessions ? `<tr><td style="padding:5px 0;color:#94a3b8;font-size:13px;font-weight:600">Sessions</td><td style="padding:5px 0;color:#0033A0;font-size:13px;font-weight:700">${escapeHtml(program.sessions)} Sessions</td></tr>` : ""}
+                    ${totalSessionsDisplay ? `<tr><td style="padding:5px 0;color:#94a3b8;font-size:13px;font-weight:600">Sessions</td><td style="padding:5px 0;color:#0033A0;font-size:13px;font-weight:700">${escapeHtml(String(totalSessionsDisplay))} Sessions</td></tr>` : ""}
                   </table>
                 </div>
 

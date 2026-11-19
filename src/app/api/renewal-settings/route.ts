@@ -44,6 +44,7 @@ export type ProgramRenewalEntry = {
   newFamilyRegistrationOpenDate?: string | null; // optional: date when /register opens for new families
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this date, renewals are free slot reservations
+  totalSessions?: number | null; // optional: custom session count per adventure/batch (defaults to PROGRAM_SCHEDULE_CONFIGS)
 };
 
 function computeDeadline(startIso: string | null): string | null {
@@ -185,6 +186,7 @@ export async function GET() {
             newFamilyRegistrationOpenDate: existing.newFamilyRegistrationOpenDate ?? null,
             closedClasses: Array.isArray(existing.closedClasses) ? existing.closedClasses : [],
             downpaymentStartDate: existing.downpaymentStartDate ?? null,
+            totalSessions: typeof existing.totalSessions === "number" ? existing.totalSessions : null,
           }
         : {
             programKey: key,
@@ -202,6 +204,7 @@ export async function GET() {
             newFamilyRegistrationOpenDate: null,
             closedClasses: [],
             downpaymentStartDate: null,
+            totalSessions: null,
           };
     });
 
@@ -290,6 +293,7 @@ export async function PUT(req: NextRequest) {
         newFamilyRegistrationOpenDate: p?.newFamilyRegistrationOpenDate ?? null,
         closedClasses: Array.isArray(p?.closedClasses) ? p.closedClasses : [],
         downpaymentStartDate: p?.downpaymentStartDate ?? null,
+        totalSessions: typeof p?.totalSessions === "number" && p.totalSessions > 0 ? p.totalSessions : null,
       };
     });
 

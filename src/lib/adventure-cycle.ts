@@ -30,6 +30,9 @@ const PROGRAM_KEYS: Record<string, string> = {
   "everyday-curious": "Discovery Club: Everyday Explorer",
   "brave-explorer": "Trailblazer: Brave Explorer",
   "saturday-playdate": "Saturday Playdate",
+  "ballet": "Ballet",
+  "virtual-session": "Virtual Tutorial",
+  "virtual-tutorial": "Virtual Tutorial",
 };
 
 export const LEGACY_ADVENTURE_2_START = "2026-10-26";

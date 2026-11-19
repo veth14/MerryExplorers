@@ -130,7 +130,10 @@ export async function POST(req: NextRequest) {
 
     const todayStr = getManilaTodayStr();
     const currentAdv = Number(adventureNumber) || Number(progEntry.currentAdventure) || 2;
-    const totalSessions = config.defaultSessions || 8;
+    const totalSessions =
+      typeof progEntry.totalSessions === "number" && progEntry.totalSessions > 0
+        ? progEntry.totalSessions
+        : config.defaultSessions || 8;
 
     // 1. Generate current schedule to inspect existing dates
     const currentSchedule = generateProgramSchedule({

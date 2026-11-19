@@ -644,6 +644,7 @@ export type ProgramRenewalEntryLike = {
   programKey: string;
   currentAdventure?: number | null;
   adventureStartDate?: string | null;
+  totalSessions?: number | null;
   [key: string]: unknown;
 };
 
@@ -669,11 +670,15 @@ export function getAllProgramsSchedules({
   return list.map((p) => {
     const config = PROGRAM_SCHEDULE_CONFIGS[p.programKey];
     const currentAdv = Number(p.currentAdventure) || 2;
+    const totalSessions =
+      typeof p.totalSessions === "number" && p.totalSessions > 0
+        ? p.totalSessions
+        : config?.defaultSessions ?? 8;
     return generateProgramSchedule({
       programKey: p.programKey,
       adventureNumber: currentAdv,
       startDateStr: p.adventureStartDate,
-      totalSessions: config?.defaultSessions ?? 8,
+      totalSessions,
       holidaysMap,
       suspensionsMap,
       todayStr,

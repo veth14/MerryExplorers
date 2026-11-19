@@ -89,6 +89,7 @@ export type ProgramRenewalEntry = {
   virtualLinkOpen?: boolean;
   closedClasses?: string[];           // optional: specific class/session names closed for registration (e.g. ["Baby Ballet (Morning)"])
   downpaymentStartDate?: string | null; // optional: date when downpayment becomes required; before this, renewals are free slot reservations
+  totalSessions?: number | null; // optional override; null/undefined = use program default from PROGRAM_SCHEDULE_CONFIGS
 };
 
 export type RenewalSettingsData = {
@@ -667,7 +668,7 @@ export function RenewalSettingsManager() {
                           </span>
                           {PROGRAM_SCHEDULE_CONFIGS[prog.programKey] && (
                             <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-                              {PROGRAM_SCHEDULE_CONFIGS[prog.programKey].defaultSessions} Sessions ({PROGRAM_SCHEDULE_CONFIGS[prog.programKey].scheduleLabel})
+                              {prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey].defaultSessions} Sessions ({PROGRAM_SCHEDULE_CONFIGS[prog.programKey].scheduleLabel})
                             </span>
                           )}
                           {prog.programKey === MASTER_PROGRAM && (
@@ -736,7 +737,7 @@ export function RenewalSettingsManager() {
 
                   {/* ── ADVENTURE PROGRAMS: Cycle Stepper + 2 date fields ── */}
                   {isAdventureProg && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                       {/* Current Adventure Number */}
                       <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1 text-center">
                         <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
@@ -810,6 +811,55 @@ export function RenewalSettingsManager() {
                           {prog.nextAdventureStart ? nextStartDateDisplay : "⚠ Not set yet — please update"}
                         </p>
                       </div>
+
+                      {/* Number of Sessions */}
+                      <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1 text-center">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Total Sessions
+                        </label>
+                        <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 8;
+                              updateProgram(prog.programKey, {
+                                totalSessions: Math.max(1, current - 1),
+                              });
+                            }}
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100 cursor-pointer"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 8}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              updateProgram(prog.programKey, {
+                                totalSessions: Number.isFinite(val) && val > 0 ? val : null,
+                              });
+                            }}
+                            className="w-14 h-8 rounded-lg border border-slate-300 bg-white text-[14px] font-black text-[#002f76] text-center focus:border-[#0033a0] focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 8;
+                              updateProgram(prog.programKey, {
+                                totalSessions: current + 1,
+                              });
+                            }}
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100 cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <p className="text-[9.5px] text-slate-400 font-semibold truncate">
+                          Default: {PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 8} sessions
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -867,7 +917,7 @@ export function RenewalSettingsManager() {
 
                   {/* ── Ballet / Virtual Tutorial: simplified Start Date + Next Batch ── */}
                   {!isAdventureProg && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1">
                         <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
                           Start Date
@@ -900,6 +950,54 @@ export function RenewalSettingsManager() {
                         />
                         <p className="text-[9.5px] text-slate-400 font-semibold truncate">
                           {prog.nextAdventureStart ? nextStartDateDisplay : "Optional"}
+                        </p>
+                      </div>
+                      {/* Number of Sessions */}
+                      <div className="rounded-2xl border-2 border-slate-100 bg-slate-50/60 p-3 space-y-1 text-center">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                          Total Sessions
+                        </label>
+                        <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 5;
+                              updateProgram(prog.programKey, {
+                                totalSessions: Math.max(1, current - 1),
+                              });
+                            }}
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100 cursor-pointer"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 5}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              updateProgram(prog.programKey, {
+                                totalSessions: Number.isFinite(val) && val > 0 ? val : null,
+                              });
+                            }}
+                            className="w-14 h-8 rounded-lg border border-slate-300 bg-white text-[14px] font-black text-[#002f76] text-center focus:border-[#0033a0] focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = prog.totalSessions ?? PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 5;
+                              updateProgram(prog.programKey, {
+                                totalSessions: current + 1,
+                              });
+                            }}
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-[#002f76] font-black text-[15px] flex items-center justify-center hover:bg-slate-100 cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <p className="text-[9.5px] text-slate-400 font-semibold truncate">
+                          Default: {PROGRAM_SCHEDULE_CONFIGS[prog.programKey]?.defaultSessions ?? 5} sessions
                         </p>
                       </div>
                     </div>
