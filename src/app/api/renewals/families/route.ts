@@ -292,12 +292,104 @@ export async function GET(request: Request) {
         };
       });
 
+    // ── Synthetic entries: approved prev-adventure students with no renewal_families record ──
+    // These are students who registered directly (not via renewal flow) so they never got a
+    // renewal_families doc. Build a minimal synthetic entry so they appear in Quick Encode.
+    const prevAdventureApproved = allApprovedRegistrations.filter((r: any) => {
+      const regPeriodStr = String(r.period || "");
+      const periodMatch = regPeriodStr.match(/adventure\s*[-_]?\s*(\d+)/i);
+      const regAdvNum = Number(r.adventureNumber) || (periodMatch ? Number(periodMatch[1]) : null);
+      return regAdvNum === prevAdventure;
+    });
+
+    // Build a set of identity keys already covered by mappedFamilies
+    const coveredKeys = new Set<string>();
+    for (const f of families) {
+      const email = (f.parentEmail || "").toLowerCase().trim();
+      const child = (f.childName || "").toLowerCase().trim();
+      if (email) coveredKeys.add(`email:${email}`);
+      if (child) coveredKeys.add(`child:${child}`);
+    }
+
+    const syntheticFamilies: any[] = [];
+    for (const r of prevAdventureApproved) {
+      const regEmail = (r.parentInfo?.email || "").toLowerCase().trim();
+      const firstName = (r.childInfo?.firstName || "").trim();
+      const lastName = (r.childInfo?.lastName || "").trim();
+      const childFull = `${firstName} ${lastName}`.trim().toLowerCase();
+      const childKey = `child:${childFull}`;
+      const emailKey = regEmail ? `email:${regEmail}` : null;
+
+      // Skip if already covered by an existing renewal_families record
+      if (coveredKeys.has(childKey) || (emailKey && coveredKeys.has(emailKey))) continue;
+
+      // Skip testing accounts
+      const TESTING_EMAILS_SET = new Set(["iangelovalmores@gmail.com", "ian.valmores@gmail.com"]);
+      if (regEmail && TESTING_EMAILS_SET.has(regEmail)) continue;
+
+      // Mark as covered so we don't double-add if matched by both email and child name
+      if (emailKey) coveredKeys.add(emailKey);
+      coveredKeys.add(childKey);
+
+      const parentNameRaw = (r.parentInfo?.name || "").trim();
+      const childDisplayName = `${firstName} ${lastName}`.trim();
+      const progDisplay = PROGRAM_DISPLAY_MAP[r.program] || r.program || "Explorer";
+
+      // Check if this student already has a confirmed target-adventure registration
+      const alreadyRegisteredForTarget = targetRegistrations.some((tr: any) => {
+        const trEmail = (tr.parentInfo?.email || "").toLowerCase().trim();
+        const trFirst = (tr.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
+        const rFirst = firstName.toLowerCase().split(/\s+/)[0];
+        return (regEmail && trEmail === regEmail && trFirst === rFirst);
+      });
+
+      const resolvedPhone =
+        (r.parentInfo?.phone || "").trim() ||
+        (r.emergencyContact?.phone || "").trim() || "";
+
+      const isPioneerSyn = Boolean(regEmail && pioneerEmails.has(regEmail));
+
+      syntheticFamilies.push({
+        _id: `synthetic-${r._id.toString()}`,
+        isSynthetic: true,
+        parentName: parentNameRaw,
+        parentEmail: regEmail,
+        phone: resolvedPhone,
+        childName: childDisplayName,
+        childNickname: r.childInfo?.nickname || null,
+        isPioneer: isPioneerSyn,
+        previousProgram: progDisplay,
+        previousClassTime: r.classTime || null,
+        renewingTo: null,
+        adventures: [{ adventure: `Adventure ${prevAdventure}`, program: progDisplay, classTime: r.classTime || "", status: "approved" }],
+        renewalStatus: alreadyRegisteredForTarget ? "confirmed" : "not_yet_submitted",
+        registrationId: alreadyRegisteredForTarget
+          ? (targetRegistrations.find((tr: any) => {
+              const trEmail = (tr.parentInfo?.email || "").toLowerCase().trim();
+              const trFirst = (tr.childInfo?.firstName || "").toLowerCase().trim().split(/\s+/)[0];
+              const rFirst = firstName.toLowerCase().split(/\s+/)[0];
+              return (regEmail && trEmail === regEmail && trFirst === rFirst);
+            })?._id?.toString() || null)
+          : null,
+        emailHistory: [],
+        lastEmailSent: null,
+        lastEmailDate: null,
+        lastEmailType: null,
+        notes: "",
+        renewalPeriod: null,
+        createdAt: r.submittedAt || null,
+        updatedAt: r.submittedAt || null,
+      });
+    }
+
+    const allFamiliesResult = [...mappedFamilies, ...syntheticFamilies];
+
     return NextResponse.json({
       success: true,
       targetAdventure,
       prevAdventure,
-      data: mappedFamilies,
-      families: mappedFamilies,
+      data: allFamiliesResult,
+      families: allFamiliesResult,
     });
   } catch (error: any) {
     console.error("[renewal_families GET]", error);
