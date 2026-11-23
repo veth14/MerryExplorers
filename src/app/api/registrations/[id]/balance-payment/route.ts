@@ -65,6 +65,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             adminNote,
             waiveInterest,
             expectedTotalPayable,
+            expectedBalance,
+            expectedInterest,
+            expectedPaidVerified,
             actorUid,
             actorName,
         } = body;
@@ -131,7 +134,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             db.collection("settings").findOne({ _key: "renewal_settings_v2" }),
         ]);
         const isPioneer = Boolean(reg.isPioneer || pioneerFamily);
-        const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[reg.program]) || FALLBACK_PIONEER_RATES[reg.program];
+        // A saved customRate is the price this registration was actually approved at.
+        // Do not replace it with a newer Pioneer price when encoding a later balance payment;
+        // Payment Tracking uses the registration's saved rate for its displayed balance.
+        const pioneerRate = Number(reg.customRate)
+            || Number(pioneerSettings?.pioneerPrices?.[reg.program])
+            || FALLBACK_PIONEER_RATES[reg.program];
         const pricedReg = {
             ...reg,
             isPioneer,
@@ -150,21 +158,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const skipDates = await getHolidaySkipSet(db);
         const terms = calcRegistrationTerms(pricedReg, student, paidVerified, reg.amountDue, new Date(), skipDates, renewalSettings?.programs || []);
 
-        // The admin's screen showed a "total payable". If it no longer matches (interest ticked over, or
-        // another payment was just saved) refuse instead of applying money against numbers they never saw.
-        if (expectedTotalPayable != null && terms.totalPayable != null) {
-            if (Math.abs(Number(expectedTotalPayable) - terms.totalPayable) > 0.01) {
+        // Use the exact breakdown the admin reviewed. The page and the API can
+        // resolve legacy Adventure/Pioneer data differently, so independently
+        // recalculating it here can reject a receipt for the amount shown on screen.
+        // Still reject if the verified amount changed since the page was loaded.
+        let allocationTerms = terms;
+        if (expectedTotalPayable != null && expectedBalance != null && expectedInterest != null) {
+            const displayedTotal = r2(Number(expectedBalance) + Number(expectedInterest));
+            if (
+                !Number.isFinite(Number(expectedBalance)) || Number(expectedBalance) < 0
+                || !Number.isFinite(Number(expectedInterest)) || Number(expectedInterest) < 0
+                || !Number.isFinite(Number(expectedTotalPayable))
+                || Math.abs(displayedTotal - Number(expectedTotalPayable)) > 0.01
+            ) {
+                return NextResponse.json({ error: "The balance breakdown is invalid. Refresh the payment screen and try again." }, { status: 400 });
+            }
+            if (expectedPaidVerified != null && Math.abs(Number(expectedPaidVerified) - Number(paidVerified)) > 0.01) {
                 return NextResponse.json(
-                    {
-                        error: `The balance changed since this screen was loaded. Total payable is now ${peso(terms.totalPayable)}. Please close this window, reopen it and check the amount again.`,
-                        currentTotalPayable: terms.totalPayable,
-                    },
+                    { error: "A payment was recorded after this screen was opened. Refresh the registration balance before saving this receipt." },
                     { status: 409 }
                 );
             }
+            allocationTerms = {
+                ...terms,
+                balance: Number(expectedBalance),
+                interest: Number(expectedInterest),
+                totalPayable: Number(expectedTotalPayable),
+            };
         }
 
-        const alloc = allocateBalancePayment(terms, amount, !!waiveInterest);
+        const alloc = allocateBalancePayment(allocationTerms, amount, !!waiveInterest);
         if (!alloc.ok) {
             return NextResponse.json({ error: alloc.error || "This payment can't be applied." }, { status: 400 });
         }

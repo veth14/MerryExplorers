@@ -1824,10 +1824,8 @@ function AdminPaymentsPageInner() {
   const followTerms = isFollowUp ? regCalc!.terms : null;
 
   // ── Interest rule: no interest is owed for a payment made before the first interest Monday ──
-  // `followTerms` is calculated as of the DATE PAID. `serverTerms` is the same registration as of TODAY, which is what
-  // the balance-payment route calculates. If interest only built up AFTER the payment date, that part is not charged.
-  // TEMPORARY: once the balance-payment route counts interest up to `paidOn`, delete autoWaiveInterest / serverTerms
-  // and send `expectedTotalPayable: followTerms?.totalPayable` and `waiveInterest: waivable && form.waiveInterest` again.
+  // `followTerms` is calculated as of the DATE PAID and is the same breakdown shown in the balance card.
+  // If interest only built up AFTER the payment date, that part is not charged.
   const serverTerms = isFollowUp && selectedReg ? regInfo(selectedReg).terms : null;
   const lateInterest = followTerms && serverTerms ? Math.max(0, (serverTerms.interest || 0) - (followTerms.interest || 0)) : 0;
   const owedOnPaidDate = followTerms ? followTerms.totalPayable ?? followTerms.balance ?? 0 : 0;
@@ -2079,7 +2077,12 @@ function AdminPaymentsPageInner() {
                 : "",
             ].filter(Boolean).join(" · "),
             waiveInterest: autoWaiveInterest || (waivable && form.waiveInterest),
-            expectedTotalPayable: serverTerms?.totalPayable ?? followTerms?.totalPayable ?? null, // the server's own (today) total
+            // Send the exact balance card shown above, which is calculated as of the payment date.
+            // Recomputing on the server as of today can produce a different total and wrongly reject this payment.
+            expectedTotalPayable: followTerms?.totalPayable ?? followTerms?.balance ?? null,
+            expectedBalance: followTerms?.balance ?? null,
+            expectedInterest: followTerms?.interest ?? 0,
+            expectedPaidVerified: Number(selectedReg?.amountPaid || selectedReg?.amountDue || 0),
             ...ADMIN_ACTOR,
           });
           if (!r.ok) return setManualError(r.error || "Could not save the payment. Please try again.");
