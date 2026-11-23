@@ -4,8 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { m, AnimatePresence } from "framer-motion";
-import { PROGRAM_SLOTS, UNIFORM_KIT, NAV_LINKS } from "@/data/landing";
+import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { SiteHeader } from "@/components/landing/site-header";
 import { DreamBanner } from "@/components/DreamBanner";
 import { readReceipt } from "@/lib/receipt-ocr";
@@ -52,8 +51,6 @@ const BLUE = "#1f7ae0";
 const SUN = "#ffd23f";
 const SUN_LIGHT = "#ffe066";
 const SUN_DEEP = "#ffb82e";
-const INPUT_BG = "#f2faff";
-const INPUT_BORDER = "#b6dcf5";
 const TEXT_2 = "#3d5a99";
 
 function Cloud({ className }: { className: string }) {
@@ -100,6 +97,7 @@ export default function PaymentPage() {
   const id = params.id as string;
 
   const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -122,7 +120,6 @@ export default function PaymentPage() {
   const [ocrDone, setOcrDone] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
   const [renewingReservation, setRenewingReservation] = useState(false);
-  const [disclaimerAcknowledged, setDisclaimerAcknowledged] = useState(false);
   const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,13 +129,11 @@ export default function PaymentPage() {
     if (!id) return;
     const key = `disclaimer_ack_${id}`;
     const already = sessionStorage.getItem(key) === "true";
-    setDisclaimerAcknowledged(already);
     if (!already) setShowDisclaimerModal(true);
   }, [id]);
 
   function handleAcknowledgeDisclaimer() {
     if (id) sessionStorage.setItem(`disclaimer_ack_${id}`, "true");
-    setDisclaimerAcknowledged(true);
     setShowDisclaimerModal(false);
   }
 
@@ -180,6 +175,13 @@ export default function PaymentPage() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  useEffect(() => {
+    const updateNow = () => setNow(Date.now());
+    updateNow();
+    const interval = setInterval(updateNow, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Reservation countdown
   useEffect(() => {
@@ -304,6 +306,9 @@ export default function PaymentPage() {
           receiptBase64,
           balancePayment: isBalanceMode,
           expectedTotalPayable: isBalanceMode ? regData?.balanceInfo?.totalPayable : undefined,
+          expectedBalance: isBalanceMode ? regData?.balanceInfo?.balance : undefined,
+          expectedInterest: isBalanceMode ? regData?.balanceInfo?.interest : undefined,
+          expectedPaidVerified: isBalanceMode ? regData?.balanceInfo?.paid : undefined,
           paidOn: isBalanceMode ? new Date().toISOString() : undefined,
           uniformOrdered,
           lanyardOrdered,
@@ -356,12 +361,12 @@ export default function PaymentPage() {
   const isRenewalRegistration = regData?.isNewFamily === false;
   const isDeferred = isRenewalRegistration && Boolean(
     regData?.downpaymentDeferred ||
-    (regData?.status === "reserved" && regData?.downpaymentStartDate && new Date(regData.downpaymentStartDate).getTime() > Date.now())
+    (regData?.status === "reserved" && regData?.downpaymentStartDate && new Date(regData.downpaymentStartDate).getTime() > now)
   );
   const isExpired = !isDeferred && (timeLeft === "0d 0h 0m 0s" || timeLeft === "00:00");
   const reservationIsExpired = !isDeferred && Boolean(regData && (
     regData.status === "expired" ||
-    (regData.status === "reserved" && regData.reservedUntil && new Date(regData.reservedUntil).getTime() <= Date.now())
+    (regData.status === "reserved" && regData.reservedUntil && new Date(regData.reservedUntil).getTime() <= now)
   ));
   const showErrorScreen = (!!error && (!regData || regData.status !== "reserved" || isExpired)) || reservationIsExpired;
 

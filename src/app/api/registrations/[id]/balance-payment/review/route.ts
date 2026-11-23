@@ -42,6 +42,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const match = {
       _id: new ObjectId(id),
       status: { $in: ["approved", "active"] },
+      amountPaid: registration.amountPaid ?? null,
+      previousAdventureBalance: registration.previousAdventureBalance ?? null,
       balancePayments: { $elemMatch: { id: paymentId, verified: { $ne: true }, rejected: { $ne: true } } },
     };
 
@@ -81,12 +83,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const adventureStart = getRegistrationAdventureStart(renewalSettings?.programs || [], registration, getManilaTodayIso());
     const student = getStudentSessionInfo(registration, parentAccount, adventureStart);
     const paidVerified = isRegistrationVerified(registration.status) ? Number(registration.amountPaid || registration.amountDue || 0) : 0;
+    const previousAdventureBalance = Math.max(0, Number(registration.previousAdventureBalance) || 0);
+    const paidToPrevious = Math.min(paidVerified, previousAdventureBalance);
+    const appliedToCurrentSession = Math.max(0, paidVerified - paidToPrevious);
     const fallbackTotal = (getRegistrationTotal({ ...pricedRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
       + (registration.uniformOrdered ? 650 : 0);
     const paidOn = payment.paidOn ? new Date(payment.paidOn) : payment.submittedAt ? new Date(payment.submittedAt) : now;
     const skipDates = await getHolidaySkipSet(db);
-    const terms = calcRegistrationTerms(pricedRegistration, student, paidVerified, fallbackTotal, paidOn, skipDates, renewalSettings?.programs || []);
-    const allocation = allocateBalancePayment(terms, Number(payment.amountPaid), false);
+    const terms = calcRegistrationTerms(pricedRegistration, student, appliedToCurrentSession, fallbackTotal, paidOn, skipDates, renewalSettings?.programs || []);
+    const remainingPrevious = Math.max(0, previousAdventureBalance - paidToPrevious);
+    const totalBalance = terms.balance != null ? terms.balance + remainingPrevious : (remainingPrevious > 0 ? remainingPrevious : null);
+    const totalPayable = terms.totalPayable != null ? terms.totalPayable + remainingPrevious : totalBalance;
+    const allocationTerms = { ...terms, balance: totalBalance, totalPayable };
+    const allocation = allocateBalancePayment(allocationTerms, Number(payment.amountPaid), false);
     if (!allocation.ok) return NextResponse.json({ error: allocation.error || "This payment cannot be applied to the current balance." }, { status: 409 });
 
     const amountPaidTotal = Math.round((paidVerified + Number(payment.amountPaid)) * 100) / 100;

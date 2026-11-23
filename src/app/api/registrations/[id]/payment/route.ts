@@ -96,7 +96,9 @@ export async function POST(
       const pioneerFamily = parentEmail ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail)) : null;
       const isPioneer = Boolean(registration.isPioneer || pioneerFamily);
       const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
-      const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[registration.program]) || FALLBACK_PIONEER_RATES[registration.program];
+      const pioneerRate = Number(registration.customRate)
+        || Number(pioneerSettings?.pioneerPrices?.[registration.program])
+        || FALLBACK_PIONEER_RATES[registration.program];
       const pricingRegistration = {
         ...registration,
         isPioneer,
@@ -108,16 +110,36 @@ export async function POST(
         : null;
       const renewalSettings = await db.collection("settings").findOne({ _key: "renewal_settings_v2" });
       const adventureStart = getRegistrationAdventureStart(renewalSettings?.programs || [], registration, getManilaTodayIso());
-      const student = getStudentSessionInfo(registration, parentAccount, adventureStart);
+      const student = getStudentSessionInfo(pricingRegistration, parentAccount, adventureStart);
       const paidVerified = isRegistrationVerified(registration.status) ? Number(registration.amountPaid || registration.amountDue || 0) : 0;
+      const previousAdventureBalance = Math.max(0, Number(registration.previousAdventureBalance) || 0);
+      const paidToPrevious = Math.min(paidVerified, previousAdventureBalance);
+      const appliedToCurrentSession = Math.max(0, paidVerified - paidToPrevious);
       const fallbackTotal = (getRegistrationTotal({ ...pricingRegistration, uniformOrdered: false }, Number(registration.amountDue) || 0) || 0)
         + (registration.uniformOrdered ? 650 : 0);
       const skipDates = await getHolidaySkipSet(db);
-      const terms = calcRegistrationTerms(pricingRegistration, student, paidVerified, fallbackTotal, new Date(), skipDates, renewalSettings?.programs || []);
-      if (data.expectedTotalPayable != null && terms.totalPayable != null && Math.abs(Number(data.expectedTotalPayable) - terms.totalPayable) > 0.01) {
-        return NextResponse.json({ error: "The balance changed while you were preparing this payment. Refresh this page to see the latest amount." }, { status: 409 });
+      const terms = calcRegistrationTerms(pricingRegistration, student, appliedToCurrentSession, fallbackTotal, new Date(), skipDates, renewalSettings?.programs || []);
+      const remainingPrevious = Math.max(0, previousAdventureBalance - paidToPrevious);
+      const totalBalance = terms.balance != null ? terms.balance + remainingPrevious : (remainingPrevious > 0 ? remainingPrevious : null);
+      const totalPayable = terms.totalPayable != null ? terms.totalPayable + remainingPrevious : totalBalance;
+      const allocationTerms = { ...terms, balance: totalBalance, totalPayable };
+      const changedBalanceError = NextResponse.json(
+        { error: "The balance changed while you were preparing this payment. Refresh this page to see the latest amount." },
+        { status: 409 }
+      );
+      const expectedTotal = data.expectedTotalPayable == null ? null : Number(data.expectedTotalPayable);
+      const expectedBalance = data.expectedBalance == null ? null : Number(data.expectedBalance);
+      const expectedInterest = data.expectedInterest == null ? null : Number(data.expectedInterest);
+      const expectedPaid = data.expectedPaidVerified == null ? null : Number(data.expectedPaidVerified);
+      if (
+        (expectedTotal != null && (!Number.isFinite(expectedTotal) || totalPayable == null || Math.abs(expectedTotal - totalPayable) > 0.01))
+        || (expectedBalance != null && (!Number.isFinite(expectedBalance) || totalBalance == null || Math.abs(expectedBalance - totalBalance) > 0.01))
+        || (expectedInterest != null && (!Number.isFinite(expectedInterest) || Math.abs(expectedInterest - terms.interest) > 0.01))
+      ) return changedBalanceError;
+      if (expectedPaid != null && (!Number.isFinite(expectedPaid) || Math.abs(expectedPaid - paidVerified) > 0.01)) {
+        return NextResponse.json({ error: "A payment was recorded after this page was opened. Refresh the balance before submitting again." }, { status: 409 });
       }
-      const allocation = allocateBalancePayment(terms, amount, false);
+      const allocation = allocateBalancePayment(allocationTerms, amount, false);
       if (!allocation.ok) return NextResponse.json({ error: allocation.error || "This payment amount cannot be applied to the current balance." }, { status: 400 });
 
       let receiptUrl = "";
@@ -159,6 +181,8 @@ export async function POST(
         {
           _id: new ObjectId(id),
           status: { $in: ["approved", "active"] },
+          amountPaid: registration.amountPaid ?? null,
+          previousAdventureBalance: registration.previousAdventureBalance ?? null,
           balancePayments: { $not: { $elemMatch: { verified: { $ne: true }, rejected: { $ne: true } } } },
         },
         { $push: { balancePayments: entry } as any }

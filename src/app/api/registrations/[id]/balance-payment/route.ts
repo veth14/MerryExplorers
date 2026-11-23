@@ -26,8 +26,6 @@ const MAX_RECEIPT_CHARS = 2_500_000; // base64 text; the page already compresses
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const peso = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 function statusMessage(status: string): string {
     switch (status) {
         case "reserved":
@@ -108,6 +106,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
         if (!SETTLEABLE_STATUSES.includes(reg.status)) {
             return NextResponse.json({ error: statusMessage(String(reg.status)) }, { status: 409 });
+        }
+        if ((reg.balancePayments || []).some((payment: any) => payment?.verified !== true && payment?.rejected !== true)) {
+            return NextResponse.json(
+                { error: "A parent balance payment is waiting for review. Review it before encoding another payment." },
+                { status: 409 }
+            );
         }
 
         // Reject a reused reference across all Adventures and payment types before uploading the receipt.
@@ -235,7 +239,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
         // The filter makes sure nobody changed the registration between our read and this write
         const res = await regs.updateOne(
-            { _id: new ObjectId(id), status: reg.status, amountPaid: reg.amountPaid ?? null },
+            {
+                _id: new ObjectId(id),
+                status: reg.status,
+                amountPaid: reg.amountPaid ?? null,
+                balancePayments: { $not: { $elemMatch: { verified: { $ne: true }, rejected: { $ne: true } } } },
+            },
             { $set, $push: { balancePayments: entry } } as any
         );
 

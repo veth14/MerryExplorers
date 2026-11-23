@@ -54,7 +54,9 @@ export async function GET(
       : null;
     const isPioneer = Boolean(registration.isPioneer || pioneerFamily);
     const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
-    const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[registration.program]) || FALLBACK_PIONEER_RATES[registration.program];
+    const pioneerRate = Number(registration.customRate)
+      || Number(pioneerSettings?.pioneerPrices?.[registration.program])
+      || FALLBACK_PIONEER_RATES[registration.program];
     const pricingRegistration = {
       ...registration,
       isPioneer,
