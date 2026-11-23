@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { v2 as cloudinary } from "cloudinary";
 import { isReturningFamilyRecord } from "@/lib/returning-family";
 import { requireAdmin } from "@/lib/auth-guard";
 import { calcRegistrationTerms, FALLBACK_PIONEER_RATES, getManilaTodayIso, getRegistrationAdventureStart, getRegistrationTotal, getStudentSessionInfo, isRegistrationVerified } from "@/lib/payment-terms";
 import { getHolidaySkipSet } from "@/lib/get-holiday-skip-set";
 import { pioneerEmailQuery } from "@/lib/pioneer-families";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+function extractCloudinaryPublicId(url?: string | null): string | null {
+  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com")) return null;
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?$/);
+  return match?.[1] || null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -226,10 +239,49 @@ export async function DELETE(
     const childName = `${registration.childInfo?.firstName || ""} ${registration.childInfo?.lastName || ""}`.trim() || "Explorer";
 
     if (action === "delete") {
-      // 1. Permanently delete from student_registrations
+      // 1. Clean up Cloudinary assets (receipt, signature, balance payments) if not shared by other registrations
+      try {
+        const publicIdsToCheck: string[] = [];
+        const regReceiptPid = registration.receiptPublicId || extractCloudinaryPublicId(registration.receiptUrl);
+        if (regReceiptPid) publicIdsToCheck.push(regReceiptPid);
+
+        const regSigPid = registration.signaturePublicId || extractCloudinaryPublicId(registration.signatureUrl);
+        if (regSigPid) publicIdsToCheck.push(regSigPid);
+
+        if (Array.isArray(registration.balancePayments)) {
+          for (const bp of registration.balancePayments) {
+            const bpPid = bp.receiptPublicId || extractCloudinaryPublicId(bp.receiptUrl);
+            if (bpPid) publicIdsToCheck.push(bpPid);
+          }
+        }
+
+        const uniquePids = [...new Set(publicIdsToCheck)];
+        for (const pid of uniquePids) {
+          // Verify no other registration references this same public ID or URL
+          const sharedCount = await db.collection("student_registrations").countDocuments({
+            _id: { $ne: new ObjectId(id) },
+            $or: [
+              { receiptPublicId: pid },
+              { signaturePublicId: pid },
+              { "balancePayments.receiptPublicId": pid },
+              { receiptUrl: { $regex: pid } },
+              { signatureUrl: { $regex: pid } },
+            ],
+          });
+          if (sharedCount === 0) {
+            await cloudinary.uploader.destroy(pid, { resource_type: "image" }).catch((cErr) => {
+              console.warn(`[registrations DELETE] Failed to destroy Cloudinary image ${pid}:`, cErr?.message || cErr);
+            });
+          }
+        }
+      } catch (cloudinaryErr) {
+        console.error("[registrations DELETE] Error cleaning up Cloudinary assets:", cloudinaryErr);
+      }
+
+      // 2. Permanently delete from student_registrations
       await db.collection("student_registrations").deleteOne({ _id: new ObjectId(id) });
 
-      // 2. Remove any student record created by this registration
+      // 3. Remove any student record created by this registration
       await db.collection("students").deleteMany({ registrationId: id });
 
       // 3. If linked to a renewal family, relink to any remaining active registration or reset
