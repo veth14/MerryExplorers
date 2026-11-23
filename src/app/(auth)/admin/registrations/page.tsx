@@ -11,7 +11,7 @@ import { PROGRAM_SLOTS, UNIFORM_KIT } from "@/data/landing";
 import { QuickEncodeModal } from "@/components/admin/QuickEncodeModal";
 import { UploadReceiptModal } from "@/components/admin/UploadReceiptModal";
 
-type Status = "pending" | "approved" | "active" | "rejected" | "early-bird" | "expired" | "reserved";
+type Status = "pending" | "approved" | "active" | "rejected" | "early-bird" | "expired" | "reserved" | "voided";
 
 interface Registration {
   id: string;
@@ -83,6 +83,7 @@ const STATUS_STYLES: Record<Status, string> = {
   "early-bird": "bg-orange-100 text-orange-700",
   expired: "bg-rose-100 text-rose-700",
   reserved: "bg-blue-100 text-blue-700",
+  voided: "bg-slate-100 text-slate-500 border border-slate-300",
 };
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -93,6 +94,7 @@ const STATUS_LABELS: Record<Status, string> = {
   "early-bird": "🐣 Early Bird",
   expired: "⏰ Expired Slot",
   reserved: "🔒 Slot Reserved",
+  voided: "🚫 Voided",
 };
 
 function isRegExpired(r: Registration): boolean {
@@ -324,7 +326,7 @@ function SectionCard({ emoji, title, children }: { emoji: string; title: string;
 }
 
 function DetailModal({
-  reg, allRegistrations, onRefreshRegistrations, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, isProcessing, onToast,
+  reg, allRegistrations, onRefreshRegistrations, onClose, onApprove, onReject, onEarlyBird, onOpenPayment, onSavePreviousAdventureBalance, onVoid, onDelete, isProcessing, onToast,
 }: {
   reg: Registration;
   allRegistrations: Registration[];
@@ -335,6 +337,8 @@ function DetailModal({
   onEarlyBird: (id: string, deadline: string) => void;
   onOpenPayment: (id: string) => void;
   onSavePreviousAdventureBalance: (id: string, amount: number) => Promise<boolean>;
+  onVoid: (id: string, reason: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   isProcessing: boolean;
   onToast?: (msg: string) => void;
 }) {
@@ -342,7 +346,10 @@ function DetailModal({
   const [showUploadReceipt, setShowUploadReceipt] = useState(false);
   const [rejectMode, setRejectMode] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState(false);
+  const [voidMode, setVoidMode] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
   const [reason, setReason] = useState("");
+  const [voidReason, setVoidReason] = useState("Duplicate registration");
   const [earlyBirdDeadline, setEarlyBirdDeadline] = useState("");
   const [editingPreviousBalance, setEditingPreviousBalance] = useState(false);
   const [previousBalanceInput, setPreviousBalanceInput] = useState(typeof reg.previousAdventureBalance === "number" ? String(reg.previousAdventureBalance) : "");
@@ -562,6 +569,26 @@ function DetailModal({
 
           {/* ── Scrollable body ── */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+
+            {/* Voided notice banner */}
+            {reg.status === "voided" && (
+              <div className="rounded-2xl border-2 border-rose-200 bg-rose-50/80 p-3.5 flex items-center justify-between gap-3 text-rose-900">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">🚫</span>
+                  <div>
+                    <p className="text-[12.5px] font-extrabold text-rose-950">This registration is VOIDED</p>
+                    <p className="text-[11px] text-rose-700">Held slot is released. Excluded from active student rosters and counts.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeleteMode(true)}
+                  className="px-3 py-1.5 rounded-xl border border-red-300 bg-white hover:bg-red-50 text-[11px] font-bold text-red-600 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                >
+                  🗑️ Delete Permanently
+                </button>
+              </div>
+            )}
 
             {/* Registration history across Adventures */}
             <SectionCard emoji="🗺️" title="Adventure Timeline">
@@ -940,7 +967,7 @@ function DetailModal({
                 </div>
               )}
 
-              {!rejectMode && !earlyBirdMode ? (
+              {!rejectMode && !earlyBirdMode && !voidMode && !deleteMode ? (
                 <div className="space-y-2">
                   {isPending && (
                     <div className="flex gap-3">
@@ -981,6 +1008,94 @@ function DetailModal({
                       🐣 Mark as Early Bird (Secure Slot, Defer Payment)
                     </button>
                   )}
+
+                  {/* ── Record Management: Void & Delete ── */}
+                  <div className="pt-2.5 mt-2 border-t border-slate-200/80 flex items-center gap-2.5">
+                    {reg.status !== "voided" && (
+                      <button
+                        type="button"
+                        onClick={() => setVoidMode(true)}
+                        disabled={isProcessing}
+                        className="flex-1 rounded-2xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 py-3 text-[12.5px] font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                      >
+                        <span>🚫</span>
+                        <span>Void Registration</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteMode(true)}
+                      disabled={isProcessing}
+                      className="flex-1 rounded-2xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 py-3 text-[12.5px] font-bold text-slate-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    >
+                      <span>🗑️</span>
+                      <span>Delete Record</span>
+                    </button>
+                  </div>
+                </div>
+              ) : voidMode ? (
+                <div className="space-y-3 rounded-2xl border-2 border-rose-200 bg-rose-50/80 p-4">
+                  <div className="flex items-center gap-2 text-rose-900">
+                    <span className="text-xl">🚫</span>
+                    <p className="text-[13.5px] font-extrabold">Void This Registration</p>
+                  </div>
+                  <p className="text-[12px] text-rose-800 leading-relaxed">
+                    This will mark the registration as <strong>Voided</strong>, release the held slot for other students, and remove the student from active rosters.
+                  </p>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Reason for voiding:</label>
+                    <input
+                      type="text"
+                      className="w-full rounded-xl bg-white border border-rose-200 px-3.5 py-2.5 text-[12.5px] font-medium text-slate-800 focus:outline-none focus:border-rose-400"
+                      value={voidReason}
+                      onChange={(e) => setVoidReason(e.target.value)}
+                      placeholder="e.g. Duplicate registration, customer requested cancellation…"
+                    />
+                  </div>
+                  <div className="flex gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setVoidMode(false)}
+                      className="flex-1 rounded-xl border border-slate-300 bg-white py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onVoid(reg.id, voidReason)}
+                      disabled={isProcessing}
+                      className="flex-1 rounded-xl bg-rose-600 py-2.5 text-[12px] font-bold text-white hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md shadow-rose-600/20 cursor-pointer"
+                    >
+                      {isProcessing ? "Voiding…" : "Confirm Void"}
+                    </button>
+                  </div>
+                </div>
+              ) : deleteMode ? (
+                <div className="space-y-3 rounded-2xl border-2 border-red-300 bg-red-50 p-4">
+                  <div className="flex items-center gap-2 text-red-900">
+                    <span className="text-xl">⚠️</span>
+                    <p className="text-[13.5px] font-extrabold">Permanently Delete Record</p>
+                  </div>
+                  <p className="text-[12px] text-red-800 leading-relaxed">
+                    Are you sure you want to <strong>permanently delete</strong> the registration for <strong>{reg.childInfo?.firstName} {reg.childInfo?.lastName}</strong> ({reg.program})? This will permanently erase the record from the database and cannot be undone.
+                  </p>
+                  <div className="flex gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteMode(false)}
+                      className="flex-1 rounded-xl border border-slate-300 bg-white py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      ← Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(reg.id)}
+                      disabled={isProcessing}
+                      className="flex-1 rounded-xl bg-red-600 py-2.5 text-[12px] font-bold text-white hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md shadow-red-600/20 cursor-pointer"
+                    >
+                      {isProcessing ? "Deleting…" : "Permanently Delete"}
+                    </button>
+                  </div>
                 </div>
               ) : earlyBirdMode ? (
                 <div className="space-y-3">
@@ -2086,6 +2201,61 @@ export default function AdminRegistrationsPage() {
     finally { setIsProcessing(false); }
   }
 
+  async function handleVoid(id: string, reason: string) {
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/registrations/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "void",
+          reason,
+          actorUid: user?.uid,
+          actorName: userProfile?.fullName || user?.email,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToast("🚫 Registration voided and slot released.");
+        setSelected(null);
+        fetchRegistrations();
+      } else {
+        setToast(`❌ ${data.error || "Failed to void registration"}`);
+      }
+    } catch {
+      setToast("❌ Network error");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/registrations/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete",
+          actorUid: user?.uid,
+          actorName: userProfile?.fullName || user?.email,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToast("🗑️ Registration record permanently deleted.");
+        setSelected(null);
+        fetchRegistrations();
+      } else {
+        setToast(`❌ ${data.error || "Failed to delete registration"}`);
+      }
+    } catch {
+      setToast("❌ Network error");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   async function handleEarlyBird(id: string, deadline: string) {
     setIsProcessing(true);
     try {
@@ -2181,14 +2351,15 @@ export default function AdminRegistrationsPage() {
   });
 
   const counts = {
-    all: registrationsForAdventure.length,
+    all: registrationsForAdventure.filter(r => r.status !== "voided").length,
     pending: registrationsForAdventure.filter(r => r.status === "pending").length,
     reserved: registrationsForAdventure.filter(r => r.status === "reserved" && !isRegExpired(r)).length,
     "early-bird": registrationsForAdventure.filter(r => r.status === "early-bird" && !isRegExpired(r)).length,
-    expired: registrationsForAdventure.filter(isRegExpired).length,
+    expired: registrationsForAdventure.filter(r => isRegExpired(r) && r.status !== "voided").length,
     approved: registrationsForAdventure.filter(r => r.status === "approved").length,
     active: registrationsForAdventure.filter(r => r.status === "active").length,
     rejected: registrationsForAdventure.filter(r => r.status === "rejected").length,
+    voided: registrationsForAdventure.filter(r => r.status === "voided").length,
   };
 
   const prospectiveLeads = leads.filter(l => l.status !== "converted" && l.status !== "archived");
@@ -2204,6 +2375,7 @@ export default function AdminRegistrationsPage() {
     { key: "approved", label: `Approved (${counts.approved})` },
     { key: "active", label: `Active (${counts.active})` },
     { key: "rejected", label: `Rejected (${counts.rejected})` },
+    { key: "voided", label: `🚫 Voided (${counts.voided})` },
     { key: "leads", label: `📝 In-Progress Leads (${prospectiveLeads.length})` },
   ];
 
@@ -2212,9 +2384,9 @@ export default function AdminRegistrationsPage() {
   const filtered = registrations.filter(r => {
     let matchStatus = false;
     if (filter === "all") {
-      matchStatus = true;
+      matchStatus = r.status !== "voided";
     } else if (filter === "expired") {
-      matchStatus = isRegExpired(r);
+      matchStatus = isRegExpired(r) && r.status !== "voided";
     } else if (filter === "early-bird") {
       matchStatus = r.status === "early-bird" && !isRegExpired(r);
     } else if (filter === "reserved") {
@@ -2729,8 +2901,8 @@ export default function AdminRegistrationsPage() {
                       <td className="px-5 py-4 text-[#334155] font-semibold">{reg.classTime}</td>
                       {/* Status */}
                       <td className="px-5 py-4">
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isRegExpired(reg) ? STATUS_STYLES.expired : STATUS_STYLES[reg.status] || "bg-slate-100 text-slate-700"}`}>
-                          {isRegExpired(reg) ? "⏰ Expired Slot" : STATUS_LABELS[reg.status] || reg.status}
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${reg.status === "voided" ? STATUS_STYLES.voided : isRegExpired(reg) ? STATUS_STYLES.expired : STATUS_STYLES[reg.status] || "bg-slate-100 text-slate-700"}`}>
+                          {reg.status === "voided" ? "🚫 Voided" : isRegExpired(reg) ? "⏰ Expired Slot" : STATUS_LABELS[reg.status] || reg.status}
                         </span>
                       </td>
                       {/* Submitted */}
@@ -2788,6 +2960,8 @@ export default function AdminRegistrationsPage() {
           onEarlyBird={handleEarlyBird}
           onOpenPayment={handleOpenPayment}
           onSavePreviousAdventureBalance={handleSavePreviousAdventureBalance}
+          onVoid={handleVoid}
+          onDelete={handleDelete}
           isProcessing={isProcessing}
           onToast={setToast}
         />

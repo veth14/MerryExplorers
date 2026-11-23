@@ -18,6 +18,7 @@ export interface RenewalFamilyOption {
   classTime?: string;
   renewingTo?: string;
   renewalStatus: "not_yet_submitted" | "reserved" | "confirmed" | "released";
+  registrationId?: string | null;
   isPioneer?: boolean;
   adventures?: Array<{ adventure: string; program: string; classTime?: string }>;
 }
@@ -168,6 +169,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
   const [submitting, setSubmitting] = useState(false);
   const [submitStep, setSubmitStep] = useState<"" | "creating" | "uploading-receipt" | "done">("");
   const [error, setError] = useState<string | null>(null);
+  const [allowDuplicateOverride, setAllowDuplicateOverride] = useState(false);
 
   // Convert receipt image file → base64 & run OCR extraction
   const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -484,6 +486,10 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       setError("Please choose a program and a session time.");
       return;
     }
+    if (selectedFamily && (selectedFamily.renewalStatus !== "not_yet_submitted" || selectedFamily.registrationId) && !allowDuplicateOverride) {
+      setError(`⚠️ This student already has an active renewal record (${selectedFamily.renewalStatus}). Check the confirmation box below if you intentionally want to encode another registration.`);
+      return;
+    }
     if (recordPayment && !referenceNumber.trim()) {
       setError("Please enter a reference/receipt number for the payment.");
       return;
@@ -498,6 +504,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
       const payload = {
         encodedBy: "admin",
         encodedFamilyId: selectedFamily._id,
+        allowDuplicate: allowDuplicateOverride,
         isRenewal: true,
         isNewFamily: false,
         program: selectedProgram,
@@ -781,6 +788,7 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
                             type="button"
                             onClick={() => {
                               setSelectedFamilyId(f._id);
+                              setAllowDuplicateOverride(false);
                               setIsListExpanded(false);
                             }}
                             className={`w-full text-left p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
@@ -828,14 +836,30 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
               )}
 
               {/* Warning if already submitted */}
-              {selectedFamily && selectedFamily.renewalStatus !== "not_yet_submitted" && (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-[11.5px] font-semibold text-amber-900 flex items-start gap-2">
-                  <span className="shrink-0 text-amber-600 font-bold">⚠️</span>
-                  <span>
-                    This family is already marked as{" "}
-                    <strong className="uppercase font-black text-amber-950">{selectedFamily.renewalStatus}</strong>.
-                    Submitting this form will encode another registration record for them.
-                  </span>
+              {selectedFamily && (selectedFamily.renewalStatus !== "not_yet_submitted" || selectedFamily.registrationId) && (
+                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3.5 space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <span className="shrink-0 text-amber-600 font-black text-lg">⚠️</span>
+                    <div className="text-[12px] text-amber-950 leading-relaxed">
+                      <p className="font-extrabold text-[12.5px] text-amber-900">
+                        Registration Already Exists ({String(selectedFamily.renewalStatus).toUpperCase()})
+                      </p>
+                      <p className="mt-0.5 text-amber-800">
+                        <strong>{selectedFamily.childName}</strong> is already recorded as <strong>{selectedFamily.renewalStatus}</strong>. Encoding again will create a duplicate registration and take up a second slot.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 pt-1 border-t border-amber-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allowDuplicateOverride}
+                      onChange={(e) => setAllowDuplicateOverride(e.target.checked)}
+                      className="h-4 w-4 rounded border-amber-400 text-[#0033A0] focus:ring-amber-400"
+                    />
+                    <span className="text-[11.5px] font-bold text-amber-900">
+                      I confirm this is an intentional second enrollment for this student.
+                    </span>
+                  </label>
                 </div>
               )}
             </div>
@@ -1359,8 +1383,8 @@ export function QuickEncodeModal({ isOpen, onClose, onSuccess, currentAdventure 
               </button>
               <button
                 type="submit"
-                disabled={submitting || !selectedFamily}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0033A0] hover:bg-[#002776] text-white text-[12.5px] font-extrabold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting || !selectedFamily || ((selectedFamily.renewalStatus !== "not_yet_submitted" || Boolean(selectedFamily.registrationId)) && !allowDuplicateOverride)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0033A0] hover:bg-[#002776] text-white text-[12.5px] font-extrabold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <span>⚡</span>
                 <span>

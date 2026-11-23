@@ -182,6 +182,7 @@ export async function POST(request: Request) {
       encodedFamilyId, // renewal_families._id to directly link (skips email-match lookup)
       paidOn,
       paymentDate,
+      allowDuplicate,
       submittedAt: clientSubmittedAt,
     } = data;
 
@@ -339,15 +340,19 @@ export async function POST(request: Request) {
           "parentInfo.email": { $regex: new RegExp(`^${escapeRegex(emailForDupe)}$`, "i") },
           "childInfo.firstName": { $regex: new RegExp(`^${escapeRegex(childFirstForDupe)}$`, "i") },
         };
-      const existing = await db.collection("student_registrations").findOne({
+      const cycleConditions: Record<string, unknown>[] = [
+        ...(cycleQuery.length ? cycleQuery : []),
+        ...(adventureNumber !== null ? [{ adventureNumber }, { period: `adventure-${adventureNumber}` }] : []),
+      ];
+      const existing = (!allowDuplicate) ? await db.collection("student_registrations").findOne({
         ...identityQuery,
-        ...(cycleQuery.length ? { $or: cycleQuery } : {}),
-        status: { $in: ["pending", "approved", "reserved", "expired"] },
-      }, { sort: { submittedAt: -1 } });
+        ...(cycleConditions.length ? { $or: cycleConditions } : {}),
+        status: { $in: ["pending", "approved", "reserved", "active"] },
+      }, { sort: { submittedAt: -1 } }) : null;
       if (existing) {
         const existingId = existing._id.toString();
         return NextResponse.json({
-          error: `A registration for ${childFirstForDupe} was already found for Adventure ${adventureNumber ?? 2}. Continue from its payment page: /register/payment/${existingId}`,
+          error: `A registration for ${childFirstForDupe} was already found for Adventure ${adventureNumber ?? 2}. (${String(existing.status).toUpperCase()}) — continue from its payment page: /register/payment/${existingId}`,
           duplicateRegistrationId: existingId,
           duplicateRegistrationSubmittedAt: existing.submittedAt || null,
           duplicateRegistrationExpired: existing.status === "expired" || Boolean(existing.reservedUntil && new Date(existing.reservedUntil).getTime() <= Date.now()),
