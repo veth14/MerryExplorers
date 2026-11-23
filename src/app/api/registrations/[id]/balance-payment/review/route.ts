@@ -63,7 +63,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const pioneerFamily = parentEmail ? await db.collection("pioneer_families").findOne(pioneerEmailQuery(parentEmail)) : null;
     const isPioneer = Boolean(registration.isPioneer || pioneerFamily);
     const pioneerSettings = await db.collection("settings").findOne({ _key: "pioneer_settings_v1" });
-    const pioneerRate = Number(pioneerSettings?.pioneerPrices?.[registration.program]) || FALLBACK_PIONEER_RATES[registration.program];
+    // Keep the rate saved on this registration so reviewing a balance payment
+    // uses the same approved price as the original payment screen.
+    const pioneerRate = Number(registration.customRate)
+      || Number(pioneerSettings?.pioneerPrices?.[registration.program])
+      || FALLBACK_PIONEER_RATES[registration.program];
     const pricedRegistration = {
       ...registration,
       isPioneer,

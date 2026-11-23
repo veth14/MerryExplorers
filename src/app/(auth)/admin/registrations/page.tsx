@@ -380,95 +380,6 @@ function DetailModal({
   const totalRemainingBalance = (sessionRemaining ?? 0) + remainingPrevious;
   const requiredDownpayment = effectiveProgramRate > 0 ? Math.round(effectiveProgramRate * 0.6) : (programDetails ? programDetails.downpayment : 0);
 
-  async function handleGenerateSummary() {
-    const summaryWindow = window.open("", "_blank");
-    if (!summaryWindow) {
-      window.alert("Please allow pop-ups to open the registration summary.");
-      return;
-    }
-    summaryWindow.opener = null;
-    summaryWindow.document.write("<p style='font-family:Arial,sans-serif;padding:24px;color:#334155'>Preparing the latest registration and Adventure summary…</p>");
-    const latestRegistrations = await onRefreshRegistrations();
-    const reportRegistrations = latestRegistrations.length > 0 ? latestRegistrations : allRegistrations;
-    const reportTimeline = getRegistrationTimeline(reg, reportRegistrations);
-
-    const schedule = PROGRAM_SLOTS[reg.program as keyof typeof PROGRAM_SLOTS];
-    const chosenSession = schedule?.classes.find((session) => session.name === reg.classTime);
-    const row = (label: string, value: unknown) => `<tr><th>${escapeSummaryHtml(label)}</th><td>${escapeSummaryHtml(value)}</td></tr>`;
-    const submittedDate = reg.submittedAt
-      ? new Date(reg.submittedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })
-      : "—";
-    const money = (value: number | null | undefined) => typeof value === "number"
-      ? `₱${value.toLocaleString("en-PH")}`
-      : "—";
-    const studentName = `${reg.childInfo.firstName || ""} ${reg.childInfo.lastName || ""}`.trim();
-    const currentRemaining = sessionRemaining;
-    const summaryPrevBal = remainingPrevious;
-    const summaryTotalBal = totalRemainingBalance;
-    const timelineSummaryRows = reportTimeline.map((entry) => {
-      const entryProgram = PROGRAM_SLOTS[entry.program as keyof typeof PROGRAM_SLOTS];
-      const entrySession = entryProgram?.classes.find((session) => session.name === entry.classTime);
-      const entryStatus = isRegExpired(entry)
-        ? "Reservation expired"
-        : entry.status === "reserved" || entry.status === "pending"
-          ? entry.receiptUrl ? "Receipt submitted · awaiting review" : "Reserved · payment pending"
-          : STATUS_LABELS[entry.status] || entry.status;
-      const startDate = formatAdventureDate(entry.adventureStartDate);
-      const timing = `${entryProgram?.schedule ? `${entryProgram.schedule} · ` : ""}${entry.classTime}${entrySession?.time ? ` · ${entrySession.time}` : ""}`;
-      return row(`${adventureLabel(entry)} · ${getProgramLabel(entry.program)}`, `${timing} · ${entryStatus}${startDate ? ` · Starts ${startDate}` : ""}`);
-    }).join("");
-    const targetAdventure = getAdventureNumber(reg);
-    const currentCycleRegistrations = reportRegistrations.filter((entry) =>
-      getAdventureNumber(entry) === targetAdventure && !isTestRegistration(entry) && occupiesAdventureSlot(entry)
-    );
-    const capacityPrograms = ["curious-explorer", "everyday-curious", "creative-explorer", "brave-explorer"] as const;
-    const availabilityRows = capacityPrograms.flatMap((programId) => {
-      const program = PROGRAM_SLOTS[programId];
-      return program.classes.map((session) => {
-        const classAlias = session.name.includes("Session")
-          ? session.name.replace("Session", "Class")
-          : session.name.replace("Class", "Session");
-        const inSession = currentCycleRegistrations.filter((entry) =>
-          entry.program === programId && (entry.classTime === session.name || entry.classTime === classAlias)
-        );
-        const unpaidHolds = inSession.filter((entry) =>
-          (entry.status === "reserved" || entry.status === "pending") && !entry.receiptUrl && !(Number(entry.amountPaid) > 0)
-        );
-        const awaitingReview = inSession.filter((entry) =>
-          (entry.status === "reserved" || entry.status === "pending") && Boolean(entry.receiptUrl || Number(entry.amountPaid) > 0)
-        );
-        const taken = countUniqueChildren(inSession);
-        const schedule = `${program.schedule} · ${session.name} · ${session.time}`;
-        const availability = `${taken}/${session.maxSlots} occupied · ${Math.max(0, session.maxSlots - taken)} slots left · ${countUniqueChildren(unpaidHolds)} unpaid holds · ${countUniqueChildren(awaitingReview)} awaiting payment review`;
-        return row(schedule, availability);
-      });
-    }).join("");
-    const availabilitySection = hasAdventureCycle
-      ? `<section class="section"><h2>Session Availability · ${escapeSummaryHtml(adventureLabel(reg))}</h2><p class="muted">Counts reflect this Adventure’s active approved registrations and unexpired reservations, including unpaid holds, as of report generation.</p><table class="table">${availabilityRows}</table></section>`
-      : "";
-    const summaryHtml = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registration Summary - ${escapeSummaryHtml(studentName)}</title>
-<style>
-  *{box-sizing:border-box}body{margin:0;padding:28px;background:#f1f6ff;color:#17366b;font-family:Arial,Helvetica,sans-serif}.page{max-width:800px;margin:0 auto;background:#fff;border:1px solid #d9e6f7;border-radius:18px;overflow:hidden}.brand{background:#ffd84d;padding:22px 30px;color:#002f76;font-weight:800;letter-spacing:.04em}.content{padding:28px 32px}.title{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.title h1{margin:0 0 6px;color:#002f76;font-size:25px}.muted{color:#64748b;font-size:13px}.badge{display:inline-block;padding:7px 12px;border-radius:20px;background:#eef4ff;color:#0033a0;font-size:12px;font-weight:800}.section{margin-top:24px}.section h2{padding-bottom:8px;border-bottom:2px solid #e6eef9;color:#0033a0;font-size:14px;text-transform:uppercase;letter-spacing:.06em}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 12px;border-bottom:1px solid #e9eef5;text-align:left;vertical-align:top;font-size:13px;line-height:1.45}.table th{width:34%;color:#64748b;font-weight:700}.table td{color:#17366b;font-weight:600}.notes{margin-top:22px;padding:14px 16px;border-radius:12px;background:#f7faff;color:#526b8d;font-size:12px;line-height:1.55}.actions{max-width:800px;margin:16px auto;display:flex;justify-content:flex-end;gap:10px}.actions button{border:0;border-radius:10px;padding:11px 16px;background:#0033a0;color:#fff;font-weight:700;cursor:pointer}.actions .close{background:#e7eef8;color:#334155}@media print{body{padding:0;background:#fff}.page{max-width:none;border:0;border-radius:0}.actions{display:none}.content{padding:22px 26px}}
-</style></head><body>
-<div class="actions"><button class="close" onclick="window.close()">Close</button><button onclick="window.print()">Print / Save as PDF</button></div>
-<main class="page"><div class="brand">MERRY EXPLORERS PLAYGROUP LEARNING CENTER</div><div class="content">
-  <div class="title"><div><h1>Registration Summary</h1><div class="muted">Prepared ${escapeSummaryHtml(new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }))}</div></div><span class="badge">${escapeSummaryHtml(STATUS_LABELS[reg.status] || reg.status)}</span></div>
-  <section class="section"><h2>Explorer & Session</h2><table class="table">${row("Student", studentName)}${row("Adventure", adventureLabel(reg))}${row("Adventure start date", formatAdventureDate(reg.adventureStartDate) || "Not scheduled")}${row("Nickname", reg.childInfo.nickname || "—")}${row("Date of Birth", reg.childInfo.dateOfBirth)}${row("Gender", reg.childInfo.gender)}${row("Program", getProgramLabel(reg.program))}${row("Session days", schedule?.schedule || "—")}${row("Session", reg.classTime)}${row("Session time", chosenSession?.time || "—")}${row("Registration date", submittedDate)}${row("Registration reference", reg.id)}</table></section>
-  <section class="section"><h2>Adventure Timeline</h2><table class="table">${timelineSummaryRows || row("History", "No other registrations found for this Explorer.")}</table></section>
-  ${availabilitySection}
-  <section class="section"><h2>Parent / Guardian</h2><table class="table">${row("Name", reg.parentInfo.name)}${row("Relationship", reg.parentInfo.relationship)}${row("Email", reg.parentInfo.email)}${row("Phone", reg.parentInfo.phone)}${reg.parentInfo.facebook ? row("Facebook", reg.parentInfo.facebook) : ""}</table></section>
-  <section class="section"><h2>Emergency Contact</h2><table class="table">${row("Name", reg.emergencyContact?.name)}${row("Relationship", reg.emergencyContact?.relationship)}${row("Phone", reg.emergencyContact?.phone)}</table></section>
-  <section class="section"><h2>Payment Summary</h2><table class="table">${row("Program fee", `${money(effectiveProgramRate)}${isPioneer ? " (Pioneer Family Rate)" : ""}`)}${row("Initial amount due", money(reg.amountDue || requiredDownpayment))}${row("Amount paid (receipt)", money(totalPaid))}${prevAdventureBal > 0 ? row("Deducted for previous adventure", `-${money(paidToPrevious)} (Adv 1 cleared)`) : ""}${prevAdventureBal > 0 ? row("Applied to current session", money(appliedToCurrentSession)) : ""}${row("Remaining balance", money(totalRemainingBalance))}${row("Payment method", reg.paymentMethod?.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) || "—")}${row("Reference number", reg.referenceNumber || "—")}</table></section>
-  <section class="section"><h2>Additional Information</h2><table class="table">${row("Uniform kit", reg.uniformOrdered ? "Ordered" : "Not ordered")}${row("Photo consent", reg.photoConsent === "yes" ? "Allowed" : "Not allowed")}${row("Health profile", reg.childInfo.healthProfile || "None noted")}${row("Allergies", reg.childInfo.allergies || "None noted")}${row("Special needs", reg.childInfo.specialNeeds || "None noted")}</table></section>
-  <div class="notes">This summary is for registration reference. Previous adventure balance and current session balance are shown separately.</div>
-</div></main></body></html>`;
-
-    summaryWindow.document.open();
-    summaryWindow.document.write(summaryHtml);
-    summaryWindow.document.close();
-  }
-
   return (
     <AnimatePresence>
       {/* Backdrop */}
@@ -558,29 +469,6 @@ function DetailModal({
                 <span className="text-[11px] text-[#94a3b8] font-medium">
                   Submitted {new Date(reg.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleGenerateSummary}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-extrabold text-[#0033A0] hover:bg-blue-100 transition-colors"
-                >
-                  🧾 Student Summary
-                </button>
-                {reg.status !== "voided" && (
-                  <button
-                    type="button"
-                    onClick={() => setVoidMode(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-extrabold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
-                  >
-                    🚫 Void
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setDeleteMode(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-extrabold text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                >
-                  🗑️ Delete
-                </button>
               </div>
             </div>
           </div>
@@ -598,13 +486,6 @@ function DetailModal({
                     <p className="text-[11px] text-rose-700">Held slot is released. Excluded from active student rosters and counts.</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDeleteMode(true)}
-                  className="px-3 py-1.5 rounded-xl border border-red-300 bg-white hover:bg-red-50 text-[11px] font-bold text-red-600 transition-colors shrink-0 shadow-2xs cursor-pointer"
-                >
-                  🗑️ Delete Permanently
-                </button>
               </div>
             )}
 
@@ -1147,17 +1028,17 @@ function DetailModal({
 
         {/* ── Void Confirmation Dialog Modal ── */}
         {voidMode && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="detail-void-title" className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-rose-100 space-y-4">
               <div className="flex items-center gap-3 text-rose-700">
                 <span className="text-3xl">🚫</span>
                 <div>
-                  <h3 className="text-[16px] font-black text-rose-950">Void Registration</h3>
+                  <h3 id="detail-void-title" className="text-[16px] font-black text-rose-950">Are you sure you want to void this registration?</h3>
                   <p className="text-[12px] text-rose-700 font-semibold">Release slot &amp; remove from active rosters</p>
                 </div>
               </div>
               <p className="text-[13px] text-slate-600 leading-relaxed">
-                Are you sure you want to void the registration for <strong className="text-[#002f76]">{reg.childInfo?.firstName} {reg.childInfo?.lastName}</strong> ({getProgramLabel(reg.program)})?
+                This releases the held slot and removes <strong className="text-[#002f76]">{reg.childInfo?.firstName} {reg.childInfo?.lastName}</strong>&apos;s registration for {getProgramLabel(reg.program)} from active rosters. Continue?
               </p>
               <div>
                 <label className="text-[11.5px] font-bold text-slate-600 block mb-1.5">Reason for voiding:</label>
@@ -1188,7 +1069,7 @@ function DetailModal({
                   disabled={isProcessing}
                   className="flex-1 rounded-2xl bg-rose-600 py-3.5 text-[13px] font-bold text-white hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-rose-600/25 cursor-pointer"
                 >
-                  {isProcessing ? "Voiding…" : "Confirm Void"}
+                  {isProcessing ? "Voiding…" : "Yes, void registration"}
                 </button>
               </div>
             </div>
@@ -1197,12 +1078,12 @@ function DetailModal({
 
         {/* ── Delete Confirmation Dialog Modal ── */}
         {deleteMode && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="detail-delete-title" className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-red-100 space-y-4">
               <div className="flex items-center gap-3 text-red-600">
                 <span className="text-3xl">⚠️</span>
                 <div>
-                  <h3 className="text-[16px] font-black text-red-950">Delete Permanently</h3>
+                  <h3 id="detail-delete-title" className="text-[16px] font-black text-red-950">Are you sure you want to delete this record?</h3>
                   <p className="text-[12px] text-red-600 font-semibold">This action cannot be undone</p>
                 </div>
               </div>
@@ -1227,7 +1108,7 @@ function DetailModal({
                   disabled={isProcessing}
                   className="flex-1 rounded-2xl bg-red-600 py-3.5 text-[13px] font-bold text-white hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-red-600/25 cursor-pointer"
                 >
-                  {isProcessing ? "Deleting…" : "Permanently Delete"}
+                  {isProcessing ? "Deleting…" : "Yes, permanently delete"}
                 </button>
               </div>
             </div>
@@ -3088,17 +2969,17 @@ export default function AdminRegistrationsPage() {
 
       {/* ── Table Row Void Confirmation Modal ── */}
       {tableActionVoidReg && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="table-void-title" className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-rose-100 space-y-4">
             <div className="flex items-center gap-3 text-rose-700">
               <span className="text-3xl">🚫</span>
               <div>
-                <h3 className="text-[16px] font-black text-rose-950">Void Registration</h3>
+                <h3 id="table-void-title" className="text-[16px] font-black text-rose-950">Are you sure you want to void this registration?</h3>
                 <p className="text-[12px] text-rose-700 font-semibold">Release slot &amp; remove from active rosters</p>
               </div>
             </div>
             <p className="text-[13px] text-slate-600 leading-relaxed">
-              Are you sure you want to void the registration for <strong className="text-[#002f76]">{tableActionVoidReg.childInfo?.firstName} {tableActionVoidReg.childInfo?.lastName}</strong> ({getProgramLabel(tableActionVoidReg.program)})?
+              This releases the held slot and removes <strong className="text-[#002f76]">{tableActionVoidReg.childInfo?.firstName} {tableActionVoidReg.childInfo?.lastName}</strong>&apos;s registration for {getProgramLabel(tableActionVoidReg.program)} from active rosters. Continue?
             </p>
             <div>
               <label className="text-[11.5px] font-bold text-slate-600 block mb-1.5">Reason for voiding:</label>
@@ -3129,7 +3010,7 @@ export default function AdminRegistrationsPage() {
                 disabled={isProcessing}
                 className="flex-1 rounded-2xl bg-rose-600 py-3.5 text-[13px] font-bold text-white hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-rose-600/25 cursor-pointer"
               >
-                {isProcessing ? "Voiding…" : "Confirm Void"}
+                {isProcessing ? "Voiding…" : "Yes, void registration"}
               </button>
             </div>
           </div>
@@ -3138,12 +3019,12 @@ export default function AdminRegistrationsPage() {
 
       {/* ── Table Row Delete Confirmation Modal ── */}
       {tableActionDeleteReg && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="table-delete-title" className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-red-100 space-y-4">
             <div className="flex items-center gap-3 text-red-600">
               <span className="text-3xl">⚠️</span>
               <div>
-                <h3 className="text-[16px] font-black text-red-950">Delete Permanently</h3>
+                <h3 id="table-delete-title" className="text-[16px] font-black text-red-950">Are you sure you want to delete this record?</h3>
                 <p className="text-[12px] text-red-600 font-semibold">This action cannot be undone</p>
               </div>
             </div>
@@ -3168,7 +3049,7 @@ export default function AdminRegistrationsPage() {
                 disabled={isProcessing}
                 className="flex-1 rounded-2xl bg-red-600 py-3.5 text-[13px] font-bold text-white hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-red-600/25 cursor-pointer"
               >
-                {isProcessing ? "Deleting…" : "Permanently Delete"}
+                {isProcessing ? "Deleting…" : "Yes, permanently delete"}
               </button>
             </div>
           </div>
