@@ -359,6 +359,8 @@ function DetailModal({
   const isEarlyBird = reg.status === "early-bird";
   const isPending = reg.status === "pending";
   const isReserved = (reg as any).status === "reserved" || (reg as any).status === "expired";
+  const isApproved = reg.status === "approved";
+  const isVoided = reg.status === "voided";
   const hasAdventureCycle = !["ballet", "virtual-session", "saturday-playdate"].includes(reg.program);
   
   // Calculate true remaining balance for the whole program
@@ -562,6 +564,22 @@ function DetailModal({
                   className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-extrabold text-[#0033A0] hover:bg-blue-100 transition-colors"
                 >
                   🧾 Student Summary
+                </button>
+                {reg.status !== "voided" && (
+                  <button
+                    type="button"
+                    onClick={() => setVoidMode(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-extrabold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                  >
+                    🚫 Void
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDeleteMode(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-extrabold text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                >
+                  🗑️ Delete
                 </button>
               </div>
             </div>
@@ -942,8 +960,7 @@ function DetailModal({
           </div>
 
           {/* ── Sticky action bar ── */}
-          {(isPending || isEarlyBird || isReserved) && (
-            <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
 
               {/* Early Bird info banner */}
               {isEarlyBird && (
@@ -967,7 +984,43 @@ function DetailModal({
                 </div>
               )}
 
-              {!rejectMode && !earlyBirdMode && !voidMode && !deleteMode ? (
+              {/* Approved status banner */}
+              {isApproved && (
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-xl shrink-0">✅</span>
+                    <div>
+                      <p className="text-[13px] font-extrabold text-emerald-800">Approved Registration</p>
+                      <p className="text-[11.5px] text-emerald-600 font-medium">Student is enrolled and active in class roster</p>
+                    </div>
+                  </div>
+                  {reg.receiptUrl && (
+                    <a
+                      href={reg.receiptUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[11.5px] font-bold transition-all shadow-xs"
+                    >
+                      View Receipt ↗
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Voided status banner */}
+              {isVoided && (
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-rose-50 border border-rose-200 px-4 py-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-xl shrink-0">🚫</span>
+                    <div>
+                      <p className="text-[13px] font-extrabold text-rose-800">Voided Registration</p>
+                      <p className="text-[11.5px] text-rose-600 font-medium">Slot released & excluded from active student list</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!rejectMode && !earlyBirdMode ? (
                 <div className="space-y-2">
                   {isPending && (
                     <div className="flex gap-3">
@@ -1010,13 +1063,13 @@ function DetailModal({
                   )}
 
                   {/* ── Record Management: Void & Delete ── */}
-                  <div className="pt-2.5 mt-2 border-t border-slate-200/80 flex items-center gap-2.5">
-                    {reg.status !== "voided" && (
+                  <div className="pt-2 border-t border-slate-200/80 flex items-center gap-2.5">
+                    {!isVoided && (
                       <button
                         type="button"
                         onClick={() => setVoidMode(true)}
                         disabled={isProcessing}
-                        className="flex-1 rounded-2xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 py-3 text-[12.5px] font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                        className="flex-1 rounded-2xl border border-rose-300 bg-rose-50 hover:bg-rose-100 py-3 text-[12.5px] font-extrabold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
                       >
                         <span>🚫</span>
                         <span>Void Registration</span>
@@ -1026,74 +1079,10 @@ function DetailModal({
                       type="button"
                       onClick={() => setDeleteMode(true)}
                       disabled={isProcessing}
-                      className="flex-1 rounded-2xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 py-3 text-[12.5px] font-bold text-slate-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                      className="flex-1 rounded-2xl border border-red-300 bg-red-50/70 hover:bg-red-100 py-3 text-[12.5px] font-extrabold text-red-600 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
                     >
                       <span>🗑️</span>
                       <span>Delete Record</span>
-                    </button>
-                  </div>
-                </div>
-              ) : voidMode ? (
-                <div className="space-y-3 rounded-2xl border-2 border-rose-200 bg-rose-50/80 p-4">
-                  <div className="flex items-center gap-2 text-rose-900">
-                    <span className="text-xl">🚫</span>
-                    <p className="text-[13.5px] font-extrabold">Void This Registration</p>
-                  </div>
-                  <p className="text-[12px] text-rose-800 leading-relaxed">
-                    This will mark the registration as <strong>Voided</strong>, release the held slot for other students, and remove the student from active rosters.
-                  </p>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Reason for voiding:</label>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl bg-white border border-rose-200 px-3.5 py-2.5 text-[12.5px] font-medium text-slate-800 focus:outline-none focus:border-rose-400"
-                      value={voidReason}
-                      onChange={(e) => setVoidReason(e.target.value)}
-                      placeholder="e.g. Duplicate registration, customer requested cancellation…"
-                    />
-                  </div>
-                  <div className="flex gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setVoidMode(false)}
-                      className="flex-1 rounded-xl border border-slate-300 bg-white py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onVoid(reg.id, voidReason)}
-                      disabled={isProcessing}
-                      className="flex-1 rounded-xl bg-rose-600 py-2.5 text-[12px] font-bold text-white hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md shadow-rose-600/20 cursor-pointer"
-                    >
-                      {isProcessing ? "Voiding…" : "Confirm Void"}
-                    </button>
-                  </div>
-                </div>
-              ) : deleteMode ? (
-                <div className="space-y-3 rounded-2xl border-2 border-red-300 bg-red-50 p-4">
-                  <div className="flex items-center gap-2 text-red-900">
-                    <span className="text-xl">⚠️</span>
-                    <p className="text-[13.5px] font-extrabold">Permanently Delete Record</p>
-                  </div>
-                  <p className="text-[12px] text-red-800 leading-relaxed">
-                    Are you sure you want to <strong>permanently delete</strong> the registration for <strong>{reg.childInfo?.firstName} {reg.childInfo?.lastName}</strong> ({reg.program})? This will permanently erase the record from the database and cannot be undone.
-                  </p>
-                  <div className="flex gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setDeleteMode(false)}
-                      className="flex-1 rounded-xl border border-slate-300 bg-white py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
-                    >
-                      ← Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(reg.id)}
-                      disabled={isProcessing}
-                      className="flex-1 rounded-xl bg-red-600 py-2.5 text-[12px] font-bold text-white hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md shadow-red-600/20 cursor-pointer"
-                    >
-                      {isProcessing ? "Deleting…" : "Permanently Delete"}
                     </button>
                   </div>
                 </div>
@@ -1153,9 +1142,97 @@ function DetailModal({
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </m.div>
+          </div>
+        </m.div>
+
+        {/* ── Void Confirmation Dialog Modal ── */}
+        {voidMode && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-rose-100 space-y-4">
+              <div className="flex items-center gap-3 text-rose-700">
+                <span className="text-3xl">🚫</span>
+                <div>
+                  <h3 className="text-[16px] font-black text-rose-950">Void Registration</h3>
+                  <p className="text-[12px] text-rose-700 font-semibold">Release slot &amp; remove from active rosters</p>
+                </div>
+              </div>
+              <p className="text-[13px] text-slate-600 leading-relaxed">
+                Are you sure you want to void the registration for <strong className="text-[#002f76]">{reg.childInfo?.firstName} {reg.childInfo?.lastName}</strong> ({getProgramLabel(reg.program)})?
+              </p>
+              <div>
+                <label className="text-[11.5px] font-bold text-slate-600 block mb-1.5">Reason for voiding:</label>
+                <input
+                  type="text"
+                  autoFocus
+                  className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-[13px] font-medium text-slate-800 focus:outline-none focus:border-rose-400 focus:bg-white transition-all"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder="e.g. Duplicate registration, customer cancelled…"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setVoidMode(false)}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl border border-slate-300 bg-white py-3.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await onVoid(reg.id, voidReason);
+                    setVoidMode(false);
+                  }}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl bg-rose-600 py-3.5 text-[13px] font-bold text-white hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-rose-600/25 cursor-pointer"
+                >
+                  {isProcessing ? "Voiding…" : "Confirm Void"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Delete Confirmation Dialog Modal ── */}
+        {deleteMode && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-red-100 space-y-4">
+              <div className="flex items-center gap-3 text-red-600">
+                <span className="text-3xl">⚠️</span>
+                <div>
+                  <h3 className="text-[16px] font-black text-red-950">Delete Permanently</h3>
+                  <p className="text-[12px] text-red-600 font-semibold">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-[13px] text-slate-600 leading-relaxed">
+                Are you sure you want to <strong>permanently erase</strong> the registration for <strong className="text-[#002f76]">{reg.childInfo?.firstName} {reg.childInfo?.lastName}</strong> ({getProgramLabel(reg.program)}) from the database?
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteMode(false)}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl border border-slate-300 bg-white py-3.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await onDelete(reg.id);
+                    setDeleteMode(false);
+                  }}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-2xl bg-red-600 py-3.5 text-[13px] font-bold text-white hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-red-600/25 cursor-pointer"
+                >
+                  {isProcessing ? "Deleting…" : "Permanently Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {showUploadReceipt && (
         <UploadReceiptModal
@@ -1696,6 +1773,9 @@ export default function AdminRegistrationsPage() {
   const [toast, setToast] = useState("");
   const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(null);
   const [showQuickEncodeModal, setShowQuickEncodeModal] = useState(false);
+  const [tableActionVoidReg, setTableActionVoidReg] = useState<Registration | null>(null);
+  const [tableActionDeleteReg, setTableActionDeleteReg] = useState<Registration | null>(null);
+  const [tableVoidReason, setTableVoidReason] = useState("Duplicate registration");
 
   // ── SWR data fetching ───────────────────────────────────────────────────────
   // auth-context.tsx patches window.fetch to inject the Bearer token, so SWR
@@ -2831,7 +2911,7 @@ export default function AdminRegistrationsPage() {
                     <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Class</th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Status</th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Submitted</th>
-                    <th className="px-4 py-3.5"></th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-extrabold uppercase tracking-widest text-[#94a3b8]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2909,11 +2989,39 @@ export default function AdminRegistrationsPage() {
                       <td className="px-5 py-4 text-[#94a3b8] font-medium">
                         {new Date(reg.submittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
                       </td>
-                      {/* Arrow */}
-                      <td className="px-4 py-4">
-                        <svg className="h-4 w-4 text-[#cbd5e1] group-hover:text-[#0033A0] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                          <path d="m9 18 6-6-6-6" />
-                        </svg>
+                      {/* Arrow & Actions */}
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {reg.status !== "voided" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTableActionVoidReg(reg);
+                              }}
+                              title="Void registration (Release slot)"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <span className="text-xs">🚫</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTableActionDeleteReg(reg);
+                            }}
+                            title="Delete registration permanently"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                          <svg className="h-4 w-4 text-[#cbd5e1] group-hover:text-[#0033A0] transition-colors ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <path d="m9 18 6-6-6-6" />
+                          </svg>
+                        </div>
                       </td>
                     </m.tr>
                   ))}
@@ -2976,6 +3084,95 @@ export default function AdminRegistrationsPage() {
           onDelete={handleDeleteLead}
           isProcessing={isProcessing}
         />
+      )}
+
+      {/* ── Table Row Void Confirmation Modal ── */}
+      {tableActionVoidReg && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-rose-100 space-y-4">
+            <div className="flex items-center gap-3 text-rose-700">
+              <span className="text-3xl">🚫</span>
+              <div>
+                <h3 className="text-[16px] font-black text-rose-950">Void Registration</h3>
+                <p className="text-[12px] text-rose-700 font-semibold">Release slot &amp; remove from active rosters</p>
+              </div>
+            </div>
+            <p className="text-[13px] text-slate-600 leading-relaxed">
+              Are you sure you want to void the registration for <strong className="text-[#002f76]">{tableActionVoidReg.childInfo?.firstName} {tableActionVoidReg.childInfo?.lastName}</strong> ({getProgramLabel(tableActionVoidReg.program)})?
+            </p>
+            <div>
+              <label className="text-[11.5px] font-bold text-slate-600 block mb-1.5">Reason for voiding:</label>
+              <input
+                type="text"
+                autoFocus
+                className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-[13px] font-medium text-slate-800 focus:outline-none focus:border-rose-400 focus:bg-white transition-all"
+                value={tableVoidReason}
+                onChange={(e) => setTableVoidReason(e.target.value)}
+                placeholder="e.g. Duplicate registration, customer cancelled…"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setTableActionVoidReg(null)}
+                disabled={isProcessing}
+                className="flex-1 rounded-2xl border border-slate-300 bg-white py-3.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleVoid(tableActionVoidReg.id, tableVoidReason);
+                  setTableActionVoidReg(null);
+                }}
+                disabled={isProcessing}
+                className="flex-1 rounded-2xl bg-rose-600 py-3.5 text-[13px] font-bold text-white hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-rose-600/25 cursor-pointer"
+              >
+                {isProcessing ? "Voiding…" : "Confirm Void"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Table Row Delete Confirmation Modal ── */}
+      {tableActionDeleteReg && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-red-100 space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <span className="text-3xl">⚠️</span>
+              <div>
+                <h3 className="text-[16px] font-black text-red-950">Delete Permanently</h3>
+                <p className="text-[12px] text-red-600 font-semibold">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-[13px] text-slate-600 leading-relaxed">
+              Are you sure you want to <strong>permanently erase</strong> the registration for <strong className="text-[#002f76]">{tableActionDeleteReg.childInfo?.firstName} {tableActionDeleteReg.childInfo?.lastName}</strong> ({getProgramLabel(tableActionDeleteReg.program)}) from the database?
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setTableActionDeleteReg(null)}
+                disabled={isProcessing}
+                className="flex-1 rounded-2xl border border-slate-300 bg-white py-3.5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleDelete(tableActionDeleteReg.id);
+                  setTableActionDeleteReg(null);
+                }}
+                disabled={isProcessing}
+                className="flex-1 rounded-2xl bg-red-600 py-3.5 text-[13px] font-bold text-white hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-red-600/25 cursor-pointer"
+              >
+                {isProcessing ? "Deleting…" : "Permanently Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Delete Lead Confirm Modal ── */}
