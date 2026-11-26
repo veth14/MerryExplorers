@@ -828,7 +828,7 @@ function WaiverAgreementText() {
       <p style={{ fontWeight: "700" }}>💡 Trailblazer: Brave Explorer — Prepare for What&apos;s Next</p>
       <ul><li>Ages 3–4.11 | ₱6,900 | 18 sessions | 1 hr 15 mins/face-to-face session/shift to online</li></ul>
       <h3>3. REGISTRATION, PAYMENTS &amp; PENALTIES</h3>
-      <p>60% non-refundable reservation fee upon registration. 40% balance due on or before the 6th session. 4% weekly interest on overdue balances. Accepted payments: Cash, GCash, BDO Bank Transfer, Credit/Debit Card (via GCash QR).</p>
+      <p>60% non-refundable reservation fee upon registration. 40% balance due on or before the 6th session. 4% weekly compounded interest on overdue balances. Accepted payments: Cash, GCash, BDO Bank Transfer, Credit/Debit Card (via GCash QR).</p>
       <h3>4. ATTENDANCE, ABSENCES &amp; MAKE-UP SESSIONS</h3>
       <p>Make-up sessions are subject to availability and must be completed within the current Adventure. Unused make-ups do not carry over. Merry Explorers may reschedule sessions due to force majeure with a complimentary make-up session.</p>
       <h3>5. PHOTO &amp; VIDEO HIGHLIGHTS</h3>
@@ -2665,7 +2665,7 @@ export default function ParentDashboardPage() {
                                     {progData && (
                                       <div style={{ background: dpPaymentType === "full" ? "linear-gradient(135deg,#16a34a,#22c55e)" : "linear-gradient(135deg,#002f76,#0050d5)", color: "white", padding: "20px", borderRadius: "16px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
                                         <div style={{ fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.8 }}>Amount Due</div>
-                                        <div style={{ fontSize: "32px", fontWeight: "900", marginTop: "2px" }}>₱{amountDue.toLocaleString()}</div>
+                                        <div style={{ fontSize: "32px", fontWeight: "900", marginTop: "2px" }}>₱{amountDue.toLocaleString("en-PH", { minimumFractionDigits: Number.isInteger(amountDue) ? 0 : 2, maximumFractionDigits: 2 })}</div>
                                       </div>
                                     )}
                                     <div>

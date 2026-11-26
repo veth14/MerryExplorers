@@ -80,7 +80,7 @@ export default function AdventureBalanceEmailPreviewPage() {
               </dl>
               {currentBalanceRemaining > 0 && (
                 <p className="mt-4 text-xs leading-relaxed text-amber-800">
-                  The remaining Adventure {sample.adventure} balance is due on the 6th session. A 4% weekly interest applies to overdue balances.
+                  The remaining Adventure {sample.adventure} balance is due on the 6th session. A 4% weekly compounded interest applies to overdue balances.
                 </p>
               )}
             </section>

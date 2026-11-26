@@ -185,7 +185,7 @@ export default function SignWaiverPage({ params }: { params: Promise<{ id: strin
                 <li>60% reservation payment is required upon registration to secure the child's slot.</li>
                 <li>The 60% reservation payment is non-refundable once the slot is confirmed.</li>
                 <li>The remaining 40% balance is due on the 6th session.</li>
-                <li>A 4% interest charge will apply to overdue outstanding balances. Interest is applied on a weekly basis, with the applicable interest charge taking effect every Monday.</li>
+                <li>A 4% interest charge will apply to overdue outstanding balances. Interest compounds weekly, with the charge applied every Monday.</li>
                 <li>We will only accept Bank Transfer and GCash payments.</li>
                 <li>Statement of Account regenerates every Monday.</li>
               </ul>

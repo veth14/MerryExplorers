@@ -828,7 +828,7 @@ export default function TrailblazerDashboard(p: Props) {
                                 )}
                                 {overdue && (
                                     <span style={{ fontSize: 14, color: SUN_LIGHT, fontWeight: 600 }}>
-                                        includes {fmtPeso(terms.interest)} interest ({pct(WEEKLY_INTEREST_RATE)}% × {terms.mondays} Monday{terms.mondays > 1 ? "s" : ""})
+                                        includes {fmtPeso(terms.interest)} interest ({pct(WEEKLY_INTEREST_RATE)}% compounded, {terms.mondays} Monday{terms.mondays > 1 ? "s" : ""})
                                     </span>
                                 )}
                                 {!fullyPaid && !overdue && terms.dueDate && (
@@ -903,8 +903,8 @@ export default function TrailblazerDashboard(p: Props) {
                                             <div className={`vp-rrow ${overdue ? "late" : ""}`}>
                                                 <span>
                                                     {overdue
-                                                        ? `Interest (${pct(WEEKLY_INTEREST_RATE)}% × ${terms.mondays} Monday${terms.mondays > 1 ? "s" : ""})`
-                                                        : `Interest (${pct(WEEKLY_INTEREST_RATE)}% every Monday)`}
+                                                        ? `Interest (${pct(WEEKLY_INTEREST_RATE)}% compounded, ${terms.mondays} Monday${terms.mondays > 1 ? "s" : ""})`
+                                                        : `Interest (${pct(WEEKLY_INTEREST_RATE)}% compounded every Monday)`}
                                                     {!overdue && (
                                                         <small>
                                                             {terms.interestStart ? `None yet. First charge Monday, ${fmtIsoDate(terms.interestStart)}` : "Starts the Monday after session 6"}
@@ -921,7 +921,7 @@ export default function TrailblazerDashboard(p: Props) {
 
                             {!fullyPaid && (
                                 <p className="vp-sub" style={{ marginTop: 14 }}>
-                                    📌 Unpaid balances after the due date are charged <b>{pct(WEEKLY_INTEREST_RATE)}% every Monday</b>. Only verified payments reduce your balance.
+                                    📌 Unpaid balances after the due date accrue <b>{pct(WEEKLY_INTEREST_RATE)}% compounded every Monday</b>. Only verified payments reduce your balance.
                                 </p>
                             )}
                         </>

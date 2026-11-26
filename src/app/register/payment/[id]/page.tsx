@@ -655,7 +655,7 @@ export default function PaymentPage() {
                 <div className="flex justify-between items-end gap-3 mb-4">
                   <div>
                     <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/80">Balance Payment</p>
-                    <p className="mt-1 text-[32px] font-black leading-none">₱{amountDue.toLocaleString()}</p>
+                    <p className="mt-1 text-[32px] font-black leading-none">₱{amountDue.toLocaleString("en-PH", { minimumFractionDigits: Number.isInteger(amountDue) ? 0 : 2, maximumFractionDigits: 2 })}</p>
                     <p className="mt-1 text-[11px] text-white/75">Total due now, including any current interest</p>
                   </div>
                   {isPioneer && <span className="rounded-full bg-emerald-300 text-emerald-950 px-2.5 py-1 text-[10px] font-black uppercase">⭐ Pioneer Family</span>}
@@ -674,12 +674,12 @@ export default function PaymentPage() {
                     <div className="flex justify-between text-amber-200"><span className="font-bold">Previous Adventure Unpaid</span><span className="font-extrabold">+ ₱{Number(regData?.balanceInfo?.previousAdventureBalance).toLocaleString()}</span></div>
                   )}
                   <div className="flex justify-between border-t border-white/30 pt-2"><span className="text-white/80">Remaining Balance</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.balance || 0).toLocaleString()}</span></div>
-                  {Number(regData?.balanceInfo?.interest) > 0 && <div className="flex justify-between"><span className="text-white/80">Overdue Interest ({regData?.balanceInfo?.weeksOfInterest} week{regData?.balanceInfo?.weeksOfInterest === 1 ? "" : "s"})</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.interest || 0).toLocaleString()}</span></div>}
+                  {Number(regData?.balanceInfo?.interest) > 0 && <div className="flex justify-between"><span className="text-white/80">Overdue Interest ({regData?.balanceInfo?.weeksOfInterest} week{regData?.balanceInfo?.weeksOfInterest === 1 ? "" : "s"}, compounded)</span><span className="font-extrabold">₱{Number(regData?.balanceInfo?.interest || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
                   {regData?.balanceInfo?.dueDate && <div className="border-t border-white/30 pt-2 text-[11px] leading-relaxed text-white/80">
                     Balance due on session 6: {new Date(`${regData.balanceInfo.dueDate}T12:00:00Z`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric" })}.
                     {regData.balanceInfo.interestStart
-                      ? ` 4% weekly interest starts ${new Date(`${regData.balanceInfo.interestStart}T12:00:00Z`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "long", month: "long", day: "numeric", year: "numeric" })}.`
-                      : " 4% weekly interest applies after the due date."}
+                      ? ` 4% weekly compounded interest starts ${new Date(`${regData.balanceInfo.interestStart}T12:00:00Z`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "long", month: "long", day: "numeric", year: "numeric" })}.`
+                      : " 4% weekly compounded interest applies after the due date."}
                   </div>}
                 </div>
               </div>
@@ -784,7 +784,7 @@ export default function PaymentPage() {
               <div className="flex justify-between items-end mb-4">
                 <div>
                   <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/80">Total Due Today</p>
-                  <p className="text-[36px] font-black leading-none mt-1">₱{amountDue.toLocaleString()}</p>
+                  <p className="text-[36px] font-black leading-none mt-1">₱{amountDue.toLocaleString("en-PH", { minimumFractionDigits: Number.isInteger(amountDue) ? 0 : 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="text-right flex flex-col items-end gap-1">
                   <span className="rounded-full bg-[#ffd23f] text-[#0b2a82] px-3 py-1 text-[11px] font-black uppercase">
@@ -832,7 +832,7 @@ export default function PaymentPage() {
                 )}
                 <div className="flex justify-between border-t border-white/30 pt-2 font-black text-[14px]">
                   <span>Total Due Now</span>
-                  <span className="text-[#ffd23f]">₱{amountDue.toLocaleString()}</span>
+                  <span className="text-[#ffd23f]">₱{amountDue.toLocaleString("en-PH", { minimumFractionDigits: Number.isInteger(amountDue) ? 0 : 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
@@ -880,7 +880,7 @@ export default function PaymentPage() {
                         <a href={pm.qr} download={`${pm.label}QR.png`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#f2faff] border-2 border-[#0b2a82] px-3.5 py-1.5 text-[12px] font-black text-[#0b2a82] shadow-[0_2px_0_#0b2a82] mb-2 hover:bg-[#ffe066] transition-colors">
                           ⬇️ Download QR Code
                         </a>
-                        <p className="text-[12px] font-medium text-[#3d5a99]">Scan to transfer <strong>₱{amountDue.toLocaleString()}</strong>, then upload the receipt screenshot below.</p>
+                        <p className="text-[12px] font-medium text-[#3d5a99]">Scan to transfer <strong>₱{amountDue.toLocaleString("en-PH", { minimumFractionDigits: Number.isInteger(amountDue) ? 0 : 2, maximumFractionDigits: 2 })}</strong>, then upload the receipt screenshot below.</p>
                       </div>
                     </div>
                   ))}

@@ -139,7 +139,7 @@ const NEXT_TUITION: Record<string, number> = {
 // ~5 months per adventure cycle (approximate, used for deriving date ranges that are not in the settings)
 const ADVENTURE_DURATION_MONTHS = 5;
 
-// Payment terms (60% reservation, 40% balance on the 6th session, 4% weekly interest),
+// Payment terms (60% reservation, 40% balance on the 6th session, 4% weekly compounded interest),
 // program fees, Welcome Kit / Uniform Set prices and the schedule fallbacks all live in
 // "@/lib/payment-terms" so the admin page and the parent dashboards always agree.
 
@@ -266,7 +266,11 @@ function getInitials(name: string) {
 }
 
 function fmtCurrency(n: number | undefined | null) {
-  return `₱${(n ?? 0).toLocaleString()}`;
+  const amount = n ?? 0;
+  return `₱${amount.toLocaleString("en-PH", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function fmtDateTime(iso: string | undefined) {
@@ -1970,7 +1974,7 @@ function AdminPaymentsPageInner() {
       };
       if (remaining && remaining > 0) {
         if ((result.interest ?? 0) > 0) {
-          dueNote = `${Math.round(WEEKLY_INTEREST_RATE * 100)}% interest keeps applying every Monday to the remaining balance`;
+          dueNote = `${Math.round(WEEKLY_INTEREST_RATE * 100)}% compounded interest applies every Monday to the remaining balance`;
         } else if (regCalc?.terms?.dueDate) {
           dueNote = `Balance due on session ${BALANCE_DUE_SESSION} (${fmtDate(regCalc.terms.dueDate)})`;
         }
@@ -2245,7 +2249,7 @@ function AdminPaymentsPageInner() {
       })
       .reduce((s, l) => s + l.amount, 0);
 
-    // Registrations: shared rules (program + Welcome Kit / Uniform Set, 60/40 split, weekly 4% interest)
+    // Registrations: shared rules (program + Welcome Kit / Uniform Set, 60/40 split, weekly 4% compounded interest)
     if (type === "registration") {
       const rawReg = registrations.find((x) => x.id === detail.uid) || allRegistrations.find((x) => x.id === detail.uid);
       const reg = enrichRegWithPioneer(rawReg);
@@ -2347,8 +2351,8 @@ function AdminPaymentsPageInner() {
       ...(bd?.reservation != null && bd.balance != null && bd.balance > 0
         ? [
           bd.interest > 0
-            ? `Overdue interest (${Math.round(WEEKLY_INTEREST_RATE * 100)}% x ${bd.mondays} Monday${bd.mondays > 1 ? "s" : ""}): ${fmtCurrency(bd.interest)}`
-            : `Overdue interest (${Math.round(WEEKLY_INTEREST_RATE * 100)}% weekly): none yet${bd.interestStart ? `, starts ${fmtDate(bd.interestStart)}` : ""}`,
+          ? `Overdue interest (${Math.round(WEEKLY_INTEREST_RATE * 100)}% compounded, ${bd.mondays} Monday${bd.mondays > 1 ? "s" : ""}): ${fmtCurrency(bd.interest)}`
+            : `Overdue interest (${Math.round(WEEKLY_INTEREST_RATE * 100)}% weekly, compounded): none yet${bd.interestStart ? `, starts ${fmtDate(bd.interestStart)}` : ""}`,
           `Total payable now: ${fmtCurrency(bd.totalPayable ?? 0)}`,
         ]
         : []),
@@ -2528,7 +2532,7 @@ function AdminPaymentsPageInner() {
                         let dueNote = "";
                         if (remaining && remaining > 0) {
                           if (bd?.interest && bd.interest > 0) {
-                            dueNote = "A 4% weekly interest applies to overdue balances";
+                            dueNote = "A 4% weekly compounded interest applies to overdue balances";
                           } else if (bd?.dueDate) {
                             dueNote = `Balance due on session ${BALANCE_DUE_SESSION} (${fmtDate(bd.dueDate)})`;
                           }
@@ -2727,7 +2731,7 @@ function AdminPaymentsPageInner() {
                         )}
                       </div>
                       <div style={{ fontSize: "11px", color: "#475569", marginTop: "3px" }}>
-                        Overdue interest (4% weekly) starts on the first Monday on or after this due date. Set a custom date here to override the automatic 6th session calculation.
+                        Overdue interest (4% weekly, compounded) starts on the first Monday on or after this due date. Set a custom date here to override the automatic 6th session calculation.
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -2814,8 +2818,8 @@ function AdminPaymentsPageInner() {
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "8px 0 0", fontSize: "13px", fontWeight: 600, color: bd.interest > 0 ? "#b91c1c" : "#94a3b8" }}>
                           <span>
                             {bd.interest > 0
-                              ? `Overdue interest (${pctInt}% × ${bd.mondays} Monday${bd.mondays > 1 ? "s" : ""})`
-                              : `Overdue interest (${pctInt}% weekly)${bd.interestStart ? ` · starts ${fmtDate(bd.interestStart)}` : ""}`}
+                              ? `Overdue interest (${pctInt}% compounded, ${bd.mondays} Monday${bd.mondays > 1 ? "s" : ""})`
+                              : `Overdue interest (${pctInt}% weekly, compounded)${bd.interestStart ? ` · starts ${fmtDate(bd.interestStart)}` : ""}`}
                           </span>
                           <span>{fmtCurrency(bd.interest)}</span>
                         </div>
@@ -2971,8 +2975,8 @@ function AdminPaymentsPageInner() {
                   <div style={{ ...row, color: t.interest > 0 ? "#b91c1c" : "#94a3b8" }}>
                     <span>
                       {t.interest > 0
-                        ? `Overdue interest (${pctInt}% × ${t.mondays} Monday${t.mondays > 1 ? "s" : ""})`
-                        : `Overdue interest (${pctInt}% weekly)${t.interestStart ? ` · starts ${fmtDate(t.interestStart)}` : ""}`}
+                        ? `Overdue interest (${pctInt}% compounded, ${t.mondays} Monday${t.mondays > 1 ? "s" : ""})`
+                        : `Overdue interest (${pctInt}% weekly, compounded)${t.interestStart ? ` · starts ${fmtDate(t.interestStart)}` : ""}`}
                     </span>
                     <span>{fmtCurrency(t.interest)}</span>
                   </div>
@@ -3911,7 +3915,7 @@ function AdminPaymentsPageInner() {
                                 let dueNote = "";
                                 if (remaining && remaining > 0) {
                                   if (summary?.interest && summary.interest > 0) {
-                                    dueNote = "A 4% weekly interest applies to overdue balances";
+                                    dueNote = "A 4% weekly compounded interest applies to overdue balances";
                                   } else {
                                     const info = registration ? regInfo(registration) : null;
                                     if (info?.terms?.dueDate) {
@@ -4214,7 +4218,7 @@ function AdminPaymentsPageInner() {
                                   let dueNote = "";
                                   if (remaining && remaining > 0) {
                                     if (summary?.interest && summary.interest > 0) {
-                                      dueNote = "A 4% weekly interest applies to overdue balances";
+                                      dueNote = "A 4% weekly compounded interest applies to overdue balances";
                                     } else {
                                       const info = regInfo(r);
                                       if (info?.terms?.dueDate) {

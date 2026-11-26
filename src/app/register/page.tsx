@@ -863,7 +863,7 @@ export default function RegisterPage() {
                   <li>60% reservation payment is required upon registration to secure the child&apos;s slot.</li>
                   <li>The 60% reservation payment is non-refundable once the slot is confirmed.</li>
                   <li>The remaining 40% balance is due on the 6th session.</li>
-                  <li>A 4% weekly interest charge applies to overdue outstanding balances beginning September 10, 2026.</li>
+                  <li>A 4% weekly compounded interest charge applies to overdue outstanding balances beginning September 10, 2026.</li>
                   <li>We will only accept Bank Transfer and GCash payments.</li>
                 </ul>
               </div>

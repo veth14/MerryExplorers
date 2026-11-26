@@ -356,7 +356,7 @@ export async function POST(
                               </td>
                             </tr>
                           </table>
-                          ${!isFullyPaid ? `<p style="margin: 12px 0 0 0; color: #b45309; font-size: 12px; line-height: 1.5;">⚠️ The remaining balance is due on the 6th session${dueDateText ? ` (<strong>${dueDateText}</strong>)` : ""}. A 4% weekly interest applies to overdue balances.</p>` : ""}
+                          ${!isFullyPaid ? `<p style="margin: 12px 0 0 0; color: #b45309; font-size: 12px; line-height: 1.5;">⚠️ The remaining balance is due on the 6th session${dueDateText ? ` (<strong>${dueDateText}</strong>)` : ""}. A 4% weekly compounded interest applies to overdue balances.</p>` : ""}
                         </div>
 
                         <!-- Uniform reminder -->

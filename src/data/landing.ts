@@ -349,7 +349,7 @@ export const PAYMENT_TERMS = {
   downpaymentPct: 60,
   balancePct: 40,
   balanceDue: "6th session",
-  interestRate: "4% per week (every Monday)",
+  interestRate: "4% per week, compounded every Monday",
   methods: ["Mari Bank", "BPI", "GCash"],
   nonRefundable: true,
 } as const;

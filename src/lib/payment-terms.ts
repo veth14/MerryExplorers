@@ -9,7 +9,7 @@ export { LEGACY_ADVENTURE_1_START } from "@/lib/adventure-cycle";
 // Payment terms:
 //  - 60% non-refundable reservation payment upon registration
 //  - 40% balance due on the 6th session
-//  - 4% interest on overdue balances, charged weekly every Monday
+//  - 4% interest on overdue balances, compounded every Monday
 export const RESERVATION_RATE = 0.6;
 export const WEEKLY_INTEREST_RATE = 0.04;
 export const BALANCE_DUE_SESSION = 6;
@@ -48,7 +48,11 @@ export const VERIFIED_REG_STATUSES = ["approved", "early-bird", "active", "schol
 export const isRegistrationVerified = (status?: string) => VERIFIED_REG_STATUSES.includes(status || "");
 
 export function fmtPeso(n: number | undefined | null) {
-    return `₱${(n ?? 0).toLocaleString()}`;
+    const amount = n ?? 0;
+    return `₱${amount.toLocaleString("en-PH", {
+        minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+        maximumFractionDigits: 2,
+    })}`;
 }
 
 // "YYYY-MM-DD" -> "Jun 1, 2026"
@@ -322,7 +326,10 @@ export function calcRegistrationTerms(
             // Interest weeks use NO skipDates — once past session 6, every Monday accrues interest
             // regardless of holidays (holidays only affect session counting, not interest counting).
             mondays = countMondaysAfter(dueDate, asOf);
-            interest = Math.round(balance * WEEKLY_INTEREST_RATE * mondays);
+            // Each Monday's interest is added to the balance before the next Monday's
+            // charge, so the outstanding amount compounds week over week.
+            const exactInterest = balance * ((1 + WEEKLY_INTEREST_RATE) ** mondays - 1);
+            interest = Math.round((exactInterest + Number.EPSILON) * 100) / 100;
         }
     }
     const totalPayable = balance != null ? balance + interest : null;

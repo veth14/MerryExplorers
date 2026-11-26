@@ -11,6 +11,11 @@ import { isReturningFamilyRecord } from "@/lib/returning-family";
 
 export const dynamic = "force-dynamic";
 
+const formatPeso = (amount: number) => `₱${amount.toLocaleString("en-PH", {
+  minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+  maximumFractionDigits: 2,
+})}`;
+
 const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }[char]!));
@@ -158,12 +163,12 @@ export async function POST(
                     <tr><td style="padding:5px 0;color:#b91c1c;font-size:13px;font-weight:700">Previous Adventure Unpaid Balance</td><td style="padding:5px 0;color:#b91c1c;font-size:14px;font-weight:700;text-align:right">+ ₱${remainingPrevious.toLocaleString()}</td></tr>
                     ` : ""}
                     <tr><td style="padding:8px 0 4px;color:#92400e;font-size:13px;font-weight:700;border-top:1px solid #fde68a">Remaining Balance</td><td style="padding:8px 0 4px;color:#b45309;font-size:14px;font-weight:800;text-align:right;border-top:1px solid #fde68a">₱${balance.toLocaleString()}</td></tr>
-                    ${interest > 0 ? `<tr><td style="padding:5px 0;color:#92400e;font-size:13px">Overdue Interest (${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% weekly${weeksOfInterest ? ` · ${weeksOfInterest} week${weeksOfInterest === 1 ? "" : "s"}` : ""})</td><td style="padding:5px 0;color:#c2410c;font-size:14px;font-weight:700;text-align:right">₱${interest.toLocaleString()}</td></tr>` : ""}
-                    <tr><td style="padding:10px 0 4px;color:#92400e;font-size:14px;font-weight:800;border-top:1px solid #fde68a">Total Due Now</td><td style="padding:10px 0 4px;color:#b45309;font-size:16px;font-weight:800;text-align:right;border-top:1px solid #fde68a">₱${totalPayable.toLocaleString()}</td></tr>
+                    ${interest > 0 ? `<tr><td style="padding:5px 0;color:#92400e;font-size:13px">Overdue Interest (${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% weekly, compounded${weeksOfInterest ? ` · ${weeksOfInterest} week${weeksOfInterest === 1 ? "" : "s"}` : ""})</td><td style="padding:5px 0;color:#c2410c;font-size:14px;font-weight:700;text-align:right">${formatPeso(interest)}</td></tr>` : ""}
+                    <tr><td style="padding:10px 0 4px;color:#92400e;font-size:14px;font-weight:800;border-top:1px solid #fde68a">Total Due Now</td><td style="padding:10px 0 4px;color:#b45309;font-size:16px;font-weight:800;text-align:right;border-top:1px solid #fde68a">${formatPeso(totalPayable)}</td></tr>
                   </table>
                   ${interest > 0
-                    ? `<p style="margin:12px 0 0;color:#b45309;font-size:12px;line-height:1.5">⚠️ This amount includes ${weeksOfInterest} week${weeksOfInterest === 1 ? "" : "s"} of overdue interest, charged at ${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% per week.</p>`
-                    : `<p style="margin:12px 0 0;color:#b45309;font-size:12px;line-height:1.5">⚠️ The remaining balance is due on the 6th session. A ${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% weekly interest applies to overdue balances.</p>`}
+                    ? `<p style="margin:12px 0 0;color:#b45309;font-size:12px;line-height:1.5">⚠️ This amount includes ${weeksOfInterest} week${weeksOfInterest === 1 ? "" : "s"} of overdue interest, compounded at ${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% per week.</p>`
+                    : `<p style="margin:12px 0 0;color:#b45309;font-size:12px;line-height:1.5">⚠️ The remaining balance is due on the 6th session. A ${(WEEKLY_INTEREST_RATE * 100).toLocaleString()}% weekly compounded interest applies to overdue balances.</p>`}
                   ${terms.dueDate ? `<p style="margin:5px 0 0;color:#92400e;font-size:12px">Balance due date: ${fmtIsoDate(terms.dueDate)}</p>` : ""}
                 </div>
 

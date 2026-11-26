@@ -500,7 +500,7 @@ export default function RenewPage() {
                   <li>60% reservation payment is required upon registration to secure the child&apos;s slot.</li>
                   <li>The 60% reservation payment is non-refundable once the slot is confirmed.</li>
                   <li>The remaining 40% balance is due on the 6th session.</li>
-                  <li>A 4% interest charge will apply to overdue outstanding balances beginning September 10, 2026. Interest is on a <strong>weekly basis applied every Monday</strong>.</li>
+                  <li>A 4% interest charge will apply to overdue outstanding balances beginning September 10, 2026. Interest is <strong>compounded weekly and applied every Monday</strong>.</li>
                   <li>We will only accept Bank Transfer and GCash payments.</li>
                 </ul>
               </div>
